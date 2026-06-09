@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة بيانات المدارس | Facilities Dashboard </title>
+<title>لوحة بيانات المدارس | Facilities Dashboard v32</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=y9pYUQWH7Sp3clbqnfb3iyXfjJwcHxVM-L2g2tfeHZO_U9r0SwgfoWOzUKZvSR2jQA8Gwyuqov2mpV2di3XYDuFVT47YlFLkN8_hBCEAmdKZVXl0WqfKLbKYNngfJ2SApz8pzFw7oh-Gy3mP3gu5nLiNdf1yy6Rc3vTaG7leiF6dregHw4f52YZmlUuqIGNxxQ7dg22ZRch_RaTxEI7-cHLeZxiPHh0uiUBSy4JuSWtH3jRYQAjNxoy5Gu2LkZUh8EKbh3_PwYNQ8EMsPiw7d1a4HLw33qDihsrPYBI0aKiSPBm4Gkj9cByVxXul-dPdWrZiTaYgMwieeRhFk8mwkq4Y3DzaC0fvgpNMDALiBO5JHiYZUJPYtpsxL9EyC-J6" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -670,6 +670,7 @@ tbody tr:hover td { background: rgba(8,145,178,.05) !important; }
     <div class="tab" onclick="showTab('cost',this);anInitTab()" style="background:linear-gradient(135deg,rgba(184,134,11,.12),rgba(212,168,67,.08));color:#92400e;border:1.5px solid rgba(184,134,11,.25);font-weight:700">💰 التكلفة</div>
     <div class="tab" onclick="showTab('map',this)">الخريطة</div>
     <div class="tab" onclick="showTab('table',this)">الجدول التفصيلي</div>
+    <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">💳 المدفوعات والعقود</div>
   </div>
 
   <div class="panel active" id="tab-overview">
@@ -2239,6 +2240,16 @@ tbody tr:hover td { background: rgba(8,145,178,.05) !important; }
 
   <div class="panel" id="tab-ayen">
     <div id="ayen-content"></div>
+  </div>
+
+  <!-- ══════════════════ تبويب المدفوعات والعقود ══════════════════ -->
+  <div class="panel" id="tab-payments">
+    <div id="payments-content">
+      <div class="card" style="text-align:center;padding:48px 24px">
+        <div style="font-size:32px;margin-bottom:12px">💳</div>
+        <div style="font-size:14px;color:var(--tx-muted)">جاري التحميل…</div>
+      </div>
+    </div>
   </div>
 
   <div class="panel" id="tab-table">
@@ -3953,6 +3964,824 @@ window.renderElevatorsTab = function () {
   } else {
     initTopScroll();
   }
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   تبويب المدفوعات والعقود — JavaScript كامل (مضمّن بدون fetch/API)
+   يستخدم: contract_summary.csv · invoice_detail.csv · monthly_consolidated.csv
+══════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  /* ── بيانات CSV مضمّنة في الذاكرة ── */
+  /* سيتم تحميلها من Apps Script عند الطلب بنفس آلية loadData */
+  let PAY_RAW_CONTRACT  = [];
+  let PAY_RAW_INVOICE   = [];
+  let PAY_RAW_MONTHLY   = [];
+  let PAY_LOADED        = false;
+  let PAY_LOADING       = false;
+
+  /* ── حالة الفلترة ── */
+  let PAY_STATE = {
+    region: 'الكل',
+    search: '',
+    sortCol: -1,
+    sortAsc: true,
+    page: 0,
+  };
+  const PAY_PAGE_SIZE = 20;
+
+  /* ── مخازن الرسوم البيانية ── */
+  const PAY_CHARTS = {};
+
+  /* ── مساعدات ── */
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function payNum(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    const n = parseFloat(String(v).replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function payFmt(n) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' SAR';
+  }
+
+  function payPct(n) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return Number(n).toFixed(1) + '%';
+  }
+
+  function killPayChart(id) {
+    if (PAY_CHARTS[id]) { try { PAY_CHARTS[id].destroy(); } catch (e) {} delete PAY_CHARTS[id]; }
+  }
+
+  /* ── مُحلِّل CSV قوي ── */
+  function parseCSV(text) {
+    const lines = text.split(/\r?\n/);
+    if (!lines.length) return [];
+    // إزالة BOM
+    lines[0] = lines[0].replace(/^\uFEFF/, '');
+    const headers = splitCSVLine(lines[0]).map(h => h.trim());
+    const result = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const cells = splitCSVLine(line);
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = (cells[j] ?? '').trim(); });
+      result.push(obj);
+    }
+    return result;
+  }
+
+  function splitCSVLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    result.push(cur);
+    return result;
+  }
+
+  /* ══════════════════════════════════════
+     تحميل البيانات من Apps Script
+  ══════════════════════════════════════ */
+  async function payLoadData() {
+    if (PAY_LOADING) return;
+    PAY_LOADING = true;
+    setPayStatus('loading');
+    try {
+      const gasUrl = (typeof CFG !== 'undefined' && CFG.GAS_URL) ? CFG.GAS_URL : '';
+      if (!gasUrl) throw new Error('لم يتم تعريف GAS_URL');
+      const resp = await fetch(gasUrl);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if (json.status === 'error') throw new Error(json.message || 'خطأ في Apps Script');
+      const d = json.data || {};
+      PAY_RAW_CONTRACT = d.contractSummary || [];
+      PAY_RAW_INVOICE  = d.invoiceDetail   || [];
+      PAY_RAW_MONTHLY  = d.monthlyConsolidated || [];
+      PAY_LOADED = true;
+      setPayStatus('live');
+      renderPaymentsTab();
+    } catch (err) {
+      setPayStatus('error');
+      showPayError(err.message);
+    } finally {
+      PAY_LOADING = false;
+    }
+  }
+
+  function setPayStatus(s) {
+    const dot = $('pay-status-dot');
+    if (!dot) return;
+    dot.className = 'dot ' + (s === 'live' ? 'live' : s === 'loading' ? 'loading' : 'error');
+  }
+
+  function showPayError(msg) {
+    const el = $('payments-content');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="card" style="text-align:center;padding:56px 24px">
+        <div style="font-size:40px;margin-bottom:14px">⚠️</div>
+        <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">تعذّر تحميل البيانات</div>
+        <div style="font-size:12px;color:var(--tx-muted);margin-bottom:18px">${esc(msg)}</div>
+        <button onclick="paymentsInitTab()" class="f-clear" style="margin:0 auto">إعادة المحاولة</button>
+      </div>`;
+  }
+
+  /* ══════════════════════════════════════
+     نقطة الدخول الرئيسية
+  ══════════════════════════════════════ */
+  window.paymentsInitTab = function () {
+    if (!PAY_LOADED && !PAY_LOADING) {
+      payLoadData();
+    } else if (PAY_LOADED) {
+      renderPaymentsTab();
+    }
+  };
+
+  /* ══════════════════════════════════════
+     الحساب بعد كل فلتر
+  ══════════════════════════════════════ */
+  function getFilteredContracts() {
+    if (PAY_STATE.region === 'الكل') return PAY_RAW_CONTRACT;
+    return PAY_RAW_CONTRACT.filter(r => (r['Region'] || r['المنطقة'] || '') === PAY_STATE.region);
+  }
+
+  function getFilteredInvoice() {
+    if (PAY_STATE.region === 'الكل') return PAY_RAW_INVOICE;
+    return PAY_RAW_INVOICE.filter(r => (r['Region'] || r['المنطقة'] || '') === PAY_STATE.region);
+  }
+
+  function getFilteredMonthly() {
+    if (PAY_STATE.region === 'الكل') return PAY_RAW_MONTHLY;
+    return PAY_RAW_MONTHLY.filter(r => (r['Region'] || r['المنطقة'] || '') === PAY_STATE.region);
+  }
+
+  function calcKPIs(contracts) {
+    let totalContract = 0, totalPaid = 0, totalRemaining = 0;
+    contracts.forEach(r => {
+      totalContract  += payNum(r['Updated_Contract_Value_SAR'] || r['قيمة_العقد_المحدثة'] || r['Contract_Value'] || 0);
+      totalPaid      += payNum(r['Payment_Released_SAR'] || r['المدفوعات_المصروفة'] || r['Payment_Released'] || 0);
+      totalRemaining += payNum(r['Remaining_SAR'] || r['المتبقي'] || r['Remaining'] || 0);
+    });
+    const pct = totalContract > 0 ? (totalPaid / totalContract * 100) : 0;
+    return { totalContract, totalPaid, totalRemaining, pct };
+  }
+
+  /* ══════════════════════════════════════
+     بناء واجهة التبويب الكاملة
+  ══════════════════════════════════════ */
+  function renderPaymentsTab() {
+    const el = $('payments-content');
+    if (!el) return;
+
+    const contracts = getFilteredContracts();
+    const invoices  = getFilteredInvoice();
+    const monthly   = getFilteredMonthly();
+    const kpi       = calcKPIs(contracts);
+
+    /* ── استخراج المناطق ── */
+    const regionSet = new Set();
+    PAY_RAW_CONTRACT.forEach(r => { const reg = r['Region'] || r['المنطقة'] || ''; if (reg) regionSet.add(reg); });
+    PAY_RAW_INVOICE.forEach(r => { const reg = r['Region'] || r['المنطقة'] || ''; if (reg) regionSet.add(reg); });
+    const regions = ['الكل', ...Array.from(regionSet).sort()];
+
+    /* ── بناء الـ HTML ── */
+    el.innerHTML = `
+    <!-- شريط الحالة -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <span class="dot" id="pay-status-dot" style="background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18)"></span>
+      <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">البيانات محمّلة — ${contracts.length} عقد · ${invoices.length} فاتورة · ${monthly.length} سجل شهري</span>
+      <button onclick="paymentsInitTab()" class="f-clear" style="margin-right:auto;padding:6px 14px;font-size:11px">🔄 تحديث</button>
+    </div>
+
+    <!-- أزرار الفلترة حسب المنطقة -->
+    <div class="filters-row" style="margin-bottom:18px">
+      <div class="fg">
+        <div class="fg-lbl">تصفية حسب المنطقة</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px">
+          ${regions.map(reg => `
+            <button onclick="paySetRegion('${reg}')"
+              class="pag-btn ${PAY_STATE.region === reg ? 'active' : ''}"
+              id="pay-reg-${reg.replace(/\s/g,'_')}"
+              style="font-size:12px;padding:7px 16px;border-radius:12px">${reg}</button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- بطاقات KPI -->
+    <div class="kpi-grid" style="margin-bottom:18px">
+      <div class="kpi kc-blue">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-val" id="pay-kpi-contract">—</div>
+        <div class="kpi-lbl">إجمالي قيمة العقود المحدثة</div>
+        <div class="kpi-sub">قيمة العقود المحدثة الكاملة</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-val" id="pay-kpi-paid">—</div>
+        <div class="kpi-lbl">المدفوعات المصروفة</div>
+        <div class="kpi-sub">إجمالي ما تم صرفه</div>
+      </div>
+      <div class="kpi kc-amber">
+        <div class="kpi-icon">⏳</div>
+        <div class="kpi-val" id="pay-kpi-remaining">—</div>
+        <div class="kpi-lbl">المتبقي</div>
+        <div class="kpi-sub">المبلغ المتبقي غير المصروف</div>
+      </div>
+      <div class="kpi kc-teal">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-val" id="pay-kpi-pct">—</div>
+        <div class="kpi-lbl">نسبة الصرف</div>
+        <div class="kpi-sub">مدفوعات / قيمة العقد × 100</div>
+      </div>
+    </div>
+
+    <!-- تقدم العقود -->
+    <div class="card mb14">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2">📋</span>
+        تقدم الصرف لكل عقد
+        <span class="sub" id="pay-contract-count">${contracts.length} عقد</span>
+      </div>
+      <div id="pay-contract-progress" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding-right:4px"></div>
+    </div>
+
+    <!-- شبكة الرسوم البيانية -->
+    <div class="g2 mb14">
+      <!-- الفواتير الشهرية مقابل المخطط -->
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F0FDF4;color:#059669">📈</span>
+          الفواتير الشهرية مقابل القيمة المخططة
+        </div>
+        <div class="chart-box" style="height:300px"><canvas id="pay-ch-monthly"></canvas></div>
+      </div>
+      <!-- انحراف التكلفة -->
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#FFFBEB;color:#D97706">📉</span>
+          فرق التكلفة الشهري
+        </div>
+        <div class="chart-box" style="height:300px"><canvas id="pay-ch-variance"></canvas></div>
+      </div>
+    </div>
+
+    <!-- دائرة نسبة إرسال الفواتير -->
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F0F9FF;color:#0891B2">🔵</span>
+          نسبة إرسال الفواتير حسب المنطقة
+        </div>
+        <div class="chart-box" style="height:300px"><canvas id="pay-ch-submitted"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626">📊</span>
+          ملخص نسبة الإرسال
+        </div>
+        <div id="pay-submit-summary" style="display:flex;flex-direction:column;gap:10px;padding:4px 0"></div>
+      </div>
+    </div>
+
+    <!-- جدول تفصيلي -->
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED">🗂️</span>
+        الجدول التفصيلي — الفواتير
+        <span class="sub" id="pay-tbl-count"></span>
+      </div>
+
+      <!-- بحث -->
+      <div style="margin-bottom:14px">
+        <input class="finp" id="pay-search-input"
+          placeholder="🔍 بحث في رقم أمر التوريد أو وصف المشروع…"
+          oninput="paySearch(this.value)"
+          style="min-width:280px;width:100%;max-width:480px">
+      </div>
+
+      <!-- الجدول -->
+      <div class="tbl-wrap" id="pay-tbl-wrap">
+        <table id="pay-table">
+          <thead>
+            <tr>
+              <th onclick="paySort(0)" style="cursor:pointer">المنطقة ↕</th>
+              <th onclick="paySort(1)" style="cursor:pointer">رقم أمر التوريد ↕</th>
+              <th onclick="paySort(2)" style="cursor:pointer;min-width:180px">وصف المشروع ↕</th>
+              <th onclick="paySort(3)" style="cursor:pointer">الشهر ↕</th>
+              <th onclick="paySort(4)" style="cursor:pointer">مبلغ الفاتورة</th>
+              <th onclick="paySort(5)" style="cursor:pointer">القيمة المخططة</th>
+              <th onclick="paySort(6)" style="cursor:pointer">فرق التكلفة</th>
+              <th>الحالة</th>
+              <th>الملاحظات</th>
+            </tr>
+          </thead>
+          <tbody id="pay-tbl-body"></tbody>
+        </table>
+      </div>
+
+      <!-- تصفح الصفحات -->
+      <div class="pag-bar">
+        <span class="pag-info" id="pay-pag-info"></span>
+        <div class="pag-btns" id="pay-pag-btns"></div>
+      </div>
+    </div>`;
+
+    /* تحديث KPI */
+    updatePayKPIs(kpi);
+    /* رسم تقدم العقود */
+    renderContractProgress(contracts);
+    /* رسم الرسوم البيانية */
+    renderMonthlyChart(monthly);
+    renderVarianceChart(monthly);
+    renderSubmittedChart(invoices);
+    /* رسم الجدول */
+    renderPayTable(invoices);
+  }
+
+  /* ══════════════════════════════════════
+     KPI
+  ══════════════════════════════════════ */
+  function updatePayKPIs(kpi) {
+    const el = v => {
+      const e = document.getElementById(v);
+      return e;
+    };
+    const set = (id, val) => { const e = $(id); if (e) e.textContent = val; };
+    set('pay-kpi-contract',  payFmt(kpi.totalContract));
+    set('pay-kpi-paid',      payFmt(kpi.totalPaid));
+    set('pay-kpi-remaining', payFmt(kpi.totalRemaining));
+    set('pay-kpi-pct',       payPct(kpi.pct));
+  }
+
+  /* ══════════════════════════════════════
+     تقدم العقود
+  ══════════════════════════════════════ */
+  function renderContractProgress(contracts) {
+    const el = $('pay-contract-progress');
+    if (!el) return;
+    if (!contracts.length) {
+      el.innerHTML = '<div class="empty-msg">لا توجد بيانات عقود</div>';
+      return;
+    }
+    el.innerHTML = contracts.map(r => {
+      const region   = r['Region'] || r['المنطقة'] || '—';
+      const contNum  = r['Contract_Number'] || r['رقم_العقد'] || r['Contract'] || '—';
+      const projDesc = r['Project_Description'] || r['وصف_المشروع'] || r['Project'] || '—';
+      const cv   = payNum(r['Updated_Contract_Value_SAR'] || r['قيمة_العقد_المحدثة'] || 0);
+      const paid = payNum(r['Payment_Released_SAR'] || r['المدفوعات_المصروفة'] || 0);
+      const rem  = payNum(r['Remaining_SAR'] || r['المتبقي'] || 0);
+      const pct  = cv > 0 ? Math.min(100, paid / cv * 100) : 0;
+      const pctColor = pct >= 75 ? '#059669' : pct >= 40 ? '#D97706' : '#0891B2';
+      return `
+        <div style="background:var(--bg-2);border:1px solid var(--bd-light);border-radius:14px;padding:14px 16px;border-right:3px solid ${pctColor}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            <div>
+              <div style="font-size:12px;font-weight:800;color:var(--tx-main)">${esc(projDesc.slice(0, 60))}${projDesc.length > 60 ? '…' : ''}</div>
+              <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">
+                <span style="background:#ECFEFF;color:#0891B2;padding:1px 8px;border-radius:20px;font-weight:700;font-size:10px">${esc(region)}</span>
+                &nbsp;${esc(contNum)}
+              </div>
+            </div>
+            <div style="text-align:left">
+              <div style="font-size:16px;font-weight:900;color:${pctColor}">${pct.toFixed(1)}%</div>
+              <div style="font-size:10px;color:var(--tx-muted)">نسبة الصرف</div>
+            </div>
+          </div>
+          <div style="height:8px;background:var(--bg-deep);border-radius:999px;overflow:hidden;margin-bottom:8px">
+            <div style="height:100%;width:${pct.toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width .8s cubic-bezier(.22,.61,.36,1)"></div>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
+            <div><span style="color:var(--tx-muted)">قيمة العقد: </span><strong style="color:var(--tx-main)">${payFmt(cv)}</strong></div>
+            <div><span style="color:var(--tx-muted)">المدفوع: </span><strong style="color:#059669">${payFmt(paid)}</strong></div>
+            <div><span style="color:var(--tx-muted)">المتبقي: </span><strong style="color:#D97706">${payFmt(rem)}</strong></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ══════════════════════════════════════
+     رسم الفواتير الشهرية مقابل المخطط
+  ══════════════════════════════════════ */
+  function renderMonthlyChart(monthly) {
+    killPayChart('pay-ch-monthly');
+    if (!monthly.length) return;
+
+    /* ترتيب حسب Month_Sort */
+    const sorted = [...monthly].sort((a, b) => {
+      const sa = payNum(a['Month_Sort'] || a['ترتيب_الشهر'] || 0);
+      const sb = payNum(b['Month_Sort'] || b['ترتيب_الشهر'] || 0);
+      return sa - sb;
+    });
+
+    /* تجميع حسب الشهر */
+    const monthMap = {};
+    sorted.forEach(r => {
+      const month = r['Month'] || r['الشهر'] || r['month'] || '—';
+      const sort  = payNum(r['Month_Sort'] || r['ترتيب_الشهر'] || 0);
+      if (!monthMap[month]) monthMap[month] = { sort, invoice: 0, planned: 0 };
+      monthMap[month].invoice  += payNum(r['Invoice_Amount_SAR'] || r['مبلغ_الفاتورة'] || 0);
+      monthMap[month].planned  += payNum(r['Planned_Value_SAR']  || r['القيمة_المخططة'] || 0);
+    });
+
+    const entries = Object.entries(monthMap).sort((a, b) => a[1].sort - b[1].sort);
+    const labels   = entries.map(e => e[0]);
+    const invoiceD = entries.map(e => e[1].invoice);
+    const plannedD = entries.map(e => e[1].planned);
+
+    const canvas = $('pay-ch-monthly');
+    if (!canvas) return;
+    PAY_CHARTS['pay-ch-monthly'] = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'الفاتورة الفعلية',
+            data: invoiceD,
+            backgroundColor: '#0891B288',
+            borderColor: '#0891B2',
+            borderWidth: 1.5,
+            borderRadius: 4,
+            order: 2,
+          },
+          {
+            label: 'القيمة المخططة',
+            data: plannedD,
+            type: 'line',
+            borderColor: '#D97706',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            borderDash: [6, 3],
+            pointRadius: 4,
+            pointBackgroundColor: '#D97706',
+            tension: 0.3,
+            order: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const ds = ctx.dataset.label;
+                const val = ctx.raw;
+                const inv = invoiceD[ctx.dataIndex];
+                const pln = plannedD[ctx.dataIndex];
+                const variance = inv - pln;
+                if (ctx.datasetIndex === 1) return ` ${ds}: ${payFmt(val)} | فرق: ${payFmt(variance)}`;
+                return ` ${ds}: ${payFmt(val)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 35 } },
+          y: { beginAtZero: true, ticks: { callback: v => (v / 1e6).toFixed(1) + 'M' } },
+        },
+      },
+    });
+  }
+
+  /* ══════════════════════════════════════
+     رسم فرق التكلفة
+  ══════════════════════════════════════ */
+  function renderVarianceChart(monthly) {
+    killPayChart('pay-ch-variance');
+    if (!monthly.length) return;
+
+    const monthMap = {};
+    monthly.forEach(r => {
+      const month = r['Month'] || r['الشهر'] || '—';
+      const sort  = payNum(r['Month_Sort'] || r['ترتيب_الشهر'] || 0);
+      if (!monthMap[month]) monthMap[month] = { sort, variance: 0 };
+      monthMap[month].variance += payNum(r['Cost_Variance_SAR'] || r['فرق_التكلفة'] || 0);
+    });
+
+    const entries  = Object.entries(monthMap).sort((a, b) => a[1].sort - b[1].sort);
+    const labels   = entries.map(e => e[0]);
+    const varData  = entries.map(e => e[1].variance);
+    const colors   = varData.map(v => v > 0 ? '#05966988' : v < 0 ? '#DC262688' : '#64748b88');
+    const borders  = varData.map(v => v > 0 ? '#059669' : v < 0 ? '#DC2626' : '#64748b');
+
+    const canvas = $('pay-ch-variance');
+    if (!canvas) return;
+    PAY_CHARTS['pay-ch-variance'] = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'فرق التكلفة',
+          data: varData,
+          backgroundColor: colors,
+          borderColor: borders,
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` فرق التكلفة: ${payFmt(ctx.raw)}`,
+              labelColor: ctx => ({ backgroundColor: borders[ctx.dataIndex], borderColor: borders[ctx.dataIndex] }),
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 35 } },
+          y: { ticks: { callback: v => (v / 1e6).toFixed(1) + 'M' } },
+        },
+      },
+    });
+  }
+
+  /* ══════════════════════════════════════
+     رسم نسبة إرسال الفواتير
+  ══════════════════════════════════════ */
+  function renderSubmittedChart(invoices) {
+    killPayChart('pay-ch-submitted');
+    if (!invoices.length) {
+      const el = $('pay-submit-summary');
+      if (el) el.innerHTML = '<div class="empty-msg">لا توجد بيانات</div>';
+      return;
+    }
+
+    /* تجميع حسب المنطقة */
+    const regionMap = {};
+    invoices.forEach(r => {
+      const reg = r['Region'] || r['المنطقة'] || 'غير محدد';
+      const sub = (r['Invoice_Submitted'] || r['تم_إرسال_الفاتورة'] || '').toLowerCase();
+      if (!regionMap[reg]) regionMap[reg] = { yes: 0, no: 0 };
+      if (sub === 'yes' || sub === 'نعم' || sub === '1') regionMap[reg].yes++;
+      else regionMap[reg].no++;
+    });
+
+    const regions  = Object.keys(regionMap);
+    const yesData  = regions.map(r => regionMap[r].yes);
+    const noData   = regions.map(r => regionMap[r].no);
+    const pctData  = regions.map(r => {
+      const total = regionMap[r].yes + regionMap[r].no;
+      return total > 0 ? +(regionMap[r].yes / total * 100).toFixed(1) : 0;
+    });
+
+    /* إجمالي */
+    const totalYes = invoices.filter(r => {
+      const v = (r['Invoice_Submitted'] || r['تم_إرسال_الفاتورة'] || '').toLowerCase();
+      return v === 'yes' || v === 'نعم' || v === '1';
+    }).length;
+    const totalNo  = invoices.length - totalYes;
+    const totalPct = invoices.length > 0 ? (totalYes / invoices.length * 100).toFixed(1) : 0;
+
+    /* ملخص نصي */
+    const summEl = $('pay-submit-summary');
+    if (summEl) {
+      summEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+          <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#059669">${totalYes.toLocaleString()}</div>
+            <div style="font-size:10px;color:#059669;font-weight:700">تم إرسال الفاتورة</div>
+          </div>
+          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#DC2626">${totalNo.toLocaleString()}</div>
+            <div style="font-size:10px;color:#DC2626;font-weight:700">لم يتم الإرسال</div>
+          </div>
+          <div style="background:#ECFEFF;border:1px solid #A5F3FC;border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#0891B2">${totalPct}%</div>
+            <div style="font-size:10px;color:#0891B2;font-weight:700">نسبة الإرسال</div>
+          </div>
+        </div>
+        ${regions.map((reg, i) => {
+          const total = regionMap[reg].yes + regionMap[reg].no;
+          const pct = pctData[i];
+          return `
+          <div style="padding:8px 0;border-bottom:1px solid var(--bd-light)">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:11px;font-weight:700">${esc(reg)}</span>
+              <span style="font-size:11px;font-weight:800;color:${pct >= 70 ? '#059669' : pct >= 40 ? '#D97706' : '#DC2626'}">${pct}%</span>
+            </div>
+            <div style="height:5px;background:var(--bg-deep);border-radius:999px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${pct >= 70 ? '#059669' : pct >= 40 ? '#D97706' : '#DC2626'};border-radius:999px"></div>
+            </div>
+            <div style="font-size:10px;color:var(--tx-muted);margin-top:3px">${regionMap[reg].yes} من ${total}</div>
+          </div>`;
+        }).join('')}`;
+    }
+
+    const canvas = $('pay-ch-submitted');
+    if (!canvas) return;
+    PAY_CHARTS['pay-ch-submitted'] = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['تم إرسال الفاتورة', 'لم يتم الإرسال'],
+        datasets: [{
+          data: [totalYes, totalNo],
+          backgroundColor: ['#05966988', '#DC262688'],
+          borderColor: ['#059669', '#DC2626'],
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = (ctx.raw / total * 100).toFixed(1);
+                return ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /* ══════════════════════════════════════
+     الجدول التفصيلي
+  ══════════════════════════════════════ */
+  function getTableRows() {
+    const invoices = getFilteredInvoice();
+    const q = PAY_STATE.search.toLowerCase();
+    let rows = q
+      ? invoices.filter(r => {
+          const po  = (r['PO_Number'] || r['رقم_أمر_التوريد'] || '').toLowerCase();
+          const desc = (r['Project_Description'] || r['وصف_المشروع'] || '').toLowerCase();
+          return po.includes(q) || desc.includes(q);
+        })
+      : invoices;
+
+    if (PAY_STATE.sortCol >= 0) {
+      const col = PAY_STATE.sortCol;
+      const asc = PAY_STATE.sortAsc;
+      rows = [...rows].sort((a, b) => {
+        const va = getSortVal(a, col), vb = getSortVal(b, col);
+        if (typeof va === 'number' && typeof vb === 'number') return asc ? va - vb : vb - va;
+        return asc ? String(va).localeCompare(String(vb), 'ar') : String(vb).localeCompare(String(va), 'ar');
+      });
+    }
+    return rows;
+  }
+
+  function getSortVal(r, col) {
+    switch (col) {
+      case 0: return r['Region'] || r['المنطقة'] || '';
+      case 1: return r['PO_Number'] || r['رقم_أمر_التوريد'] || '';
+      case 2: return r['Project_Description'] || r['وصف_المشروع'] || '';
+      case 3: return r['Month'] || r['الشهر'] || '';
+      case 4: return payNum(r['Invoice_Amount_SAR'] || r['مبلغ_الفاتورة'] || 0);
+      case 5: return payNum(r['Planned_Value_SAR'] || r['القيمة_المخططة'] || 0);
+      case 6: return payNum(r['Cost_Variance_SAR'] || r['فرق_التكلفة'] || 0);
+      default: return '';
+    }
+  }
+
+  function renderPayTable(invoices) {
+    const all   = getTableRows();
+    const total = all.length;
+    const maxPage = Math.max(0, Math.ceil(total / PAY_PAGE_SIZE) - 1);
+    PAY_STATE.page = Math.min(PAY_STATE.page, maxPage);
+    const start = PAY_STATE.page * PAY_PAGE_SIZE;
+    const page  = all.slice(start, start + PAY_PAGE_SIZE);
+
+    const tbody = $('pay-tbl-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    page.forEach(r => {
+      const region  = r['Region'] || r['المنطقة'] || '—';
+      const po      = r['PO_Number'] || r['رقم_أمر_التوريد'] || '—';
+      const desc    = r['Project_Description'] || r['وصف_المشروع'] || '—';
+      const month   = r['Month'] || r['الشهر'] || '—';
+      const inv     = payNum(r['Invoice_Amount_SAR'] || r['مبلغ_الفاتورة'] || 0);
+      const pln     = payNum(r['Planned_Value_SAR'] || r['القيمة_المخططة'] || 0);
+      const varAmt  = payNum(r['Cost_Variance_SAR'] || r['فرق_التكلفة'] || (inv - pln));
+      const subRaw  = (r['Invoice_Submitted'] || r['تم_إرسال_الفاتورة'] || '').toLowerCase();
+      const submitted = subRaw === 'yes' || subRaw === 'نعم' || subRaw === '1';
+      const remarks = r['Remarks'] || r['الملاحظات'] || '—';
+
+      const varColor  = varAmt > 0 ? '#059669' : varAmt < 0 ? '#DC2626' : '#64748b';
+      const varBg     = varAmt > 0 ? '#F0FDF4' : varAmt < 0 ? '#FEF2F2' : '#F8FAFC';
+      const varBorder = varAmt > 0 ? '#A7F3D0' : varAmt < 0 ? '#FECACA' : '#E2E8F0';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="badge" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC">${esc(region)}</span></td>
+        <td style="font-family:monospace;font-size:11px;font-weight:700;color:#0891B2">${esc(po)}</td>
+        <td style="text-align:right;max-width:200px;white-space:normal;line-height:1.4;font-size:11px">${esc(desc.slice(0,80))}${desc.length > 80 ? '…' : ''}</td>
+        <td style="font-size:11px;white-space:nowrap">${esc(month)}</td>
+        <td style="font-weight:700;font-size:11px;color:#0891B2">${payFmt(inv)}</td>
+        <td style="font-weight:700;font-size:11px;color:#D97706">${payFmt(pln)}</td>
+        <td>
+          <span class="badge" style="background:${varBg};color:${varColor};border:1px solid ${varBorder}">
+            ${varAmt >= 0 ? '+' : ''}${payFmt(varAmt)}
+          </span>
+        </td>
+        <td>
+          <span class="badge" style="background:${submitted ? '#F0FDF4' : '#FEF2F2'};color:${submitted ? '#059669' : '#DC2626'};border:1px solid ${submitted ? '#A7F3D0' : '#FECACA'}">
+            ${submitted ? 'تم الإرسال' : 'لم يُرسل'}
+          </span>
+        </td>
+        <td style="font-size:10px;color:var(--tx-muted);max-width:160px;white-space:normal;line-height:1.4">${esc(remarks.slice(0,80))}${remarks.length > 80 ? '…' : ''}</td>`;
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+
+    /* معلومات الصفحة */
+    const info = $('pay-tbl-count');
+    if (info) info.textContent = `${total.toLocaleString()} سجل`;
+    const pagInfo = $('pay-pag-info');
+    if (pagInfo) pagInfo.textContent = `الصفوف ${(start + 1).toLocaleString()}–${Math.min(start + PAY_PAGE_SIZE, total).toLocaleString()} من ${total.toLocaleString()}`;
+
+    /* أزرار الصفحات */
+    const pagBtns = $('pay-pag-btns');
+    if (!pagBtns) return;
+    pagBtns.innerHTML = '';
+    const addBtn = (label, pg, disabled, active = false) => {
+      const b = document.createElement('button');
+      b.className = 'pag-btn' + (active ? ' active' : '');
+      b.textContent = label;
+      b.disabled = disabled;
+      if (!disabled) b.onclick = () => { PAY_STATE.page = pg; renderPayTable(); };
+      pagBtns.appendChild(b);
+    };
+    addBtn('◄ السابق', PAY_STATE.page - 1, PAY_STATE.page === 0);
+    let lo = Math.max(0, PAY_STATE.page - 3);
+    let hi = Math.min(maxPage, PAY_STATE.page + 3);
+    if (lo > 0) { addBtn('1', 0, false); if (lo > 1) pagBtns.appendChild(Object.assign(document.createElement('span'), { textContent: '…', style: 'padding:0 4px;color:var(--tx-muted)' })); }
+    for (let i = lo; i <= hi; i++) addBtn(String(i + 1), i, false, i === PAY_STATE.page);
+    if (hi < maxPage) { pagBtns.appendChild(Object.assign(document.createElement('span'), { textContent: '…', style: 'padding:0 4px;color:var(--tx-muted)' })); addBtn(String(maxPage + 1), maxPage, false); }
+    addBtn('التالي ►', PAY_STATE.page + 1, PAY_STATE.page >= maxPage);
+  }
+
+  /* ══════════════════════════════════════
+     وظائف عامة مُصدَّرة
+  ══════════════════════════════════════ */
+  window.paySetRegion = function (region) {
+    PAY_STATE.region = region;
+    PAY_STATE.page   = 0;
+    renderPaymentsTab();
+  };
+
+  window.paySearch = function (val) {
+    PAY_STATE.search = val.trim();
+    PAY_STATE.page   = 0;
+    const invoices = getFilteredInvoice();
+    renderPayTable(invoices);
+  };
+
+  window.paySort = function (col) {
+    if (PAY_STATE.sortCol === col) {
+      PAY_STATE.sortAsc = !PAY_STATE.sortAsc;
+    } else {
+      PAY_STATE.sortCol = col;
+      PAY_STATE.sortAsc = true;
+    }
+    PAY_STATE.page = 0;
+    const invoices = getFilteredInvoice();
+    renderPayTable(invoices);
+  };
+
+  /* إتاحة إدخال البيانات من Apps Script بعد تحميل loadData الرئيسي */
+  const _origLoadData = window.loadData;
+  if (typeof _origLoadData === 'function') {
+    window.loadData = async function (silent) {
+      await _origLoadData.apply(this, arguments);
+      /* محاولة استخراج بيانات جديدة بعد تحميل loadData إذا كان التبويب مفتوحاً */
+      const tabPanel = document.getElementById('tab-payments');
+      if (tabPanel && tabPanel.classList.contains('active') && !PAY_LOADED) {
+        paymentsInitTab();
+      }
+    };
+  }
+
 })();
 </script>
 </body></html>

@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة بيانات المدارس | Facilities Dashboard</title>
+<title>لوحة بيانات المدارس | Facilities Dashboard v32</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=y9pYUQWH7Sp3clbqnfb3iyXfjJwcHxVM-L2g2tfeHZO_U9r0SwgfoWOzUKZvSR2jQA8Gwyuqov2mpV2di3XYDuFVT47YlFLkN8_hBCEAmdKZVXl0WqfKLbKYNngfJ2SApz8pzFw7oh-Gy3mP3gu5nLiNdf1yy6Rc3vTaG7leiF6dregHw4f52YZmlUuqIGNxxQ7dg22ZRch_RaTxEI7-cHLeZxiPHh0uiUBSy4JuSWtH3jRYQAjNxoy5Gu2LkZUh8EKbh3_PwYNQ8EMsPiw7d1a4HLw33qDihsrPYBI0aKiSPBm4Gkj9cByVxXul-dPdWrZiTaYgMwieeRhFk8mwkq4Y3DzaC0fvgpNMDALiBO5JHiYZUJPYtpsxL9EyC-J6" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -479,14 +479,14 @@ tbody tr:hover td { background: rgba(8,145,178,.05) !important; }
 
     <div class="fg" id="fg-city">
       <div class="fg-lbl" data-ar="المنطقة الرئيسية" data-en="Main Region">المنطقة الرئيسية</div>
-      <select class="fsel" id="fCity" onchange="applyFilters()">
+      <select class="fsel" id="fCity" onchange="updateSectorByCity();updateDistrictBySector();applyFilters()">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg" id="fg-sector" style="display:none">
       <div class="fg-lbl" data-ar="المحافظة" data-en="Governorate">المحافظة</div>
-      <select class="fsel" id="fSector" onchange="applyFilters()">
+      <select class="fsel" id="fSector" onchange="updateDistrictBySector();applyFilters()">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
@@ -2354,7 +2354,54 @@ tbody tr:hover td { background: rgba(8,145,178,.05) !important; }
   <div style="font-size:10px;color:rgba(255,255,255,.25);font-weight:500" id="footer-time"></div>
 </footer>
 
-<script>const CFG={GAS_URL:"https://script.google.com/macros/s/AKfycbzOskqxjLPBsebLWOJh0Dw77x7r2PmWtxItw0mO7dyd0K5fZymyqOI_DF6a32MA5vA/exec",AUTO_INTERVAL_MS:3e5,RETRY_MAX:3,RETRY_DELAY_MS:4e3,LOW_FCA_THRESHOLD:50},COLS={minId:["minId"],schoolSeq:["schoolSeq"],mainMinId:["mainMinId"],buildingSeq:["buildingSeq"],buildingName:["اسم_المدرسة"],name:["اسم_المدرسة"],gender:["الجنس"],stage:["المرحلة"],ownership:["حكومي_مستأجر"],linkType:["نوع_الربط"],city:["المدينة_الرئيسية"],district:["الحي"],sector:["المحافظة"],districtId:["معرف_المحافظة"],classrooms:["عدد_الفصول"],schoolSize:["حجم_المدرسة"],buildingSize:["نوع_المبنى","حجم_المبنى"],lng:["خط_الطول"],lat:["خط_العرض"],acUnits:["وحدات_التكييف"],alerts:["عدد_البلاغات"],equipment:["التجهيزات"],preventive:["الصيانة_الوقائية"],drainage:["خنادق_الصرف"],fca:["قيمة_FCA"],envScore:["درجة_البيئة_المدرسية"],envText:["البيئة_المدرسية_نص"],contractId:["معرف_العقد"],contractMaint:["رقم_عقد_الصيانة"],contractAC:["رقم_عقد_التكييف"],contractClean:["رقم_عقد_النظافة"],contrMaint:["مقاول_الصيانة"],contrAC:["مقاول_التكييف"],contrClean:["مقاول_النظافة"],projMaint:["رقم_مشروع_الصيانة"],projAC:["رقم_مشروع_التكييف"],projClean:["رقم_مشروع_النظافة"],expMaint:["حالة_الصيانة","تاريخ_انتهاء_الصيانة"],expClean:["حالة_النظافة","تاريخ_انتهاء_النظافة"],expAC:["حالة_التكييف","تاريخ_انتهاء_التكييف"],notes:["ملاحظات"],description:["وصف_الصنف"],quantity:["الكمية"],unitValue:["قيمة_وحدة_البيئة","سعر_الوحدة"],subscriptionStatus:["حالة_الاشتراك"],students:["عدد_الطلاب"],buildingAge:["عمر_المبني"],ayenScore:["تقييم_عاين"]},TIER={critical:{label:"حرج",color:"#DC2626",bg:"#FEF2F2",min:0,max:24.99},fair:{label:"متوسط",color:"#D97706",bg:"#FFFBEB",min:25,max:49.99},good:{label:"جيد",color:"#059669",bg:"#ECFDF5",min:50,max:74.99},vgood:{label:"ممتاز",color:"#0891B2",bg:"#ECFEFF",min:75,max:100}},PALETTE=["#083D4F","#0891B2","#059669","#D97706","#DC2626","#7C3AED","#0E7490","#B8860B","#1D4ED8","#9333EA","#0F766E","#C2410C"];let RAW=[],FILTERED=[],CHARTS={},autoTimer=null,retryCount=0,_filterTimer=null;const TBL={cur:0,PAGE:50};function getVal(row,field){for(const k of COLS[field]||[field]){const v=row[k];if(null!=v&&""!==v&&"#N/A"!==v&&"NaT"!==v)return v}return null}const num=v=>{if(null==v||""===v||"#N/A"===v||"NaT"===v)return null;const n=parseFloat(String(v).replace(/,/g,""));return isFinite(n)?n:null},fmt=(v,d=0)=>null==v?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}),pct=(v,d=1)=>null==v?"—":fmt(v,d)+"%",esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])),avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;function getTier(v){return null==v?null:v<=24.99?"critical":v<=49.99?"fair":v<=74.99?"good":"vgood"}const tierColor=v=>TIER[getTier(v)]?.color||"#64748b",tierBg=v=>TIER[getTier(v)]?.bg||"#f1f5f9";function killChart(id){if(CHARTS[id]){try{CHARTS[id].destroy()}catch(_){}delete CHARTS[id]}}function setDot(s){document.getElementById("dot").className="dot "+s}function setProgress(p){const b=document.getElementById("prog");b.style.width=p+"%",p>=100&&setTimeout(()=>b.style.width="0%",600)}function setText(id,v){const el=document.getElementById(id);el&&(el.textContent=v)}function setBtn(loading){const btn=document.getElementById("btnReload");btn.disabled=loading,btn.textContent=loading?"جاري...":"↻ تحديث"}function showToast(html,type){document.getElementById("toast-area").innerHTML=`<div class="toast ${type}">${html}</div>`}function clearToast(){document.getElementById("toast-area").innerHTML=""}function debounceFilter(){clearTimeout(_filterTimer),_filterTimer=setTimeout(applyFilters,300)}function buildDynamicFilters(){function fillSelect(id,values){const el=document.getElementById(id);if(!el)return;const prev=el.value,sorted=[...new Set(values.filter(v=>v&&"—"!==v&&"#N/A"!==v))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar")),allLabel="en"===LANG?"All":"الكل";el.innerHTML=`<option value="">${allLabel}</option>`+sorted.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join(""),prev&&sorted.includes(prev)&&(el.value=prev)}fillSelect("fCity",RAW.map(r=>r.city)),fillSelect("fStage",RAW.map(r=>r.stage)),fillSelect("fGender",RAW.map(r=>r.gender.replace(/\s+$/,""))),fillSelect("fSize",RAW.map(r=>r.schoolSize)),fillSelect("fOwner",RAW.map(r=>r.ownership)),fillSelect("fDistrict",RAW.map(r=>r.district)),fillSelect("fSector",RAW.map(r=>r.sector)),fillSelect("fSubStatus",RAW.map(r=>r.subscriptionStatus));const cities=[...new Set(RAW.map(r=>r.city).filter(c=>c))],sectors=[...new Set(RAW.map(r=>r.sector).filter(s=>s&&"#N/A"!==s))];document.getElementById("fg-city").style.display=cities.length>1?"":"none",document.getElementById("fg-sector").style.display=sectors.length>1?"":"none";const cityLabel=1===cities.length?cities[0]:cities.length>1?`${cities.length} ${"en"===LANG?"cities":"مدن"}`:"";setText("topTitle","en"===LANG?"Schools Dashboard":"لوحة بيانات المدارس"),setText("topSub",cityLabel?`${cityLabel} · Facilities Dashboard`:"Facilities Dashboard · CSV"),window._SHOW_CITY_COL=cities.length>1;const cityTh=document.getElementById("th-city");cityTh&&(cityTh.style.display=window._SHOW_CITY_COL?"":"none"),window._SHOW_SECTOR_COL=sectors.length>0;const sectorTh=document.getElementById("th-sector");sectorTh&&(sectorTh.style.display=window._SHOW_SECTOR_COL?"":"none")}function applyFilters(){const city=document.getElementById("fCity").value,sector=document.getElementById("fSector").value,stage=document.getElementById("fStage").value,gender=document.getElementById("fGender").value,size=document.getElementById("fSize").value,owner=document.getElementById("fOwner").value,fcaMin=parseFloat(document.getElementById("fFcaMin").value)||0,district=document.getElementById("fDistrict").value,subStatus=document.getElementById("fSubStatus")?.value||"",search=document.getElementById("fSearch").value.trim().toLowerCase(),linkChecked=[...document.querySelectorAll("#fLinkType input:checked")].map(cb=>cb.value);FILTERED=RAW.filter(r=>(!city||r.city===city)&&((!sector||r.sector===sector)&&((!stage||r.stage===stage)&&((!gender||r.gender.replace(/\s+$/,"")===gender.replace(/\s+$/,""))&&((!size||r.schoolSize===size)&&((!owner||r.ownership===owner)&&((!district||r.district===district)&&((!subStatus||r.subscriptionStatus===subStatus)&&(!(linkChecked.length&&!linkChecked.includes(r.linkType))&&((!fcaMin||!(null==r.fca||r.fca<fcaMin))&&!(search&&!r.name.toLowerCase().includes(search)&&!String(r.minId||"").toLowerCase().includes(search)&&!r.district.toLowerCase().includes(search)&&!r.sector.toLowerCase().includes(search)))))))))))),renderKPIs(),renderTierStrip();const activeId=document.querySelector(".panel.active")?.id;"tab-overview"===activeId&&renderOverviewCharts(),"tab-fca"===activeId&&renderFcaCharts(),"tab-env"===activeId&&renderEnvCharts(),"tab-stages"===activeId&&renderStageCharts(),"tab-contracts"===activeId&&renderContractCharts(),"tab-fm-contracts"===activeId&&renderFmContracts(),"tab-fm-tad"===activeId&&renderFmTad(),"tab-sys-main"===activeId&&renderSysMain(),"tab-sys-detail"===activeId&&renderSysDetail(),"tab-balagh"===activeId&&renderSingleMetricTab("balagh","alerts","البلاغات","#D97706","#FFFBEB","📢"),"tab-tajheez"===activeId&&renderSingleMetricTab("tajheez","equipment","التجهيزات","#059669","#ECFDF5","🏗️"),"tab-seyana"===activeId&&renderSingleMetricTab("seyana","preventive","الصيانة الوقائية","#0891B2","#ECFEFF","🔧"),"tab-khanadeq"===activeId&&renderSingleMetricTab("khanadeq","drainage","خنادق الصرف","#7C3AED","#F5F3FF","🕳️"),"tab-map"===activeId&&renderMap(),"tab-spare"===activeId&&renderSpareTab(),"tab-students"===activeId&&renderStudentsTab(),"tab-ayen"===activeId&&renderAyenTab(),"tab-table"===activeId&&(TBL.cur=0,renderTable()),activeId&&"tab-overview"!==activeId||renderOverviewCharts()}function clearFilters(){["fCity","fSector","fStage","fGender","fSize","fOwner","fDistrict","fSubStatus"].forEach(id=>{const el=document.getElementById(id);el&&(el.value="")}),document.getElementById("fFcaMin").value="0",document.getElementById("fSearch").value="",document.querySelectorAll("#fLinkType input").forEach(cb=>cb.checked=!1),applyFilters()}function renderKPIs(){const D=FILTERED,total=D.length,govt=D.filter(r=>(r.ownership||"").includes("حكومي")).length,rented=D.filter(r=>(r.ownership||"").includes("مستأجر")).length,fcaArr=D.filter(r=>null!=r.fca).map(r=>r.fca),envArr=D.filter(r=>null!=r.envScore).map(r=>r.envScore),lowFca=fcaArr.filter(v=>v<CFG.LOW_FCA_THRESHOLD).length,dists=new Set(D.map(r=>r.district).filter(d=>d)).size,sectors=new Set(D.map(r=>r.sector).filter(s=>s)).size,classes=D.reduce((s,r)=>s+(r.classrooms||0),0),alertsTotal=D.reduce((s,r)=>s+(r.alerts||0),0),acTotal=D.reduce((s,r)=>s+(r.acUnits||0),0);setText("k-total",total.toLocaleString()),setText("k-total-sub",`${fcaArr.length.toLocaleString()} ${"en"===LANG?"with FCA score":"لها درجة FCA"} · ${sectors} ${"en"===LANG?"governorate":"محافظة"}`),setText("k-govt",govt.toLocaleString()),setText("k-rented",`${rented.toLocaleString()} ${"en"===LANG?"rented":"مستأجرة"}`),setText("k-fca-avg",pct(avg(fcaArr))),setText("k-fca-cnt",`${fcaArr.length.toLocaleString()} ${"en"===LANG?"schools assessed":"مدرسة مقيّمة"}`),setText("k-env-avg",pct(avg(envArr))),setText("k-env-cnt",`${envArr.length.toLocaleString()} ${"en"===LANG?"schools with score":"مدرسة لها درجة"}`),setText("k-low-fca",lowFca.toLocaleString()),setText("k-districts",dists.toLocaleString()),setText("k-classrooms",`${classes.toLocaleString()} ${"en"===LANG?"total classrooms":"فصل إجمالي"}`),setText("k-alerts-total",alertsTotal.toLocaleString()),setText("k-ac-total",acTotal.toLocaleString());const studArr=D.filter(r=>null!=r.students&&r.students>0),studTotal=studArr.reduce((s,r)=>s+r.students,0),studAvg=studArr.length?studTotal/studArr.length:null,studMax=studArr.length?studArr.reduce((mx,r)=>r.students>mx.students?r:mx,studArr[0]):null;setText("k-students-total",studTotal>0?studTotal.toLocaleString():"—"),setText("k-students-avg",null!=studAvg?`${"en"===LANG?"Avg":"متوسط"} ${Math.round(studAvg).toLocaleString()} ${"en"===LANG?"student/school":"طالب/مدرسة"}`:"—"),setText("k-students-ctx",studArr.length>0?`${"en"===LANG?"Based on":"استناداً لبيانات"} ${studArr.length.toLocaleString()} ${"en"===LANG?"schools":"مدرسة"}`:""),setText("k-students-max",studMax?studMax.students.toLocaleString():"—"),setText("k-students-max-name",studMax?studMax.name.slice(0,28):"—");const ageArr=D.filter(r=>null!=r.buildingAge&&r.buildingAge>0),ageAvg=ageArr.length?ageArr.reduce((s,r)=>s+r.buildingAge,0)/ageArr.length:null,ageOld=ageArr.filter(r=>r.buildingAge>40).length,ageNew=ageArr.filter(r=>r.buildingAge<10).length;setText("k-age-avg",null!=ageAvg?Math.round(ageAvg).toLocaleString():"—"),setText("k-age-cnt",`${ageArr.length.toLocaleString()} ${"en"===LANG?"buildings assessed":"مبنى مقيّم"}`),setText("k-age-old",ageOld.toLocaleString()),setText("k-age-old-pct",ageArr.length?`${"en"===LANG?"of":"من أصل"} ${ageArr.length.toLocaleString()} ${"en"===LANG?"assessed":"مبنى مقيّم"}`:""),setText("k-age-new",ageNew.toLocaleString()),setText("k-age-new-pct",ageArr.length?`${"en"===LANG?"of":"من أصل"} ${ageArr.length.toLocaleString()} ${"en"===LANG?"assessed":"مبنى مقيّم"}`:"")}function renderTierStrip(){const fcaArr=FILTERED.filter(r=>null!=r.fca),total=fcaArr.length,counts={critical:0,fair:0,good:0,vgood:0};fcaArr.forEach(r=>{const t=getTier(r.fca);t&&counts[t]++}),["crit","fair","good","vgood"].forEach((k,i)=>{const key=["critical","fair","good","vgood"][i];setText("t-"+k,counts[key]),setText("t-"+k+"-pct",total?Math.round(counts[key]/total*100)+"%":"—")}),setText("tier-sub",`${total.toLocaleString()} ${"en"===LANG?"schools assessed":"مدرسة مقيّمة"}`)}function showTab(name,el){document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active")),document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active")),document.getElementById("tab-"+name).classList.add("active"),el&&el.classList.add("active"),"overview"===name&&renderOverviewCharts(),"fca"===name&&renderFcaCharts(),"env"===name&&renderEnvCharts(),"stages"===name&&renderStageCharts(),"contracts"===name&&renderContractCharts(),"fm-contracts"===name&&renderFmContracts(),"fm-tad"===name&&renderFmTad(),"sys-main"===name&&renderSysMain(),"sys-detail"===name&&renderSysDetail(),"balagh"===name&&renderSingleMetricTab("balagh","alerts","البلاغات","#D97706","#FFFBEB","📢"),"tajheez"===name&&renderSingleMetricTab("tajheez","equipment","التجهيزات","#059669","#ECFDF5","🏗️"),"seyana"===name&&renderSingleMetricTab("seyana","preventive","الصيانة الوقائية","#0891B2","#ECFEFF","🔧"),"khanadeq"===name&&renderSingleMetricTab("khanadeq","drainage","خنادق الصرف","#7C3AED","#F5F3FF","🕳️"),"elevators"===name&&renderElevatorsTab(),"cost"===name&&renderCostTab(),"map"===name&&renderMap(),"spare"===name&&renderSpareTab(),"students"===name&&renderStudentsTab(),"ayen"===name&&renderAyenTab(),"table"===name&&(TBL.cur=0,renderTable())}function makeDoughnut(id,dataMap,colorMap={}){killChart(id);const entries=Object.entries(dataMap).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);entries.length&&(CHARTS[id]=new Chart(document.getElementById(id),{type:"doughnut",data:{labels:entries.map(x=>x[0]||'—'),datasets:[{data:entries.map(x=>x[1]),backgroundColor:entries.map(([k],i)=>(colorMap[k]||PALETTE[i%PALETTE.length])+"DD"),borderWidth:2,borderColor:"#fff"}]},options:{maintainAspectRatio:!1,cutout:"60%",plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:12,padding:6}},tooltip:{callbacks:{label:ctx=>` ${ctx.label||'—'}: ${ctx.raw.toLocaleString()} مدرسة`}}}}}))}function makeHBar(id,labels,values,colors,maxVal=null,fullLabels=null){killChart(id);const displayLabels=labels.map(l=>String(l??"").length>28?String(l??"").slice(0,28)+"…":String(l??"")),tooltipLabels=fullLabels||labels;CHARTS[id]=new Chart(document.getElementById(id),{type:"bar",data:{labels:displayLabels,datasets:[{label:"",data:values,backgroundColor:colors,borderColor:colors.map(c=>String(c).replace("BB","FF")),borderWidth:1,borderRadius:4}]},options:{indexAxis:"y",maintainAspectRatio:!1,plugins:{legend:{display:!1},tooltip:{mode:"nearest",intersect:!0,callbacks:{title:ctx=>String(tooltipLabels[ctx[0].dataIndex]??ctx[0].label??'')||'—',label:ctx=>`  ${maxVal?ctx.raw+"%":Number(ctx.raw).toLocaleString()}`}}},scales:{x:{beginAtZero:!0,max:maxVal||void 0,ticks:{callback:v=>maxVal?v+"%":v.toLocaleString()}},y:{ticks:{font:{size:10},maxRotation:0},afterFit:s=>{s.width=Math.max(s.width,220)}}},onHover:(event,elements)=>{event.native.target.style.cursor=elements.length?"pointer":"default"}}})}function makeVBar(id,labels,datasets){killChart(id);const fullLabels=labels,displayLabels=labels.map(l=>"string"==typeof l&&l.length>16?l.slice(0,16)+"…":l);CHARTS[id]=new Chart(document.getElementById(id),{type:"bar",data:{labels:displayLabels,datasets:datasets},options:{maintainAspectRatio:!1,plugins:{legend:{position:"top",labels:{font:{size:10},boxWidth:10,padding:10}},tooltip:{callbacks:{title:ctx=>String(fullLabels[ctx[0].dataIndex]??ctx[0].label??'')||'—'}}},scales:{y:{beginAtZero:!0,ticks:{font:{size:10}}},x:{ticks:{font:{size:10},maxRotation:30}}}}})}function renderOverviewCharts(){const D=FILTERED,histLabels=["0–9","10–19","20–29","30–39","40–49","50–59","60–69","70–79","80–89","90–100"];killChart("ch-fca-hist");const fcaBins=Array(10).fill(0);D.forEach(r=>{null!=r.fca&&fcaBins[Math.min(9,Math.floor(r.fca/10))]++}),CHARTS["ch-fca-hist"]=new Chart(document.getElementById("ch-fca-hist"),{type:"bar",data:{labels:histLabels,datasets:[{label:"عدد المدارس",data:fcaBins,backgroundColor:histLabels.map((_,i)=>tierColor(10*i+5)+"BB"),borderWidth:1,borderRadius:4}]},options:{maintainAspectRatio:!1,plugins:{legend:{display:!1}},scales:{y:{beginAtZero:!0,title:{display:!0,text:"عدد المدارس"}},x:{title:{display:!0,text:"نطاق FCA"},ticks:{font:{size:10}}}}}}),killChart("ch-env-hist");const envBins=Array(10).fill(0);D.forEach(r=>{null!=r.envScore&&envBins[Math.min(9,Math.floor(r.envScore/10))]++}),CHARTS["ch-env-hist"]=new Chart(document.getElementById("ch-env-hist"),{type:"bar",data:{labels:histLabels,datasets:[{label:"عدد المدارس",data:envBins,backgroundColor:"#059669BB",borderWidth:1,borderRadius:4}]},options:{maintainAspectRatio:!1,plugins:{legend:{display:!1}},scales:{y:{beginAtZero:!0,title:{display:!0,text:"عدد المدارس"}},x:{title:{display:!0,text:"نطاق البيئة"},ticks:{font:{size:10}}}}}});const sizeMap={},ownerMap={},linkMap={};D.forEach(r=>{r.schoolSize&&(sizeMap[r.schoolSize]=(sizeMap[r.schoolSize]||0)+1),r.ownership&&(ownerMap[r.ownership]=(ownerMap[r.ownership]||0)+1),r.linkType&&"#N/A"!==r.linkType&&(linkMap[r.linkType]=(linkMap[r.linkType]||0)+1)}),makeDoughnut("ch-size",sizeMap,{"كبير":"#083D4F","متوسط":"#0891B2","صغير":"#059669"}),makeDoughnut("ch-owner",ownerMap,{"حكومي":"#083D4F","مستأجر":"#D97706"}),makeDoughnut("ch-link",linkMap,{"مستقل":"#0891B2","مشترك أساسي":"#059669"});const subMap={};D.forEach(r=>{r.subscriptionStatus&&(subMap[r.subscriptionStatus]=(subMap[r.subscriptionStatus]||0)+1)}),makeDoughnut("ch-sub-status",subMap,{"مستقل":"#0891B2","مشترك أساسي":"#059669"})}function renderFcaCharts(){const D=FILTERED,withFca=D.filter(r=>null!=r.fca).sort((a,b)=>a.fca-b.fca),bot=withFca.slice(0,20),top=[...withFca].reverse().slice(0,20);makeHBar("ch-fca-bot",bot.map(r=>r.name),bot.map(r=>+r.fca.toFixed(1)),bot.map(r=>tierColor(r.fca)+"BB"),100,bot.map(r=>r.name)),makeHBar("ch-fca-top",top.map(r=>r.name),top.map(r=>+r.fca.toFixed(1)),top.map(r=>tierColor(r.fca)+"BB"),100,top.map(r=>r.name));const dMap={};D.forEach(r=>{r.district&&null!=r.fca&&(dMap[r.district]||(dMap[r.district]=[]),dMap[r.district].push(r.fca))});const distData=Object.entries(dMap).map(([k,v])=>({k:k,a:avg(v)})).sort((a,b)=>b.a-a.a).slice(0,20);killChart("ch-fca-dist"),makeVBar("ch-fca-dist",distData.map(x=>x.k),[{label:"متوسط FCA",data:distData.map(x=>+x.a.toFixed(1)),backgroundColor:distData.map(x=>tierColor(x.a)+"BB"),borderColor:distData.map(x=>tierColor(x.a)),borderWidth:1,borderRadius:4}],"الحي","متوسط FCA (%)");const stMap={};D.forEach(r=>{r.stage&&null!=r.fca&&(stMap[r.stage]||(stMap[r.stage]=[]),stMap[r.stage].push(r.fca))});const stData=Object.entries(stMap).map(([k,v])=>({k:k,a:avg(v)}));killChart("ch-fca-stage"),makeVBar("ch-fca-stage",stData.map(x=>x.k),[{label:"متوسط FCA",data:stData.map(x=>+x.a.toFixed(1)),backgroundColor:"#0891B2BB",borderColor:"#0891B2",borderWidth:1,borderRadius:4}],"المرحلة","متوسط FCA (%)");const szMap={};D.forEach(r=>{r.schoolSize&&null!=r.fca&&(szMap[r.schoolSize]||(szMap[r.schoolSize]=[]),szMap[r.schoolSize].push(r.fca))});const szData=Object.entries(szMap).map(([k,v])=>({k:k,a:avg(v)})),szColors={"كبير":"#083D4F","متوسط":"#0891B2","صغير":"#059669"};killChart("ch-fca-size"),makeVBar("ch-fca-size",szData.map(x=>x.k),[{label:"متوسط FCA",data:szData.map(x=>+x.a.toFixed(1)),backgroundColor:szData.map(x=>(szColors[x.k]||"#64748b")+"BB"),borderColor:szData.map(x=>szColors[x.k]||"#64748b"),borderWidth:1,borderRadius:4}],"حجم المدرسة","متوسط FCA (%)")}function renderEnvCharts(){const D=FILTERED;/* ===== FCA × البيئة — Heatmap مخصص ===== */
+<script>const CFG={GAS_URL:"https://script.google.com/macros/s/AKfycbzOskqxjLPBsebLWOJh0Dw77x7r2PmWtxItw0mO7dyd0K5fZymyqOI_DF6a32MA5vA/exec",AUTO_INTERVAL_MS:3e5,RETRY_MAX:3,RETRY_DELAY_MS:4e3,LOW_FCA_THRESHOLD:50},COLS={minId:["minId"],schoolSeq:["schoolSeq"],mainMinId:["mainMinId"],buildingSeq:["buildingSeq"],buildingName:["اسم_المدرسة"],name:["اسم_المدرسة"],gender:["الجنس"],stage:["المرحلة"],ownership:["حكومي_مستأجر"],linkType:["نوع_الربط"],city:["المدينة_الرئيسية"],district:["الحي"],sector:["المحافظة"],districtId:["معرف_المحافظة"],classrooms:["عدد_الفصول"],schoolSize:["حجم_المدرسة"],buildingSize:["نوع_المبنى","حجم_المبنى"],lng:["خط_الطول"],lat:["خط_العرض"],acUnits:["وحدات_التكييف"],alerts:["عدد_البلاغات"],equipment:["التجهيزات"],preventive:["الصيانة_الوقائية"],drainage:["خنادق_الصرف"],fca:["قيمة_FCA"],envScore:["درجة_البيئة_المدرسية"],envText:["البيئة_المدرسية_نص"],contractId:["معرف_العقد"],contractMaint:["رقم_عقد_الصيانة"],contractAC:["رقم_عقد_التكييف"],contractClean:["رقم_عقد_النظافة"],contrMaint:["مقاول_الصيانة"],contrAC:["مقاول_التكييف"],contrClean:["مقاول_النظافة"],projMaint:["رقم_مشروع_الصيانة"],projAC:["رقم_مشروع_التكييف"],projClean:["رقم_مشروع_النظافة"],expMaint:["حالة_الصيانة","تاريخ_انتهاء_الصيانة"],expClean:["حالة_النظافة","تاريخ_انتهاء_النظافة"],expAC:["حالة_التكييف","تاريخ_انتهاء_التكييف"],notes:["ملاحظات"],description:["وصف_الصنف"],quantity:["الكمية"],unitValue:["قيمة_وحدة_البيئة","سعر_الوحدة"],subscriptionStatus:["حالة_الاشتراك"],students:["عدد_الطلاب"],buildingAge:["عمر_المبني"],ayenScore:["تقييم_عاين"]},TIER={critical:{label:"حرج",color:"#DC2626",bg:"#FEF2F2",min:0,max:24.99},fair:{label:"متوسط",color:"#D97706",bg:"#FFFBEB",min:25,max:49.99},good:{label:"جيد",color:"#059669",bg:"#ECFDF5",min:50,max:74.99},vgood:{label:"ممتاز",color:"#0891B2",bg:"#ECFEFF",min:75,max:100}},PALETTE=["#083D4F","#0891B2","#059669","#D97706","#DC2626","#7C3AED","#0E7490","#B8860B","#1D4ED8","#9333EA","#0F766E","#C2410C"];let RAW=[],FILTERED=[],CHARTS={},autoTimer=null,retryCount=0,_filterTimer=null;const TBL={cur:0,PAGE:50};function getVal(row,field){for(const k of COLS[field]||[field]){const v=row[k];if(null!=v&&""!==v&&"#N/A"!==v&&"NaT"!==v)return v}return null}const num=v=>{if(null==v||""===v||"#N/A"===v||"NaT"===v)return null;const n=parseFloat(String(v).replace(/,/g,""));return isFinite(n)?n:null},fmt=(v,d=0)=>null==v?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}),pct=(v,d=1)=>null==v?"—":fmt(v,d)+"%",esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])),avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;function getTier(v){return null==v?null:v<=24.99?"critical":v<=49.99?"fair":v<=74.99?"good":"vgood"}const tierColor=v=>TIER[getTier(v)]?.color||"#64748b",tierBg=v=>TIER[getTier(v)]?.bg||"#f1f5f9";function killChart(id){if(CHARTS[id]){try{CHARTS[id].destroy()}catch(_){}delete CHARTS[id]}}function setDot(s){document.getElementById("dot").className="dot "+s}function setProgress(p){const b=document.getElementById("prog");b.style.width=p+"%",p>=100&&setTimeout(()=>b.style.width="0%",600)}function setText(id,v){const el=document.getElementById(id);el&&(el.textContent=v)}function setBtn(loading){const btn=document.getElementById("btnReload");btn.disabled=loading,btn.textContent=loading?"جاري...":"↻ تحديث"}function showToast(html,type){document.getElementById("toast-area").innerHTML=`<div class="toast ${type}">${html}</div>`}function clearToast(){document.getElementById("toast-area").innerHTML=""}function debounceFilter(){clearTimeout(_filterTimer),_filterTimer=setTimeout(applyFilters,300)}function updateDistrictBySector(){
+  const city = document.getElementById("fCity").value;
+  const sector = document.getElementById("fSector").value;
+  const el = document.getElementById("fDistrict");
+  if(!el) return;
+  const prevDistrict = el.value;
+  const allLabel = "en"===LANG ? "All" : "الكل";
+  // Filter source: if sector selected → districts of that sector; else if city selected → districts of that city; else all
+  let filtered;
+  if(sector){
+    filtered = [...new Set(RAW.filter(r=>r.sector===sector).map(r=>r.district).filter(d=>d&&"—"!==d&&"#N/A"!==d))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar"));
+  } else if(city){
+    filtered = [...new Set(RAW.filter(r=>r.city===city).map(r=>r.district).filter(d=>d&&"—"!==d&&"#N/A"!==d))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar"));
+  } else {
+    filtered = [...new Set(RAW.map(r=>r.district).filter(d=>d&&"—"!==d&&"#N/A"!==d))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar"));
+  }
+  el.innerHTML = `<option value="">${allLabel}</option>` + filtered.map(v=>`<option value="${v}">${v}</option>`).join("");
+  // Restore previous value if still valid
+  if(prevDistrict && [...el.options].some(o=>o.value===prevDistrict)){
+    el.value = prevDistrict;
+  } else {
+    el.value = "";
+  }
+}
+function updateSectorByCity(){
+  const city = document.getElementById("fCity").value;
+  const el = document.getElementById("fSector");
+  if(!el) return;
+  const prevSector = el.value;
+  // Build filtered sector list based on selected city
+  const allLabel = "en"===LANG ? "All" : "الكل";
+  if(!city){
+    // No city selected: show all sectors
+    const allSectors = [...new Set(RAW.map(r=>r.sector).filter(s=>s&&"—"!==s&&"#N/A"!==s))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar"));
+    el.innerHTML = `<option value="">${allLabel}</option>` + allSectors.map(v=>`<option value="${v}">${v}</option>`).join("");
+  } else {
+    // Filter sectors to only those belonging to the selected city
+    const filtered = [...new Set(RAW.filter(r=>r.city===city).map(r=>r.sector).filter(s=>s&&"—"!==s&&"#N/A"!==s))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar"));
+    el.innerHTML = `<option value="">${allLabel}</option>` + filtered.map(v=>`<option value="${v}">${v}</option>`).join("");
+  }
+  // Restore previous sector if still valid, otherwise reset
+  if(prevSector && [...el.options].some(o=>o.value===prevSector)){
+    el.value = prevSector;
+  } else {
+    el.value = "";
+  }
+}
+function buildDynamicFilters(){function fillSelect(id,values){const el=document.getElementById(id);if(!el)return;const prev=el.value,sorted=[...new Set(values.filter(v=>v&&"—"!==v&&"#N/A"!==v))].sort((a,b)=>a.localeCompare(b,"en"===LANG?"en":"ar")),allLabel="en"===LANG?"All":"الكل";el.innerHTML=`<option value="">${allLabel}</option>`+sorted.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join(""),prev&&sorted.includes(prev)&&(el.value=prev)}fillSelect("fCity",RAW.map(r=>r.city)),fillSelect("fStage",RAW.map(r=>r.stage)),fillSelect("fGender",RAW.map(r=>r.gender.replace(/\s+$/,""))),fillSelect("fSize",RAW.map(r=>r.schoolSize)),fillSelect("fOwner",RAW.map(r=>r.ownership)),fillSelect("fDistrict",RAW.map(r=>r.district)),fillSelect("fSector",RAW.map(r=>r.sector)),fillSelect("fSubStatus",RAW.map(r=>r.subscriptionStatus));const cities=[...new Set(RAW.map(r=>r.city).filter(c=>c))],sectors=[...new Set(RAW.map(r=>r.sector).filter(s=>s&&"#N/A"!==s))];document.getElementById("fg-city").style.display=cities.length>1?"":"none",document.getElementById("fg-sector").style.display=sectors.length>1?"":"none";const cityLabel=1===cities.length?cities[0]:cities.length>1?`${cities.length} ${"en"===LANG?"cities":"مدن"}`:"";setText("topTitle","en"===LANG?"Schools Dashboard":"لوحة بيانات المدارس"),setText("topSub",cityLabel?`${cityLabel} · Facilities Dashboard`:"Facilities Dashboard · CSV"),window._SHOW_CITY_COL=cities.length>1;const cityTh=document.getElementById("th-city");cityTh&&(cityTh.style.display=window._SHOW_CITY_COL?"":"none"),window._SHOW_SECTOR_COL=sectors.length>0;const sectorTh=document.getElementById("th-sector");sectorTh&&(sectorTh.style.display=window._SHOW_SECTOR_COL?"":"none")}function applyFilters(){const city=document.getElementById("fCity").value,sector=document.getElementById("fSector").value,stage=document.getElementById("fStage").value,gender=document.getElementById("fGender").value,size=document.getElementById("fSize").value,owner=document.getElementById("fOwner").value,fcaMin=parseFloat(document.getElementById("fFcaMin").value)||0,district=document.getElementById("fDistrict").value,subStatus=document.getElementById("fSubStatus")?.value||"",search=document.getElementById("fSearch").value.trim().toLowerCase(),linkChecked=[...document.querySelectorAll("#fLinkType input:checked")].map(cb=>cb.value);FILTERED=RAW.filter(r=>(!city||r.city===city)&&((!sector||r.sector===sector)&&((!stage||r.stage===stage)&&((!gender||r.gender.replace(/\s+$/,"")===gender.replace(/\s+$/,""))&&((!size||r.schoolSize===size)&&((!owner||r.ownership===owner)&&((!district||r.district===district)&&((!subStatus||r.subscriptionStatus===subStatus)&&(!(linkChecked.length&&!linkChecked.includes(r.linkType))&&((!fcaMin||!(null==r.fca||r.fca<fcaMin))&&!(search&&!r.name.toLowerCase().includes(search)&&!String(r.minId||"").toLowerCase().includes(search)&&!r.district.toLowerCase().includes(search)&&!r.sector.toLowerCase().includes(search)))))))))))),renderKPIs(),renderTierStrip();const activeId=document.querySelector(".panel.active")?.id;"tab-overview"===activeId&&renderOverviewCharts(),"tab-fca"===activeId&&renderFcaCharts(),"tab-env"===activeId&&renderEnvCharts(),"tab-stages"===activeId&&renderStageCharts(),"tab-contracts"===activeId&&renderContractCharts(),"tab-fm-contracts"===activeId&&renderFmContracts(),"tab-fm-tad"===activeId&&renderFmTad(),"tab-sys-main"===activeId&&renderSysMain(),"tab-sys-detail"===activeId&&renderSysDetail(),"tab-balagh"===activeId&&renderSingleMetricTab("balagh","alerts","البلاغات","#D97706","#FFFBEB","📢"),"tab-tajheez"===activeId&&renderSingleMetricTab("tajheez","equipment","التجهيزات","#059669","#ECFDF5","🏗️"),"tab-seyana"===activeId&&renderSingleMetricTab("seyana","preventive","الصيانة الوقائية","#0891B2","#ECFEFF","🔧"),"tab-khanadeq"===activeId&&renderKhanadeqTab(),"tab-map"===activeId&&renderMap(),"tab-spare"===activeId&&renderSpareTab(),"tab-students"===activeId&&renderStudentsTab(),"tab-ayen"===activeId&&renderAyenTab(),"tab-table"===activeId&&(TBL.cur=0,renderTable()),activeId&&"tab-overview"!==activeId||renderOverviewCharts()}function clearFilters(){["fCity","fSector","fStage","fGender","fSize","fOwner","fDistrict","fSubStatus"].forEach(id=>{const el=document.getElementById(id);el&&(el.value="")}),document.getElementById("fFcaMin").value="0",document.getElementById("fSearch").value="",document.querySelectorAll("#fLinkType input").forEach(cb=>cb.checked=!1),applyFilters()}function renderKPIs(){const D=FILTERED,total=D.length,govt=D.filter(r=>(r.ownership||"").includes("حكومي")).length,rented=D.filter(r=>(r.ownership||"").includes("مستأجر")).length,fcaArr=D.filter(r=>null!=r.fca).map(r=>r.fca),envArr=D.filter(r=>null!=r.envScore).map(r=>r.envScore),lowFca=fcaArr.filter(v=>v<CFG.LOW_FCA_THRESHOLD).length,dists=new Set(D.map(r=>r.district).filter(d=>d)).size,sectors=new Set(D.map(r=>r.sector).filter(s=>s)).size,classes=D.reduce((s,r)=>s+(r.classrooms||0),0),alertsTotal=D.reduce((s,r)=>s+(r.alerts||0),0),acTotal=D.reduce((s,r)=>s+(r.acUnits||0),0);setText("k-total",total.toLocaleString()),setText("k-total-sub",`${fcaArr.length.toLocaleString()} ${"en"===LANG?"with FCA score":"لها درجة FCA"} · ${sectors} ${"en"===LANG?"governorate":"محافظة"}`),setText("k-govt",govt.toLocaleString()),setText("k-rented",`${rented.toLocaleString()} ${"en"===LANG?"rented":"مستأجرة"}`),setText("k-fca-avg",pct(avg(fcaArr))),setText("k-fca-cnt",`${fcaArr.length.toLocaleString()} ${"en"===LANG?"schools assessed":"مدرسة مقيّمة"}`),setText("k-env-avg",pct(avg(envArr))),setText("k-env-cnt",`${envArr.length.toLocaleString()} ${"en"===LANG?"schools with score":"مدرسة لها درجة"}`),setText("k-low-fca",lowFca.toLocaleString()),setText("k-districts",dists.toLocaleString()),setText("k-classrooms",`${classes.toLocaleString()} ${"en"===LANG?"total classrooms":"فصل إجمالي"}`),setText("k-alerts-total",alertsTotal.toLocaleString()),setText("k-ac-total",acTotal.toLocaleString());const studArr=D.filter(r=>null!=r.students&&r.students>0),studTotal=studArr.reduce((s,r)=>s+r.students,0),studAvg=studArr.length?studTotal/studArr.length:null,studMax=studArr.length?studArr.reduce((mx,r)=>r.students>mx.students?r:mx,studArr[0]):null;setText("k-students-total",studTotal>0?studTotal.toLocaleString():"—"),setText("k-students-avg",null!=studAvg?`${"en"===LANG?"Avg":"متوسط"} ${Math.round(studAvg).toLocaleString()} ${"en"===LANG?"student/school":"طالب/مدرسة"}`:"—"),setText("k-students-ctx",studArr.length>0?`${"en"===LANG?"Based on":"استناداً لبيانات"} ${studArr.length.toLocaleString()} ${"en"===LANG?"schools":"مدرسة"}`:""),setText("k-students-max",studMax?studMax.students.toLocaleString():"—"),setText("k-students-max-name",studMax?studMax.name.slice(0,28):"—");const ageArr=D.filter(r=>null!=r.buildingAge&&r.buildingAge>0),ageAvg=ageArr.length?ageArr.reduce((s,r)=>s+r.buildingAge,0)/ageArr.length:null,ageOld=ageArr.filter(r=>r.buildingAge>40).length,ageNew=ageArr.filter(r=>r.buildingAge<10).length;setText("k-age-avg",null!=ageAvg?Math.round(ageAvg).toLocaleString():"—"),setText("k-age-cnt",`${ageArr.length.toLocaleString()} ${"en"===LANG?"buildings assessed":"مبنى مقيّم"}`),setText("k-age-old",ageOld.toLocaleString()),setText("k-age-old-pct",ageArr.length?`${"en"===LANG?"of":"من أصل"} ${ageArr.length.toLocaleString()} ${"en"===LANG?"assessed":"مبنى مقيّم"}`:""),setText("k-age-new",ageNew.toLocaleString()),setText("k-age-new-pct",ageArr.length?`${"en"===LANG?"of":"من أصل"} ${ageArr.length.toLocaleString()} ${"en"===LANG?"assessed":"مبنى مقيّم"}`:"")}function renderTierStrip(){const fcaArr=FILTERED.filter(r=>null!=r.fca),total=fcaArr.length,counts={critical:0,fair:0,good:0,vgood:0};fcaArr.forEach(r=>{const t=getTier(r.fca);t&&counts[t]++}),["crit","fair","good","vgood"].forEach((k,i)=>{const key=["critical","fair","good","vgood"][i];setText("t-"+k,counts[key]),setText("t-"+k+"-pct",total?Math.round(counts[key]/total*100)+"%":"—")}),setText("tier-sub",`${total.toLocaleString()} ${"en"===LANG?"schools assessed":"مدرسة مقيّمة"}`)}function showTab(name,el){document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active")),document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active")),document.getElementById("tab-"+name).classList.add("active"),el&&el.classList.add("active"),"overview"===name&&renderOverviewCharts(),"fca"===name&&renderFcaCharts(),"env"===name&&renderEnvCharts(),"stages"===name&&renderStageCharts(),"contracts"===name&&renderContractCharts(),"fm-contracts"===name&&renderFmContracts(),"fm-tad"===name&&renderFmTad(),"sys-main"===name&&renderSysMain(),"sys-detail"===name&&renderSysDetail(),"balagh"===name&&renderSingleMetricTab("balagh","alerts","البلاغات","#D97706","#FFFBEB","📢"),"tajheez"===name&&renderSingleMetricTab("tajheez","equipment","التجهيزات","#059669","#ECFDF5","🏗️"),"seyana"===name&&renderSingleMetricTab("seyana","preventive","الصيانة الوقائية","#0891B2","#ECFEFF","🔧"),"khanadeq"===name&&renderKhanadeqTab(),"elevators"===name&&renderElevatorsTab(),"cost"===name&&renderCostTab(),"map"===name&&renderMap(),"spare"===name&&renderSpareTab(),"students"===name&&renderStudentsTab(),"ayen"===name&&renderAyenTab(),"table"===name&&(TBL.cur=0,renderTable())}function makeDoughnut(id,dataMap,colorMap={}){killChart(id);const entries=Object.entries(dataMap).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);entries.length&&(CHARTS[id]=new Chart(document.getElementById(id),{type:"doughnut",data:{labels:entries.map(x=>x[0]||'—'),datasets:[{data:entries.map(x=>x[1]),backgroundColor:entries.map(([k],i)=>(colorMap[k]||PALETTE[i%PALETTE.length])+"DD"),borderWidth:2,borderColor:"#fff"}]},options:{maintainAspectRatio:!1,cutout:"60%",plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:12,padding:6}},tooltip:{callbacks:{label:ctx=>` ${ctx.label||'—'}: ${ctx.raw.toLocaleString()} مدرسة`}}}}}))}function makeHBar(id,labels,values,colors,maxVal=null,fullLabels=null){killChart(id);const displayLabels=labels.map(l=>String(l??"").length>28?String(l??"").slice(0,28)+"…":String(l??"")),tooltipLabels=fullLabels||labels;CHARTS[id]=new Chart(document.getElementById(id),{type:"bar",data:{labels:displayLabels,datasets:[{label:"",data:values,backgroundColor:colors,borderColor:colors.map(c=>String(c).replace("BB","FF")),borderWidth:1,borderRadius:4}]},options:{indexAxis:"y",maintainAspectRatio:!1,plugins:{legend:{display:!1},tooltip:{mode:"nearest",intersect:!0,callbacks:{title:ctx=>String(tooltipLabels[ctx[0].dataIndex]??ctx[0].label??'')||'—',label:ctx=>`  ${maxVal?ctx.raw+"%":Number(ctx.raw).toLocaleString()}`}}},scales:{x:{beginAtZero:!0,max:maxVal||void 0,ticks:{callback:v=>maxVal?v+"%":v.toLocaleString()}},y:{ticks:{font:{size:10},maxRotation:0},afterFit:s=>{s.width=Math.max(s.width,220)}}},onHover:(event,elements)=>{event.native.target.style.cursor=elements.length?"pointer":"default"}}})}function makeVBar(id,labels,datasets){killChart(id);const fullLabels=labels,displayLabels=labels.map(l=>"string"==typeof l&&l.length>16?l.slice(0,16)+"…":l);CHARTS[id]=new Chart(document.getElementById(id),{type:"bar",data:{labels:displayLabels,datasets:datasets},options:{maintainAspectRatio:!1,plugins:{legend:{position:"top",labels:{font:{size:10},boxWidth:10,padding:10}},tooltip:{callbacks:{title:ctx=>String(fullLabels[ctx[0].dataIndex]??ctx[0].label??'')||'—'}}},scales:{y:{beginAtZero:!0,ticks:{font:{size:10}}},x:{ticks:{font:{size:10},maxRotation:30}}}}})}function renderOverviewCharts(){const D=FILTERED,histLabels=["0–9","10–19","20–29","30–39","40–49","50–59","60–69","70–79","80–89","90–100"];killChart("ch-fca-hist");const fcaBins=Array(10).fill(0);D.forEach(r=>{null!=r.fca&&fcaBins[Math.min(9,Math.floor(r.fca/10))]++}),CHARTS["ch-fca-hist"]=new Chart(document.getElementById("ch-fca-hist"),{type:"bar",data:{labels:histLabels,datasets:[{label:"عدد المدارس",data:fcaBins,backgroundColor:histLabels.map((_,i)=>tierColor(10*i+5)+"BB"),borderWidth:1,borderRadius:4}]},options:{maintainAspectRatio:!1,plugins:{legend:{display:!1}},scales:{y:{beginAtZero:!0,title:{display:!0,text:"عدد المدارس"}},x:{title:{display:!0,text:"نطاق FCA"},ticks:{font:{size:10}}}}}}),killChart("ch-env-hist");const envBins=Array(10).fill(0);D.forEach(r=>{null!=r.envScore&&envBins[Math.min(9,Math.floor(r.envScore/10))]++}),CHARTS["ch-env-hist"]=new Chart(document.getElementById("ch-env-hist"),{type:"bar",data:{labels:histLabels,datasets:[{label:"عدد المدارس",data:envBins,backgroundColor:"#059669BB",borderWidth:1,borderRadius:4}]},options:{maintainAspectRatio:!1,plugins:{legend:{display:!1}},scales:{y:{beginAtZero:!0,title:{display:!0,text:"عدد المدارس"}},x:{title:{display:!0,text:"نطاق البيئة"},ticks:{font:{size:10}}}}}});const sizeMap={},ownerMap={},linkMap={};D.forEach(r=>{r.schoolSize&&(sizeMap[r.schoolSize]=(sizeMap[r.schoolSize]||0)+1),r.ownership&&(ownerMap[r.ownership]=(ownerMap[r.ownership]||0)+1),r.linkType&&"#N/A"!==r.linkType&&(linkMap[r.linkType]=(linkMap[r.linkType]||0)+1)}),makeDoughnut("ch-size",sizeMap,{"كبير":"#083D4F","متوسط":"#0891B2","صغير":"#059669"}),makeDoughnut("ch-owner",ownerMap,{"حكومي":"#083D4F","مستأجر":"#D97706"}),makeDoughnut("ch-link",linkMap,{"مستقل":"#0891B2","مشترك أساسي":"#059669"});const subMap={};D.forEach(r=>{r.subscriptionStatus&&(subMap[r.subscriptionStatus]=(subMap[r.subscriptionStatus]||0)+1)}),makeDoughnut("ch-sub-status",subMap,{"مستقل":"#0891B2","مشترك أساسي":"#059669"})}function renderFcaCharts(){const D=FILTERED,withFca=D.filter(r=>null!=r.fca).sort((a,b)=>a.fca-b.fca),bot=withFca.slice(0,20),top=[...withFca].reverse().slice(0,20);makeHBar("ch-fca-bot",bot.map(r=>r.name),bot.map(r=>+r.fca.toFixed(1)),bot.map(r=>tierColor(r.fca)+"BB"),100,bot.map(r=>r.name)),makeHBar("ch-fca-top",top.map(r=>r.name),top.map(r=>+r.fca.toFixed(1)),top.map(r=>tierColor(r.fca)+"BB"),100,top.map(r=>r.name));const dMap={};D.forEach(r=>{r.district&&null!=r.fca&&(dMap[r.district]||(dMap[r.district]=[]),dMap[r.district].push(r.fca))});const distData=Object.entries(dMap).map(([k,v])=>({k:k,a:avg(v)})).sort((a,b)=>b.a-a.a).slice(0,20);killChart("ch-fca-dist"),makeVBar("ch-fca-dist",distData.map(x=>x.k),[{label:"متوسط FCA",data:distData.map(x=>+x.a.toFixed(1)),backgroundColor:distData.map(x=>tierColor(x.a)+"BB"),borderColor:distData.map(x=>tierColor(x.a)),borderWidth:1,borderRadius:4}],"الحي","متوسط FCA (%)");const stMap={};D.forEach(r=>{r.stage&&null!=r.fca&&(stMap[r.stage]||(stMap[r.stage]=[]),stMap[r.stage].push(r.fca))});const stData=Object.entries(stMap).map(([k,v])=>({k:k,a:avg(v)}));killChart("ch-fca-stage"),makeVBar("ch-fca-stage",stData.map(x=>x.k),[{label:"متوسط FCA",data:stData.map(x=>+x.a.toFixed(1)),backgroundColor:"#0891B2BB",borderColor:"#0891B2",borderWidth:1,borderRadius:4}],"المرحلة","متوسط FCA (%)");const szMap={};D.forEach(r=>{r.schoolSize&&null!=r.fca&&(szMap[r.schoolSize]||(szMap[r.schoolSize]=[]),szMap[r.schoolSize].push(r.fca))});const szData=Object.entries(szMap).map(([k,v])=>({k:k,a:avg(v)})),szColors={"كبير":"#083D4F","متوسط":"#0891B2","صغير":"#059669"};killChart("ch-fca-size"),makeVBar("ch-fca-size",szData.map(x=>x.k),[{label:"متوسط FCA",data:szData.map(x=>+x.a.toFixed(1)),backgroundColor:szData.map(x=>(szColors[x.k]||"#64748b")+"BB"),borderColor:szData.map(x=>szColors[x.k]||"#64748b"),borderWidth:1,borderRadius:4}],"حجم المدرسة","متوسط FCA (%)")}function renderEnvCharts(){const D=FILTERED;/* ===== FCA × البيئة — Heatmap مخصص ===== */
 (function renderFcaEnvHeatmap(){
   const wrap=document.getElementById("ch-scatter-heatmap");
   if(!wrap)return;
@@ -2563,7 +2610,9 @@ tbody tr:hover td { background: rgba(8,145,178,.05) !important; }
 function _sysExportSafeName(name){return String(name||"").replace(/[\\/:*?"<>|]+/g,"_").replace(/\s+/g,"_").replace(/^_+|_+$/g,"")}
 function _sysCsvCell(v){return `"${String(v??"").replace(/"/g,'""')}"`}
 function _sysDownloadFile(filename,content,mime){const blob=new Blob([content],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.style.display="none";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},150)}
-function _sysExcelTableHTML(title,headers,rows){const escHtml=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");return`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table border="1"><tr>${headers.map(h=>`<th>${escHtml(h)}</th>`).join("")}</tr>${rows.map(row=>`<tr>${row.map(v=>`<td>${escHtml(v)}</td>`).join("")}</tr>`).join("")}</table></body></html>`}
+function _sysExcelTableHTML(title,headers,rows){const escHtml=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");return`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table border="1"><tr>${headers.map(h=>`<th>${escHtml(h)}</th>`).join("")}</tr>${rows.map(row=>`<tr>${row.map(v=>`<td>${escHtml(v)}</td>`).join("")}</tr>`).join("")}</table>
+
+</body></html>`}
 function _sysDateVal(v){if(!v)return"";if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);const s=String(v);return s.length>=10?s.slice(0,10):s}
 function _sysNum(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toFixed(d):""}
 window.exportSysMainCSV=function(){const isEn="en"===LANG,systems=(window._sysMainSystems||[]).filter(s=>"6"!==s),rows=(window._sysMainRows||[]).filter(r=>{const q=(document.getElementById("sysm-search")?.value||"").toLowerCase().trim();return!q||String(r.name||"").toLowerCase().includes(q)||String(r.city||"").toLowerCase().includes(q)||String(r.eng||"").toLowerCase().includes(q)}),headers=isEn?["School Name","City","Total Score","Tier",...systems,"Visit Date","Engineer"]:["اسم المدرسة","المدينة","الدرجة الكلية","الفئة",...systems,"تاريخ الزيارة","المهندس"],csv=[headers.map(_sysCsvCell).join(",")];rows.forEach(r=>{csv.push([r.name||"",r.city||"",_sysNum(r.score,1),r.tier||"",...systems.map(s=>{const sg=r.systems?.[s];return sg?+(sg.sum/sg.cnt).toFixed(1):""}),_sysDateVal(r.date),r.eng||""].map(_sysCsvCell).join(","))});_sysDownloadFile(`sys_main_${_sysExportSafeName(isEn?"data":"الأنظمة_الرئيسية")}_${new Date().toISOString().slice(0,10)}.csv`,`\ufeff${csv.join("\r\n")}`,"text/csv;charset=utf-8;")}
@@ -4783,5 +4832,314 @@ window.renderElevatorsTab = function () {
   }
 
 })();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   تبويب خنادق الصرف — عرض متكامل بناءً على بيانات المدن
+   ══════════════════════════════════════════════════════════════ */
+
+function renderKhanadeqTab() {
+  const el = document.getElementById('khanadeq-content');
+  if (!el) return;
+
+  // ══════════════════════════════════════════════════════
+  // 🔧 عدّل أرقام khanadeq هنا — عدد المدارس من الملخص
+  // ══════════════════════════════════════════════════════
+  const cityData = [
+    { city: "مكة",      schools: 46,   khanadeq: 46   },
+    { city: "جدة",      schools: 161,  khanadeq: 161  },
+    { city: "الطائف",   schools: 528,  khanadeq: 528  },
+    { city: "المدينة",  schools: 142,  khanadeq: 142  },
+    { city: "العلا",    schools: 73,   khanadeq: 73   },
+    { city: "ينبع",     schools: 178,  khanadeq: 178  },
+    { city: "المهد",    schools: 86,   khanadeq: 86   },
+    { city: "الليث",    schools: 157,  khanadeq: 157  },
+    { city: "القنفذة",  schools: 261,  khanadeq: 261  },
+    // الإجمالي: 1,632 مدرسة = 1,632 خندق — عدّل khanadeq لكل مدينة لو تغير
+  ];
+  // ══════════════════════════════════════════════════════
+
+  const totalSchools = cityData.reduce((s, r) => s + r.schools, 0);
+  const totalKhanadeq = cityData.reduce((s, r) => s + (r.khanadeq || 0), 0);
+  const citiesWithData = cityData.filter(r => r.khanadeq > 0).length;
+  const avgPerSchool = totalKhanadeq > 0 && totalSchools > 0
+    ? (totalKhanadeq / totalSchools).toFixed(2)
+    : '—';
+  const maxCity = cityData.length
+    ? cityData.reduce((mx, r) => r.khanadeq > mx.khanadeq ? r : mx, cityData[0])
+    : null;
+
+  // ── ألوان المدن ──
+  const CITY_COLORS = [
+    '#083D4F','#0891B2','#059669','#D97706',
+    '#7C3AED','#0E7490','#DC2626','#B8860B','#1D4ED8'
+  ];
+
+  // ── نسب الخنادق لكل مدرسة ──
+  const ratios = cityData.map(r => ({
+    ...r,
+    ratio: r.schools > 0 ? +(r.khanadeq / r.schools).toFixed(2) : 0
+  }));
+
+
+  el.innerHTML = `
+  <!-- ── KPIs ── -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="card" style="border-top:3px solid #7C3AED">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">إجمالي المدارس</div>
+      <div style="font-size:28px;font-weight:800;color:#7C3AED">${totalSchools.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">في ${cityData.length} مدن</div>
+    </div>
+    <div class="card" style="border-top:3px solid #0891B2">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">إجمالي خنادق الصرف</div>
+      <div style="font-size:28px;font-weight:800;color:#0891B2">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : '—'}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${citiesWithData > 0 ? citiesWithData + ' مدن لها بيانات' : 'أدخل الأرقام في الكود'}</div>
+    </div>
+    <div class="card" style="border-top:3px solid #059669">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">متوسط خندق / مدرسة</div>
+      <div style="font-size:28px;font-weight:800;color:#059669">${avgPerSchool}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">خندق لكل مدرسة</div>
+    </div>
+    <div class="card" style="border-top:3px solid #D97706">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">أعلى مدينة</div>
+      <div style="font-size:28px;font-weight:800;color:#D97706">${maxCity && maxCity.khanadeq > 0 ? maxCity.khanadeq.toLocaleString() : '—'}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${maxCity && maxCity.khanadeq > 0 ? maxCity.city : 'لا توجد بيانات بعد'}</div>
+    </div>
+  </div>
+
+  <!-- ── مؤشر توجيهي ── -->
+  ${totalKhanadeq === 0 ? `
+  <div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:1.5px dashed #7C3AED55;
+    border-radius:16px;padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+    <div style="font-size:28px">⚙️</div>
+    <div>
+      <div style="font-size:13px;font-weight:800;color:#5B21B6;margin-bottom:4px">أضف بيانات خنادق الصرف</div>
+      <div style="font-size:11px;color:#7C3AED;line-height:1.6">
+        عدّل قيم <code style="background:#DDD6FE;padding:1px 6px;border-radius:4px">khanadeq</code> في الجزء المخصص داخل الكود<br>
+        ابحث عن التعليق: <code style="background:#DDD6FE;padding:1px 6px;border-radius:4px">🔧 بيانات خنادق الصرف — عدّل الأرقام هنا فقط</code>
+      </div>
+    </div>
+  </div>` : ''}
+
+  <!-- ── جدول المدن ── -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED">🕳️</span>
+      ملخص خنادق الصرف حسب المدينة
+      <span class="sub">${cityData.length} مدينة · ${totalSchools.toLocaleString()} مدرسة</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:right;padding-right:18px">المدينة</th>
+            <th>عدد المدارس</th>
+            <th>خنادق الصرف</th>
+            <th>خندق / مدرسة</th>
+            <th>نسبة التغطية</th>
+            <th>التوزيع</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cityData.map((r, i) => {
+            const ratio = r.schools > 0 ? (r.khanadeq / r.schools).toFixed(2) : '—';
+            const pctOfTotal = totalKhanadeq > 0 ? (r.khanadeq / totalKhanadeq * 100).toFixed(1) : 0;
+            const barW = totalKhanadeq > 0 ? Math.round(r.khanadeq / totalKhanadeq * 100) : 0;
+            const color = CITY_COLORS[i % CITY_COLORS.length];
+            return `<tr>
+              <td style="text-align:right;padding-right:18px;font-weight:700">${r.city}</td>
+              <td style="font-weight:700;color:#083D4F">${r.schools.toLocaleString()}</td>
+              <td style="font-weight:800;color:${color};font-size:15px">${r.khanadeq > 0 ? r.khanadeq.toLocaleString() : '—'}</td>
+              <td style="font-weight:700;color:#059669">${r.khanadeq > 0 ? ratio : '—'}</td>
+              <td style="font-size:11px;color:var(--tx-muted)">${r.khanadeq > 0 ? pctOfTotal + '%' : '—'}</td>
+              <td style="min-width:120px">
+                <div style="background:#F3F4F6;border-radius:999px;height:8px;overflow:hidden;width:100%">
+                  <div style="width:${barW}%;height:100%;background:${color};border-radius:999px;transition:width .6s ease"></div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="background:#F8FAFC;border-top:2px solid #E0EAF0">
+            <td style="text-align:right;padding-right:18px;font-weight:800;color:#083D4F">الإجمالي</td>
+            <td style="font-weight:800;color:#083D4F">${totalSchools.toLocaleString()}</td>
+            <td style="font-weight:800;color:#7C3AED;font-size:15px">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : '—'}</td>
+            <td style="font-weight:800;color:#059669">${avgPerSchool}</td>
+            <td style="font-weight:700">100%</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── الرسوم البيانية ── -->
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">توزيع خنادق الصرف حسب المدينة</div>
+      <div class="chart-box" style="height:340px"><canvas id="ch-kh-city-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">نسبة خنادق الصرف لكل مدرسة (حسب المدينة)</div>
+      <div class="chart-box" style="height:340px"><canvas id="ch-kh-ratio-bar"></canvas></div>
+    </div>
+  </div>
+
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">التوزيع النسبي لخنادق الصرف</div>
+      <div class="chart-box" style="height:300px"><canvas id="ch-kh-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">خنادق الصرف مقابل عدد المدارس</div>
+      <div class="chart-box" style="height:300px"><canvas id="ch-kh-scatter"></canvas></div>
+    </div>
+  </div>
+
+
+  `;
+
+  // رسم الرسوم البيانية
+  requestAnimationFrame(() => {
+    const labels = cityData.map(r => r.city);
+    const kValues = cityData.map(r => r.khanadeq);
+    const colors = cityData.map((_, i) => CITY_COLORS[i % CITY_COLORS.length]);
+
+    // 1) مخطط الأعمدة - عدد الخنادق
+    killChart('ch-kh-city-bar');
+    if (document.getElementById('ch-kh-city-bar') && kValues.some(v => v > 0)) {
+      CHARTS['ch-kh-city-bar'] = new Chart(document.getElementById('ch-kh-city-bar'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'خنادق الصرف',
+            data: kValues,
+            backgroundColor: colors.map(c => c + '99'),
+            borderColor: colors,
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    // 2) مخطط النسبة خندق/مدرسة
+    killChart('ch-kh-ratio-bar');
+    if (document.getElementById('ch-kh-ratio-bar')) {
+      const ratioVals = cityData.map(r => r.schools > 0 ? +(r.khanadeq / r.schools).toFixed(2) : 0);
+      CHARTS['ch-kh-ratio-bar'] = new Chart(document.getElementById('ch-kh-ratio-bar'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'خندق / مدرسة',
+            data: ratioVals,
+            backgroundColor: colors.map(c => c + '88'),
+            borderColor: colors,
+            borderWidth: 1.5,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    // 3) دائرة التوزيع النسبي
+    killChart('ch-kh-pie');
+    if (document.getElementById('ch-kh-pie') && kValues.some(v => v > 0)) {
+      CHARTS['ch-kh-pie'] = new Chart(document.getElementById('ch-kh-pie'), {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: kValues,
+            backgroundColor: colors.map(c => c + 'CC'),
+            borderColor: '#fff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          cutout: '55%',
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { font: { size: 10 }, padding: 10, boxWidth: 12 }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.label}: ${ctx.raw.toLocaleString()} خندق`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 4) scatter مدارس vs خنادق
+    killChart('ch-kh-scatter');
+    if (document.getElementById('ch-kh-scatter') && kValues.some(v => v > 0)) {
+      const scPts = cityData.filter(r => r.khanadeq > 0).map((r, i) => ({
+        x: r.schools, y: r.khanadeq, label: r.city,
+        c: CITY_COLORS[cityData.indexOf(r) % CITY_COLORS.length]
+      }));
+      CHARTS['ch-kh-scatter'] = new Chart(document.getElementById('ch-kh-scatter'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'المدن',
+            data: scPts.map(p => ({ x: p.x, y: p.y })),
+            backgroundColor: scPts.map(p => p.c + '99'),
+            borderColor: scPts.map(p => p.c),
+            borderWidth: 2,
+            pointRadius: 8,
+            pointHoverRadius: 11
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const pt = scPts[ctx.dataIndex];
+                  return [
+                    ` ${pt ? pt.label : ''}`,
+                    ` المدارس: ${ctx.raw.x.toLocaleString()}`,
+                    ` الخنادق: ${ctx.raw.y.toLocaleString()}`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'عدد المدارس' }, beginAtZero: true },
+            y: { title: { display: true, text: 'خنادق الصرف' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+  });
+}
 </script>
 </body></html>

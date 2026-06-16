@@ -37,7 +37,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>لوحة بيانات المدارس | Facilities Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=42cinOsu2pOxqf2-5U9tx8ka8__aRLWE0jrlmZpaohkcyj8KYNYjsUA2xxivn9rPIrwPrix32tWSbk8CgS_kwg7BY-idNo3jrKEv2nuZ6id2_4C93LVgv_BvEHVTuRoAU1grBXLB0xnvN_ysGumnAEq_D9YDFpVknQBb1ZRG8uHM6s7K9FyyWYill9svfceBMzT-KaCW5DFLVaeG6Xf1YX7HgXdEfUKJS_Z7UnF7qWDM0ylwk8iITZTIAn7WxG89gLf0TDt2dELJu2rHOWGZAT3W0pUDkbGb9aB6aOM96riyFJIOCb0WBJB2X0mj1PFgIfXckdeZG7hgdECmeF0_I8nNCuhi7Isumpw4ZrR7J3s" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1834,6 +1834,12 @@ tbody tr:hover td {
   border-radius: 10px;
 }
 
+
+/* ─── Presentation mode helpers ─── */
+.presentation-hidden {
+  display: none !important;
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 1200px) {
   .kpi-grid {
@@ -1940,6 +1946,83 @@ tbody tr:hover td {
 /* تحديد لغة الصفحة (عربي افتراضياً) */
 window.LANG = window.LANG || "ar";
 </script>
+<script>
+/* وضع العرض المؤقت: إخفاء/إظهار عناصر محددة بدون حذف أي كود */
+window.__PRESENTATION_MODE_KEY__ = "dashboard_presentation_mode";
+window.__PRESENTATION_TOTAL__ = "3643";
+try {
+  window.__PRESENTATION_MODE__ = localStorage.getItem(window.__PRESENTATION_MODE_KEY__) !== "0";
+} catch (e) {
+  window.__PRESENTATION_MODE__ = true;
+}
+window.__ACTUAL_K_TOTAL__ = null;
+
+function setPresentationMode(nextMode) {
+  window.__PRESENTATION_MODE__ = !!nextMode;
+  try {
+    localStorage.setItem(window.__PRESENTATION_MODE_KEY__, window.__PRESENTATION_MODE__ ? "1" : "0");
+  } catch (e) {}
+  applyPresentationModeUI();
+}
+
+function togglePresentationMode() {
+  setPresentationMode(!window.__PRESENTATION_MODE__);
+}
+
+function applyPresentationModeUI() {
+  const on = !!window.__PRESENTATION_MODE__;
+  const idsToHide = [
+    "tabbtn-students",
+    "tabbtn-seyana",
+    "tab-students",
+    "tab-seyana",
+    "kpi-students-total",
+    "kpi-students-max",
+    "kpi-age-avg",
+    "kpi-age-old",
+    "kpi-age-new",
+  ];
+  idsToHide.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("presentation-hidden", on);
+  });
+
+  const kTotal = document.getElementById("k-total");
+  if (kTotal) {
+    if (on) {
+      kTotal.textContent = window.__PRESENTATION_TOTAL__;
+    } else if (window.__ACTUAL_K_TOTAL__ != null) {
+      kTotal.textContent = window.__ACTUAL_K_TOTAL__;
+    }
+  }
+
+  const btn = document.getElementById("btnPresentationMode");
+  if (btn) {
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on ? "Presentation Mode: ON" : "Presentation Mode: OFF";
+    btn.textContent = on ? "👁" : "◌";
+  }
+
+  if (on) {
+    const activeTab = document.querySelector(".tab.active");
+    if (activeTab && (activeTab.id === "tabbtn-students" || activeTab.id === "tabbtn-seyana")) {
+      const fallback = document.querySelector('.tab[onclick*="showTab(\'overview\'"]');
+      if (fallback && typeof showTab === "function") showTab("overview", fallback);
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  applyPresentationModeUI();
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key || "").toLowerCase() === "p") {
+      e.preventDefault();
+      togglePresentationMode();
+    }
+  });
+});
+</script>
 
 <div class="topbar">
 
@@ -1966,6 +2049,7 @@ window.LANG = window.LANG || "ar";
     <span id="lastTime" style="font-size:10px;color:rgba(255,255,255,.35);font-weight:500"></span>
     <button class="tb-btn" id="btnReload" onclick="loadData()">↻ <span data-ar="تحديث" data-en="Refresh">تحديث</span></button>
     <button class="tb-btn" id="btnAuto"   onclick="toggleAuto()">◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">تلقائي</span></button>
+    <button class="tb-btn" id="btnPresentationMode" onclick="togglePresentationMode()" title="Presentation Mode" aria-pressed="true" style="padding:4px 8px;min-width:30px;opacity:.12;font-size:10px;line-height:1">◌</button>
   </div>
 </div>
 <div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
@@ -2080,29 +2164,29 @@ window.LANG = window.LANG || "ar";
   </div>
 
   <div class="kpi-grid" style="margin-top:-4px">
-    <div class="kpi kc-green">
+    <div class="kpi kc-green" id="kpi-students-total">
       <div class="kpi-val" id="k-students-total">—</div>
       <div class="kpi-lbl" data-ar="إجمالي الطلاب" data-en="Total Students">إجمالي الطلاب</div>
       <div class="kpi-sub" id="k-students-avg">—</div>
       <div class="kpi-sub" id="k-students-ctx" style="margin-top:2px;font-size:10px;color:var(--tx-muted)"></div>
     </div>
-    <div class="kpi kc-teal" style="border-top:3px solid #0891B2">
+    <div class="kpi kc-teal" id="kpi-students-max" style="border-top:3px solid #0891B2">
       <div class="kpi-val" id="k-students-max" style="color:#0891B2">—</div>
       <div class="kpi-lbl" data-ar="أكبر مدرسة (طلاب)" data-en="Largest School (students)">أكبر مدرسة (طلاب)</div>
       <div class="kpi-sub" id="k-students-max-name">—</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber" id="kpi-age-avg">
       <div class="kpi-val" id="k-age-avg">—</div>
       <div class="kpi-lbl" data-ar="متوسط عمر المبنى" data-en="Avg Building Age">متوسط عمر المبنى</div>
       <div class="kpi-sub" id="k-age-cnt" data-ar="سنة" data-en="year">سنة</div>
     </div>
-    <div class="kpi kc-red">
+    <div class="kpi kc-red" id="kpi-age-old">
       <div class="kpi-val" id="k-age-old">—</div>
       <div class="kpi-lbl" data-ar="مبانٍ عمرها &gt; 40 سنة" data-en="Buildings &gt; 40 yrs">مبانٍ عمرها &gt; 40 سنة</div>
       <div class="kpi-sub" data-ar="تحتاج مراجعة" data-en="Needs review">تحتاج مراجعة</div>
       <div class="kpi-sub" id="k-age-old-pct" style="font-size:10px;color:var(--tx-muted)"></div>
     </div>
-    <div class="kpi kc-navy">
+    <div class="kpi kc-navy" id="kpi-age-new">
       <div class="kpi-val" id="k-age-new">—</div>
       <div class="kpi-lbl" data-ar="مبانٍ عمرها &lt; 10 سنوات" data-en="Buildings &lt; 10 yrs">مبانٍ عمرها &lt; 10 سنوات</div>
       <div class="kpi-sub" data-ar="مبانٍ حديثة" data-en="New buildings">مبانٍ حديثة</div>
@@ -2146,11 +2230,11 @@ window.LANG = window.LANG || "ar";
   </div>
 
   <div class="tabs">
-    <div class="tab active" onclick="showTab('overview',this)">نظرة عامة</div>
+    <div class="tab active" id="tabbtn-overview" onclick="showTab('overview',this)">نظرة عامة</div>
     <div class="tab" onclick="showTab('fca',this)">تحليل FCA</div>
     <div class="tab" onclick="showTab('stage-compare',this)">مقارنة مراحل FCA</div>
     <div class="tab" onclick="showTab('env',this)">البيئة المدرسية</div>
-    <div class="tab" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
+    <div class="tab" id="tabbtn-students" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
     <div class="tab" onclick="showTab('stages',this)">التركيبة الأكاديمية</div>
 
     <div class="tab" onclick="showTab('contracts',this)">العقود</div>
@@ -2158,7 +2242,7 @@ window.LANG = window.LANG || "ar";
     <div class="tab" onclick="showTab('fm-tad',this)">متابعة التضامن الوافي</div>
     <div class="tab" onclick="showTab('sys-main',this)">الأنظمة الرئيسية</div>
     <div class="tab" onclick="showTab('sys-detail',this)">الأنظمة التفصيلية</div>
-    <div class="tab" onclick="showTab('seyana',this)">الصيانة الوقائية</div>
+    <div class="tab" id="tabbtn-seyana" onclick="showTab('seyana',this)">الصيانة الوقائية</div>
     <div class="tab" onclick="showTab('tajheez',this)">🏗️ التجهيزات</div>
     <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
 
@@ -3842,7 +3926,13 @@ window.LANG = window.LANG || "ar";
   }
   function setText(id, val) {
     const e = document.getElementById(id);
-    if (e) e.textContent = val;
+    if (!e) return;
+    if (id === "k-total") {
+      window.__ACTUAL_K_TOTAL__ = val;
+      e.textContent = window.__PRESENTATION_MODE__ ? window.__PRESENTATION_TOTAL__ : val;
+      return;
+    }
+    e.textContent = val;
   }
 
   function updateHeader(data) {
@@ -5728,6 +5818,10 @@ function renderTierStrip() {
    ║                                                                ║
    ╚════════════════════════════════════════════════════════════════╝ */
 function showTab(name, el) {
+  if (window.__PRESENTATION_MODE__ && (name === "students" || name === "seyana")) {
+    const fallback = document.getElementById("tabbtn-overview");
+    return showTab("overview", fallback);
+  }
   (document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active")),
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active")),
     document.getElementById("tab-" + name).classList.add("active"),

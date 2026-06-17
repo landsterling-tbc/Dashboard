@@ -6,7 +6,7 @@
 ║   1. 📊  نظرة عامة                      (tab-overview)
 ║   2. 📈  تحليل FCA                      (tab-fca)
 ║   3. 🌿  البيئة المدرسية                (tab-env)
-║   4. 🎓  المرحلة الدراسية            (tab-stages)
+║   4. 🎓  التركيبة الأكاديمية            (tab-stages)
 ║   5. 📋  العقود                         (tab-contracts)
 ║   6. 📌  متابعة عقود غير المجال         (tab-fm-contracts)
 ║   7. 💧  متابعة التضامن الوافي          (tab-fm-tad)
@@ -35,9 +35,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة بيانات المدارس | Facilities Dashboard</title>
+<title>لوحة بيانات إدارة المرافق التعليمية | Educational Facilities Management Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=42cinOsu2pOxqf2-5U9tx8ka8__aRLWE0jrlmZpaohkcyj8KYNYjsUA2xxivn9rPIrwPrix32tWSbk8CgS_kwg7BY-idNo3jrKEv2nuZ6id2_4C93LVgv_BvEHVTuRoAU1grBXLB0xnvN_ysGumnAEq_D9YDFpVknQBb1ZRG8uHM6s7K9FyyWYill9svfceBMzT-KaCW5DFLVaeG6Xf1YX7HgXdEfUKJS_Z7UnF7qWDM0ylwk8iITZTIAn7WxG89gLf0TDt2dELJu2rHOWGZAT3W0pUDkbGb9aB6aOM96riyFJIOCb0WBJB2X0mj1PFgIfXckdeZG7hgdECmeF0_I8nNCuhi7Isumpw4ZrR7J3s" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -173,8 +173,8 @@ body::before {
   background: linear-gradient(
     to left,
     transparent 0,
-    var(--red) 15%,
-    var(--red-3) 30%,
+    var(--teal-3) 15%,
+    var(--teal) 30%,
     rgba(255, 255, 255, 0.06) 47%,
     rgba(255, 255, 255, 0.06) 53%,
     var(--teal-3) 70%,
@@ -189,8 +189,8 @@ body::before {
   align-items: center;
   gap: 10px;
   padding: 0 20px;
-  background: linear-gradient(135deg, rgba(140, 28, 43, 0.2), rgba(168, 33, 53, 0.06));
-  border-left: 1px solid rgba(201, 66, 87, 0.16);
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.16), rgba(8, 145, 178, 0.05));
+  border-left: 1px solid rgba(8, 145, 178, 0.16);
 }
 .tb-tbc {
   flex: 1;
@@ -1375,8 +1375,8 @@ body::before {
 .tb-ls {
   min-width: 160px;
   padding: 0 16px;
-  background: linear-gradient(135deg, rgba(140, 28, 43, 0.16), rgba(168, 33, 53, 0.05));
-  border-left: 1px solid rgba(201, 66, 87, 0.12);
+  background: linear-gradient(135deg, rgba(8, 145, 178, 0.13), rgba(8, 145, 178, 0.04));
+  border-left: 1px solid rgba(8, 145, 178, 0.12);
 }
 .tb-tbc {
   gap: 12px;
@@ -2030,17 +2030,18 @@ document.addEventListener("DOMContentLoaded", () => {
     <img class="tb-logo"
          src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png"
          alt="Land Sterling"
-         style="height:22px;filter:brightness(0) invert(1);opacity:.9"
+         style="height:21px;filter:brightness(0) invert(1);opacity:.94;display:block"
          onerror="this.style.display='none'">
   </div>
+  <div class="tb-divider"></div>
 
   <div class="tb-tbc">
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183"
-         alt="TBC" style="height:38px;opacity:.85;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
+         alt="TBC" style="height:26px;opacity:.94;filter:brightness(0) invert(1);display:block" onerror="this.style.display='none'">
     <div class="tb-divider"></div>
     <div>
-      <div class="tb-title" id="topTitle">لوحة بيانات المدارس</div>
-      <div class="tb-sub" id="topSub">Facilities Dashboard · CSV</div>
+      <div class="tb-title" id="topTitle">لوحة بيانات إدارة المرافق التعليمية</div>
+      <div class="tb-sub" id="topSub">Facilities Management Intelligence</div>
     </div>
   </div>
 
@@ -2235,7 +2236,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="tab" onclick="showTab('stage-compare',this)">مقارنة مراحل FCA</div>
     <div class="tab" onclick="showTab('env',this)">البيئة المدرسية</div>
     <div class="tab" id="tabbtn-students" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
-    <div class="tab" onclick="showTab('stages',this)">المرحلة الدراسية</div>
+    <div class="tab" onclick="showTab('stages',this)">التركيبة الأكاديمية</div>
 
     <div class="tab" onclick="showTab('contracts',this)">العقود</div>
     <div class="tab" onclick="showTab('fm-contracts',this)">متابعة عقود غير المجال</div>
@@ -2243,7 +2244,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="tab" onclick="showTab('sys-main',this)">الأنظمة الرئيسية</div>
     <div class="tab" onclick="showTab('sys-detail',this)">الأنظمة التفصيلية</div>
     <div class="tab" id="tabbtn-seyana" onclick="showTab('seyana',this)">الصيانة الوقائية</div>
-    <div class="tab" onclick="showTab('tajheez',this)">🏗️ التجهيزات</div>
+    <div class="tab" onclick="showTab('tajheez',this)">التجهيزات</div>
     <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
 
     <div class="tab" onclick="showTab('balagh',this)">البلاغات</div>
@@ -2251,10 +2252,10 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="tab" onclick="showTab('ayen',this)">تقييم عاين</div>
 
     <div class="tab" onclick="showTab('elevators',this)">المصاعد</div>
-    <div class="tab" onclick="showTab('cost',this);anInitTab()" style="background:linear-gradient(135deg,rgba(184,134,11,.12),rgba(212,168,67,.08));color:#92400e;border:1.5px solid rgba(184,134,11,.25);font-weight:700">💰 التكلفة</div>
+    <div class="tab tab-premium" onclick="showTab('cost',this);anInitTab()">التكلفة</div>
     <div class="tab" onclick="showTab('map',this)">الخريطة</div>
     <div class="tab" onclick="showTab('table',this)">الجدول التفصيلي</div>
-    <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">💳 المدفوعات</div>
+    <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">المدفوعات</div>
   </div>
 
 
@@ -2405,7 +2406,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
-║  🎓  تبويب رقم 4: المرحلة الدراسية
+║  🎓  تبويب رقم 4: التركيبة الأكاديمية
 ║  ID: tab-stages
 ╠════════════════════════════════════════════════════════════════════╣
 ║  HTML الخاص بهذا التبويب ↓
@@ -3541,6 +3542,618 @@ document.addEventListener("DOMContentLoaded", () => {
   #tab-cost .an-cost-kpi {
     min-height: 104px;
   }
+}
+</style>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     طبقة التحديث البصري — Executive Theme Layer (v2)
+     لا تغيّر أي IDs / منطق JS — تنسيق بصري فقط (ألوان، مسافات، ظلال،
+     خطوط، استجابة للموبايل) فوق كل الطبقات السابقة.
+     Design language: "Ink & Brass" — قاعدة slate هادئة + Teal كلون
+     أساسي للبيانات + لمسة Brass/Gold فاخرة للعناصر المالية/المميزة،
+     مع خط Tajawal للأرقام والعناوين وIBM Plex Sans Arabic لجسم النص.
+═══════════════════════════════════════════════════════════════════════ -->
+<style id="executive-theme-v2">
+
+/* ─────────────────────────────────────────────
+   1) DESIGN TOKENS — لوحة ألوان أعمق وأكثر فخامة
+───────────────────────────────────────────────── */
+:root {
+  --navy: #0a2c3d;
+  --navy-2: #123c52;
+  --navy-deep: #071f2c;
+  --teal: #0c7f93;
+  --teal-2: #14a0ba;
+  --teal-3: #0a647a;
+  --teal-glow: rgba(12, 127, 147, 0.14);
+  --brass: #b08a4e;
+  --brass-2: #d4af6a;
+  --brass-glow: rgba(176, 138, 78, 0.18);
+  --red: #7d1f2c;
+  --red-2: #9c2a3a;
+  --red-3: #b8425a;
+  --warn: #bf7414;
+  --good: #066a52;
+  --good-2: #0e9488;
+  --purple: #6c2bd9;
+  --muted-ink: #6e8fa0;
+
+  --bg: #eef2f6;
+  --bg-2: #f7fafc;
+  --bg-3: #ffffff;
+  --bg-4: rgba(255, 255, 255, 0.92);
+  --bg-deep: #e3edf3;
+  --tx-main: #0c2330;
+  --tx-sec: #2c5468;
+  --tx-muted: #6d8794;
+  --bd-light: #dbe7ee;
+  --bd-mid: #b9d0db;
+  --bd-focus: rgba(12, 127, 147, 0.45);
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --r-2xl: 26px;
+  --r-pill: 999px;
+
+  --sh-card: 0 1px 2px rgba(8, 35, 48, 0.04), 0 14px 32px -10px rgba(8, 35, 48, 0.10);
+  --sh-soft: 0 10px 26px -6px rgba(8, 35, 48, 0.12);
+  --sh-hover: 0 18px 40px -10px rgba(12, 127, 147, 0.20), 0 6px 16px -4px rgba(8, 35, 48, 0.10);
+  --sh-lift: 0 22px 50px -14px rgba(8, 35, 48, 0.22);
+  --sh-gold: 0 10px 26px -6px rgba(176, 138, 78, 0.28);
+
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-blur: blur(18px) saturate(160%);
+  --glass-border: rgba(255, 255, 255, 0.55);
+
+  --ch-1: #0c7f93;
+  --ch-2: #0e9488;
+  --ch-3: #6c2bd9;
+  --ch-4: #b08a4e;
+  --ch-5: #b8425a;
+  --ch-6: #066a52;
+}
+
+/* ─────────────────────────────────────────────
+   2) GLOBAL — خلفية، طباعة، تمرير
+───────────────────────────────────────────────── */
+body, html {
+  font-size: 14.5px !important;
+  line-height: 1.66 !important;
+  letter-spacing: 0.001em;
+  background:
+    radial-gradient(1100px 560px at 102% -8%, rgba(12, 127, 147, 0.07), transparent 48%),
+    radial-gradient(820px 460px at -2% 102%, rgba(176, 138, 78, 0.05), transparent 46%),
+    linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%) !important;
+  color: var(--tx-main) !important;
+}
+b, strong { font-weight: 700; }
+:focus-visible {
+  outline: 2.5px solid var(--teal-2);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(110, 143, 160, 0.5) !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(12, 127, 147, 0.65) !important;
+}
+
+/* ─────────────────────────────────────────────
+   3) TOPBAR — شريط قيادة فاخر بزجاج خفيف
+───────────────────────────────────────────────── */
+.topbar {
+  height: 60px !important;
+  background:
+    linear-gradient(180deg, rgba(5, 18, 26, 0.98) 0%, rgba(7, 31, 44, 0.96) 100%) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 28px rgba(3, 12, 18, 0.28) !important;
+}
+.topbar::after {
+  height: 2px !important;
+  background: linear-gradient(
+    to left,
+    transparent 0,
+    var(--teal-3) 14%,
+    var(--teal) 28%,
+    rgba(255, 255, 255, 0.08) 46%,
+    rgba(255, 255, 255, 0.08) 54%,
+    var(--brass) 70%,
+    var(--teal-2) 88%,
+    transparent 100%
+  ) !important;
+  opacity: 1 !important;
+}
+.tb-ls {
+  min-width: auto !important;
+  padding: 0 18px !important;
+  background: transparent !important;
+  border-left: none !important;
+  display: flex !important;
+  align-items: center !important;
+}
+.tb-tbc { gap: 14px !important; padding: 0 18px !important; border-left: none !important; }
+.tb-right { gap: 9px !important; padding: 0 16px !important; }
+.tb-divider {
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.24) 25%, rgba(255, 255, 255, 0.24) 75%, transparent) !important;
+}
+.tb-logo, .tb-tbc img {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3)) !important;
+}
+.tb-title {
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.005em !important;
+  color: #fff !important;
+}
+.tb-sub {
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  color: rgba(255, 255, 255, 0.42) !important;
+}
+.tb-btn {
+  min-height: 33px !important;
+  border-radius: 11px !important;
+  padding: 7px 15px !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: none !important;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease !important;
+}
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18) !important;
+}
+#btnAuto.on {
+  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(12, 127, 147, 0.32) !important;
+}
+.dot {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+}
+
+.prog-bar { top: 60px !important; }
+.prog-fill {
+  background: linear-gradient(to left, var(--teal-2), var(--brass)) !important;
+  box-shadow: 0 0 10px rgba(12, 127, 147, 0.5) !important;
+}
+
+/* ─────────────────────────────────────────────
+   4) CONTENT — مسافات متوازنة
+───────────────────────────────────────────────── */
+.content {
+  padding: 24px 28px 34px !important;
+  max-width: 1820px !important;
+}
+
+/* ─────────────────────────────────────────────
+   5) CARDS — زجاج خفيف + شريط تمييز علوي + ظل فاخر
+───────────────────────────────────────────────── */
+.card {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid var(--bd-light) !important;
+  border-radius: var(--r-2xl) !important;
+  padding: 22px 24px !important;
+  box-shadow: var(--sh-card) !important;
+  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+.card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 0 auto 0 !important;
+  height: 3px !important;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0 !important;
+  background: linear-gradient(90deg, var(--teal-3), var(--teal-2) 55%, var(--brass-2)) !important;
+  opacity: 0.85 !important;
+}
+.card:hover {
+  transform: translateY(-2px) !important;
+  border-color: #c9dde7 !important;
+  box-shadow: var(--sh-hover) !important;
+}
+.card-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 11px !important;
+  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em !important;
+  color: var(--tx-main) !important;
+  padding-bottom: 13px !important;
+  margin-bottom: 16px !important;
+  border-bottom: 1px solid #e7eff4 !important;
+}
+.card-title-icon {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 11px !important;
+  font-size: 14px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+}
+.card-title .sub {
+  background: #eef6f9 !important;
+  color: var(--tx-sec) !important;
+  font-weight: 700 !important;
+  padding: 3px 10px !important;
+  border-radius: var(--r-pill) !important;
+}
+
+.g12, .g2, .g21, .g3, .g4 { gap: 18px !important; margin-bottom: 18px !important; }
+
+.chart-box {
+  background: linear-gradient(180deg, #fdfeff 0%, #fafcfe 100%) !important;
+  border: 1px solid #eaf1f6 !important;
+  border-radius: var(--r-lg) !important;
+  padding: 12px !important;
+}
+
+/* ─────────────────────────────────────────────
+   6) KPI TILES — بطاقات مؤشرات بصرة فاخرة
+───────────────────────────────────────────────── */
+.kpi-grid { gap: 16px !important; margin-bottom: 18px !important; }
+.kpi {
+  background: #fff !important;
+  border: 1px solid var(--bd-light) !important;
+  border-radius: var(--r-xl) !important;
+  padding: 19px 19px 17px !important;
+  box-shadow: 0 3px 10px rgba(8, 35, 48, 0.05) !important;
+  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+.kpi:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: var(--sh-soft) !important;
+  border-color: #d0e1ea !important;
+}
+.kpi::before { height: 3px !important; border-radius: var(--r-xl) var(--r-xl) 0 0 !important; }
+.kpi::after { opacity: 0.06 !important; width: 84px !important; height: 84px !important; }
+.kpi-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 11px !important;
+  opacity: 0.14 !important;
+  font-size: 16px !important;
+}
+.kpi-val {
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif !important;
+  font-size: 29px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.025em !important;
+}
+.kpi-lbl { font-size: 12.5px !important; font-weight: 700 !important; margin-top: 8px !important; }
+.kpi-sub { font-size: 11px !important; margin-top: 4px !important; opacity: 0.95; }
+
+/* ─────────────────────────────────────────────
+   7) TIER STRIP
+───────────────────────────────────────────────── */
+.tier-strip { gap: 11px !important; }
+.tier-seg {
+  border-radius: var(--r-lg) !important;
+  padding: 16px 15px 14px !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+.tier-seg:hover { transform: translateY(-2px) !important; box-shadow: 0 12px 26px rgba(0,0,0,.09) !important; }
+.tier-num { font-family: "Tajawal", sans-serif !important; font-size: 27px !important; font-weight: 900 !important; }
+
+/* ─────────────────────────────────────────────
+   8) FILTERS — زجاج خفيف + حقول مصقولة
+───────────────────────────────────────────────── */
+.filters-row {
+  gap: 14px !important;
+  padding: 17px 20px !important;
+  border-radius: var(--r-xl) !important;
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7) !important;
+  margin-bottom: 18px !important;
+}
+.fg-lbl {
+  font-size: 10.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: var(--teal-3) !important;
+  opacity: 0.85;
+}
+.finp, .fsel {
+  min-height: 42px !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--bd-light) !important;
+  background: #fff !important;
+  font-size: 13px !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease !important;
+}
+.finp:hover, .fsel:hover { border-color: var(--bd-mid) !important; }
+.finp:focus, .fsel:focus {
+  border-color: var(--teal) !important;
+  box-shadow: 0 0 0 3.5px var(--teal-glow) !important;
+}
+.f-clear {
+  min-height: 42px !important;
+  padding: 10px 16px !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+}
+.f-clear:hover {
+  background: #fdf2f2 !important;
+  color: var(--red-2) !important;
+  border-color: rgba(184, 66, 90, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Pills */
+.pill span {
+  border-radius: var(--r-pill) !important;
+  font-weight: 700 !important;
+  transition: all 0.16s ease !important;
+}
+.pill input:checked + span {
+  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
+  border-color: var(--teal-3) !important;
+  box-shadow: 0 3px 12px rgba(12, 127, 147, 0.26) !important;
+}
+
+/* ─────────────────────────────────────────────
+   9) TABS — شريط زجاجي + مؤشر نشط بتدرج هادئ
+───────────────────────────────────────────────── */
+.tabs {
+  gap: 7px !important;
+  padding: 11px !important;
+  border-radius: var(--r-xl) !important;
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7) !important;
+  top: 60px !important;
+}
+.tab {
+  padding: 10.5px 17px !important;
+  border-radius: 12px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  color: #7c98a6 !important;
+  border: 1px solid transparent !important;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease !important;
+}
+.tab:hover {
+  background: #f1f8fa !important;
+  color: var(--tx-sec) !important;
+  border-color: rgba(185, 208, 219, 0.55) !important;
+  transform: translateY(-1px) !important;
+}
+.tab.active {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--teal-3) 70%, var(--teal) 100%) !important;
+  box-shadow: 0 10px 22px -4px rgba(12, 127, 147, 0.32) !important;
+}
+.tab.tab-premium {
+  background: linear-gradient(135deg, rgba(176, 138, 78, 0.14), rgba(212, 175, 106, 0.07)) !important;
+  color: #8a6526 !important;
+  border: 1px solid rgba(176, 138, 78, 0.32) !important;
+  font-weight: 800 !important;
+}
+.tab.tab-premium:hover {
+  background: linear-gradient(135deg, rgba(176, 138, 78, 0.22), rgba(212, 175, 106, 0.12)) !important;
+  border-color: rgba(176, 138, 78, 0.48) !important;
+  color: #6f4f1a !important;
+}
+.tab.tab-premium.active {
+  background: linear-gradient(135deg, #8a6526, var(--brass)) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: var(--sh-gold) !important;
+}
+
+/* ─────────────────────────────────────────────
+   10) TABLES — رؤوس غامقة، صفوف هادئة، تمييز عند التحويم
+───────────────────────────────────────────────── */
+.tbl-wrap {
+  border-radius: var(--r-lg) !important;
+  border: 1px solid var(--bd-light) !important;
+  box-shadow: var(--sh-card) !important;
+}
+table { font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif !important; }
+thead th {
+  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.045em !important;
+  padding: 13px 12px !important;
+  border-bottom: 2px solid rgba(176, 138, 78, 0.35) !important;
+}
+tbody td { font-size: 12px !important; padding: 12px 12px !important; }
+tbody tr:nth-child(2n) td { background: #fbfdfe !important; }
+tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
+
+.pag-bar { padding: 11px 16px !important; border-radius: 0 0 var(--r-lg) var(--r-lg) !important; }
+.pag-btn { border-radius: 10px !important; font-weight: 700 !important; }
+.pag-btn:hover:not(:disabled) {
+  background: var(--teal) !important;
+  border-color: var(--teal) !important;
+  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22) !important;
+}
+.pag-btn.active {
+  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
+  border-color: transparent !important;
+}
+
+.badge {
+  padding: 4px 11px !important;
+  border-radius: var(--r-pill) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.025em !important;
+}
+
+/* ─────────────────────────────────────────────
+   11) SCHOOL ROWS / MINI BARS
+───────────────────────────────────────────────── */
+.school-row:hover { background: var(--bg-2) !important; }
+.mini-track { background: var(--bg-deep) !important; }
+
+/* ─────────────────────────────────────────────
+   12) CONTRACT CARDS / EMPTY STATES
+───────────────────────────────────────────────── */
+.contract-card {
+  border-radius: var(--r-lg) !important;
+  border-right: 3px solid var(--teal) !important;
+  background: #fff !important;
+}
+.contract-card:hover {
+  box-shadow: 0 8px 22px rgba(12, 127, 147, 0.12) !important;
+  border-color: #cfe3ea !important;
+}
+.empty-msg {
+  border-radius: var(--r-lg) !important;
+  background: linear-gradient(135deg, var(--bg-2), var(--bg-deep)) !important;
+  border: 1.5px dashed var(--bd-mid) !important;
+}
+
+/* ─────────────────────────────────────────────
+   13) MAP — خريطة فاخرة بزجاج خفيف للوسيلة والإحصاءات
+───────────────────────────────────────────────── */
+#map-container {
+  border-radius: var(--r-xl) !important;
+  border: 1px solid var(--bd-light) !important;
+  box-shadow: var(--sh-card) !important;
+}
+.map-legend, .map-stat {
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--sh-card) !important;
+}
+.map-stat:hover { box-shadow: var(--sh-soft) !important; transform: translateY(-1px) !important; }
+.map-ctrl-btn { border-radius: 11px !important; font-weight: 800 !important; }
+.map-ctrl-btn.active, .map-ctrl-btn:hover {
+  background: var(--teal) !important;
+  border-color: var(--teal) !important;
+  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22) !important;
+}
+/* Leaflet popup polish */
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  box-shadow: 0 14px 34px rgba(8, 35, 48, 0.22) !important;
+}
+.leaflet-popup-content { margin: 13px 15px !important; }
+.map-popup-name {
+  font-weight: 800 !important;
+  font-size: 12.5px !important;
+  color: var(--tx-main) !important;
+  margin-bottom: 6px !important;
+}
+.map-popup-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 4px 0 !important;
+  border-bottom: 1px solid #eef3f6 !important;
+  font-size: 11px !important;
+}
+.map-popup-row:last-child { border-bottom: none !important; }
+.map-popup-lbl { color: var(--tx-muted) !important; font-weight: 600 !important; }
+.map-popup-val { font-weight: 800 !important; color: var(--tx-main) !important; }
+
+/* ─────────────────────────────────────────────
+   14) TOASTS / SKELETONS / AN- (تبويب التكلفة والتحليلات)
+───────────────────────────────────────────────── */
+.toast, .an-toast { border-radius: 13px !important; box-shadow: 0 6px 18px rgba(8, 35, 48, 0.09) !important; }
+.an-skel-box {
+  border-radius: var(--r-lg) !important;
+  background: linear-gradient(90deg, #e6eff4 25%, #f3f9fb 50%, #e6eff4 75%) !important;
+}
+.an-data-bar {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 55%, var(--teal) 100%) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: 0 8px 22px rgba(8, 35, 48, 0.22) !important;
+}
+.an-data-bar::after { background: linear-gradient(90deg, transparent, var(--brass-2), transparent) !important; }
+.an-pill.active, .an-band-pill.active {
+  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
+  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22) !important;
+}
+.an-active-tag { border-color: rgba(12, 127, 147, 0.35) !important; color: var(--teal-3) !important; }
+#tab-cost .an-cost-kpi, #tab-cost .an-cost-sidebox, #tab-cost .an-cost-card, #tab-cost .an-cost-tablebox {
+  border-radius: var(--r-lg) !important;
+}
+#tab-cost .an-cost-tablebox thead tr {
+  background: linear-gradient(180deg, var(--navy) 0, var(--navy-deep) 100%) !important;
+}
+
+/* ─────────────────────────────────────────────
+   15) RESPONSIVE — تعزيز قوي لتجربة الموبايل
+───────────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 1024px) {
+  .content { padding: 18px 18px 26px !important; }
+  .g12, .g21 { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 960px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .g2, .g3 { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 768px) {
+  body, html { font-size: 13.5px !important; }
+  .content { padding: 14px 14px 22px !important; }
+  .card { padding: 18px !important; border-radius: var(--r-xl) !important; }
+  .topbar { height: auto !important; flex-wrap: wrap !important; }
+  .tb-ls, .tb-tbc { padding: 10px 14px !important; }
+  .tb-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding: 9px 14px 11px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
+  }
+  .prog-bar { top: auto !important; position: sticky !important; }
+  .tabs {
+    position: relative !important;
+    top: auto !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x proximity !important;
+  }
+  .tab { scroll-snap-align: start !important; white-space: nowrap !important; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+  .filters-row { padding: 14px !important; }
+  .finp, .fsel, .f-clear { width: 100% !important; min-width: 0 !important; }
+  .map-stat { min-width: calc(50% - 6px) !important; }
+  #map-container { height: 460px !important; }
+}
+@media (max-width: 560px) {
+  .kpi-grid { grid-template-columns: 1fr !important; }
+  .tier-strip, .contracts-grid { grid-template-columns: 1fr !important; }
+  .card-title { flex-wrap: wrap !important; }
+  .tb-btn span { display: none !important; }
+  .tb-btn { padding: 7px 10px !important; min-width: 36px !important; }
+  #btnPresentationMode { display: none !important; }
+  .map-stat { min-width: 100% !important; }
+}
+@media (max-width: 420px) {
+  .tb-sub { display: none !important; }
+  .tb-divider { display: none !important; }
 }
 </style>
 
@@ -5571,10 +6184,10 @@ function buildDynamicFilters() {
       : cities.length > 1
         ? `${cities.length} ${"en" === LANG ? "cities" : "مدن"}`
         : "";
-  (setText("topTitle", "en" === LANG ? "Schools Dashboard" : "لوحة بيانات المدارس"),
+  (setText("topTitle", "en" === LANG ? "Educational Facilities Management Dashboard" : "لوحة بيانات إدارة المرافق التعليمية"),
     setText(
       "topSub",
-      cityLabel ? `${cityLabel} · Facilities Dashboard` : "Facilities Dashboard · CSV",
+      cityLabel ? `${cityLabel} · Facilities Management Intelligence` : "Facilities Management Intelligence",
     ),
     (window._SHOW_CITY_COL = cities.length > 1));
   const cityTh = document.getElementById("th-city");
@@ -6493,7 +7106,7 @@ function renderEnvCharts() {
     )));
 }
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  🎓  JS تبويب: المرحلة الدراسية
+   ║  🎓  JS تبويب: التركيبة الأكاديمية
    ║  (tab-stages) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
 function renderStageCharts() {
@@ -11539,6 +12152,24 @@ if (document.readyState === "loading") {
   __scheduleDashboardLoad();
 }
 window.addEventListener("load", __scheduleDashboardLoad, { once: true });
+
+// تحميل بيانات تبويب التكلفة وتبويب المدفوعات تلقائياً عند فتح الداشبورد
+window.__COST_PAY_AUTO_STARTED__ = window.__COST_PAY_AUTO_STARTED__ || false;
+function __startCostPaymentsAutoLoad() {
+  if (window.__COST_PAY_AUTO_STARTED__) return;
+  window.__COST_PAY_AUTO_STARTED__ = true;
+  if (typeof window.renderCostTab === "function") window.renderCostTab();
+  if (typeof window.paymentsInitTab === "function") window.paymentsInitTab();
+}
+function __scheduleCostPaymentsAutoLoad() {
+  setTimeout(__startCostPaymentsAutoLoad, 0);
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", __scheduleCostPaymentsAutoLoad, { once: true });
+} else {
+  __scheduleCostPaymentsAutoLoad();
+}
+window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
 </script>
 
 <script id="premium-chart-overrides">
@@ -13392,83 +14023,84 @@ window.renderElevatorsTab = function () {
     const host = $("an-dash");
     if (!host) return;
     host.innerHTML = `
-      <div style="max-width:1800px;margin:0 auto;padding:20px 24px 28px">
-        <div id="cost-toast" style="min-height:40px;margin-bottom:12px"></div>
+        <div id="cost-toast" style="min-height:40px;margin-bottom:10px"></div>
 
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,#083D4F 0%,#0A5468 60%,#0891B2 100%);color:#fff;padding:16px 18px;border-radius:18px;box-shadow:0 4px 18px rgba(8,61,79,.18);margin-bottom:16px">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span id="cost-status-dot" style="width:10px;height:10px;border-radius:50%;background:#D97706;display:inline-block"></span>
-            <div>
-              <div style="font-size:15px;font-weight:900;line-height:1.25">Category Analysis</div>
-              <div id="cost-subtitle" style="font-size:11px;opacity:.7">All Cities · Complete Data</div>
-            </div>
-            <div id="cost-last-update" style="font-size:10px;opacity:.65"></div>
+        <div class="card mb14" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 18px">
+          <div class="card-title" style="margin:0;padding:0;border:0">
+            <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2">💰</span>
+            <span>تحليل التكلفة</span>
+            <span id="cost-status-dot" class="dot loading"></span>
+            <span id="cost-subtitle" class="sub">All Cities · Complete Data</span>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <button id="cost-reload-btn" onclick="window.costReload && window.costReload()" style="font-family:inherit;font-size:11px;font-weight:800;padding:7px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.12);color:#fff;cursor:pointer">↻ تحديث</button>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span id="cost-last-update" style="font-size:10px;color:var(--tx-muted)"></span>
+            <button id="cost-reload-btn" class="f-clear" onclick="window.costReload && window.costReload()">↻ تحديث</button>
           </div>
         </div>
 
         <div id="cost-skeleton" style="display:none;margin-bottom:14px">
-          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+          <div class="kpi-grid">
             ${Array.from({ length: 8 })
               .map(
                 () =>
-                  '<div style="height:112px;border-radius:18px;background:linear-gradient(90deg,#edf4f8 25%,#f7fbfd 50%,#edf4f8 75%);background-size:200% 100%;animation:costPulse 1.2s infinite"></div>',
+                  '<div style="height:112px;border-radius:20px;background:linear-gradient(90deg,#edf4f8 25%,#f7fbfd 50%,#edf4f8 75%);background-size:200% 100%;animation:costPulse 1.2s infinite"></div>',
               )
               .join("")}
           </div>
           <style>@keyframes costPulse{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
         </div>
 
-        <div id="cost-empty" style="display:none;padding:56px 20px;text-align:center;border-radius:18px;border:1px dashed #b9d1dd;background:linear-gradient(135deg,#f8fbfd,#eef5f8);color:#6b8795;font-size:13px;font-weight:700">
+        <div id="cost-empty" class="card" style="display:none;padding:56px 20px;text-align:center;color:var(--tx-muted);font-size:13px;font-weight:700">
           لا توجد بيانات تكلفة متاحة.
           <div id="cost-error" style="margin-top:8px;font-weight:600;color:#991b1b"></div>
         </div>
 
         <div id="cost-body" style="display:none">
-          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px">
+          <div class="kpi-grid">
             ${[
-              ["cost-k-categories", "Categories", "عدد الفئات"],
-              ["cost-k-subcats", "Sub Categories", "عدد الفئات الفرعية"],
-              ["cost-k-qty", "Total Qty", "إجمالي الكمية"],
-              ["cost-k-schools", "Schools", "إجمالي المدارس"],
-              ["cost-k-withqty", "With Qty", "مدارس بها كمية"],
-              ["cost-k-withoutqty", "Without Qty", "مدارس بدون كمية"],
-              ["cost-k-totalprice", "Total Price", "إجمالي السعر"],
-              ["cost-k-avgunit", "Avg Unit", "متوسط سعر الوحدة"],
+              ["cost-k-categories", "kc-blue", "Categories", "عدد الفئات"],
+              ["cost-k-subcats", "kc-teal", "Sub Categories", "عدد الفئات الفرعية"],
+              ["cost-k-qty", "kc-navy", "Total Qty", "إجمالي الكمية"],
+              ["cost-k-schools", "kc-green", "Schools", "إجمالي المدارس"],
+              ["cost-k-withqty", "kc-green", "With Qty", "مدارس بها كمية"],
+              ["cost-k-withoutqty", "kc-red", "Without Qty", "مدارس بدون كمية"],
+              ["cost-k-totalprice", "kc-amber", "Total Price", "إجمالي السعر"],
+              ["cost-k-avgunit", "kc-purple", "Avg Unit", "متوسط سعر الوحدة"],
             ]
               .map(
-                ([id, title, sub]) => `
-              <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:16px 16px 14px;box-shadow:0 2px 8px rgba(7,24,33,.04);min-height:112px;position:relative;overflow:hidden">
-                <div style="font-size:28px;font-weight:900;line-height:1.05;letter-spacing:-.03em" id="${id}">—</div>
-                <div style="margin-top:8px;font-size:12px;font-weight:800;color:#0b2530">${title}</div>
-                <div style="margin-top:4px;font-size:11px;color:#6b8795">${sub}</div>
+                ([id, kc, title, sub]) => `
+              <div class="kpi ${kc}">
+                <div class="kpi-val" id="${id}">—</div>
+                <div class="kpi-lbl">${title}</div>
+                <div class="kpi-sub">${sub}</div>
               </div>
             `,
               )
               .join("")}
           </div>
 
-          <div style="display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:start;margin-bottom:14px">
-            <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(7,24,33,.04);position:sticky;top:72px">
-              <div style="font-size:12px;font-weight:900;color:#0b2530;margin-bottom:10px;border-bottom:1px solid #e6eff4;padding-bottom:8px">الفلاتر</div>
-              <div style="display:grid;gap:10px">
-                <div>
-                  <div style="font-size:11px;font-weight:800;color:#2d5b6d;margin-bottom:6px">بحث</div>
-                  <input id="cost-search" oninput="window.costSearch && window.costSearch(this.value)" placeholder="اسم المدرسة / المدينة / الفئة" style="width:100%;min-height:40px;border:1px solid #d9e8ef;border-radius:10px;padding:8px 12px;background:#f8fbfd;font-family:inherit">
+          <div class="g12" style="align-items:start">
+            <div class="card" style="position:sticky;top:72px">
+              <div class="card-title">
+                <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">▤</span>
+                <span>الفلاتر</span>
+              </div>
+              <div style="display:grid;gap:12px">
+                <div class="fg">
+                  <div class="fg-lbl">بحث</div>
+                  <input class="finp" id="cost-search" oninput="window.costSearch && window.costSearch(this.value)" placeholder="🔍 اسم المدرسة / المدينة / الفئة" style="width:100%">
                 </div>
-                <div>
-                  <div style="font-size:11px;font-weight:800;color:#2d5b6d;margin-bottom:6px">المدينة</div>
-                  <select id="cost-city-filter" onchange="window.costCityFilter && window.costCityFilter(this.value)" style="width:100%;min-height:40px;border:1px solid #d9e8ef;border-radius:10px;padding:8px 12px;background:#f8fbfd;font-family:inherit"></select>
+                <div class="fg">
+                  <div class="fg-lbl">المدينة</div>
+                  <select class="fsel" id="cost-city-filter" onchange="window.costCityFilter && window.costCityFilter(this.value)" style="width:100%"></select>
                 </div>
-                <div>
-                  <div style="font-size:11px;font-weight:800;color:#2d5b6d;margin-bottom:6px">الفئة</div>
-                  <select id="cost-cat-filter" onchange="window.costCatFilter && window.costCatFilter(this.value)" style="width:100%;min-height:40px;border:1px solid #d9e8ef;border-radius:10px;padding:8px 12px;background:#f8fbfd;font-family:inherit"></select>
+                <div class="fg">
+                  <div class="fg-lbl">الفئة</div>
+                  <select class="fsel" id="cost-cat-filter" onchange="window.costCatFilter && window.costCatFilter(this.value)" style="width:100%"></select>
                 </div>
-                <div>
-                  <div style="font-size:11px;font-weight:800;color:#2d5b6d;margin-bottom:6px">الترتيب</div>
-                  <select id="cost-sort-filter" onchange="window.costSortFilter && window.costSortFilter(this.value)" style="width:100%;min-height:40px;border:1px solid #d9e8ef;border-radius:10px;padding:8px 12px;background:#f8fbfd;font-family:inherit">
+                <div class="fg">
+                  <div class="fg-lbl">الترتيب</div>
+                  <select class="fsel" id="cost-sort-filter" onchange="window.costSortFilter && window.costSortFilter(this.value)" style="width:100%">
                     <option value="qty_desc">الأعلى كمية</option>
                     <option value="qty_asc">الأقل كمية</option>
                     <option value="price_desc">الأعلى تكلفة</option>
@@ -13476,88 +14108,99 @@ window.renderElevatorsTab = function () {
                     <option value="school">اسم المدرسة</option>
                   </select>
                 </div>
-                <button onclick="window.costClearFilters && window.costClearFilters()" style="min-height:40px;border:1px solid #bdd1da;border-radius:10px;background:#fff;color:#2d5b6d;font-family:inherit;font-size:11px;font-weight:800;cursor:pointer">✕ مسح الفلاتر</button>
+                <button class="f-clear" onclick="window.costClearFilters && window.costClearFilters()" style="align-self:stretch">✕ مسح الفلاتر</button>
               </div>
-              <div style="margin-top:12px;font-size:11px;color:#6b8795;line-height:1.8">
+              <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd-light);font-size:11px;color:var(--tx-muted);line-height:1.8">
                 <div>• الاعتماد على ملف التكلفة فقط.</div>
                 <div>• التجميع يتم حسب المدرسة ثم الفئة.</div>
               </div>
             </div>
 
-            <div style="display:grid;gap:14px">
-              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
-                <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(7,24,33,.04)">
-                  <div style="font-size:12px;font-weight:900;color:#0b2530;margin-bottom:8px">أكبر الفئات حسب الكمية</div>
-                  <div style="height:320px"><canvas id="cost-chart-categories"></canvas></div>
+            <div style="display:grid;gap:16px">
+              <div class="g2" style="margin-bottom:0">
+                <div class="card" style="padding-bottom:14px">
+                  <div class="card-title">
+                    <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2">▦</span>
+                    <span>أكبر الفئات حسب الكمية</span>
+                  </div>
+                  <div class="chart-box" style="height:320px"><canvas id="cost-chart-categories"></canvas></div>
                 </div>
-                <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(7,24,33,.04)">
-                  <div style="font-size:12px;font-weight:900;color:#0b2530;margin-bottom:8px">أكبر المدن حسب التكلفة</div>
-                  <div style="height:320px"><canvas id="cost-chart-cities"></canvas></div>
+                <div class="card" style="padding-bottom:14px">
+                  <div class="card-title">
+                    <span class="card-title-icon" style="background:#F0FDF4;color:#059669">▦</span>
+                    <span>أكبر المدن حسب التكلفة</span>
+                  </div>
+                  <div class="chart-box" style="height:320px"><canvas id="cost-chart-cities"></canvas></div>
                 </div>
               </div>
 
-              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
-                <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(7,24,33,.04)">
-                  <div style="font-size:12px;font-weight:900;color:#0b2530;margin-bottom:8px">أهم الفئات الفرعية حسب التكلفة</div>
-                  <div style="height:320px"><canvas id="cost-chart-subcats"></canvas></div>
+              <div class="g2" style="margin-bottom:0">
+                <div class="card" style="padding-bottom:14px">
+                  <div class="card-title">
+                    <span class="card-title-icon" style="background:#FAF5FF;color:#7C3AED">▦</span>
+                    <span>أهم الفئات الفرعية حسب التكلفة</span>
+                  </div>
+                  <div class="chart-box" style="height:320px"><canvas id="cost-chart-subcats"></canvas></div>
                 </div>
-                <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;padding:14px;box-shadow:0 2px 8px rgba(7,24,33,.04)">
-                  <div style="font-size:12px;font-weight:900;color:#0b2530;margin-bottom:8px">أعلى المدارس تكلفة</div>
-                  <div style="height:320px"><canvas id="cost-chart-schools"></canvas></div>
+                <div class="card" style="padding-bottom:14px">
+                  <div class="card-title">
+                    <span class="card-title-icon" style="background:#FFFBEB;color:#D97706">▦</span>
+                    <span>أعلى المدارس تكلفة</span>
+                  </div>
+                  <div class="chart-box" style="height:320px"><canvas id="cost-chart-schools"></canvas></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px">
-            <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;box-shadow:0 2px 8px rgba(7,24,33,.04);overflow:hidden">
-              <div style="padding:14px 16px;border-bottom:1px solid #e6eff4;font-size:12px;font-weight:900;color:#0b2530;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-                <span>Category Analysis</span>
-                <span id="cost-cat-count" style="font-size:10px;color:#6b8795;font-weight:700"></span>
-              </div>
-              <div style="overflow:auto;max-height:420px">
-                <table style="width:100%;border-collapse:separate;border-spacing:0">
-                  <thead>
-                    <tr style="background:linear-gradient(180deg,#0b3443 0,#082030 100%)">
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">#</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px;text-align:right">Category</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Schools</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Sub Cats</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Qty</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Total Price</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cost-cat-tbody"></tbody>
-                </table>
-              </div>
+          <div class="card mb14" style="padding:0;overflow:hidden">
+            <div class="card-title" style="margin:0;padding:16px 18px;border-bottom:1px solid var(--bd-light)">
+              <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2">📋</span>
+              <span>تحليل الفئات</span>
+              <span class="sub" id="cost-cat-count"></span>
             </div>
+            <div class="tbl-wrap" style="max-height:420px;border:0;border-radius:0;box-shadow:none">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th style="text-align:right">الفئة</th>
+                    <th>المدارس</th>
+                    <th>الفئات الفرعية</th>
+                    <th>الكمية</th>
+                    <th>إجمالي السعر</th>
+                  </tr>
+                </thead>
+                <tbody id="cost-cat-tbody"></tbody>
+              </table>
+            </div>
+          </div>
 
-            <div style="background:#fff;border:1px solid #d9e8ef;border-radius:18px;box-shadow:0 2px 8px rgba(7,24,33,.04);overflow:hidden">
-              <div style="padding:14px 16px;border-bottom:1px solid #e6eff4;font-size:12px;font-weight:900;color:#0b2530;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-                <span>Schools Summary</span>
-                <span id="cost-school-count" style="font-size:10px;color:#6b8795;font-weight:700"></span>
-              </div>
-              <div style="overflow:auto;max-height:520px">
-                <table style="width:100%;border-collapse:separate;border-spacing:0">
-                  <thead>
-                    <tr style="background:linear-gradient(180deg,#0b3443 0,#082030 100%)">
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">#</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px;text-align:right">School</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">City</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Cats</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Sub Cats</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Qty</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Total Price</th>
-                      <th style="position:sticky;top:0;z-index:2;padding:12px 8px;color:rgba(255,255,255,.85);font-size:11px">Avg Unit</th>
-                    </tr>
-                  </thead>
-                  <tbody id="cost-school-tbody"></tbody>
-                </table>
-              </div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="card-title" style="margin:0;padding:16px 18px;border-bottom:1px solid var(--bd-light)">
+              <span class="card-title-icon" style="background:#F0FDF4;color:#059669">🏫</span>
+              <span>ملخص المدارس</span>
+              <span class="sub" id="cost-school-count"></span>
+            </div>
+            <div class="tbl-wrap" style="max-height:520px;border:0;border-radius:0;box-shadow:none">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th style="text-align:right">المدرسة</th>
+                    <th>المدينة</th>
+                    <th>الفئات</th>
+                    <th>الفئات الفرعية</th>
+                    <th>الكمية</th>
+                    <th>إجمالي السعر</th>
+                    <th>متوسط الوحدة</th>
+                  </tr>
+                </thead>
+                <tbody id="cost-school-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
-      </div>
     `;
 
     window.costReload = async function () {
@@ -16940,6 +17583,9 @@ function renderTajheezAllTable() {
   .fcb-fab-icon,
   .fcb-fab-close {
     position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 25px;
     transition: transform 0.25s ease, opacity 0.2s ease;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
@@ -17090,7 +17736,7 @@ function renderTajheezAllTable() {
     box-shadow: 0 2px 6px rgba(8, 61, 79, 0.28);
   }
   .fcb-col { display: flex; flex-direction: column; min-width: 0; }
-  .fcb-bubble { padding: 10px 13px; font-size: 12.5px; font-weight: 500; line-height: 1.7; }
+  .fcb-bubble { padding: 10px 13px; font-size: 12.5px; font-weight: 500; line-height: 1.7; white-space: pre-line; }
   .fcb-row.bot .fcb-bubble {
     background: #fff;
     color: var(--tx-main);
@@ -17165,8 +17811,17 @@ function renderTajheezAllTable() {
 </style>
 
 <div class="fcb-fab" id="fcbFab" onclick="fcbToggle()">
-  <span class="fcb-fab-icon">💬</span>
-  <span class="fcb-fab-close">✕</span>
+  <span class="fcb-fab-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 20.5h18"/>
+      <path d="M5 20.5V7.2a1 1 0 0 1 .56-.9l6-3a1 1 0 0 1 .88 0l6 3a1 1 0 0 1 .56.9V20.5"/>
+      <path d="M9 20.5v-3.2a1.2 1.2 0 0 1 1.2-1.2h3.6a1.2 1.2 0 0 1 1.2 1.2v3.2"/>
+      <path d="M8.4 9.6h2.1M13.5 9.6h2.1M8.4 12.6h2.1M13.5 12.6h2.1"/>
+    </svg>
+  </span>
+  <span class="fcb-fab-close" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </span>
   <span class="fcb-fab-dot"></span>
   <span class="fcb-fab-tip">تحدث مع المساعد</span>
 </div>
@@ -17207,7 +17862,8 @@ function renderTajheezAllTable() {
 
     <div class="fcb-quick">
       <button class="fcb-chip" type="button" onclick="fcbSend('ما هذه اللوحة؟')">📊 عن اللوحة</button>
-      <button class="fcb-chip" type="button" onclick="fcbSend('ايه التبويبات الموجودة؟')">🗂️ التبويبات المتاحة</button>
+      <button class="fcb-chip" type="button" onclick="fcbSend('ايه التبويبات الموجودة؟')">🗂️ التبويبات</button>
+      <button class="fcb-chip" type="button" onclick="fcbSend('اشرح لي تحليل FCA')">🏗️ تحليل FCA</button>
     </div>
   </div>
 
@@ -17229,10 +17885,21 @@ function renderTajheezAllTable() {
   // اصطناعياً حقيقياً متصلاً ببيانات اللوحة. سؤالان عامان فقط حالياً،
   // وسيتم تطوير الردود لتغطي اللوحة بالكامل لاحقاً ──────────────────
   const FCB_RULES = [
-    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين/i, reply: "هذه لوحة بيانات شاملة لإدارة مرافق المدارس: تقييمات FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، وغيرها — كل بيانات المنشآت في مكان واحد 📊" },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs/i, reply: "اللوحة فيها عدة تبويبات رئيسية مثل: نظرة عامة، تحليل FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة — تقدر تتنقل بينها من الشريط العلوي 🗂️" },
+    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا المساعد الذكي للوحة إدارة المرافق التعليمية 🤖 — تجمع اللوحة بيانات منشآت المدارس في مكان واحد: تقييمات الحالة الفنية (FCA)، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة الجغرافية. اسألني عن أي قسم وأوضح لك مكانه ووظيفته 📊" },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة البيئة والترتيب\n• العقود — حالة ومدد التعاقدات\n• الصيانة — البلاغات والأعمال\n• التجهيزات — الأصول والمعدات\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تبويب تحليل FCA يعرض تقييم الحالة الفنية للمباني (Facility Condition Assessment): مؤشر حالة المنشأة، أعلى وأدنى المدارس أداءً، والأنظمة التي تحتاج تدخّل عاجل. يساعدك في ترتيب أولويات الإصلاح والميزانية 🏗️" },
+    { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "تبويب البيئة المدرسية يقيس جودة بيئة كل مدرسة (نظافة، سلامة، جاهزية المرافق) ويعرض أفضل 10 وأسوأ 10 مدارس، عشان تركّز جهود التحسين على المواقع الأكثر احتياجاً 🌿" },
+    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "تبويب العقود يتابع التعاقدات النشطة: نوع العقد، المورّد، تاريخ البداية والانتهاء، والعقود القريبة من الانتهاء التي تحتاج تجديد — حتى لا تنقطع الخدمة 📁" },
+    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل/i, reply: "تبويب الصيانة يعرض بلاغات وأوامر العمل: المفتوحة، قيد التنفيذ، والمغلقة، مع توزيعها حسب النوع والأولوية — لمتابعة سرعة الاستجابة وحجم الأعطال 🔧" },
+    { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد/i, reply: "تبويب التجهيزات يحصر أصول ومعدات المدارس (التكييف، الأثاث، الأجهزة...) مع حالتها وأعمارها التشغيلية، لدعم قرارات الاستبدال والصيانة الوقائية 🪑" },
+    { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة يعرض توزيع المدارس جغرافياً، وتقدر تشوف حالة كل موقع على الخريطة مباشرة لتحديد التجمعات والمناطق ذات الأولوية 🗺️" },
+    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "تبويب نظرة عامة يجمع أهم المؤشرات (KPIs) في بطاقات سريعة: عدد المدارس، حالة المنشآت، البلاغات، والعقود — نقطة بداية مثالية قبل التعمّق في أي قسم 📈" },
+    { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل التحديث «◷ تلقائي» ليجلب أحدث الأرقام دورياً. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
+    { test: /لغة|عربي|english|انجليزي|ترجم/i, reply: "اللوحة تدعم العربية والإنجليزية، وتقدر تبدّل اللغة من إعدادات العرض في الشريط العلوي 🌐" },
+    { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌 — لو احتجت أي توضيح عن أقسام إدارة المرافق، أنا هنا." },
+    { test: /سلام|أهلا|اهلا|مرحب|هلا|hi|hello/i, reply: "أهلًا وسهلًا 👋 أنا مساعد لوحة إدارة المرافق. اسألني عن FCA، الصيانة، العقود، التجهيزات، البيئة، أو الخريطة." },
   ];
-  const FCB_FALLBACK = "هذا نموذج عرض تجريبي للواجهة فقط 🙂 — حالياً عندي إجابتان جاهزتان فقط، وهيتم تطوير ردودي تدريجياً لتغطي اللوحة كاملةً.";
+  const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن أحد أقسام إدارة المرافق: تحليل FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، أو الخريطة، وأوضح لك مكانه ووظيفته.";
 
   function fcbReplyFor(text) {
     for (const r of FCB_RULES) if (r.test.test(text)) return r.reply;

@@ -8,22 +8,21 @@
 ║   3. 🌿  البيئة المدرسية                (tab-env)
 ║   4. 🎓  المرحلة الدراسية            (tab-stages)
 ║   5. 📋  العقود                         (tab-contracts)
-║   6. 📌  متابعة عقود غير المجال         (tab-fm-contracts)
-║   7. 💧  متابعة التضامن الوافي          (tab-fm-tad)
-║   8. 📢  البلاغات                       (tab-balagh)
-║   9. 🏗️  التجهيزات                      (tab-tajheez)
-║  10. ⚙️  الأنظمة الرئيسية               (tab-sys-main)
-║  11. 🔩  الأنظمة التفصيلية              (tab-sys-detail)
-║  12. 🔧  الصيانة الوقائية               (tab-seyana)
-║  13. 🌊  خنادق الصرف                    (tab-khanadeq)
-║  14. 🛗  المصاعد                        (tab-elevators)
-║  15. 💰  التكلفة                        (tab-cost)
-║  16. 🗺️  الخريطة                        (tab-map)
-║  17. 👨‍🎓  الطلاب وعمر المبنى             (tab-students)
-║  18. 🔩  قطع الغيار                     (tab-spare)
-║  19. 🔍  تقييم عاين                     (tab-ayen)
-║  20. 💳  المدفوعات والعقود              (tab-payments)
-║  21. 📅  الجدول التفصيلي                (tab-table)
+║   6. 📌  عقود غير المجال                (tab-all-contracts)
+║   7. 📢  البلاغات                       (tab-balagh)
+║   8. 🏗️  التجهيزات                      (tab-tajheez)
+║   9. ⚙️  الأنظمة الرئيسية               (tab-sys-main)
+║  10. 🔩  الأنظمة التفصيلية              (tab-sys-detail)
+║  11. 🔧  الصيانة الوقائية               (tab-seyana)
+║  12. 🌊  خنادق الصرف                    (tab-khanadeq)
+║  13. 🛗  المصاعد                        (tab-elevators)
+║  14. 💰  التكلفة                        (tab-cost)
+║  15. 🗺️  الخريطة                        (tab-map)
+║  16. 👨‍🎓  الطلاب وعمر المبنى             (tab-students)
+║  17. 🔩  قطع الغيار                     (tab-spare)
+║  18. 🔍  تقييم عاين                     (tab-ayen)
+║  19. 💳  المدفوعات والعقود              (tab-payments)
+║  20. 📅  الجدول التفصيلي                (tab-table)
 ╠════════════════════════════════════════════════════════════════════╣
 ║  📁 هيكل الملف:
 ║     • الـ HTML لكل تبويب: مُعلَّم بـ ╔═══╗ قبل كل <div class="panel">
@@ -2239,8 +2238,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="tab" onclick="showTab('stages',this)">المرحلة الدراسية</div>
 
     <div class="tab" onclick="showTab('contracts',this)">العقود</div>
-    <div class="tab" onclick="showTab('fm-contracts',this)">متابعة عقود غير المجال</div>
-    <div class="tab" onclick="showTab('fm-tad',this)">متابعة التضامن الوافي</div>
+    <div class="tab" onclick="showTab('all-contracts',this)">عقود غير المجال</div>
     <div class="tab" onclick="showTab('sys-main',this)">الأنظمة الرئيسية</div>
     <div class="tab" onclick="showTab('sys-detail',this)">الأنظمة التفصيلية</div>
     <div class="tab" id="tabbtn-seyana" onclick="showTab('seyana',this)">الصيانة الوقائية</div>
@@ -2636,10 +2634,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
-║  📌  تبويب رقم 6: متابعة عقود غير المجال
-║  ID: tab-fm-contracts
+║  📌  تبويب رقم 6: عقود غير المجال
+║  ID: tab-all-contracts
 ╠════════════════════════════════════════════════════════════════════╣
 ║  HTML الخاص بهذا التبويب ↓
+║  يسحب كل بياناته من Invoices_Tracker.csv عبر window.RAW_INVOICES_TRACKER
+║  (كل المقاولين — بدون فلترة مسبقة على مقاول واحد)
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
 ║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
@@ -2650,36 +2650,10 @@ document.addEventListener("DOMContentLoaded", () => {
 ║     4. أضف "NEW_ID"===name && renderNewTab() في دالتَي showTab() و applyFilters()
 ╚════════════════════════════════════════════════════════════════════╝
 -->
-  <div class="panel" id="tab-fm-contracts">
-    <div id="fm-contracts-content">
+  <div class="panel" id="tab-all-contracts">
+    <div id="all-contracts-content">
       <div class="card" style="text-align:center;padding:48px 24px">
-        <div style="font-size:32px;margin-bottom:12px">📋</div>
-        <div style="font-size:14px;color:var(--tx-muted)">جاري التحميل…</div>
-      </div>
-    </div>
-  </div>
-
-
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  💧  تبويب رقم 7: متابعة التضامن الوافي
-║  ID: tab-fm-tad
-╠════════════════════════════════════════════════════════════════════╣
-║  HTML الخاص بهذا التبويب ↓
-║
-║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
-║        في قسم <div class="tabs"> (حوالي السطر 649)
-║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
-║        في مكانٍ مناسب بعد هذا القسم
-║     3. أضف دالة renderNewTab() في قسم الـ JS المناسب
-║     4. أضف "NEW_ID"===name && renderNewTab() في دالتَي showTab() و applyFilters()
-╚════════════════════════════════════════════════════════════════════╝
--->
-  <div class="panel" id="tab-fm-tad">
-    <div id="fm-tad-content">
-      <div class="card" style="text-align:center;padding:48px 24px">
-        <div style="font-size:32px;margin-bottom:12px">💧</div>
+        <div style="font-size:32px;margin-bottom:12px">📌</div>
         <div style="font-size:14px;color:var(--tx-muted)">جاري التحميل…</div>
       </div>
     </div>
@@ -6253,8 +6227,7 @@ function applyFilters() {
     if (activeId === "tab-stages") safeRun(renderStageCharts, "stages");
     if (activeId === "tab-stage-compare") safeRun(renderStageCompareTab, "stage-compare");
     if (activeId === "tab-contracts") safeRun(renderContractCharts, "contracts");
-    if (activeId === "tab-fm-contracts") safeRun(renderFmContracts, "fm-contracts");
-    if (activeId === "tab-fm-tad") safeRun(renderFmTad, "fm-tad");
+    if (activeId === "tab-all-contracts") safeRun(renderAllContracts, "all-contracts");
     if (activeId === "tab-sys-main") safeRun(renderSysMain, "sys-main");
     if (activeId === "tab-sys-detail") safeRun(renderSysDetail, "sys-detail");
     if (activeId === "tab-balagh") safeRun(renderBalaghTab, "balagh");
@@ -6445,8 +6418,7 @@ function showTab(name, el) {
     "stages" === name && renderStageCharts(),
     "stage-compare" === name && renderStageCompareTab(),
     "contracts" === name && renderContractCharts(),
-    "fm-contracts" === name && renderFmContracts(),
-    "fm-tad" === name && renderFmTad(),
+    "all-contracts" === name && renderAllContracts(),
     "sys-main" === name && renderSysMain(),
     "sys-detail" === name && renderSysDetail(),
     "balagh" === name && renderBalaghTab(),
@@ -9623,48 +9595,246 @@ function renderAyenTable() {
   }
 }
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  📌  JS تبويب: متابعة عقود غير المجال
-   ║  (tab-fm-contracts) — الدوال الخاصة بهذا التبويب تبدأ هنا
+   ║  📌  JS تبويب: عقود غير المجال
+   ║  (tab-all-contracts) — الدوال الخاصة بهذا التبويب تبدأ هنا
+   ║  المصدر: window.RAW_INVOICES_TRACKER (من Invoices_Tracker.csv)
+   ║  يعرض كل المقاولين بدون فلترة مسبقة، مع فلتر اختياري بالمقاول
    ╚════════════════════════════════════════════════════════════╝ */
-function renderFmContracts() {
-  const el = document.getElementById("fm-contracts-content");
+function acNormContractor(v) {
+  return String(v || "")
+    .replace(/^\s*شركة\s+/, "")
+    .replace(/^\s*مؤسسة\s+/, "")
+    .trim();
+}
+function acRemDays(r) {
+  return num(r["المدة المتبقية بالأيام"]);
+}
+function acStatusBadge(rem) {
+  return null == rem
+    ? '<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #64748b33">—</span>'
+    : rem <= 0
+      ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">منتهي</span>'
+      : rem <= 90
+        ? '<span style="background:#FFFBEB;color:#D97706;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #D9770633">قارب على الانتهاء</span>'
+        : '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">جاري</span>';
+}
+window._acState = { contractor: "", search: "" };
+function renderAllContracts() {
+  const el = document.getElementById("all-contracts-content");
   if (!el) return;
-  const contracts = window.RAW_FM_CONTRACTS || [];
-  if (!contracts.length)
+  const all = window.RAW_INVOICES_TRACKER || [];
+  if (!all.length)
     return void (el.innerHTML =
-      '<div class="card" style="text-align:center;padding:48px 24px">\n      <div style="font-size:48px;margin-bottom:12px">📋</div>\n      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">لا توجد بيانات متابعة عقود</div>\n      <div style="font-size:12px;color:var(--tx-muted)">تأكد من إضافة الملف في الدرايف:<br>\n        <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;margin-top:6px;display:inline-block">العقود_لغير_المجال.csv</code>\n      </div>\n    </div>');
-  new Date();
-  /* حالة العقد محسوبة من المدة المتبقية — لا يوجد عمود منفصل */ const _isActive = (r) => {
-    const rem = parseFloat(r["المدة المتبقية (أيام)"]);
-    return isFinite(rem) && rem > 0;
-  };
-  const total = contracts.length,
-    active = contracts.filter(_isActive).length,
-    expired = contracts.filter((r) => !_isActive(r)).length,
-    expiring = contracts.filter((r) => {
-      const rem = parseFloat(r["المدة المتبقية (أيام)"]);
-      return isFinite(rem) && rem > 0 && rem <= 90;
+      '<div class="card" style="text-align:center;padding:48px 24px">\n      <div style="font-size:48px;margin-bottom:12px">📌</div>\n      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">لا توجد بيانات عقود غير المجال</div>\n      <div style="font-size:12px;color:var(--tx-muted)">تأكد من إضافة الملف في الدرايف:<br>\n        <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;margin-top:6px;display:inline-block">Invoices_Tracker.csv</code>\n      </div>\n    </div>');
+
+  const contractorList = [...new Set(all.map((r) => acNormContractor(r["المقاول"])).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b, "ar"),
+  );
+
+  ((el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <select id="ac-contractor"
+        onchange="window._acState.contractor=this.value;renderAllContractsBody()"
+        style="font-family:inherit;font-size:12px;padding:8px 14px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer;min-width:200px">
+        <option value="">كل المقاولين (${contractorList.length})</option>
+        ${contractorList
+          .map(
+            (c) =>
+              `<option value="${esc(c)}" ${window._acState.contractor === c ? "selected" : ""}>${esc(c)}</option>`,
+          )
+          .join("")}
+      </select>
+      <input id="ac-search" type="text" placeholder="بحث في كل الأعمدة…"
+        value="${esc(window._acState.search)}"
+        oninput="window._acState.search=this.value;renderAllContractsBody()"
+        style="flex:1;min-width:200px;padding:8px 14px;border:1px solid var(--bd-light);border-radius:10px;
+        font-family:inherit;font-size:12px;direction:rtl">
+      ${
+        window._acState.contractor || window._acState.search
+          ? `<button type="button" onclick="window._acState={contractor:'',search:''};renderAllContracts()"
+        style="font-family:inherit;font-size:11px;font-weight:700;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--bd-mid);background:var(--bg-3);color:var(--tx-sec);white-space:nowrap">✕ إلغاء الفلاتر</button>`
+          : ""
+      }
+    </div>
+    <div id="ac-body"></div>
+  `),
+    renderAllContractsBody());
+}
+function renderAllContractsBody() {
+  const el = document.getElementById("ac-body");
+  if (!el) return;
+  const all = window.RAW_INVOICES_TRACKER || [];
+  const st = window._acState || { contractor: "", search: "" };
+  let data = all;
+  if (st.contractor) data = data.filter((r) => acNormContractor(r["المقاول"]) === st.contractor);
+  if (st.search) {
+    const q = st.search.toLowerCase();
+    data = data.filter((r) =>
+      Object.values(r).some((v) =>
+        String(v || "")
+          .toLowerCase()
+          .includes(q),
+      ),
+    );
+  }
+  if (!data.length) {
+    el.innerHTML =
+      '<div class="card" style="text-align:center;padding:36px 24px">\n      <div style="font-size:32px;margin-bottom:10px">🔍</div>\n      <div style="font-size:13px;color:var(--tx-muted)">لا توجد نتائج مطابقة للفلتر/البحث الحالي</div>\n    </div>';
+    return;
+  }
+
+  const total = data.length,
+    active = data.filter((r) => {
+      const rem = acRemDays(r);
+      return null != rem && rem > 0;
     }).length,
-    byRegion = {};
-  contracts.forEach((r) => {
+    expired = data.filter((r) => {
+      const rem = acRemDays(r);
+      return null != rem && rem <= 0;
+    }).length,
+    expiring = data.filter((r) => {
+      const rem = acRemDays(r);
+      return null != rem && rem > 0 && rem <= 90;
+    }).length,
+    totalBase = data.reduce((s, r) => s + (num(r["قيمة العقد الأساسي"]) || 0), 0),
+    totalValue = data.reduce((s, r) => s + (num(r["قيمة العقد المحدثة"]) || 0), 0),
+    totalSpent = data.reduce((s, r) => s + (num(r["تراكمي المستخلصات المصروفة"]) || 0), 0);
+
+  const byRegion = {},
+    byScope = {},
+    byContractor = {};
+  data.forEach((r) => {
     const reg = r["المنطقة"] || "غير محدد";
     (byRegion[reg] || (byRegion[reg] = { total: 0, active: 0, expired: 0 }),
       byRegion[reg].total++,
-      _isActive(r) ? byRegion[reg].active++ : byRegion[reg].expired++);
-  });
-  const byScope = {};
-  contracts.forEach((r) => {
-    const sc = r["الحالة"] || "غير محدد";
+      (() => {
+        const rem = acRemDays(r);
+        null != rem && rem > 0 ? byRegion[reg].active++ : byRegion[reg].expired++;
+      })());
+    const sc = r["النطاق"] || "غير محدد";
     byScope[sc] = (byScope[sc] || 0) + 1;
+    const ctr = acNormContractor(r["المقاول"]) || "غير محدد";
+    byContractor[ctr] = (byContractor[ctr] || 0) + 1;
   });
-  const regionColors = ["#0891B2", "#059669", "#D97706", "#7C3AED", "#DC2626", "#0E7490"];
-  ((el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid #0891B2;padding:16px">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي العقود</div>\n        <div style="font-size:28px;font-weight:800;color:#0891B2">${total}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">عقد</div>\n      </div>\n      <div class="card" style="border-top:3px solid #059669;padding:16px">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">جارية</div>\n        <div style="font-size:28px;font-weight:800;color:#059669">${active}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? Math.round((active / total) * 100) : 0}% من الإجمالي</div>\n      </div>\n      <div class="card" style="border-top:3px solid #DC2626;padding:16px">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">منتهية</div>\n        <div style="font-size:28px;font-weight:800;color:#DC2626">${expired}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? Math.round((expired / total) * 100) : 0}% من الإجمالي</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706;padding:16px">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">تنتهي خلال 90 يوم</div>\n        <div style="font-size:28px;font-weight:800;color:#D97706">${expiring}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">تحتاج متابعة</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع العقود حسب المنطقة</div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-fmc-region"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">توزيع العقود حسب النطاق</div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-fmc-scope"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">📋 جميع العقود\n        <span class="sub">${total} عقد</span>\n        <input id="fmc-search" type="text" placeholder="بحث في العقود…"\n          style="margin-right:auto;padding:5px 10px;border:1px solid var(--bd-light);\n          border-radius:6px;font-family:inherit;font-size:12px;width:200px;direction:rtl"\n          oninput="filterFmcTable()">\n      </div>\n      <div style="overflow-x:auto">\n        <table id="fmc-table" style="width:100%;border-collapse:collapse;font-size:11px">\n          <thead>\n            <tr style="background:var(--bg-sub);text-align:right">\n              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المقاول</th>\n              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المشروع</th>\n              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المنطقة</th>\n              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المتبقي (يوم)</th>\n              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الحالة</th>\n              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الملاحظات</th>\n              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">وضع العقد</th>\n            </tr>\n          </thead>\n          <tbody id="fmc-tbody">\n          </tbody>\n        </table>\n      </div>\n    </div>\n  `),
+
+  const regionColors = ["#0891B2", "#059669", "#D97706", "#7C3AED", "#DC2626", "#0E7490", "#DB2777", "#65A30D"];
+  const regions = Object.keys(byRegion);
+  const topContractors = Object.entries(byContractor)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12);
+
+  ((el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+      <div class="card" style="border-top:3px solid #0891B2;padding:16px">
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي العقود</div>
+        <div style="font-size:28px;font-weight:800;color:#0891B2">${total}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">عقد</div>
+      </div>
+      <div class="card" style="border-top:3px solid #7C3AED;padding:16px">
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي قيمة العقود (محدثة)</div>
+        <div style="font-size:18px;font-weight:800;color:#7C3AED">${fmt(totalValue, 0)}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · أساسي ${fmt(totalBase, 0)}</div>
+      </div>
+      <div class="card" style="border-top:3px solid #0E7490;padding:16px">
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المستخلصات المصروفة</div>
+        <div style="font-size:18px;font-weight:800;color:#0E7490">${fmt(totalSpent, 0)}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
+      </div>
+      <div class="card" style="border-top:3px solid ${expired ? "#DC2626" : "#059669"};padding:16px">
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">جارية / منتهية / قاربت</div>
+        <div style="font-size:20px;font-weight:800;color:var(--tx-main)">
+          <span style="color:#059669">${active}</span>
+          <span style="color:var(--tx-muted);font-size:13px"> / </span>
+          <span style="color:#DC2626">${expired}</span>
+          <span style="color:var(--tx-muted);font-size:13px"> / </span>
+          <span style="color:#D97706">${expiring}</span>
+        </div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">من إجمالي ${total} عقد</div>
+      </div>
+    </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">توزيع العقود حسب المنطقة</div>
+        <div class="chart-box" style="height:260px"><canvas id="ch-ac-region"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">توزيع العقود حسب النطاق</div>
+        <div class="chart-box" style="height:260px"><canvas id="ch-ac-scope"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">عدد العقود حسب المقاول
+        <span class="sub">أعلى ${topContractors.length} مقاول</span>
+      </div>
+      <div class="chart-box" style="height:${Math.max(220, topContractors.length * 28)}px"><canvas id="ch-ac-contractor"></canvas></div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">📋 كل العقود
+        <span class="sub">${total} عقد</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="background:var(--bg-sub);text-align:right">
+              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المقاول</th>
+              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">رقم العقد</th>
+              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المشروع</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المنطقة</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">النطاق</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الفترة</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المتبقي (يوم)</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">% الإنجاز</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">آخر مستخلص</th>
+              <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الإجراءات والملاحظات</th>
+              <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الحالة</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data
+              .map((r, i) => {
+                const rem = acRemDays(r),
+                  remBadge =
+                    null == rem
+                      ? "—"
+                      : rem <= 0
+                        ? `<span style="color:#DC2626;font-weight:800">${rem} (منتهي)</span>`
+                        : `<span style="color:${rem <= 90 ? "#D97706" : "#059669"};font-weight:800">${rem}</span>`,
+                  lastVal = num(r["آخر مستخلص - القيمة"]),
+                  lastMonth = r["آخر مستخلص - الشهر"],
+                  lastYear = r["آخر مستخلص - السنة"],
+                  lastInvoice =
+                    null == lastVal
+                      ? "—"
+                      : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`;
+                return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-sub)"}">
+                  <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:160px">${esc(r["المقاول"] || "")}</td>
+                  <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
+                  <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:240px">${esc(r["المشروع"] || "")}</td>
+                  <td style="padding:10px 8px;font-weight:600">${esc(r["المنطقة"] || "")}</td>
+                  <td style="padding:10px 8px;font-size:10px">${esc(r["النطاق"] || "—")}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;font-family:monospace;font-size:10px">${esc(r["تاريخ بداية العقد"] || "—")} ← ${esc(r["تاريخ نهاية العقد المحدثة"] || "—")}</td>
+                  <td style="padding:10px 8px">${remBadge}</td>
+                  <td style="padding:10px 8px;font-weight:700">${esc(r["نسبة الإنجاز POC%"] || "—")}</td>
+                  <td style="padding:10px 8px;white-space:nowrap">${lastInvoice}</td>
+                  <td style="padding:10px 12px;font-size:10px;color:var(--tx-sec);line-height:1.5;max-width:260px">${esc(r["الإجراءات المتخذة والملاحظات"] || "—")}</td>
+                  <td style="padding:10px 8px">${acStatusBadge(rem)}</td>
+                </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `),
     requestAnimationFrame(() => {
-      const regionLabels = Object.keys(byRegion),
+      const regionLabels = regions,
         regionActive = regionLabels.map((k) => byRegion[k].active),
         regionExpired = regionLabels.map((k) => byRegion[k].expired);
-      (killChart("ch-fmc-region"),
-        (CHARTS["ch-fmc-region"] = new Chart(document.getElementById("ch-fmc-region"), {
+      (killChart("ch-ac-region"),
+        (CHARTS["ch-ac-region"] = new Chart(document.getElementById("ch-ac-region"), {
           type: "bar",
           data: {
             labels: regionLabels,
@@ -9691,22 +9861,23 @@ function renderFmContracts() {
             maintainAspectRatio: !1,
             plugins: { legend: { position: "top", labels: { font: { size: 11 } } } },
             scales: {
-              x: { stacked: !1, ticks: { font: { size: 11 } } },
+              x: { ticks: { font: { size: 11 } } },
               y: { beginAtZero: !0, ticks: { stepSize: 1 } },
             },
           },
         })));
+
       const scopeLabels = Object.keys(byScope),
         scopeData = scopeLabels.map((k) => byScope[k]);
-      (killChart("ch-fmc-scope"),
-        (CHARTS["ch-fmc-scope"] = new Chart(document.getElementById("ch-fmc-scope"), {
+      (killChart("ch-ac-scope"),
+        (CHARTS["ch-ac-scope"] = new Chart(document.getElementById("ch-ac-scope"), {
           type: "doughnut",
           data: {
             labels: scopeLabels,
             datasets: [
               {
                 data: scopeData,
-                backgroundColor: regionColors.slice(0, scopeLabels.length),
+                backgroundColor: regionColors.concat(regionColors).slice(0, scopeLabels.length),
                 borderWidth: 2,
                 borderColor: "#fff",
               },
@@ -9714,218 +9885,38 @@ function renderFmContracts() {
           },
           options: {
             maintainAspectRatio: !1,
-            plugins: { legend: { position: "right", labels: { font: { size: 11 }, padding: 12 } } },
+            plugins: { legend: { position: "right", labels: { font: { size: 10 }, padding: 8 } } },
           },
         })));
-    }),
-    fillFmcTable(contracts));
-}
-function fillFmcTable(data) {
-  const tbody = document.getElementById("fmc-tbody");
-  tbody &&
-    (tbody.innerHTML = data
-      .map((r, i) => {
-        const rem = parseFloat(r["المدة المتبقية (أيام)"]),
-          remNum = isFinite(rem) ? rem : null,
-          remClr =
-            remNum === null
-              ? "#64748b"
-              : remNum <= 0
-                ? "#DC2626"
-                : remNum <= 90
-                  ? "#D97706"
-                  : "#059669",
-          /* حالة العقد محسوبة من المدة المتبقية */ isAct = remNum !== null && remNum > 0,
-          stBadge = isAct
-            ? '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">جاري</span>'
-            : '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">منتهي</span>';
-        return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-sub)"}">\n      <td style="padding:10px 12px;font-weight:600;line-height:1.4">${esc(r["المقاول"] || "")}</td>\n      <td style="padding:10px 12px;line-height:1.4;font-size:10px;max-width:260px">${esc(r["المشروع"] || "")}</td>\n      <td style="padding:10px 8px;font-weight:600">${esc(r["المنطقة"] || "")}</td>\n      <td style="padding:10px 8px;font-weight:800;color:${remClr};white-space:nowrap">${remNum === null ? "—" : remNum + " يوم"}</td>\n      <td style="padding:10px 8px;font-size:10px">${esc(r["الحالة"] || "")}</td>\n      <td style="padding:10px 12px;font-size:10px;color:var(--tx-sec);line-height:1.5;max-width:280px">${esc(r["الملاحظات"] || "—")}</td>\n      <td style="padding:10px 8px">${stBadge}</td>\n    </tr>`;
-      })
-      .join(""));
-}
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  💧  JS تبويب: متابعة التضامن الوافي
-   ║  (tab-fm-tad) — الدوال الخاصة بهذا التبويب تبدأ هنا
-   ╚════════════════════════════════════════════════════════════╝ */
-function renderFmTad() {
-  const el = document.getElementById("fm-tad-content");
-  if (!el) return;
-  const all = window.RAW_INVOICES_TRACKER || [];
-  const normContractor = (v) => String(v || "").replace(/^\s*شركة\s+/, "").trim();
-  const data = all.filter((r) => normContractor(r["المقاول"]) === "التضامن الوافي");
-  if (!data.length)
-    return void (el.innerHTML =
-      '<div class="card" style="text-align:center;padding:48px 24px">\n      <div style="font-size:48px;margin-bottom:12px">💧</div>\n      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">لا توجد بيانات التضامن الوافي</div>\n      <div style="font-size:12px;color:var(--tx-muted)">تأكد من إضافة الملف في الدرايف:<br>\n        <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;margin-top:6px;display:inline-block">Invoices_Tracker.csv</code>\n      </div>\n    </div>');
 
-  const remDays = (r) => num(r["المدة المتبقية بالأيام"]);
-  const total = data.length,
-    active = data.filter((r) => {
-      const rem = remDays(r);
-      return null != rem && rem > 0;
-    }).length,
-    expired = data.filter((r) => {
-      const rem = remDays(r);
-      return null != rem && rem <= 0;
-    }).length,
-    totalValue = data.reduce((s, r) => s + (num(r["قيمة العقد المحدثة"]) || 0), 0),
-    totalSpent = data.reduce((s, r) => s + (num(r["تراكمي المستخلصات المصروفة"]) || 0), 0);
-
-  const byRegion = {},
-    byScope = {};
-  data.forEach((r) => {
-    const reg = r["المنطقة"] || "غير محدد";
-    (byRegion[reg] || (byRegion[reg] = [])).push(r);
-    const sc = r["النطاق"] || "غير محدد";
-    byScope[sc] = (byScope[sc] || 0) + 1;
-  });
-
-  const regionColors = ["#0891B2", "#059669", "#D97706", "#7C3AED", "#DC2626", "#0E7490"];
-  const regions = Object.keys(byRegion);
-
-  ((el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
-      <div class="card" style="border-top:3px solid #0891B2;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي العقود</div>
-        <div style="font-size:28px;font-weight:800;color:#0891B2">${total}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">عقد</div>
-      </div>
-      <div class="card" style="border-top:3px solid #7C3AED;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي قيمة العقود (محدثة)</div>
-        <div style="font-size:20px;font-weight:800;color:#7C3AED">${fmt(totalValue, 0)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س</div>
-      </div>
-      <div class="card" style="border-top:3px solid #0E7490;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المستخلصات المصروفة</div>
-        <div style="font-size:20px;font-weight:800;color:#0E7490">${fmt(totalSpent, 0)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
-      </div>
-      <div class="card" style="border-top:3px solid ${expired ? "#DC2626" : "#059669"};padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">منتهية / جارية</div>
-        <div style="font-size:22px;font-weight:800;color:var(--tx-main)">
-          <span style="color:#DC2626">${expired}</span>
-          <span style="color:var(--tx-muted);font-size:14px"> / </span>
-          <span style="color:#059669">${active}</span>
-        </div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">منتهية / جارية</div>
-      </div>
-    </div>
-
-    <div class="g2 mb14">
-      <div class="card">
-        <div class="card-title">توزيع العقود حسب المنطقة</div>
-        <div class="chart-box" style="height:260px"><canvas id="ch-tad-region"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">توزيع العقود حسب النطاق</div>
-        <div class="chart-box" style="height:260px"><canvas id="ch-tad-scope"></canvas></div>
-      </div>
-    </div>
-
-    ${regions
-      .map((region, ri) => {
-        const rows = byRegion[region],
-          clr = regionColors[ri % regionColors.length];
-        return `
-      <div class="card mb14" style="border-top:3px solid ${clr}">
-        <div class="card-title" style="color:${clr}">
-          📍 ${esc(region)}
-          <span class="sub">${rows.length} عقد</span>
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead>
-              <tr style="background:var(--bg-sub);text-align:right">
-                <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">رقم العقد</th>
-                <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المشروع</th>
-                <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">النطاق</th>
-                <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الفترة</th>
-                <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">المتبقي (يوم)</th>
-                <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">% الإنجاز</th>
-                <th style="padding:10px 8px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">آخر مستخلص</th>
-                <th style="padding:10px 12px;font-weight:700;color:var(--tx-sec);border-bottom:2px solid var(--bd-light)">الإجراءات والملاحظات</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows
-                .map((r, i) => {
-                  const rem = remDays(r),
-                    remBadge =
-                      null == rem
-                        ? "—"
-                        : rem <= 0
-                          ? `<span style="color:#DC2626;font-weight:800">${rem} (منتهي)</span>`
-                          : `<span style="color:${rem <= 90 ? "#D97706" : "#059669"};font-weight:800">${rem}</span>`,
-                    lastVal = num(r["آخر مستخلص - القيمة"]),
-                    lastMonth = r["آخر مستخلص - الشهر"],
-                    lastYear = r["آخر مستخلص - السنة"],
-                    lastInvoice =
-                      null == lastVal
-                        ? "—"
-                        : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`;
-                  return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-sub)"}">
-                  <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
-                  <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:260px">${esc(r["المشروع"] || "")}</td>
-                  <td style="padding:10px 8px;font-size:10px">${esc(r["النطاق"] || "—")}</td>
-                  <td style="padding:10px 8px;white-space:nowrap;font-family:monospace;font-size:10px">${esc(r["تاريخ بداية العقد"] || "—")} ← ${esc(r["تاريخ نهاية العقد المحدثة"] || "—")}</td>
-                  <td style="padding:10px 8px">${remBadge}</td>
-                  <td style="padding:10px 8px;font-weight:700">${esc(r["نسبة الإنجاز POC%"] || "—")}</td>
-                  <td style="padding:10px 8px;white-space:nowrap">${lastInvoice}</td>
-                  <td style="padding:10px 12px;font-size:10px;color:var(--tx-sec);line-height:1.5;max-width:280px">${esc(r["الإجراءات المتخذة والملاحظات"] || "—")}</td>
-                </tr>`;
-                })
-                .join("")}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-      })
-      .join("")}
-  `),
-    requestAnimationFrame(() => {
-      const regionData = regions.map((k) => byRegion[k].length);
-      (killChart("ch-tad-region"),
-        (CHARTS["ch-tad-region"] = new Chart(document.getElementById("ch-tad-region"), {
-          type: "doughnut",
+      const ctrLabels = topContractors.map((c) => c[0]),
+        ctrData = topContractors.map((c) => c[1]);
+      (killChart("ch-ac-contractor"),
+        (CHARTS["ch-ac-contractor"] = new Chart(document.getElementById("ch-ac-contractor"), {
+          type: "bar",
           data: {
-            labels: regions,
+            labels: ctrLabels,
             datasets: [
               {
-                data: regionData,
-                backgroundColor: regionColors,
-                borderWidth: 2,
-                borderColor: "#fff",
+                label: "عدد العقود",
+                data: ctrData,
+                backgroundColor: "#0891B299",
+                borderColor: "#0891B2",
+                borderWidth: 1.5,
+                borderRadius: 4,
               },
             ],
           },
           options: {
+            indexAxis: "y",
             maintainAspectRatio: !1,
-            plugins: { legend: { position: "right", labels: { font: { size: 11 }, padding: 10 } } },
-          },
-        })),
-        killChart("ch-tad-scope"));
-      const scopeLabels = Object.keys(byScope),
-        scopeData = scopeLabels.map((k) => byScope[k]);
-      CHARTS["ch-tad-scope"] = new Chart(document.getElementById("ch-tad-scope"), {
-        type: "bar",
-        data: {
-          labels: scopeLabels,
-          datasets: [
-            {
-              label: "العقود",
-              data: scopeData,
-              backgroundColor: "#0891B299",
-              borderColor: "#0891B2",
-              borderWidth: 2,
-              borderRadius: 8,
+            plugins: { legend: { display: !1 } },
+            scales: {
+              x: { beginAtZero: !0, ticks: { stepSize: 1 } },
+              y: { ticks: { font: { size: 10 } } },
             },
-          ],
-        },
-        options: {
-          maintainAspectRatio: !1,
-          plugins: { legend: { display: !1 } },
-          scales: { y: { beginAtZero: !0, ticks: { stepSize: 1 } }, x: { ticks: { font: { size: 9 } } } },
-        },
-      });
+          },
+        })));
     }));
 }
 ((window.setMapMode = function (mode) {
@@ -9948,22 +9939,7 @@ function renderFmTad() {
     (Chart.defaults.plugins.tooltip.padding = 10),
     (Chart.defaults.plugins.tooltip.cornerRadius = 8),
     (Chart.defaults.scale.grid.color = "rgba(0,0,0,.04)"),
-    (Chart.defaults.elements.bar.borderSkipped = !1)),
-  (window.filterFmcTable = function () {
-    const q = (document.getElementById("fmc-search")?.value || "").toLowerCase(),
-      contracts = window.RAW_FM_CONTRACTS || [];
-    fillFmcTable(
-      q
-        ? contracts.filter((r) =>
-            Object.values(r).some((v) =>
-              String(v || "")
-                .toLowerCase()
-                .includes(q),
-            ),
-          )
-        : contracts,
-    );
-  }));
+    (Chart.defaults.elements.bar.borderSkipped = !1)));
 const SYS_TIER = {
   حرج: { color: "#DC2626", bg: "#FEF2F2", border: "#DC262644" },
   متوسط: { color: "#D97706", bg: "#FFFBEB", border: "#D9770644" },

@@ -394,26 +394,6 @@ body::before {
 .mb14 {
   margin-bottom: 16px;
 }
-.hm-sd-cell:hover {
-  filter: brightness(0.82) !important;
-}
-.hm-sd-tip {
-  position: fixed;
-  background: rgba(7, 30, 40, 0.94);
-  color: #fff;
-  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
-  font-size: 11px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  pointer-events: none;
-  z-index: 9999;
-  display: none;
-  direction: rtl;
-  max-width: 240px;
-  line-height: 1.8;
-  box-shadow: 0 8px 30px rgba(8, 145, 178, 0.3);
-  border: 1px solid rgba(8, 145, 178, 0.28);
-}
 @media (max-width: 960px) {
   .g4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1899,14 +1879,6 @@ tbody tr:hover td {
   min-height: 32px;
   margin-bottom: 12px;
 }
-
-/* ─── HEATMAP tooltip ─── */
-.hm-sd-tip {
-  box-shadow: 0 4px 18px rgba(8, 145, 178, 0.18);
-  border: 1px solid rgba(8, 145, 178, 0.22);
-  border-radius: 10px;
-}
-
 
 /* ─── Presentation mode helpers ─── */
 .presentation-hidden {
@@ -3789,6 +3761,18 @@ const CFG = {
     RETRY_MAX: 3,
     RETRY_DELAY_MS: 4e3,
     LOW_FCA_THRESHOLD: 50,
+
+    // ════════════════════════════════════════════════════════════════
+    // 🔑 إعدادات المساعد الذكي (OpenAI API) — ضع مفتاحك هنا
+    // ════════════════════════════════════════════════════════════════
+    // ⚠️ تنبيه أمان: هذا المفتاح سيكون مرئياً لأي شخص يفتح كود الصفحة
+    // (View Source / Inspect). لا تشارك رابط/ملف الصفحة علناً وفيه
+    // مفتاح حقيقي. للاستخدام الإنتاجي الأفضل تمرير الطلبات عبر سيرفر
+    // خاص بك (proxy) يخزن المفتاح بأمان. هذا الإعداد مناسب للتجربة
+    // والتطوير الحالي.
+    OPENAI_API_KEY: "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", // 👈 حط مفتاحك بدل هذا النص
+    OPENAI_MODEL: "gpt-5.4-mini", // 👈 اسم الموديل — غيّره وقت ما تحب تجرب موديل تاني
+    OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   },
   COLS = {
     minId: ["minId"],
@@ -8194,6 +8178,7 @@ function renderSysDetail() {
   window._hmSdExport = {
     rows: hmSchools.map((r) => ({
       main: selMain || "",
+      id: r.id,
       name: r.name,
       score: r.score,
       systems: r.systems,
@@ -8203,58 +8188,30 @@ function renderSysDetail() {
   };
   const showN = Math.min(parseInt(hmSt.showN) || 30, hmSchools.length),
     showSch = hmSchools.slice(0, showN),
-    hBg = (v) =>
-      null == v || isNaN(v)
-        ? "#E5E7EB"
-        : v <= 2
-          ? "#DC2626"
-          : v <= 3
-            ? "#D97706"
-            : v <= 4
-              ? "#059669"
-              : "#0891B2",
     subCols = subAvg.map((s) => s.name),
     thCells = subCols
       .map((sys) => {
         const avgV = subSum[sys] / subCnt[sys],
-          bg = hBg(avgV),
-          lbl = sys.length > 14 ? sys.slice(0, 13) + "…" : sys,
-          pct = ((avgV / 5) * 100).toFixed(0);
-        return `<th title="${esc(sys)} — متوسط: ${avgV.toFixed(2)}"\n      style="position:sticky;top:0;z-index:3;background:var(--navy);color:rgba(255,255,255,.9);\n      padding:8px 4px;min-width:52px;max-width:72px;vertical-align:bottom;text-align:center;\n      font-size:9px;font-weight:700;border-bottom:2px solid rgba(255,255,255,.12)">\n      <div style="max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:normal;\n        word-break:break-all;line-height:1.3;margin-bottom:3px">${lbl}</div>\n      <div style="width:28px;height:4px;background:#ffffff30;border-radius:2px;\n        overflow:hidden;margin:0 auto 3px">\n        <div style="width:${pct}%;height:100%;background:${bg};border-radius:2px"></div>\n      </div>\n      <div style="font-size:9px;font-weight:800;color:${bg}">${avgV.toFixed(1)}</div>\n    </th>`;
+          lbl = sys.length > 14 ? sys.slice(0, 13) + "…" : sys;
+        return `<th title="${esc(sys)} — متوسط: ${avgV.toFixed(2)}" style="white-space:nowrap;text-align:center">${esc(lbl)}</th>`;
       })
       .join(""),
     bodyRows = showSch
-      .map((s, idx) => {
-        const rowBg = idx % 2 == 0 ? "#ffffff" : "#f7fafc",
-          sc = s.score || 0,
+      .map((s) => {
+        const sc = s.score || 0,
+          scoreClr = sc >= 70 ? "#0891B2" : sc >= 50 ? "#059669" : sc >= 35 ? "#D97706" : "#DC2626",
           cells = subCols
             .map((sys) => {
               const sg = s.systems[sys];
-              if (!sg)
-                return '<td style="background:#F1F5F9;color:#CBD5E1;text-align:center;\n        padding:5px 3px;border-bottom:1px solid rgba(0,0,0,.04);font-size:11px;min-width:46px">—</td>';
-              const v = sg.sum / sg.cnt,
-                bg = hBg(v);
-              return `<td class="hm-sd-cell"\n        data-tip="${esc(s.name || "")}|${esc(sys)}|${v.toFixed(2)}"\n        style="background:${bg};color:#fff;text-align:center;padding:5px 3px;\n          border-bottom:1px solid rgba(0,0,0,.05);font-size:11px;font-weight:700;\n          cursor:default;min-width:46px;max-width:68px;transition:filter .12s"\n      >${v.toFixed(1)}</td>`;
+              if (!sg) return '<td style="text-align:center;color:var(--tx-muted)">—</td>';
+              const v = sg.sum / sg.cnt;
+              return `<td style="text-align:center;font-weight:700;color:${v >= 4 ? "#0891B2" : v >= 3 ? "#059669" : v >= 2 ? "#D97706" : "#DC2626"}">${v.toFixed(1)}</td>`;
             })
             .join("");
-        return `<tr>\n      <td style="position:sticky;right:0;z-index:2;background:${rowBg};font-size:11px;\n        padding:6px 10px;max-width:200px;min-width:160px;white-space:normal;\n        word-break:break-word;line-height:1.35;border-bottom:1px solid var(--bd-light);\n        border-left:2px solid var(--bd-mid);font-weight:500">${esc(s.name || "")}${s.id ? `<span style="font-size:9px;color:var(--tx-muted);font-weight:500;margin-right:4px">(${esc(s.id)})</span>` : ""}</td>\n      <td style="text-align:center;font-size:11px;font-weight:800;padding:6px 5px;\n        border-bottom:1px solid var(--bd-light);color:${((v = sc), v >= 70 ? "#0891B2" : v >= 50 ? "#059669" : v >= 35 ? "#D97706" : "#DC2626")};background:${rowBg};\n        white-space:nowrap;min-width:56px">${sc > 0 ? sc.toFixed(1) + "%" : "—"}</td>\n      ${cells}\n    </tr>`;
-        var v;
+        return `<tr>\n      <td style="white-space:nowrap">${esc(s.id || "—")}</td>\n      <td style="white-space:normal;word-break:break-word">${esc(s.name || "")}</td>\n      <td style="text-align:center;font-weight:800;color:${scoreClr};white-space:nowrap">${sc > 0 ? sc.toFixed(1) + "%" : "—"}</td>\n      ${cells}\n    </tr>`;
       })
-      .join(""),
-    allRatVals = [];
-  showSch.forEach((s) =>
-    subCols.forEach((sys) => {
-      const sg = s.systems[sys];
-      sg && allRatVals.push(sg.sum / sg.cnt);
-    }),
-  );
-  const [critC, fairC, goodC, vgC] = [
-      allRatVals.filter((v) => v <= 2).length,
-      allRatVals.filter((v) => v > 2 && v <= 3).length,
-      allRatVals.filter((v) => v > 3 && v <= 4).length,
-      allRatVals.filter((v) => v > 4).length,
-    ],
-    sectionChips = `\n    <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px">\n      <span style="font-size:11px;color:var(--tx-muted);font-weight:700;white-space:nowrap">تصفية سريعة:</span>\n      <button onclick="window._sdActiveSection='';renderSysDetail()"\n        style="font-family:inherit;font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;cursor:pointer;transition:.15s;\n          border:1.5px solid ${selMain ? "var(--bd-mid)" : "var(--teal)"};\n          background:${selMain ? "transparent" : "var(--teal)"};\n          color:${selMain ? "var(--tx-muted)" : "#fff"}">الكل</button>\n      ${allMainSys.map((sec) => `\n        <button onclick="window._sdActiveSection='${sec.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}';renderSysDetail()"\n          style="font-family:inherit;font-size:11px;font-weight:600;padding:5px 14px;border-radius:20px;cursor:pointer;transition:.15s;\n            border:1.5px solid ${selMain === sec ? "var(--teal)" : "var(--bd-mid)"};\n            background:${selMain === sec ? "var(--teal)" : "transparent"};\n            color:${selMain === sec ? "#fff" : "var(--tx-muted)"}">${esc(sec)}</button>\n      `).join("")}\n    </div>`,
+      .join("");
+  const sectionChips = `\n    <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px">\n      <span style="font-size:11px;color:var(--tx-muted);font-weight:700;white-space:nowrap">تصفية سريعة:</span>\n      <button onclick="window._sdActiveSection='';renderSysDetail()"\n        style="font-family:inherit;font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;cursor:pointer;transition:.15s;\n          border:1.5px solid ${selMain ? "var(--bd-mid)" : "var(--teal)"};\n          background:${selMain ? "transparent" : "var(--teal)"};\n          color:${selMain ? "var(--tx-muted)" : "#fff"}">الكل</button>\n      ${allMainSys.map((sec) => `\n        <button onclick="window._sdActiveSection='${sec.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}';renderSysDetail()"\n          style="font-family:inherit;font-size:11px;font-weight:600;padding:5px 14px;border-radius:20px;cursor:pointer;transition:.15s;\n            border:1.5px solid ${selMain === sec ? "var(--teal)" : "var(--bd-mid)"};\n            background:${selMain === sec ? "var(--teal)" : "transparent"};\n            color:${selMain === sec ? "#fff" : "var(--tx-muted)"}">${esc(sec)}</button>\n      `).join("")}\n    </div>`,
     nOptsHtml = [
       ...new Set([10, 20, 30, 50, hmSchools.length].filter((n) => n <= hmSchools.length)),
     ]
@@ -8262,18 +8219,7 @@ function renderSysDetail() {
         (n) =>
           `<option value="${n}" ${n === showN ? "selected" : ""}>${n === hmSchools.length ? "الكل (" + n + ")" : n + " مدرسة"}</option>`,
       )
-      .join(""),
-    legendHtml = `\n    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;align-items:center">\n      ${[
-      { l: "حرج (≤2)", c: "#DC2626" },
-      { l: "متوسط (2–3)", c: "#D97706" },
-      { l: "جيد (3–4)", c: "#059669" },
-      { l: "جيد جداً (4–5)", c: "#0891B2" },
-    ]
-      .map(
-        (li) =>
-          `\n        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--tx-muted)">\n          <div style="width:16px;height:16px;border-radius:4px;background:${li.c};flex-shrink:0"></div>\n          <span>${li.l}</span>\n        </div>`,
-      )
-      .join("")}\n    </div>`;
+      .join("");
   ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:rgba(8,145,178,.1);color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
     .map((row, i) => {
       const cats = subTiers[row.name] || {},
@@ -8292,19 +8238,7 @@ function renderSysDetail() {
     })
     .join(
       "",
-    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🔥 الخريطة الحرارية — تقييم المدارس عبر الأنظمة الفرعية\n      ${selMain ? `<span style="background:rgba(8,145,178,.1);color:var(--teal);border:1px solid rgba(8,145,178,.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">\n      ${[
-    { v: critC, l: "حرج", sub: "تقييم ≤ 2", c: "#DC2626", bg: "#FEF2F2" },
-    { v: fairC, l: "متوسط", sub: "تقييم 2–3", c: "#D97706", bg: "#FFFBEB" },
-    { v: goodC, l: "جيد", sub: "تقييم 3–4", c: "#059669", bg: "#ECFDF5" },
-    { v: vgC, l: "جيد جداً", sub: "تقييم 4–5", c: "#0891B2", bg: "#ECFEFF" },
-  ]
-    .map(
-      (item) =>
-        `\n        <div style="background:${item.bg};border-radius:14px;padding:12px 14px;text-align:center;border:1px solid ${item.c}22">\n          <div style="font-size:22px;font-weight:800;color:${item.c};line-height:1">${item.v.toLocaleString()}</div>\n          <div style="font-size:11px;font-weight:700;color:${item.c};margin-top:4px">${item.l}</div>\n          <div style="font-size:10px;color:${item.c};opacity:.6;margin-top:2px">${item.sub}</div>\n        </div>`,
-    )
-    .join(
-      "",
-    )}\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    ${legendHtml}\n\n    \n    <div style="overflow:auto;max-height:680px;border-radius:14px;border:1px solid var(--bd-light);margin-top:4px">\n      <table id="hmSdTable" style="border-collapse:separate;border-spacing:0;min-width:100%;font-family:inherit">\n        <thead>\n          <tr>\n            <th style="position:sticky;right:0;top:0;z-index:4;\n              text-align:right;min-width:175px">المدرسة</th>\n            <th style="position:sticky;top:0;z-index:3;\n              min-width:58px;text-align:center">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div id="hmSdTip" class="hm-sd-tip"></div>\n  `),
+    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:rgba(8,145,178,.1);color:var(--teal);border:1px solid rgba(8,145,178,.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
     requestAnimationFrame(() => {
       const subLabels = subAvg.map((s) =>
           s.name.length > 22 ? s.name.slice(0, 22) + "…" : s.name,
@@ -8408,26 +8342,6 @@ function renderSysDetail() {
             },
           },
         })));
-    }));
-  const hmTable = document.getElementById("hmSdTable"),
-    tip = document.getElementById("hmSdTip");
-  hmTable &&
-    tip &&
-    (hmTable.addEventListener("mousemove", (e) => {
-      const td = e.target.closest(".hm-sd-cell");
-      if (!td) return void (tip.style.display = "none");
-      const parts = td.dataset.tip.split("|"),
-        [school, sys, val] = parts,
-        fv = parseFloat(val),
-        cat = fv <= 2 ? "حرج" : fv <= 3 ? "متوسط" : fv <= 4 ? "جيد" : "جيد جداً",
-        col = hBg(fv);
-      ((tip.innerHTML = `<strong>${school}</strong><br>النظام: ${sys}<br>التقييم: <strong style="color:${col}">${val}</strong> — <span style="opacity:.8">${cat}</span>`),
-        (tip.style.display = "block"),
-        (tip.style.left = e.clientX + 14 + "px"),
-        (tip.style.top = e.clientY - 10 + "px"));
-    }),
-    hmTable.addEventListener("mouseleave", () => {
-      tip.style.display = "none";
     }));
 }
 function getExportData() {
@@ -9962,13 +9876,14 @@ window.exportSysDetailCSV = function () {
     rows = meta.rows || [],
     subCols = meta.subCols || [],
     headers = isEn
-      ? ["Main System", "School Name", "Score", ...subCols]
-      : ["القسم الرئيسي", "اسم المدرسة", "الدرجة", ...subCols],
+      ? ["Main System", "School Number", "School Name", "Score", ...subCols]
+      : ["القسم الرئيسي", "رقم المدرسة", "اسم المدرسة", "الدرجة", ...subCols],
     csv = [headers.map(_sysCsvCell).join(",")];
   rows.forEach((r) => {
     csv.push(
       [
         r.main || window._sdActiveSection || "",
+        r.id || "",
         r.name || "",
         _sysNum(r.score, 1),
         ...subCols.map((sys) => {
@@ -9992,12 +9907,13 @@ window.exportSysDetailExcel = function () {
     rows = meta.rows || [],
     subCols = meta.subCols || [],
     headers = isEn
-      ? ["Main System", "School Name", "Score", ...subCols]
-      : ["القسم الرئيسي", "اسم المدرسة", "الدرجة", ...subCols];
+      ? ["Main System", "School Number", "School Name", "Score", ...subCols]
+      : ["القسم الرئيسي", "رقم المدرسة", "اسم المدرسة", "الدرجة", ...subCols];
   const dataArr = [headers];
   rows.forEach((r) => {
     dataArr.push([
       r.main || window._sdActiveSection || "",
+      r.id || "",
       r.name || "",
       _sysNum(r.score, 1),
       ...subCols.map((sys) => {
@@ -13794,6 +13710,7 @@ function renderTajheezAllTable() {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
     background: radial-gradient(420px 200px at 100% 0%, rgba(8, 145, 178, 0.05), transparent 55%), var(--bg-2);
   }
   .fcb-row { display: flex; align-items: flex-end; gap: 8px; max-width: 88%; }
@@ -13841,6 +13758,48 @@ function renderTajheezAllTable() {
     0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
     40% { transform: translateY(-4px); opacity: 1; }
   }
+
+  .fcb-settings {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: var(--bg-3);
+    padding: 18px 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .fcb-settings-title { font-size: 14px; font-weight: 800; color: var(--tx-main); margin-bottom: 4px; }
+  .fcb-settings-lbl { font-size: 11px; font-weight: 600; color: var(--tx-sec); margin-top: 6px; }
+  .fcb-settings-input {
+    border: 1px solid var(--bd-light);
+    background: var(--bg-2);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--tx-main);
+    outline: none;
+    width: 100%;
+    direction: ltr;
+    text-align: left;
+  }
+  .fcb-settings-input:focus { border-color: var(--bd-focus); }
+  .fcb-settings-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .fcb-settings-save, .fcb-settings-clear {
+    flex: 1;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .fcb-settings-save { background: linear-gradient(135deg, var(--teal), var(--teal-2)); color: #fff; }
+  .fcb-settings-clear { background: var(--bg-2); color: var(--tx-sec); border: 1px solid var(--bd-light); }
+  .fcb-settings-note { font-size: 10px; color: var(--tx-muted); margin-top: 8px; line-height: 1.6; }
 
   .fcb-foot {
     flex-shrink: 0;
@@ -13909,7 +13868,24 @@ function renderTajheezAllTable() {
       <div class="fcb-head-title">المساعد الذكي للوحة البيانات</div>
       <div class="fcb-head-sub"><span class="dot"></span> متصل الآن</div>
     </div>
+    <div class="fcb-head-close" id="fcbSettingsBtn" onclick="fcbOpenSettings()" title="إعدادات المساعد" style="margin-left:4px;">⚙️</div>
     <div class="fcb-head-close" onclick="fcbToggle()">✕</div>
+  </div>
+
+  <div class="fcb-settings" id="fcbSettingsPanel" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="fcb-settings-title">⚙️ إعدادات المساعد الذكي</div>
+      <div class="fcb-head-close" onclick="fcbCloseSettings()" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);">✕</div>
+    </div>
+    <label class="fcb-settings-lbl">مفتاح OpenAI API (اختياري — يطغى على المفتاح المضبوط بالكود)</label>
+    <input type="password" id="fcbApiKeyInput" class="fcb-settings-input" placeholder="sk-...">
+    <label class="fcb-settings-lbl">اسم الموديل</label>
+    <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-5.4-mini">
+    <div class="fcb-settings-actions">
+      <button type="button" class="fcb-settings-save" onclick="fcbSaveSettings()">💾 حفظ</button>
+      <button type="button" class="fcb-settings-clear" onclick="fcbClearSettings()">🗑️ مسح المخزّن محلياً</button>
+    </div>
+    <div class="fcb-settings-note">المفتاح يُخزَّن في متصفحك فقط (localStorage) ولا يُرسل لأي مكان عدا OpenAI مباشرة.</div>
   </div>
 
   <div class="fcb-body" id="fcbBody">
@@ -13955,11 +13931,189 @@ function renderTajheezAllTable() {
   function fcbToggle() {
     document.getElementById("fcbPanel").classList.toggle("open");
     document.getElementById("fcbFab").classList.toggle("active");
+    fcbCloseSettings();
   }
 
-  // ── ردود مبرمجة بسيطة (Rule-based) — تجربة توضيحية وليست ذكاءً
-  // اصطناعياً حقيقياً متصلاً ببيانات اللوحة. سؤالان عامان فقط حالياً،
-  // وسيتم تطوير الردود لتغطي اللوحة بالكامل لاحقاً ──────────────────
+  /* ════════════════════════════════════════════════════════════════
+     ⚙️ إعدادات المساعد — قراءة/حفظ مفتاح API من واجهة الإعدادات
+     الأولوية: المفتاح المحفوظ محلياً (localStorage) > المفتاح بالكود (CFG)
+  ════════════════════════════════════════════════════════════════ */
+  function fcbGetApiKey() {
+    const local = (localStorage.getItem("fcb_openai_key") || "").trim();
+    if (local) return local;
+    const codeKey = (CFG.OPENAI_API_KEY || "").trim();
+    return codeKey && codeKey !== "ضع_مفتاح_API_هنا" ? codeKey : "";
+  }
+  function fcbGetModel() {
+    const local = (localStorage.getItem("fcb_openai_model") || "").trim();
+    return local || CFG.OPENAI_MODEL || "gpt-5.4-mini";
+  }
+  function fcbOpenSettings() {
+    document.getElementById("fcbApiKeyInput").value = localStorage.getItem("fcb_openai_key") || "";
+    document.getElementById("fcbModelInput").value = fcbGetModel();
+    document.getElementById("fcbSettingsPanel").style.display = "flex";
+  }
+  function fcbCloseSettings() {
+    document.getElementById("fcbSettingsPanel").style.display = "none";
+  }
+  function fcbSaveSettings() {
+    const key = document.getElementById("fcbApiKeyInput").value.trim();
+    const model = document.getElementById("fcbModelInput").value.trim();
+    if (key) localStorage.setItem("fcb_openai_key", key);
+    else localStorage.removeItem("fcb_openai_key");
+    if (model) localStorage.setItem("fcb_openai_model", model);
+    else localStorage.removeItem("fcb_openai_model");
+    fcbCloseSettings();
+    showToast("تم حفظ إعدادات المساعد ✅", "ok");
+  }
+  function fcbClearSettings() {
+    localStorage.removeItem("fcb_openai_key");
+    localStorage.removeItem("fcb_openai_model");
+    document.getElementById("fcbApiKeyInput").value = "";
+    document.getElementById("fcbModelInput").value = "";
+    showToast("تم مسح الإعدادات المحلية 🗑️", "ok");
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     📊 بناء ملخص ذكي وشامل من بيانات الداشبورد (من RAW + كل المصادر)
+     الهدف: تلخيص آلاف الصفوف في كائن JSON مضغوط يقدر الموديل يفهمه
+     ويجاوب عليه بدقة، بدون إرسال كل البيانات الخام (توفير Token)
+  ════════════════════════════════════════════════════════════════ */
+  function fcbTopN(arr, key, n = 8, asc = true) {
+    const valid = arr.filter((r) => null != r[key]);
+    const sorted = [...valid].sort((a, b) => (asc ? a[key] - b[key] : b[key] - a[key]));
+    return sorted.slice(0, n).map((r) => ({ name: r.name, value: r[key] }));
+  }
+  function fcbCountBy(arr, key, n = 10) {
+    const map = {};
+    arr.forEach((r) => {
+      const v = (r[key] ?? "").toString().trim();
+      if (!v || v === "—" || v === "#N/A") return;
+      map[v] = (map[v] || 0) + 1;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([k, v]) => ({ name: k, count: v }));
+  }
+  function fcbAvg(arr, key) {
+    const vals = arr.filter((r) => null != r[key]).map((r) => r[key]);
+    return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
+  }
+  function fcbBuildDashboardSummary() {
+    const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+    const total = D.length;
+    if (!total) {
+      return { error: "لا توجد بيانات محمّلة حالياً في اللوحة. اطلب من المستخدم الضغط على زر التحديث ↻ أولاً." };
+    }
+
+    const fcaArr = D.filter((r) => null != r.fca);
+    const envArr = D.filter((r) => null != r.envScore);
+    const summary = {
+      عدد_المباني_الإجمالي: total,
+      توزيع_حكومي_مستأجر: fcbCountBy(D, "ownership", 5),
+      توزيع_المدن: fcbCountBy(D, "city", 15),
+      توزيع_المحافظات: fcbCountBy(D, "sector", 15),
+      توزيع_المراحل_الدراسية: fcbCountBy(D, "stage", 10),
+      توزيع_الجنس: fcbCountBy(D, "gender", 5),
+
+      تحليل_FCA: {
+        عدد_المدارس_المقيّمة: fcaArr.length,
+        المتوسط_العام: fcbAvg(D, "fca"),
+        عدد_حرجة_اقل_من_25: fcaArr.filter((r) => r.fca < 25).length,
+        عدد_متوسطة_25_50: fcaArr.filter((r) => r.fca >= 25 && r.fca < 50).length,
+        عدد_جيدة_50_75: fcaArr.filter((r) => r.fca >= 50 && r.fca < 75).length,
+        عدد_ممتازة_75_100: fcaArr.filter((r) => r.fca >= 75).length,
+        أسوأ_10_مدارس: fcbTopN(fcaArr, "fca", 10, true),
+        أفضل_10_مدارس: fcbTopN(fcaArr, "fca", 10, false),
+      },
+
+      البيئة_المدرسية: {
+        عدد_المدارس_المقيّمة: envArr.length,
+        المتوسط_العام: fcbAvg(D, "envScore"),
+        أسوأ_10_مدارس: fcbTopN(envArr, "envScore", 10, true),
+        أفضل_10_مدارس: fcbTopN(envArr, "envScore", 10, false),
+      },
+
+      الطلاب_وعمر_المبنى: {
+        إجمالي_الطلاب: D.reduce((s, r) => s + (r.students || 0), 0),
+        متوسط_الطلاب_للمدرسة: fcbAvg(D, "students"),
+        أكبر_5_مدارس_من_حيث_عدد_الطلاب: fcbTopN(D, "students", 5, false),
+        متوسط_عمر_المبنى: fcbAvg(D, "buildingAge"),
+        عدد_مبانٍ_عمرها_اكثر_من_40_سنة: D.filter((r) => r.buildingAge > 40).length,
+        عدد_مبانٍ_جديدة_اقل_من_10_سنوات: D.filter((r) => r.buildingAge < 10).length,
+      },
+
+      الفصول_والتكييف: {
+        إجمالي_الفصول: D.reduce((s, r) => s + (r.classrooms || 0), 0),
+        إجمالي_وحدات_التكييف: D.reduce((s, r) => s + (r.acUnits || 0), 0),
+      },
+
+      البلاغات_الصيانة: {
+        إجمالي_البلاغات_من_بيانات_المباني: D.reduce((s, r) => s + (r.alerts || 0), 0),
+        أعلى_10_مدارس_بلاغات: fcbTopN(D, "alerts", 10, false),
+      },
+
+      العقود: {
+        أهم_مقاولي_الصيانة: fcbCountBy(D, "contrMaint", 8),
+        أهم_مقاولي_التكييف: fcbCountBy(D, "contrAC", 8),
+        أهم_مقاولي_النظافة: fcbCountBy(D, "contrClean", 8),
+        حالة_الاشتراك_توزيع: fcbCountBy(D, "subscriptionStatus", 8),
+      },
+
+      تقييم_عاين: {
+        عدد_المقيّم: D.filter((r) => null != r.ayenScore).length,
+        المتوسط: fcbAvg(D, "ayenScore"),
+      },
+    };
+
+    // ── بيانات إضافية من مصادر أخرى (لو متاحة في الصفحة) ──
+    try {
+      if (Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) {
+        summary.بلاغات_CSV = { إجمالي_السجلات: window.RAW_BALAGH.length };
+      }
+    } catch (_) {}
+    try {
+      if (Array.isArray(window.RAW_SPARE_PARTS) && window.RAW_SPARE_PARTS.length) {
+        summary.قطع_الغيار = { إجمالي_السجلات: window.RAW_SPARE_PARTS.length };
+      }
+    } catch (_) {}
+    try {
+      if (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
+        summary.المصاعد = { إجمالي_السجلات: window.RAW_ELEVATORS.length };
+      }
+    } catch (_) {}
+    try {
+      if (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) {
+        summary.الأنظمة = { إجمالي_السجلات: window.RAW_ALL_SYSTEMS.length };
+      }
+    } catch (_) {}
+    try {
+      if (Array.isArray(window.RAW_FM_CONTRACTS) && window.RAW_FM_CONTRACTS.length) {
+        summary.عقود_FM = { إجمالي_السجلات: window.RAW_FM_CONTRACTS.length };
+      }
+    } catch (_) {}
+    try {
+      if (Array.isArray(window.RAW_INVOICES_TRACKER) && window.RAW_INVOICES_TRACKER.length) {
+        summary.متابعة_الفواتير = { إجمالي_السجلات: window.RAW_INVOICES_TRACKER.length };
+      }
+    } catch (_) {}
+    try {
+      if (typeof PAY_RAW_CONTRACT !== "undefined" && PAY_RAW_CONTRACT.length) {
+        summary.المدفوعات_والعقود = {
+          عدد_العقود: PAY_RAW_CONTRACT.length,
+          عدد_الفواتير: (typeof PAY_RAW_INVOICE !== "undefined" ? PAY_RAW_INVOICE.length : 0),
+        };
+      }
+    } catch (_) {}
+
+    return summary;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     🧠 ردود مبرمجة بسيطة (Rule-based) — تُستخدم فقط كحل احتياطي
+     لو ما فيه مفتاح API أو فشل الاتصال بـ OpenAI
+  ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
     { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا المساعد الذكي للوحة إدارة المرافق التعليمية 🤖 — تجمع اللوحة بيانات منشآت المدارس في مكان واحد: تقييمات الحالة الفنية (FCA)، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة الجغرافية. اسألني عن أي قسم وأوضح لك مكانه ووظيفته 📊" },
     { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة البيئة والترتيب\n• العقود — حالة ومدد التعاقدات\n• الصيانة — البلاغات والأعمال\n• التجهيزات — الأصول والمعدات\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
@@ -14019,17 +14173,104 @@ function renderTajheezAllTable() {
     if (t) t.remove();
   }
 
-  function fcbSend(presetText) {
+  /* ════════════════════════════════════════════════════════════════
+     💬 سجل المحادثة (للحفاظ على سياق الحوار مع OpenAI)
+  ════════════════════════════════════════════════════════════════ */
+  const FCB_HISTORY = [];
+  const FCB_HISTORY_MAX = 12; // آخر 12 رسالة (6 أسئلة + 6 ردود) كسياق
+
+  /* ════════════════════════════════════════════════════════════════
+     🤖 استدعاء OpenAI API مع تمرير ملخص بيانات الداشبورد كسياق
+  ════════════════════════════════════════════════════════════════ */
+  async function fcbAskOpenAI(userText) {
+    const apiKey = fcbGetApiKey();
+    if (!apiKey) {
+      throw new Error("NO_API_KEY");
+    }
+    const model = fcbGetModel();
+    const dashboardData = fcbBuildDashboardSummary();
+
+    const systemPrompt = `أنت "المساعد الذكي" للوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
+مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة واعتماداً على بيانات اللوحة الفعلية المرفقة لك بصيغة JSON بالأسفل.
+
+تعليمات مهمة:
+- اعتمد فقط على البيانات المرفقة فعلياً في الإجابة عن أي أرقام أو إحصائيات. لا تخترع أرقاماً غير موجودة.
+- لو سؤال المستخدم عن رقم أو تفصيل غير متوفر في البيانات المرفقة، وضّح أن هذه التفاصيل غير متاحة في الملخص الحالي ووجّهه للتبويب المناسب في اللوحة ليشوف التفصيل الكامل.
+- اللوحة فيها 20 تبويب رئيسي: نظرة عامة، تحليل FCA، البيئة المدرسية، المرحلة الدراسية، العقود، عقود غير المجال، البلاغات، التجهيزات، الأنظمة الرئيسية، الأنظمة التفصيلية، الصيانة الوقائية، خنادق الصرف، المصاعد، التكلفة، الخريطة، الطلاب وعمر المبنى، قطع الغيار، تقييم عاين، المدفوعات والعقود، الجدول التفصيلي.
+- كن مختصراً ومباشراً، استخدم نقاطاً أو أرقاماً عند الحاجة، وأضف إيموجي مناسب بشكل خفيف.
+- لو المستخدم سأل سؤال عام لا يخص اللوحة، جاوبه بشكل طبيعي ومفيد بدون افتراض إنه يتكلم عن اللوحة.
+
+بيانات اللوحة الحالية (محدّثة لحظة هذا السؤال):
+${JSON.stringify(dashboardData)}`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...FCB_HISTORY,
+      { role: "user", content: userText },
+    ];
+
+    const resp = await fetch(CFG.OPENAI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + apiKey,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 0.4,
+        max_completion_tokens: 700,
+      }),
+    });
+
+    if (!resp.ok) {
+      let errMsg = "HTTP " + resp.status;
+      try {
+        const errJson = await resp.json();
+        errMsg = errJson?.error?.message || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const data = await resp.json();
+    const reply = data?.choices?.[0]?.message?.content?.trim();
+    if (!reply) throw new Error("EMPTY_RESPONSE");
+
+    FCB_HISTORY.push({ role: "user", content: userText });
+    FCB_HISTORY.push({ role: "assistant", content: reply });
+    while (FCB_HISTORY.length > FCB_HISTORY_MAX) FCB_HISTORY.shift();
+
+    return reply;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     📨 إرسال الرسالة — يجرّب OpenAI أولاً، ولو فشل أو ما فيه مفتاح
+     يرجع تلقائياً للردود المبرمجة (Rule-based) كحل احتياطي
+  ════════════════════════════════════════════════════════════════ */
+  async function fcbSend(presetText) {
     const inputEl = document.getElementById("fcbInput");
     const val = (typeof presetText === "string" ? presetText : inputEl.value).trim();
     if (!val) return;
     fcbAppendMsg(val, "user");
     inputEl.value = "";
     fcbShowTyping();
-    setTimeout(() => {
+
+    try {
+      const apiKey = fcbGetApiKey();
+      if (!apiKey) {
+        // لا يوجد مفتاح API — استخدم الردود المبرمجة فوراً بدون محاولة الاتصال
+        fcbHideTyping();
+        fcbAppendMsg(fcbReplyFor(val), "bot");
+        return;
+      }
+      const reply = await fcbAskOpenAI(val);
+      fcbHideTyping();
+      fcbAppendMsg(reply, "bot");
+    } catch (err) {
+      console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       fcbHideTyping();
       fcbAppendMsg(fcbReplyFor(val), "bot");
-    }, 700);
+    }
   }
 </script>
 

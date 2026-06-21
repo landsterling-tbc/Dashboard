@@ -2862,7 +2862,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="tier-indicator" style="background:#0891B2"></div>
         <div class="tier-num" id="t-vgood">—</div>
         <div class="tier-pct" id="t-vgood-pct"></div>
-        <div class="tier-sub" data-ar="ممتاز · 75–100%" data-en="Excellent · 75–100%">ممتاز · 75–100%</div>
+        <div class="tier-sub" data-ar="جيد جداً · 75–100%" data-en="Very Good · 75–100%">جيد جداً · 75–100%</div>
       </div>
     </div>
   </div>
@@ -3520,7 +3520,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="map-stat-dot" style="background:#0891B2"></div>
         <div>
           <div class="map-stat-val" id="ms-vgood" style="color:#0891B2">—</div>
-          <div class="map-stat-lbl">ممتاز · 75–100%</div>
+          <div class="map-stat-lbl">جيد جداً · 75–100%</div>
         </div>
       </div>
       <div class="map-stat">
@@ -3763,15 +3763,16 @@ const CFG = {
     LOW_FCA_THRESHOLD: 50,
 
     // ════════════════════════════════════════════════════════════════
-    // 🔑 إعدادات المساعد الذكي (OpenAI API) — ضع مفتاحك هنا
+    // 🔑 إعدادات المساعد الذكي (OpenAI API)
     // ════════════════════════════════════════════════════════════════
-    // ⚠️ تنبيه أمان: هذا المفتاح سيكون مرئياً لأي شخص يفتح كود الصفحة
-    // (View Source / Inspect). لا تشارك رابط/ملف الصفحة علناً وفيه
-    // مفتاح حقيقي. للاستخدام الإنتاجي الأفضل تمرير الطلبات عبر سيرفر
-    // خاص بك (proxy) يخزن المفتاح بأمان. هذا الإعداد مناسب للتجربة
-    // والتطوير الحالي.
-    OPENAI_API_KEY: "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", // 👈 حط مفتاحك بدل هذا النص
-    OPENAI_MODEL: "gpt-5.4-mini", // 👈 اسم الموديل — غيّره وقت ما تحب تجرب موديل تاني
+    // ⚠️ هذه اللوحة تُستضاف على GitHub Pages بدون أي سيرفر خلفي، لذلك
+    // لا يوجد — ولا يجب أن يوجد — أي مفتاح API داخل الكود المصدري.
+    // كل مستخدم يُدخل مفتاحه الخاص من ⚙️ إعدادات المساعد، ويُخزَّن
+    // محلياً في متصفحه فقط (localStorage) ولا يُرسل لأي مكان غير
+    // OpenAI مباشرة. راجع وحدة AIService بالأسفل لكل منطق الاتصال —
+    // لو احتجت لاحقاً تمرير الطلبات عبر سيرفر/بروكسي خاص بك، التعديل
+    // يكون في AIService فقط دون لمس بقية اللوحة.
+    OPENAI_MODEL: "gpt-5.4-mini", // الموديل الافتراضي لو المستخدم لم يحدد موديل آخر في الإعدادات
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   },
   COLS = {
@@ -3828,7 +3829,7 @@ const CFG = {
     critical: { label: "حرج", color: "#DC2626", bg: "#FEF2F2", min: 0, max: 24.99 },
     fair: { label: "متوسط", color: "#D97706", bg: "#FFFBEB", min: 25, max: 49.99 },
     good: { label: "جيد", color: "#059669", bg: "#ECFDF5", min: 50, max: 74.99 },
-    vgood: { label: "ممتاز", color: "#0891B2", bg: "#ECFEFF", min: 75, max: 100 },
+    vgood: { label: "جيد جداً", color: "#0891B2", bg: "#ECFEFF", min: 75, max: 100 },
   },
   PALETTE = [
     "#083D4F",
@@ -3895,6 +3896,87 @@ function killChart(id) {
     delete CHARTS[id];
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   🛡️ دوال حماية عامة للرسوم البيانية (Chart.js Sanitizers)
+   هدفها: منع ظهور undefined / null / NaN على أي محور أو تسمية أو
+   tooltip في أي رسم بياني بالداشبورد بالكامل — تُستخدم كطبقة حماية
+   أخيرة قبل تمرير البيانات لـ new Chart(...)
+   ════════════════════════════════════════════════════════════════ */
+
+// ينظّف قيمة نصية مفردة (label واحد): يرجع fallback لو القيمة فاضية/تالفة
+function sanitizeText(value, fallback = "غير متوفر") {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "number" && !Number.isFinite(value)) return fallback;
+  const s = String(value).trim();
+  if (!s || s === "undefined" || s === "null" || s === "NaN" || s === "#N/A") return fallback;
+  return s;
+}
+
+// ينظّف قيمة رقمية مفردة: يرجع fallback (افتراضيًا null، آمن لـ Chart.js) لو القيمة غير صالحة
+function safeNumber(value, fallback = null) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const n = typeof value === "number" ? value : Number(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// يضمن أن القيمة دائماً مصفوفة (يحوّل أي قيمة غير مصفوفة لمصفوفة فاضية)
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+// ينظّف مصفوفة تسميات (labels) كاملة لرسم بياني — كل عنصر يصبح نصاً آمناً دائماً
+function sanitizeChartLabels(labels, fallback = "غير متوفر") {
+  return safeArray(labels).map((l) => sanitizeText(l, fallback));
+}
+
+// ينظّف مصفوفة بيانات رقمية (data) كاملة — كل عنصر يصبح رقماً صالحاً أو null
+function sanitizeChartValues(values) {
+  return safeArray(values).map((v) => safeNumber(v, null));
+}
+
+/* ينظّف labels + datasets معاً قبل تمريرهما لـ Chart.js:
+   - يوحّد طول labels مع أطول dataset
+   - ينظّف كل تسمية وكل قيمة رقمية
+   - dataset بدون أي قيمة صالحة يُستثنى تلقائياً من الرسم */
+function normalizeChartData(labels, datasets) {
+  const safeDatasets = safeArray(datasets)
+    .map((ds) => {
+      if (!ds || typeof ds !== "object") return null;
+      const cleanData = sanitizeChartValues(ds.data);
+      const hasAnyValidValue = cleanData.some((v) => v !== null);
+      if (!cleanData.length || !hasAnyValidValue) return null; // dataset بدون أي قيمة صالحة لا يُرسم
+      return { ...ds, label: sanitizeText(ds.label, ""), data: cleanData };
+    })
+    .filter(Boolean);
+  const maxLen = safeDatasets.reduce((m, ds) => Math.max(m, ds.data.length), 0);
+  let cleanLabels = sanitizeChartLabels(labels);
+  // لو الـ labels أقصر من البيانات، نكمّلها بقيمة آمنة بدل ما تظهر undefined
+  while (cleanLabels.length < maxLen) cleanLabels.push("غير متوفر");
+  return { labels: cleanLabels, datasets: safeDatasets };
+}
+
+// يعرض رسالة "لا توجد بيانات" أنيقة بدل الكانفس الفاضي عند عدم وجود بيانات كافية لرسم شارت
+function renderEmptyState(container, message = "لا توجد بيانات متاحة") {
+  const el = typeof container === "string" ? document.getElementById(container) : container;
+  if (!el) return;
+  el.innerHTML = `<div class="chart-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:var(--tx-muted);gap:8px">
+    <div style="font-size:30px;opacity:.5">📭</div>
+    <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
+  </div>`;
+}
+
+/* Callback آمن لمحاور Chart.js (ticks.callback) — يُستخدم في scales.x/y.ticks.callback
+   لمنع ظهور undefined/null/NaN حتى لو وصلت القيمة الخام فاسدة لأي سبب وقت الرسم فعلياً.
+   يعمل مع كلا نوعي المحاور: category (تمرّر index، نجيب label الحقيقي) وlinear (تمرّر القيمة مباشرة). */
+function safeTickCallback(value, index, ticks) {
+  const hasLabelGetter = this && typeof this.getLabelForValue === "function";
+  const raw = hasLabelGetter ? this.getLabelForValue(value) : value;
+  // لو الناتج رقم صالح (محور خطي)، نرجّعه كرقم بدل تحويله لنص "غير متوفر"
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  return sanitizeText(raw, "");
+}
+
 function setDot(s) {
   document.getElementById("dot").className = "dot " + s;
 }
@@ -4417,26 +4499,30 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
 }
 function makeVBar(id, labels, datasets) {
   killChart(id);
-  const fullLabels = labels,
-    displayLabels = labels.map((l) =>
-      "string" == typeof l && l.length > 16 ? l.slice(0, 16) + "…" : l,
-    );
+  // 🛡️ تنظيف شامل: نمنع وصول undefined/null/NaN لأي تسمية أو قيمة على المحاور
+  const { labels: cleanLabels, datasets: cleanDatasets } = normalizeChartData(labels, datasets);
+  if (!cleanLabels.length || !cleanDatasets.length) {
+    renderEmptyState(document.getElementById(id)?.closest(".chart-box") || document.getElementById(id), "لا توجد بيانات متاحة");
+    return;
+  }
+  const fullLabels = cleanLabels,
+    displayLabels = cleanLabels.map((l) => (l.length > 16 ? l.slice(0, 16) + "…" : l));
   CHARTS[id] = new Chart(document.getElementById(id), {
     type: "bar",
-    data: { labels: displayLabels, datasets: datasets },
+    data: { labels: displayLabels, datasets: cleanDatasets },
     options: {
       maintainAspectRatio: !1,
       plugins: {
         legend: { position: "top", labels: { font: { size: 10 }, boxWidth: 10, padding: 10 } },
         tooltip: {
           callbacks: {
-            title: (ctx) => String(fullLabels[ctx[0].dataIndex] ?? ctx[0].label ?? "") || "—",
+            title: (ctx) => sanitizeText(fullLabels[ctx[0].dataIndex] ?? ctx[0].label, "—"),
           },
         },
       },
       scales: {
-        y: { beginAtZero: !0, ticks: { font: { size: 10 } } },
-        x: { ticks: { font: { size: 10 }, maxRotation: 30 } },
+        y: { beginAtZero: !0, ticks: { font: { size: 10 }, callback: safeTickCallback } },
+        x: { ticks: { font: { size: 10 }, maxRotation: 30, callback: safeTickCallback } },
       },
     },
   });
@@ -4720,7 +4806,7 @@ function renderEnvCharts() {
       /* خلايا */
       for (let row = 0; row < BINS; row++) {
         for (let col = 0; col < BINS; col++) {
-          const yIdx = BINS - 1 - row; /* البيئة: أعلى = ممتاز */
+          const yIdx = BINS - 1 - row; /* البيئة: أعلى = جيد جداً */
           const v = grid[yIdx][col];
           const x = PAD.left + col * cellW;
           const y = PAD.top + row * cellH;
@@ -4828,7 +4914,7 @@ function renderEnvCharts() {
       const yMin = yIdx * 20,
         yMax = (yIdx + 1) * 20;
 
-      const TIER_LBL = ["حرج", "متوسط", "جيد", "جيد", "ممتاز"];
+      const TIER_LBL = ["حرج", "متوسط", "جيد", "جيد", "جيد جداً"];
       const sample = schoolList
         .slice(0, 3)
         .map(
@@ -6393,7 +6479,7 @@ function getMarkerStyle(r, mode) {
 }
 function buildLegendHTML(mode) {
   if ("fca" === mode || "env" === mode) {
-    return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#059669"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>ممتاز · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>لا توجد بيانات</div>`;
+    return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#059669"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>جيد جداً · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>لا توجد بيانات</div>`;
   }
   return "gender" === mode
     ? '<div class="map-legend-title">👦👧 الجنس</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>بنات</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>بنين</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
@@ -7190,7 +7276,7 @@ function renderAyenTab() {
   });
   const worst10 = scored.slice(0, 10),
     best10 = [...scored].reverse().slice(0, 10);
-  ((el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid #0E7490">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط تقييم عاين</div>\n        <div style="font-size:26px;font-weight:800;color:#0E7490;letter-spacing:-.02em">${avgAyen.toFixed(1)}%</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="card" style="border-top:3px solid #DC2626">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">حرج · أقل من 25%</div>\n        <div style="font-size:26px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${critical.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط · 25–49%</div>\n        <div style="font-size:26px;font-weight:800;color:#D97706;letter-spacing:-.02em">${needWork.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #059669">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">جيد · 50–74%</div>\n        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${good.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="card" style="border-top:3px solid #0891B2">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">ممتاز · 75–100%</div>\n        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${excellent.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى ممتاز</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">ممتاز · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
+  ((el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid #0E7490">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط تقييم عاين</div>\n        <div style="font-size:26px;font-weight:800;color:#0E7490;letter-spacing:-.02em">${avgAyen.toFixed(1)}%</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="card" style="border-top:3px solid #DC2626">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">حرج · أقل من 25%</div>\n        <div style="font-size:26px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${critical.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط · 25–49%</div>\n        <div style="font-size:26px;font-weight:800;color:#D97706;letter-spacing:-.02em">${needWork.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #059669">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">جيد · 50–74%</div>\n        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${good.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="card" style="border-top:3px solid #0891B2">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">جيد جداً · 75–100%</div>\n        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${excellent.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
     (window._AYEN_ROWS = scored),
     (window._AYEN_PAGE = { cur: 0, SIZE: 50 }),
     requestAnimationFrame(() => {
@@ -10311,27 +10397,30 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
     }),
     (window.makeVBar = function (id, labels, datasets, xTitle, yTitle) {
       killChart(id);
-      const fullLabels = labels,
-        displayLabels = labels.map((l) => {
-          const s = String(l ?? "");
-          return s.length > 16 ? s.slice(0, 16) + "…" : s;
-        });
+      // 🛡️ تنظيف شامل: نمنع وصول undefined/null/NaN لأي تسمية أو قيمة على المحاور
+      const { labels: cleanLabels, datasets: cleanDatasets } = normalizeChartData(labels, datasets);
+      if (!cleanLabels.length || !cleanDatasets.length) {
+        renderEmptyState(document.getElementById(id)?.closest(".chart-box") || document.getElementById(id), "لا توجد بيانات متاحة");
+        return;
+      }
+      const fullLabels = cleanLabels,
+        displayLabels = cleanLabels.map((l) => (l.length > 16 ? l.slice(0, 16) + "…" : l));
       CHARTS[id] = new Chart(document.getElementById(id), {
         type: "bar",
-        data: { labels: displayLabels, datasets: datasets },
+        data: { labels: displayLabels, datasets: cleanDatasets },
         options: enhanceChartScales(
           {
             plugins: {
               legend: { position: "top" },
               tooltip: {
                 callbacks: {
-                  title: (ctx) => String(fullLabels[ctx[0].dataIndex] ?? ctx[0].label ?? "") || "—",
+                  title: (ctx) => sanitizeText(fullLabels[ctx[0].dataIndex] ?? ctx[0].label, "—"),
                 },
               },
             },
             scales: {
-              x: { ticks: { font: { size: 10 }, maxRotation: 30 } },
-              y: { beginAtZero: !0, ticks: { font: { size: 10 } } },
+              x: { ticks: { font: { size: 10 }, maxRotation: 30, callback: safeTickCallback } },
+              y: { beginAtZero: !0, ticks: { font: { size: 10 }, callback: safeTickCallback } },
             },
           },
           xTitle || "الفئات",
@@ -10518,7 +10607,7 @@ window.renderElevatorsTab = function () {
   /* === تبويب التكلفة — جلب البيانات من الشيت الخاص بالتكلفة === */
   const COST_URL =
     "https://script.google.com/macros/s/AKfycbweVcD1cOAqFa6nkt9555c1kOyATcU6t_UWHGmySeOENb4y8XfmVbl9juXgRtqp2uEdeA/exec";
-  const state = {
+  const state = window.RAW_COST_STATE = {
     loaded: false,
     loading: false,
     error: "",
@@ -12335,7 +12424,7 @@ function renderKhanadeqTab() {
   // ══════════════════════════════════════════════════════
   // 🔧 عدّل أرقام khanadeq هنا — عدد المدارس من الملخص
   // ══════════════════════════════════════════════════════
-  const cityData = [
+  const cityData = window.RAW_KHANADEQ_CITY_DATA = [
     { city: "مكة", schools: 46, khanadeq: 46 },
     { city: "جدة", schools: 161, khanadeq: 161 },
     { city: "الطائف", schools: 528, khanadeq: 528 },
@@ -13551,95 +13640,112 @@ function renderTajheezAllTable() {
 ╚════════════════════════════════════════════════════════════════════╝
 -->
 <style>
+  /* ============================================================
+     💬 المساعد الذكي — تصميم مودرن (v2)
+     ============================================================ */
+
   .fcb-fab {
     position: fixed;
-    bottom: 26px;
-    left: 26px;
-    width: 60px;
-    height: 60px;
+    bottom: 28px;
+    left: 28px;
+    width: 62px;
+    height: 62px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 55%, var(--teal) 135%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: var(--sh-lift), 0 0 0 6px rgba(8, 145, 178, 0.08);
+    background: linear-gradient(145deg, var(--teal-2) 0%, var(--teal) 45%, var(--navy-2) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 10px 28px rgba(8, 145, 178, 0.32), 0 4px 12px rgba(8, 45, 60, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     z-index: 600;
-    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), box-shadow 0.28s ease;
+  }
+  .fcb-fab::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(8, 145, 178, 0.32);
+    animation: fcb-ring 2.6s ease-out infinite;
+  }
+  @keyframes fcb-ring {
+    0% { transform: scale(0.82); opacity: 0.85; }
+    100% { transform: scale(1.22); opacity: 0; }
   }
   .fcb-fab:hover {
-    transform: translateY(-3px) scale(1.04);
-    box-shadow: var(--sh-lift), 0 0 0 9px rgba(8, 145, 178, 0.14);
+    transform: translateY(-4px) scale(1.06);
+    box-shadow: 0 16px 36px rgba(8, 145, 178, 0.4), 0 6px 16px rgba(8, 45, 60, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
+  .fcb-fab.active { transform: scale(1) rotate(0deg); }
   .fcb-fab-icon,
   .fcb-fab-close {
     position: absolute;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 25px;
-    transition: transform 0.25s ease, opacity 0.2s ease;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.22s ease;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.22));
   }
-  .fcb-fab-close { font-size: 22px; color: #fff; opacity: 0; transform: rotate(-90deg) scale(0.4); }
+  .fcb-fab-close { opacity: 0; transform: rotate(-90deg) scale(0.4); }
   .fcb-fab.active .fcb-fab-icon { opacity: 0; transform: rotate(90deg) scale(0.4); }
   .fcb-fab.active .fcb-fab-close { opacity: 1; transform: rotate(0) scale(1); }
   .fcb-fab-dot {
     position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 14px;
-    height: 14px;
+    top: -1px;
+    right: -1px;
+    width: 15px;
+    height: 15px;
     border-radius: 50%;
     background: #10b981;
     border: 2.5px solid #fff;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
     animation: pulse-dot 1.8s infinite;
   }
   .fcb-fab-tip {
     position: absolute;
-    left: 72px;
-    bottom: 19px;
-    background: #07212c;
+    left: 76px;
+    bottom: 20px;
+    background: linear-gradient(135deg, #0a2530, #07212c);
     color: #fff;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 700;
-    padding: 7px 13px;
-    border-radius: 10px;
+    padding: 8px 14px;
+    border-radius: 11px;
     white-space: nowrap;
     opacity: 0;
     transform: translateX(-8px);
-    transition: all 0.2s ease;
+    transition: all 0.22s ease;
     pointer-events: none;
-    box-shadow: 0 6px 16px rgba(8, 45, 60, 0.22);
+    box-shadow: 0 8px 20px rgba(8, 45, 60, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
   .fcb-fab:hover .fcb-fab-tip { opacity: 1; transform: translateX(0); }
 
   .fcb-panel {
     position: fixed;
-    bottom: 98px;
-    left: 26px;
-    width: 368px;
+    bottom: 102px;
+    left: 28px;
+    width: 392px;
     max-width: calc(100vw - 32px);
     height: 0;
-    max-height: 75vh;
+    max-height: 78vh;
     background: var(--bg-3);
     border: 1px solid var(--bd-light);
-    border-radius: var(--r-2xl);
-    box-shadow: var(--sh-lift);
+    border-radius: 22px;
+    box-shadow: 0 24px 64px rgba(8, 45, 60, 0.22), 0 4px 18px rgba(8, 45, 60, 0.1);
     z-index: 599;
     overflow: hidden;
     opacity: 0;
-    transform: translateY(16px) scale(0.96);
+    transform: translateY(20px) scale(0.95);
     transform-origin: bottom left;
-    transition: opacity 0.26s ease, transform 0.26s ease, height 0.26s ease;
+    transition: opacity 0.28s cubic-bezier(.22,1,.36,1), transform 0.32s cubic-bezier(.22,1,.36,1), height 0.32s cubic-bezier(.22,1,.36,1);
     display: flex;
     flex-direction: column;
     pointer-events: none;
   }
   .fcb-panel.open {
-    height: 524px;
+    height: 580px;
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
@@ -13651,42 +13757,56 @@ function renderTajheezAllTable() {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 16px 18px;
-    background: linear-gradient(135deg, rgba(6, 20, 28, 0.97) 0, rgba(7, 30, 40, 0.96) 60%, rgba(8, 84, 104, 0.92) 100%);
+    padding: 17px 18px;
+    background: linear-gradient(120deg, #06141c 0%, #0a2a36 45%, var(--teal-3) 130%);
+    overflow: hidden;
+  }
+  .fcb-head::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(180px 90px at 88% -20%, rgba(8, 145, 178, 0.35), transparent 60%),
+      radial-gradient(140px 70px at 10% 120%, rgba(124, 58, 237, 0.12), transparent 60%);
+    pointer-events: none;
   }
   .fcb-head::after {
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
-    height: 1.5px;
-    background: linear-gradient(to left, transparent, var(--teal-2), transparent);
-    opacity: 0.85;
+    height: 2px;
+    background: linear-gradient(to left, transparent, var(--teal-2), rgba(255,255,255,0.5), var(--teal-2), transparent);
+    opacity: 0.9;
   }
   .fcb-avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
     flex-shrink: 0;
     background: linear-gradient(135deg, var(--teal), var(--teal-2));
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    box-shadow: 0 4px 10px rgba(8, 145, 178, 0.35);
+    font-size: 19px;
+    box-shadow: 0 6px 14px rgba(8, 145, 178, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+    z-index: 1;
   }
-  .fcb-head-text { flex: 1; min-width: 0; }
-  .fcb-head-title { color: #fff; font-size: 13.5px; font-weight: 800; letter-spacing: 0.01em; }
+  .fcb-head-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .fcb-head-title { color: #fff; font-size: 14px; font-weight: 800; letter-spacing: 0.01em; }
   .fcb-head-sub {
     margin-top: 3px;
     display: flex;
     align-items: center;
     gap: 5px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 10.5px;
     font-weight: 600;
   }
-  .fcb-head-sub .dot { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.22); }
+  .fcb-head-sub .dot { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25); }
   .fcb-head-close {
+    position: relative;
+    z-index: 1;
     width: 30px;
     height: 30px;
     border-radius: 50%;
@@ -13695,30 +13815,43 @@ function renderTajheezAllTable() {
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.78);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.18s ease;
   }
-  .fcb-head-close:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+  .fcb-head-close:hover { background: rgba(255, 255, 255, 0.18); color: #fff; transform: scale(1.06); }
 
   .fcb-body {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 14px 6px;
+    padding: 18px 14px 6px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     position: relative;
-    background: radial-gradient(420px 200px at 100% 0%, rgba(8, 145, 178, 0.05), transparent 55%), var(--bg-2);
+    background:
+      radial-gradient(460px 220px at 100% 0%, rgba(8, 145, 178, 0.06), transparent 55%),
+      radial-gradient(360px 200px at 0% 100%, rgba(124, 58, 237, 0.03), transparent 55%),
+      var(--bg-2);
   }
-  .fcb-row { display: flex; align-items: flex-end; gap: 8px; max-width: 88%; }
+  .fcb-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: 90%;
+    animation: fcb-rise 0.32s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes fcb-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
   .fcb-row.bot { margin-inline-end: auto; }
   .fcb-row.user { margin-inline-start: auto; }
   .fcb-msg-avatar {
-    width: 26px;
-    height: 26px;
+    width: 27px;
+    height: 27px;
     border-radius: 50%;
     flex-shrink: 0;
     background: linear-gradient(135deg, var(--navy-2), var(--teal));
@@ -13726,37 +13859,154 @@ function renderTajheezAllTable() {
     align-items: center;
     justify-content: center;
     font-size: 13px;
-    box-shadow: 0 2px 6px rgba(8, 61, 79, 0.28);
+    box-shadow: 0 2px 8px rgba(8, 61, 79, 0.3);
   }
   .fcb-col { display: flex; flex-direction: column; min-width: 0; }
-  .fcb-bubble { padding: 10px 13px; font-size: 12.5px; font-weight: 500; line-height: 1.7; white-space: pre-line; }
+  .fcb-bubble {
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.75;
+    letter-spacing: 0.001em;
+    word-wrap: break-word;
+  }
   .fcb-row.bot .fcb-bubble {
     background: #fff;
     color: var(--tx-main);
     border: 1px solid var(--bd-light);
-    border-radius: 14px 4px 14px 14px;
+    border-radius: 16px 5px 16px 16px;
+    box-shadow: 0 2px 8px rgba(8, 45, 60, 0.05);
   }
   .fcb-row.user .fcb-bubble {
     background: linear-gradient(135deg, var(--teal), var(--teal-2));
     color: #fff;
-    border-radius: 14px 14px 14px 4px;
-    box-shadow: 0 4px 10px rgba(8, 145, 178, 0.25);
+    border-radius: 16px 16px 16px 5px;
+    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.28);
+    font-weight: 600;
   }
-  .fcb-time { margin-top: 4px; font-size: 9.5px; color: var(--tx-muted); }
+  /* تنسيق محتوى الردود (Markdown مبسّط) */
+  .fcb-bubble p { margin: 0 0 8px; }
+  .fcb-bubble p:last-child { margin-bottom: 0; }
+  .fcb-bubble strong { font-weight: 800; color: var(--navy-2); }
+  .fcb-row.user .fcb-bubble strong { color: #fff; }
+  .fcb-bubble em { font-style: normal; color: var(--teal-3); font-weight: 600; }
+  .fcb-bubble ul, .fcb-bubble ol { margin: 4px 0 8px; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .fcb-bubble li { line-height: 1.65; }
+  .fcb-bubble li::marker { color: var(--teal); font-weight: 800; }
+  .fcb-bubble code {
+    background: rgba(8, 145, 178, 0.1);
+    color: var(--teal-3);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    direction: ltr;
+    display: inline-block;
+  }
+  .fcb-row.user .fcb-bubble code { background: rgba(255, 255, 255, 0.2); color: #fff; }
+  .fcb-bubble h4 { font-size: 13px; font-weight: 800; color: var(--navy-2); margin: 2px 0 6px; }
+  .fcb-bubble hr { border: none; border-top: 1px solid var(--bd-light); margin: 8px 0; }
+  .fcb-bubble a { color: var(--teal-3); font-weight: 700; text-decoration: underline; text-decoration-color: rgba(8,145,178,0.35); }
+
+  /* جداول داخل ردود المساعد */
+  .fcb-table-wrap { margin: 6px 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid var(--bd-light); max-width: 100%; overflow-x: auto; }
+  .fcb-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .fcb-table thead th {
+    background: linear-gradient(135deg, var(--navy), var(--navy-2));
+    color: #fff;
+    font-weight: 700;
+    padding: 8px 10px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .fcb-table tbody td {
+    padding: 7px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--bd-light);
+    color: var(--tx-main);
+    white-space: nowrap;
+  }
+  .fcb-table tbody tr:last-child td { border-bottom: none; }
+  .fcb-table tbody tr:nth-child(even) { background: var(--bg-2); }
+  .fcb-table tbody tr:hover { background: var(--teal-glow); }
+
+  /* رسوم بيانية داخل ردود المساعد */
+  .fcb-chart-wrap {
+    margin: 6px 0 10px;
+    padding: 12px 10px 8px;
+    background: #fff;
+    border: 1px solid var(--bd-light);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(8, 45, 60, 0.05);
+  }
+  .fcb-chart-title { font-size: 11.5px; font-weight: 800; color: var(--navy-2); margin-bottom: 8px; text-align: center; }
+  .fcb-chart-canvas-box { position: relative; height: 200px; width: 100%; }
+  .fcb-chart-error { font-size: 11px; color: var(--red-2); padding: 6px; text-align: center; }
+
+  /* صف أزرار تصدير المحتوى (جدول/رسم/رد كامل) إلى CSV/Excel/PDF/PNG/نسخ */
+  .fcb-export-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--bd-light);
+  }
+  .fcb-chart-wrap .fcb-export-row,
+  .fcb-table-wrap .fcb-export-row { margin: 8px 10px 0; padding: 8px 0 2px; }
+  .fcb-export-row-msg { margin-top: 10px; }
+  .fcb-export-btn {
+    background: rgba(8, 145, 178, 0.07);
+    border: 1px solid rgba(8, 145, 178, 0.2);
+    color: var(--teal-3);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s ease;
+    font-family: inherit;
+  }
+  .fcb-export-btn:hover {
+    background: linear-gradient(135deg, var(--teal), var(--teal-2));
+    border-color: transparent;
+    color: #fff;
+  }
+  .fcb-export-btn:active { transform: scale(0.96); }
+
+  .fcb-time { margin-top: 5px; font-size: 9.5px; color: var(--tx-muted); font-weight: 600; padding: 0 2px; }
   .fcb-row.bot .fcb-time { text-align: right; }
   .fcb-row.user .fcb-time { text-align: left; }
 
-  .fcb-quick { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px 14px 14px; flex-shrink: 0; }
-  .fcb-chip { background: rgba(8, 145, 178, 0.08); border: 1px solid rgba(8, 145, 178, 0.22); color: var(--teal-3); font-size: 11px; font-weight: 700; padding: 7px 12px; border-radius: 999px; white-space: nowrap; cursor: pointer; transition: background 0.18s ease; }
-  .fcb-chip:hover { background: rgba(8, 145, 178, 0.15); }
+  .fcb-quick { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 14px 16px; flex-shrink: 0; }
+  .fcb-chip {
+    background: linear-gradient(135deg, rgba(8, 145, 178, 0.08), rgba(8, 145, 178, 0.04));
+    border: 1px solid rgba(8, 145, 178, 0.22);
+    color: var(--teal-3);
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 8px 13px;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(.22,1,.36,1);
+  }
+  .fcb-chip:hover {
+    background: linear-gradient(135deg, var(--teal), var(--teal-2));
+    border-color: transparent;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(8, 145, 178, 0.3);
+  }
 
-  .fcb-typing { display: flex; align-items: center; gap: 4px; padding: 13px 14px; }
-  .fcb-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--tx-muted); animation: fcb-bounce 1.2s infinite ease-in-out; }
+  .fcb-typing { display: flex; align-items: center; gap: 4px; padding: 14px 16px; }
+  .fcb-typing span { width: 6.5px; height: 6.5px; border-radius: 50%; background: var(--teal); opacity: 0.55; animation: fcb-bounce 1.2s infinite ease-in-out; }
   .fcb-typing span:nth-child(2) { animation-delay: 0.15s; }
   .fcb-typing span:nth-child(3) { animation-delay: 0.3s; }
   @keyframes fcb-bounce {
-    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-    40% { transform: translateY(-4px); opacity: 1; }
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+    40% { transform: translateY(-5px); opacity: 1; }
   }
 
   .fcb-settings {
@@ -13764,70 +14014,78 @@ function renderTajheezAllTable() {
     inset: 0;
     z-index: 5;
     background: var(--bg-3);
-    padding: 18px 16px;
+    padding: 20px 18px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 11px;
+    animation: fcb-rise 0.22s ease;
   }
-  .fcb-settings-title { font-size: 14px; font-weight: 800; color: var(--tx-main); margin-bottom: 4px; }
-  .fcb-settings-lbl { font-size: 11px; font-weight: 600; color: var(--tx-sec); margin-top: 6px; }
+  .fcb-settings-title { font-size: 14.5px; font-weight: 800; color: var(--tx-main); margin-bottom: 4px; }
+  .fcb-settings-lbl { font-size: 11.5px; font-weight: 700; color: var(--tx-sec); margin-top: 8px; }
   .fcb-settings-input {
-    border: 1px solid var(--bd-light);
+    border: 1.5px solid var(--bd-light);
     background: var(--bg-2);
-    border-radius: 10px;
-    padding: 9px 12px;
-    font-size: 12px;
+    border-radius: 11px;
+    padding: 10px 13px;
+    font-size: 12.5px;
     font-family: inherit;
     color: var(--tx-main);
     outline: none;
     width: 100%;
     direction: ltr;
     text-align: left;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
   }
-  .fcb-settings-input:focus { border-color: var(--bd-focus); }
-  .fcb-settings-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .fcb-settings-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); }
+  .fcb-settings-actions { display: flex; gap: 8px; margin-top: 12px; }
   .fcb-settings-save, .fcb-settings-clear {
     flex: 1;
     border: none;
-    border-radius: 10px;
-    padding: 9px 10px;
-    font-size: 12px;
+    border-radius: 11px;
+    padding: 10px 10px;
+    font-size: 12.5px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
   }
-  .fcb-settings-save { background: linear-gradient(135deg, var(--teal), var(--teal-2)); color: #fff; }
-  .fcb-settings-clear { background: var(--bg-2); color: var(--tx-sec); border: 1px solid var(--bd-light); }
-  .fcb-settings-note { font-size: 10px; color: var(--tx-muted); margin-top: 8px; line-height: 1.6; }
+  .fcb-settings-save { background: linear-gradient(135deg, var(--teal), var(--teal-2)); color: #fff; box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3); }
+  .fcb-settings-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(8, 145, 178, 0.38); }
+  .fcb-settings-clear { background: var(--bg-2); color: var(--tx-sec); border: 1.5px solid var(--bd-light); }
+  .fcb-settings-clear:hover { background: var(--bg); }
+  .fcb-settings-note { font-size: 10.5px; color: var(--tx-muted); margin-top: 10px; line-height: 1.7; background: var(--bg-2); border: 1px solid var(--bd-light); border-radius: 10px; padding: 10px 12px; }
 
   .fcb-foot {
     flex-shrink: 0;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 14px;
+    align-items: flex-end;
+    gap: 9px;
+    padding: 13px 14px;
     border-top: 1px solid var(--bd-light);
     background: var(--bg-3);
   }
   .fcb-input {
     flex: 1;
     min-width: 0;
-    border: 1px solid var(--bd-light);
+    max-height: 92px;
+    border: 1.5px solid var(--bd-light);
     background: var(--bg-2);
-    border-radius: 999px;
+    border-radius: 18px;
     padding: 10px 16px;
-    font-size: 12px;
+    font-size: 12.5px;
     font-family: inherit;
     color: var(--tx-main);
     outline: none;
-    transition: border-color 0.18s ease;
+    line-height: 1.5;
+    resize: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
   }
-  .fcb-input:focus { border-color: var(--bd-focus); }
+  .fcb-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); }
   .fcb-input::placeholder { color: var(--tx-muted); }
   .fcb-send {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     flex-shrink: 0;
     border: none;
@@ -13835,37 +14093,52 @@ function renderTajheezAllTable() {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 10px rgba(8, 145, 178, 0.3);
+    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.32);
+    cursor: pointer;
+    transition: transform 0.18s cubic-bezier(.34,1.56,.64,1), box-shadow 0.18s ease, opacity 0.18s ease;
   }
-  .fcb-send svg { width: 16px; height: 16px; transform: scaleX(-1); }
+  .fcb-send:hover { transform: scale(1.08); box-shadow: 0 6px 16px rgba(8, 145, 178, 0.4); }
+  .fcb-send:active { transform: scale(0.94); }
+  .fcb-send:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .fcb-send svg { width: 17px; height: 17px; transform: scaleX(-1); }
 
   @media (max-width: 480px) {
     .fcb-fab { left: 14px; bottom: 16px; }
-    .fcb-panel { left: 10px; bottom: 84px; width: calc(100vw - 20px); }
+    .fcb-panel { left: 10px; bottom: 86px; width: calc(100vw - 20px); }
+    .fcb-panel.open { height: min(580px, 72vh); }
   }
 </style>
 
 <div class="fcb-fab" id="fcbFab" onclick="fcbToggle()">
   <span class="fcb-fab-icon" aria-hidden="true">
-    <svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 20.5h18"/>
-      <path d="M5 20.5V7.2a1 1 0 0 1 .56-.9l6-3a1 1 0 0 1 .88 0l6 3a1 1 0 0 1 .56.9V20.5"/>
-      <path d="M9 20.5v-3.2a1.2 1.2 0 0 1 1.2-1.2h3.6a1.2 1.2 0 0 1 1.2 1.2v3.2"/>
-      <path d="M8.4 9.6h2.1M13.5 9.6h2.1M8.4 12.6h2.1M13.5 12.6h2.1"/>
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
+      <path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/>
+      <rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/>
+      <rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/>
+      <rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/>
     </svg>
   </span>
   <span class="fcb-fab-close" aria-hidden="true">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
   </span>
   <span class="fcb-fab-dot"></span>
-  <span class="fcb-fab-tip">تحدث مع المساعد</span>
+  <span class="fcb-fab-tip">تحدث مع خبير المرافق 🏫</span>
 </div>
 
 <div class="fcb-panel" id="fcbPanel">
   <div class="fcb-head">
-    <div class="fcb-avatar">🤖</div>
+    <div class="fcb-avatar">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
+        <path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/>
+        <rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/>
+        <rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/>
+        <rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/>
+      </svg>
+    </div>
     <div class="fcb-head-text">
-      <div class="fcb-head-title">المساعد الذكي للوحة البيانات</div>
+      <div class="fcb-head-title">خبير إدارة المرافق الذكي</div>
       <div class="fcb-head-sub"><span class="dot"></span> متصل الآن</div>
     </div>
     <div class="fcb-head-close" id="fcbSettingsBtn" onclick="fcbOpenSettings()" title="إعدادات المساعد" style="margin-left:4px;">⚙️</div>
@@ -13877,7 +14150,7 @@ function renderTajheezAllTable() {
       <div class="fcb-settings-title">⚙️ إعدادات المساعد الذكي</div>
       <div class="fcb-head-close" onclick="fcbCloseSettings()" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);">✕</div>
     </div>
-    <label class="fcb-settings-lbl">مفتاح OpenAI API (اختياري — يطغى على المفتاح المضبوط بالكود)</label>
+    <label class="fcb-settings-lbl">مفتاح OpenAI API (مطلوب لتفعيل المساعد الذكي الكامل)</label>
     <input type="password" id="fcbApiKeyInput" class="fcb-settings-input" placeholder="sk-...">
     <label class="fcb-settings-lbl">اسم الموديل</label>
     <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-5.4-mini">
@@ -13891,37 +14164,19 @@ function renderTajheezAllTable() {
   <div class="fcb-body" id="fcbBody">
     <div id="fcbMessages">
       <div class="fcb-row bot">
-        <div class="fcb-msg-avatar">🤖</div>
+        <div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>
         <div class="fcb-col">
-          <div class="fcb-bubble">👋 أهلًا بك! أنا المساعد الذكي للوحة بيانات المرافق. كيف أقدر أساعدك اليوم؟</div>
+          <div class="fcb-bubble">👋 أهلًا بك! أنا خبير إدارة المرافق الذكي — أساعدك في تحليل الحالة الفنية، ترتيب الأولويات، واقتراح حلول عملية مبنية على بيانات اللوحة الفعلية. كيف أقدر أخدمك؟</div>
           <div class="fcb-time">10:24 ص</div>
         </div>
       </div>
-      <div class="fcb-row user">
-        <div class="fcb-col">
-          <div class="fcb-bubble">ما هذه اللوحة؟</div>
-          <div class="fcb-time">10:25 ص</div>
-        </div>
-      </div>
-      <div class="fcb-row bot">
-        <div class="fcb-msg-avatar">🤖</div>
-        <div class="fcb-col">
-          <div class="fcb-bubble">هذه لوحة بيانات شاملة لإدارة مرافق المدارس: تقييمات FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، وغيرها — كل بيانات المنشآت في مكان واحد 📊</div>
-          <div class="fcb-time">10:25 ص</div>
-        </div>
-      </div>
     </div>
 
-    <div class="fcb-quick">
-      <button class="fcb-chip" type="button" onclick="fcbSend('ما هذه اللوحة؟')">📊 عن اللوحة</button>
-      <button class="fcb-chip" type="button" onclick="fcbSend('ايه التبويبات الموجودة؟')">🗂️ التبويبات</button>
-      <button class="fcb-chip" type="button" onclick="fcbSend('اشرح لي تحليل FCA')">🏗️ تحليل FCA</button>
-    </div>
   </div>
 
   <div class="fcb-foot">
-    <input class="fcb-input" id="fcbInput" type="text" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter'){fcbSend()}">
-    <button class="fcb-send" type="button" onclick="fcbSend()">
+    <textarea class="fcb-input" id="fcbInput" rows="1" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fcbSend();}" oninput="fcbAutoGrow(this)"></textarea>
+    <button class="fcb-send" id="fcbSendBtn" type="button" onclick="fcbSend()">
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
     </button>
   </div>
@@ -13934,23 +14189,106 @@ function renderTajheezAllTable() {
     fcbCloseSettings();
   }
 
+  function fcbAutoGrow(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 92) + "px";
+  }
+
   /* ════════════════════════════════════════════════════════════════
      ⚙️ إعدادات المساعد — قراءة/حفظ مفتاح API من واجهة الإعدادات
      الأولوية: المفتاح المحفوظ محلياً (localStorage) > المفتاح بالكود (CFG)
   ════════════════════════════════════════════════════════════════ */
-  function fcbGetApiKey() {
-    const local = (localStorage.getItem("fcb_openai_key") || "").trim();
-    if (local) return local;
-    const codeKey = (CFG.OPENAI_API_KEY || "").trim();
-    return codeKey && codeKey !== "ضع_مفتاح_API_هنا" ? codeKey : "";
-  }
-  function fcbGetModel() {
-    const local = (localStorage.getItem("fcb_openai_model") || "").trim();
-    return local || CFG.OPENAI_MODEL || "gpt-5.4-mini";
-  }
+  /* ════════════════════════════════════════════════════════════════
+     🤖 AIService — الوحدة الوحيدة المسؤولة عن كل اتصال بالذكاء
+     الاصطناعي (OpenAI) في اللوحة بالكامل.
+
+     لماذا وحدة واحدة؟
+     • لا يوجد أي مفتاح API داخل الكود المصدري إطلاقاً — اللوحة
+       مستضافة على GitHub Pages بدون سيرفر خلفي، فأي مفتاح بالكود
+       يكون مرئياً للجميع (View Source). المفتاح يُدخله كل مستخدم
+       بنفسه من ⚙️ إعدادات المساعد، ويُخزَّن فقط في متصفحه
+       (localStorage) — لا يُرسل لأي مكان عدا OpenAI مباشرة.
+     • لو احتجت لاحقاً تمرير الطلبات عبر سيرفر/بروكسي خاص بك (مثلاً
+       لإخفاء المفتاح أو لتطبيق Rate Limiting)، التعديل الوحيد
+       المطلوب هو داخل AIService.chat (تغيير الـ endpoint وطريقة
+       الإرسال) — بقية اللوحة (fcbSend وكل أدوات الشات) لا تحتاج أي
+       تعديل لأنها لا تتحدث مباشرة مع OpenAI، بل فقط مع AIService.
+  ════════════════════════════════════════════════════════════════ */
+  const AIService = {
+    /** المفتاح المحفوظ محلياً في متصفح هذا المستخدم فقط، أو "" لو غير موجود */
+    getApiKey() {
+      return (localStorage.getItem("fcb_openai_key") || "").trim();
+    },
+    /** هل يوجد مفتاح صالح حالياً؟ */
+    hasKey() {
+      return this.getApiKey().length > 0;
+    },
+    /** اسم الموديل: المحفوظ محلياً، وإلا الافتراضي من CFG */
+    getModel() {
+      const local = (localStorage.getItem("fcb_openai_model") || "").trim();
+      return local || CFG.OPENAI_MODEL || "gpt-5.4-mini";
+    },
+    saveSettings(key, model) {
+      if (key) localStorage.setItem("fcb_openai_key", key);
+      else localStorage.removeItem("fcb_openai_key");
+      if (model) localStorage.setItem("fcb_openai_model", model);
+      else localStorage.removeItem("fcb_openai_model");
+    },
+    clearSettings() {
+      localStorage.removeItem("fcb_openai_key");
+      localStorage.removeItem("fcb_openai_model");
+    },
+    /**
+     * يرسل محادثة كاملة (system + history + رسالة المستخدم) إلى OpenAI
+     * ويرجع نص الرد. يرمي استثناء بكود NO_API_KEY لو لا يوجد مفتاح،
+     * حتى يتعامل المستدعي مع الحالتين (لا مفتاح / فشل اتصال) بشكل مختلف.
+     *
+     * هذه هي الدالة الوحيدة التي تعرف عنوان واجهة OpenAI — أي بروكسي
+     * مستقبلي يُستبدل هنا فقط.
+     */
+    async chat(messages) {
+      const apiKey = this.getApiKey();
+      if (!apiKey) {
+        const err = new Error("NO_API_KEY");
+        err.code = "NO_API_KEY";
+        throw err;
+      }
+      const resp = await fetch(CFG.OPENAI_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + apiKey,
+        },
+        body: JSON.stringify({
+          model: this.getModel(),
+          messages: messages,
+          temperature: 0.4,
+          max_completion_tokens: 700,
+        }),
+      });
+      if (!resp.ok) {
+        let errMsg = "HTTP " + resp.status;
+        try {
+          const errJson = await resp.json();
+          errMsg = errJson?.error?.message || errMsg;
+        } catch (_) {}
+        const err = new Error(errMsg);
+        err.code = resp.status === 401 ? "INVALID_KEY" : "REQUEST_FAILED";
+        throw err;
+      }
+      const data = await resp.json();
+      const reply = data?.choices?.[0]?.message?.content?.trim();
+      if (!reply) {
+        const err = new Error("EMPTY_RESPONSE");
+        err.code = "EMPTY_RESPONSE";
+        throw err;
+      }
+      return reply;
+    },
+  };
   function fcbOpenSettings() {
-    document.getElementById("fcbApiKeyInput").value = localStorage.getItem("fcb_openai_key") || "";
-    document.getElementById("fcbModelInput").value = fcbGetModel();
+    document.getElementById("fcbApiKeyInput").value = AIService.getApiKey();
+    document.getElementById("fcbModelInput").value = AIService.getModel();
     document.getElementById("fcbSettingsPanel").style.display = "flex";
   }
   function fcbCloseSettings() {
@@ -13959,16 +14297,15 @@ function renderTajheezAllTable() {
   function fcbSaveSettings() {
     const key = document.getElementById("fcbApiKeyInput").value.trim();
     const model = document.getElementById("fcbModelInput").value.trim();
-    if (key) localStorage.setItem("fcb_openai_key", key);
-    else localStorage.removeItem("fcb_openai_key");
-    if (model) localStorage.setItem("fcb_openai_model", model);
-    else localStorage.removeItem("fcb_openai_model");
+    AIService.saveSettings(key, model);
     fcbCloseSettings();
-    showToast("تم حفظ إعدادات المساعد ✅", "ok");
+    showToast(
+      key ? "تم حفظ إعدادات المساعد ✅" : "تم الحفظ — لكن لم تُدخل مفتاح API، سيستخدم المساعد الردود المبرمجة فقط ⚠️",
+      key ? "ok" : "info",
+    );
   }
   function fcbClearSettings() {
-    localStorage.removeItem("fcb_openai_key");
-    localStorage.removeItem("fcb_openai_model");
+    AIService.clearSettings();
     document.getElementById("fcbApiKeyInput").value = "";
     document.getElementById("fcbModelInput").value = "";
     showToast("تم مسح الإعدادات المحلية 🗑️", "ok");
@@ -14000,6 +14337,29 @@ function renderTajheezAllTable() {
     const vals = arr.filter((r) => null != r[key]).map((r) => r[key]);
     return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
   }
+  /* ── دوال مساعدة عامة (مضافة لدعم تغطية كل التبويبات في ملخص الشات بوت) ── */
+  function fcbSum(arr, key) {
+    return arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+  }
+  function fcbNum(v) {
+    if (v === null || v === undefined || v === "" || v === "—" || v === "#N/A") return null;
+    const f = parseFloat(String(v).replace(/,/g, ""));
+    return isFinite(f) ? f : null;
+  }
+  // يجمع قيمة عددية (numKey) مجمّعة حسب مفتاح فئة (groupKey)، ويرجع أعلى n فئات
+  function fcbGroupBySum(arr, groupKey, numKey, n = 10) {
+    const map = {};
+    arr.forEach((r) => {
+      const g = (r[groupKey] ?? "").toString().trim();
+      const v = fcbNum(r[numKey]);
+      if (!g || g === "—" || v === null) return;
+      map[g] = (map[g] || 0) + v;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
+  }
   function fcbBuildDashboardSummary() {
     const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
     const total = D.length;
@@ -14023,7 +14383,7 @@ function renderTajheezAllTable() {
         عدد_حرجة_اقل_من_25: fcaArr.filter((r) => r.fca < 25).length,
         عدد_متوسطة_25_50: fcaArr.filter((r) => r.fca >= 25 && r.fca < 50).length,
         عدد_جيدة_50_75: fcaArr.filter((r) => r.fca >= 50 && r.fca < 75).length,
-        عدد_ممتازة_75_100: fcaArr.filter((r) => r.fca >= 75).length,
+        عدد_جيدة_جداً_75_100: fcaArr.filter((r) => r.fca >= 75).length,
         أسوأ_10_مدارس: fcbTopN(fcaArr, "fca", 10, true),
         أفضل_10_مدارس: fcbTopN(fcaArr, "fca", 10, false),
       },
@@ -14054,6 +14414,22 @@ function renderTajheezAllTable() {
         أعلى_10_مدارس_بلاغات: fcbTopN(D, "alerts", 10, false),
       },
 
+      الصيانة_الوقائية_حسب_المبنى: {
+        ملاحظة: "هذا عدد أعمال/بنود الصيانة الوقائية المسجّلة لكل مبنى من بيانات الخدمات — لتفاصيل أوسع راجع تبويب الصيانة الوقائية مباشرة.",
+        إجمالي_بنود_الصيانة_الوقائية: D.reduce((s, r) => s + (r.preventive || 0), 0),
+        أعلى_10_مدارس_صيانة_وقائية: fcbTopN(D, "preventive", 10, false),
+      },
+
+      التجهيزات_حسب_المبنى: {
+        ملاحظة: "هذا عدد بنود التجهيزات المسجّلة لكل مبنى من بيانات الخدمات — لتفاصيل المخزون والاحتياج الكامل راجع قسم تجهيزات_المخزون بالأسفل (من تبويب التجهيزات نفسه).",
+        إجمالي_بنود_التجهيزات: D.reduce((s, r) => s + (r.equipment || 0), 0),
+        أعلى_10_مدارس_تجهيزات: fcbTopN(D, "equipment", 10, false),
+      },
+
+      خنادق_الصرف_حسب_المبنى: {
+        إجمالي_من_بيانات_الخدمات: D.reduce((s, r) => s + (r.drainage || 0), 0),
+      },
+
       العقود: {
         أهم_مقاولي_الصيانة: fcbCountBy(D, "contrMaint", 8),
         أهم_مقاولي_التكييف: fcbCountBy(D, "contrAC", 8),
@@ -14067,35 +14443,290 @@ function renderTajheezAllTable() {
       },
     };
 
+    // ════════════════════════════════════════════════════════════════
+    // 🏗️ تبويب التجهيزات (window.RAW_TAJHEEZ_INV) — مخزون شامل: مخصص/احتياج/فروقات
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const tajRaw = Array.isArray(window.RAW_TAJHEEZ_INV) ? window.RAW_TAJHEEZ_INV : [];
+      if (tajRaw.length && typeof parseTajheezRow === "function") {
+        const taj = tajRaw.map(parseTajheezRow).filter((r) => r.صنف || r.قسم);
+        const أقسام = [...new Set(taj.map((r) => r.قسم).filter(Boolean))];
+        const إجمالي_مخصص_كمية = fcbSum(taj.map((r) => ({ v: r.مخصص?.كلي })), "v");
+        const إجمالي_مخصص_قيمة = fcbSum(taj.map((r) => ({ v: r.مخصص?.قيمة })), "v");
+        const إجمالي_احتياج_كمية = fcbSum(taj.map((r) => ({ v: r.احتياج?.كلي })), "v");
+        const إجمالي_احتياج_قيمة = fcbSum(taj.map((r) => ({ v: r.احتياج?.قيمة })), "v");
+        // تجميع الاحتياج بالقيمة حسب القسم (أكبر الأقسام احتياجاً)
+        const احتياجَ_حسب_القسم = {};
+        taj.forEach((r) => {
+          const q = r.قسم || "—";
+          const v = r.احتياج?.قيمة || 0;
+          if (!v) return;
+          احتياجَ_حسب_القسم[q] = (احتياجَ_حسب_القسم[q] || 0) + v;
+        });
+        const أعلى_10_أقسام_احتياجاً_بالقيمة = Object.entries(احتياجَ_حسب_القسم)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
+        const أعلى_15_صنف_احتياجاً_بالقيمة = [...taj]
+          .filter((r) => r.احتياج?.قيمة)
+          .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0))
+          .slice(0, 15)
+          .map((r) => ({ القسم: r.قسم, الصنف: r.صنف, قيمة_الاحتياج: r.احتياج.قيمة, كمية_الاحتياج: r.احتياج.كلي }));
+        const أعلى_10_فروقات_نقص_بالقيمة = [...taj]
+          .filter((r) => null != r.فرق_قيمة)
+          .sort((a, b) => (a.فرق_قيمة || 0) - (b.فرق_قيمة || 0)) // أكثر سالب = أكبر نقص
+          .slice(0, 10)
+          .map((r) => ({ القسم: r.قسم, الصنف: r.صنف, فرق_القيمة: r.فرق_قيمة, فرق_الكمية: r.فرق_كمية }));
+        summary.تجهيزات_المخزون = {
+          مصدر: "تبويب التجهيزات — ملف التجهيزات_منظف.csv (مخصص حالي مقابل احتياج فعلي لكل مدينة)",
+          عدد_الأصناف_الإجمالي: taj.length,
+          الأقسام: أقسام,
+          عدد_الأقسام: أقسام.length,
+          إجمالي_الكمية_المخصصة_حالياً: +إجمالي_مخصص_كمية.toFixed(2),
+          إجمالي_قيمة_المخصص_حالياً_ريال: +إجمالي_مخصص_قيمة.toFixed(2),
+          إجمالي_الكمية_المطلوبة_احتياج: +إجمالي_احتياج_كمية.toFixed(2),
+          إجمالي_قيمة_الاحتياج_ريال: +إجمالي_احتياج_قيمة.toFixed(2),
+          الفرق_الإجمالي_قيمة_ريال: +(إجمالي_مخصص_قيمة - إجمالي_احتياج_قيمة).toFixed(2),
+          أعلى_10_أقسام_احتياجاً_بالقيمة: أعلى_10_أقسام_احتياجاً_بالقيمة,
+          أعلى_15_صنف_احتياجاً_بالقيمة: أعلى_15_صنف_احتياجاً_بالقيمة,
+          أعلى_10_فروقات_نقص_بالقيمة_الأكثر_عجزاً: أعلى_10_فروقات_نقص_بالقيمة,
+          توزيع_المخصص_حسب_المدينة: {
+            مكة: fcbSum(taj.map((r) => ({ v: r.مخصص?.مكة })), "v"),
+            جدة: fcbSum(taj.map((r) => ({ v: r.مخصص?.جدة })), "v"),
+            الطائف: fcbSum(taj.map((r) => ({ v: r.مخصص?.الطائف })), "v"),
+            القنفذة: fcbSum(taj.map((r) => ({ v: r.مخصص?.القنفذة })), "v"),
+            الليث: fcbSum(taj.map((r) => ({ v: r.مخصص?.الليث })), "v"),
+            المدينة: fcbSum(taj.map((r) => ({ v: r.مخصص?.المدينة })), "v"),
+            ينبع: fcbSum(taj.map((r) => ({ v: r.مخصص?.ينبع })), "v"),
+            العلا: fcbSum(taj.map((r) => ({ v: r.مخصص?.العلا })), "v"),
+            المهد: fcbSum(taj.map((r) => ({ v: r.مخصص?.المهد })), "v"),
+          },
+          توزيع_الاحتياج_حسب_المدينة: {
+            مكة: fcbSum(taj.map((r) => ({ v: r.احتياج?.مكة })), "v"),
+            جدة: fcbSum(taj.map((r) => ({ v: r.احتياج?.جدة })), "v"),
+            الطائف: fcbSum(taj.map((r) => ({ v: r.احتياج?.الطائف })), "v"),
+            المدينة: fcbSum(taj.map((r) => ({ v: r.احتياج?.المدينة })), "v"),
+          },
+        };
+      } else if (tajRaw.length) {
+        summary.تجهيزات_المخزون = { تنبيه: "بيانات التجهيزات موجودة لكن دالة parseTajheezRow غير متاحة في هذا السياق.", إجمالي_السجلات: tajRaw.length };
+      }
+    } catch (e) {
+      summary.تجهيزات_المخزون = { تنبيه: "تعذّر تلخيص بيانات التجهيزات: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ⚙️ تبويب الأنظمة الرئيسية والتفصيلية (window.RAW_ALL_SYSTEMS)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const sysRaw = Array.isArray(window.RAW_ALL_SYSTEMS) ? window.RAW_ALL_SYSTEMS : [];
+      if (sysRaw.length) {
+        const schoolScores = {};
+        sysRaw.forEach((r) => {
+          const id = r["رقم المدرسة"];
+          if (id && null != r["الدرجة الموزونة الكلية للمبنى"]) {
+            schoolScores[id] = fcbNum(r["الدرجة الموزونة الكلية للمبنى"]);
+          }
+        });
+        const scoreVals = Object.values(schoolScores).filter((v) => null != v);
+        const avgScore = scoreVals.length ? +(scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length).toFixed(2) : null;
+        const tierCount = {};
+        sysRaw.forEach((r) => {
+          const t = r["فئة الدرجة الموزونة الكلية"];
+          if (t) tierCount[t] = (tierCount[t] || 0) + 1;
+        });
+        const sysSum = {}, sysCnt = {};
+        sysRaw.forEach((r) => {
+          const s = r["القسم الرئيسي"], v = fcbNum(r["التقييم (1–5)"]);
+          if (s && v != null && v > 0) {
+            sysSum[s] = (sysSum[s] || 0) + v;
+            sysCnt[s] = (sysCnt[s] || 0) + 1;
+          }
+        });
+        const متوسط_كل_نظام_رئيسي = Object.keys(sysSum)
+          .map((k) => ({ النظام: k, المتوسط_من_5: +(sysSum[k] / sysCnt[k]).toFixed(2), عدد_التقييمات: sysCnt[k] }))
+          .sort((a, b) => a.المتوسط_من_5 - b.المتوسط_من_5);
+        const مدن = [...new Set(sysRaw.map((r) => r["المدينة الرئيسية"]).filter(Boolean))];
+        summary.الأنظمة_الرئيسية_والتفصيلية = {
+          مصدر: "تبويب الأنظمة الرئيسية والتفصيلية — ملف جميع_المدن_جميع_الانظمة",
+          إجمالي_سجلات_التقييم: sysRaw.length,
+          عدد_المدارس_المقيّمة_بالأنظمة: Object.keys(schoolScores).length,
+          متوسط_الدرجة_الموزونة_الكلية_للمباني: avgScore,
+          توزيع_فئات_الدرجة_الموزونة: tierCount,
+          متوسط_كل_نظام_رئيسي_من_الأضعف_للأقوى: متوسط_كل_نظام_رئيسي,
+          المدن_المغطاة: مدن,
+        };
+      }
+    } catch (e) {
+      summary.الأنظمة_الرئيسية_والتفصيلية = { تنبيه: "تعذّر تلخيص بيانات الأنظمة: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 🛗 تبويب المصاعد (window.RAW_ELEVATORS)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const elvRaw = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
+      if (elvRaw.length) {
+        const gv = (r, keys) => {
+          for (const k of keys) { const v = r[k]; if (v != null && v !== "" && v !== "—") return v; }
+          return null;
+        };
+        const getCity = (r) => gv(r, ["المدينة_الرئيسية", "المدينة"]);
+        const getAge = (r) => fcbNum(gv(r, ["عمر المصعد"]));
+        const getCount = (r) => fcbNum(gv(r, ["عدد المصاعد بالمبنى"]));
+        const getStatus = (r) => gv(r, ["حالة المصعد"]);
+        const totalSchools = new Set(elvRaw.map((r) => gv(r, ["اسم_المدرسة", "اسم المدرسة"])).filter(Boolean)).size;
+        const totalElevators = elvRaw.reduce((s, r) => s + (getCount(r) || 0), 0);
+        const ages = elvRaw.map(getAge).filter((v) => v != null);
+        const avgAge = ages.length ? +(ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : null;
+        const broken = elvRaw.filter((r) => { const s = String(getStatus(r) || ""); return s.includes("متعطل") || s.includes("لا يعمل"); }).length;
+        const working = elvRaw.filter((r) => { const s = String(getStatus(r) || ""); return s.includes("يعمل") && !s.includes("لا يعمل"); }).length;
+        const cityCount = {};
+        elvRaw.forEach((r) => { const c = getCity(r); if (c) cityCount[c] = (cityCount[c] || 0) + (getCount(r) || 0); });
+        summary.المصاعد = {
+          مصدر: "تبويب المصاعد",
+          عدد_المدارس_التي_لديها_مصاعد: totalSchools,
+          إجمالي_عدد_المصاعد: totalElevators,
+          متوسط_عمر_المصعد: avgAge,
+          عدد_المصاعد_المتعطلة: broken,
+          عدد_المصاعد_العاملة: working,
+          توزيع_عدد_المصاعد_حسب_المدينة: cityCount,
+        };
+      }
+    } catch (e) {
+      summary.المصاعد = { تنبيه: "تعذّر تلخيص بيانات المصاعد: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 🌊 تبويب خنادق الصرف (window.RAW_KHANADEQ_CITY_DATA)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const khRaw = Array.isArray(window.RAW_KHANADEQ_CITY_DATA) ? window.RAW_KHANADEQ_CITY_DATA : [];
+      if (khRaw.length) {
+        const totalSchools = khRaw.reduce((s, r) => s + (r.schools || 0), 0);
+        const totalKhanadeq = khRaw.reduce((s, r) => s + (r.khanadeq || 0), 0);
+        summary.خنادق_الصرف = {
+          مصدر: "تبويب خنادق الصرف",
+          إجمالي_المدارس: totalSchools,
+          إجمالي_خنادق_الصرف: totalKhanadeq,
+          متوسط_خندق_لكل_مدرسة: totalSchools ? +(totalKhanadeq / totalSchools).toFixed(2) : null,
+          توزيع_حسب_المدينة: khRaw.map((r) => ({ المدينة: r.city, المدارس: r.schools, الخنادق: r.khanadeq })),
+        };
+      }
+    } catch (e) {
+      summary.خنادق_الصرف = { تنبيه: "تعذّر تلخيص بيانات خنادق الصرف: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 💰 تبويب التكلفة (window.RAW_COST_STATE)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const costState = window.RAW_COST_STATE;
+      if (costState && Array.isArray(costState.rows) && costState.rows.length) {
+        const rows = costState.rows;
+        const totalQty = fcbSum(rows, "quantity");
+        const totalPrice = rows.reduce((s, r) => {
+          const tp = Number.isFinite(r.totalPrice) ? r.totalPrice
+            : (Number.isFinite(r.unitPrice) && Number.isFinite(r.quantity) ? r.unitPrice * r.quantity : 0);
+          return s + tp;
+        }, 0);
+        const بالقيمة_حسب_الفئة = {};
+        rows.forEach((r) => {
+          const c = r.category || "—";
+          const tp = Number.isFinite(r.totalPrice) ? r.totalPrice
+            : (Number.isFinite(r.unitPrice) && Number.isFinite(r.quantity) ? r.unitPrice * r.quantity : 0);
+          if (c !== "—" && tp) بالقيمة_حسب_الفئة[c] = (بالقيمة_حسب_الفئة[c] || 0) + tp;
+        });
+        const أعلى_10_فئات_تكلفة = Object.entries(بالقيمة_حسب_الفئة)
+          .sort((a, b) => b[1] - a[1]).slice(0, 10)
+          .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
+        const بالقيمة_حسب_المدينة = {};
+        rows.forEach((r) => {
+          const c = r.city || "—";
+          const tp = Number.isFinite(r.totalPrice) ? r.totalPrice
+            : (Number.isFinite(r.unitPrice) && Number.isFinite(r.quantity) ? r.unitPrice * r.quantity : 0);
+          if (c !== "—" && tp) بالقيمة_حسب_المدينة[c] = (بالقيمة_حسب_المدينة[c] || 0) + tp;
+        });
+        summary.التكلفة = {
+          مصدر: "تبويب التكلفة",
+          عدد_المدارس_في_بيانات_التكلفة: (costState.schools || []).length,
+          إجمالي_عدد_السجلات: rows.length,
+          إجمالي_الكمية: +totalQty.toFixed(2),
+          إجمالي_التكلفة_ريال: +totalPrice.toFixed(2),
+          أعلى_10_فئات_من_حيث_التكلفة: أعلى_10_فئات_تكلفة,
+          التكلفة_حسب_المدينة: Object.entries(بالقيمة_حسب_المدينة).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ المدينة: k, التكلفة: +v.toFixed(2) })),
+        };
+      } else if (costState && costState.error) {
+        summary.التكلفة = { تنبيه: "بيانات التكلفة لم تُحمَّل بنجاح: " + costState.error };
+      }
+    } catch (e) {
+      summary.التكلفة = { تنبيه: "تعذّر تلخيص بيانات التكلفة: " + (e?.message || e) };
+    }
+
     // ── بيانات إضافية من مصادر أخرى (لو متاحة في الصفحة) ──
     try {
       if (Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) {
-        summary.بلاغات_CSV = { إجمالي_السجلات: window.RAW_BALAGH.length };
+        const bal = window.RAW_BALAGH;
+        // نحاول استخراج توزيع حسب أكثر مفتاح تصنيف شائع (نوع البلاغ/الحالة) لو موجود
+        const sampleKeys = Object.keys(bal[0] || {});
+        const typeKey = sampleKeys.find((k) => /نوع|تصنيف|فئة/i.test(k));
+        const statusKey = sampleKeys.find((k) => /حالة|status/i.test(k));
+        summary.بلاغات_CSV = {
+          مصدر: "تبويب البلاغات — ملف بلاغات منفصل (CSV)",
+          إجمالي_السجلات: bal.length,
+          ...(typeKey ? { توزيع_حسب_النوع: fcbCountBy(bal, typeKey, 10) } : {}),
+          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(bal, statusKey, 10) } : {}),
+        };
       }
     } catch (_) {}
     try {
       if (Array.isArray(window.RAW_SPARE_PARTS) && window.RAW_SPARE_PARTS.length) {
-        summary.قطع_الغيار = { إجمالي_السجلات: window.RAW_SPARE_PARTS.length };
-      }
-    } catch (_) {}
-    try {
-      if (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
-        summary.المصاعد = { إجمالي_السجلات: window.RAW_ELEVATORS.length };
-      }
-    } catch (_) {}
-    try {
-      if (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) {
-        summary.الأنظمة = { إجمالي_السجلات: window.RAW_ALL_SYSTEMS.length };
+        const sp = window.RAW_SPARE_PARTS;
+        const items = sp.map((r) => ({
+          name: String(r["وصف_الصنف"] ?? "—").trim(),
+          qty: fcbNum(r["الكمية"]) || 0,
+          unitPrice: fcbNum(r["سعر_الوحدة"]) || 0,
+        }));
+        const totalQty = items.reduce((s, r) => s + r.qty, 0);
+        const totalValue = items.reduce((s, r) => s + r.qty * r.unitPrice, 0);
+        const valueByItem = {};
+        items.forEach((r) => { if (r.name && r.name !== "—") valueByItem[r.name] = (valueByItem[r.name] || 0) + r.qty * r.unitPrice; });
+        const أعلى_10_أصناف_قيمة = Object.entries(valueByItem).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
+        summary.قطع_الغيار = {
+          مصدر: "تبويب قطع الغيار",
+          إجمالي_السجلات: sp.length,
+          إجمالي_الكمية: +totalQty.toFixed(2),
+          إجمالي_القيمة_التقديرية_ريال: +totalValue.toFixed(2),
+          أعلى_10_أصناف_من_حيث_القيمة: أعلى_10_أصناف_قيمة,
+        };
       }
     } catch (_) {}
     try {
       if (Array.isArray(window.RAW_FM_CONTRACTS) && window.RAW_FM_CONTRACTS.length) {
-        summary.عقود_FM = { إجمالي_السجلات: window.RAW_FM_CONTRACTS.length };
+        const fm = window.RAW_FM_CONTRACTS;
+        const sampleKeys = Object.keys(fm[0] || {});
+        const statusKey = sampleKeys.find((k) => /حالة|status/i.test(k));
+        const typeKey = sampleKeys.find((k) => /نوع|تصنيف/i.test(k));
+        summary.عقود_FM = {
+          مصدر: "تبويب عقود غير المجال (FM)",
+          إجمالي_السجلات: fm.length,
+          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(fm, statusKey, 10) } : {}),
+          ...(typeKey ? { توزيع_حسب_النوع: fcbCountBy(fm, typeKey, 10) } : {}),
+        };
       }
     } catch (_) {}
     try {
       if (Array.isArray(window.RAW_INVOICES_TRACKER) && window.RAW_INVOICES_TRACKER.length) {
-        summary.متابعة_الفواتير = { إجمالي_السجلات: window.RAW_INVOICES_TRACKER.length };
+        const inv = window.RAW_INVOICES_TRACKER;
+        const sampleKeys = Object.keys(inv[0] || {});
+        const amountKey = sampleKeys.find((k) => /قيمة|مبلغ|amount|سعر/i.test(k));
+        const statusKey = sampleKeys.find((k) => /حالة|status/i.test(k));
+        summary.متابعة_الفواتير = {
+          مصدر: "تبويب متابعة الفواتير",
+          إجمالي_السجلات: inv.length,
+          ...(amountKey ? { إجمالي_القيمة_ريال: +fcbSum(inv.map((r) => ({ v: fcbNum(r[amountKey]) })), "v").toFixed(2) } : {}),
+          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(inv, statusKey, 10) } : {}),
+        };
       }
     } catch (_) {}
     try {
@@ -14111,11 +14742,53 @@ function renderTajheezAllTable() {
   }
 
   /* ════════════════════════════════════════════════════════════════
+     🧮 محرّك أولويات وحلول إدارة المرافق (Facilities Decision Engine)
+     يحسب فعلياً من البيانات الخام درجة خطورة لكل مبنى ويرتّب الأولويات
+     بمنطق متعارف عليه في إدارة المرافق: FCA + عمر المبنى + البلاغات
+     + البيئة المدرسية، ثم يصنّف الحل المناسب (استبدال/إصلاح/مراقبة)
+  ════════════════════════════════════════════════════════════════ */
+  function fcbConditionTier(conditionScore) {
+    if (conditionScore < 25) return { tier: "حرج 🔴", action: "تدخّل عاجل خلال 30 يوماً — جدولة فحص فني ميداني وتخصيص بند طارئ بالميزانية." };
+    if (conditionScore < 50) return { tier: "متوسط 🟠", action: "صيانة تصحيحية مجدولة خلال الفصل الحالي، مع مراجعة عقد المقاول المسؤول." };
+    if (conditionScore < 75) return { tier: "جيد 🟡", action: "صيانة وقائية دورية + إعادة تقييم بعد 2-3 أشهر." };
+    return { tier: "جيد جداً 🟢", action: "مراقبة روتينية ضمن خطة الصيانة الوقائية العامة." };
+  }
+
+  function fcbBuildPriorityActions(topN = 8) {
+    const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+    if (!D.length) return null;
+
+    const maxAlerts = Math.max(1, ...D.map((r) => r.alerts || 0));
+    const scored = D
+      .filter((r) => null != r.fca)
+      .map((r) => {
+        // درجة الخطورة الداخلية (لترتيب الأولوية فقط): FCA منخفض يرفعها، عمر المبنى
+        // الكبير يرفعها، البيئة الضعيفة ترفعها، وكثرة البلاغات ترفعها — كل عامل بوزنه
+        const fcaRisk = (100 - (r.fca ?? 100)) * 0.5;
+        const ageRisk = Math.min(100, ((r.buildingAge ?? 0) / 50) * 100) * 0.2;
+        const envRisk = (100 - (r.envScore ?? 100)) * 0.15;
+        const alertsRisk = (((r.alerts ?? 0) / maxAlerts) * 100) * 0.15;
+        const riskScore = Math.round(fcaRisk + ageRisk + envRisk + alertsRisk);
+        // درجة الحالة المعروضة من 100 (الأعلى = أفضل) — معكوسة عن درجة الخطورة
+        // لتتوافق مع نظام التصنيف الموحّد المستخدم في كل اللوحة (حرج → جيد جداً)
+        const conditionScore = Math.max(0, Math.min(100, 100 - riskScore));
+        return { name: r.name, fca: r.fca, buildingAge: r.buildingAge, envScore: r.envScore, alerts: r.alerts, riskScore, conditionScore };
+      })
+      .sort((a, b) => b.riskScore - a.riskScore);
+
+    const top = scored.slice(0, topN).map((r) => ({ ...r, ...fcbConditionTier(r.conditionScore) }));
+    const tierCounts = { "حرج 🔴": 0, "متوسط 🟠": 0, "جيد 🟡": 0, "جيد جداً 🟢": 0 };
+    scored.forEach((r) => { tierCounts[fcbConditionTier(r.conditionScore).tier]++; });
+
+    return { top, tierCounts, totalScored: scored.length };
+  }
+
+  /* ════════════════════════════════════════════════════════════════
      🧠 ردود مبرمجة بسيطة (Rule-based) — تُستخدم فقط كحل احتياطي
      لو ما فيه مفتاح API أو فشل الاتصال بـ OpenAI
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
-    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا المساعد الذكي للوحة إدارة المرافق التعليمية 🤖 — تجمع اللوحة بيانات منشآت المدارس في مكان واحد: تقييمات الحالة الفنية (FCA)، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة الجغرافية. اسألني عن أي قسم وأوضح لك مكانه ووظيفته 📊" },
+    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا خبير إدارة المرافق الذكي 🛡️ — متخصص بتحليل الحالة الفنية للمنشآت، ترتيب الأولويات، واقتراح حلول عملية. اللوحة تجمع بيانات منشآت المدارس في مكان واحد: تقييمات الحالة الفنية (FCA)، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة الجغرافية. اسألني عن أي قسم، أو قل لي 'ايش الحلول والأولويات' وأرتّب لك المباني الأكثر احتياجاً 📊" },
     { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة البيئة والترتيب\n• العقود — حالة ومدد التعاقدات\n• الصيانة — البلاغات والأعمال\n• التجهيزات — الأصول والمعدات\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
     { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تبويب تحليل FCA يعرض تقييم الحالة الفنية للمباني (Facility Condition Assessment): مؤشر حالة المنشأة، أعلى وأدنى المدارس أداءً، والأنظمة التي تحتاج تدخّل عاجل. يساعدك في ترتيب أولويات الإصلاح والميزانية 🏗️" },
     { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "تبويب البيئة المدرسية يقيس جودة بيئة كل مدرسة (نظافة، سلامة، جاهزية المرافق) ويعرض أفضل 10 وأسوأ 10 مدارس، عشان تركّز جهود التحسين على المواقع الأكثر احتياجاً 🌿" },
@@ -14131,10 +14804,549 @@ function renderTajheezAllTable() {
   ];
   const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن أحد أقسام إدارة المرافق: تحليل FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، أو الخريطة، وأوضح لك مكانه ووظيفته.";
 
+  /* رد ديناميكي: جدول من بيانات الداشبورد الفعلية (يعمل بدون مفتاح API) */
+  function fcbDynamicTableReply() {
+    const s = fcbBuildDashboardSummary();
+    const rows = [];
+    Object.keys(s).forEach((k) => {
+      const v = s[k];
+      if (v && typeof v === "object") {
+        const firstNumKey = Object.keys(v).find((kk) => typeof v[kk] === "number");
+        if (firstNumKey) rows.push([k.replace(/_/g, " "), String(v[firstNumKey])]);
+      }
+    });
+    if (!rows.length) return null;
+    let md = "📋 ملخص سريع من بيانات اللوحة الحالية:\n\n| القسم | القيمة |\n|---|---|\n";
+    rows.forEach((r) => { md += `| ${r[0]} | ${r[1]} |\n`; });
+    return md;
+  }
+
+  /* رد ديناميكي: رسم بياني تجريبي من بيانات الداشبورد الفعلية (يعمل بدون مفتاح API) */
+  function fcbDynamicChartReply() {
+    const s = fcbBuildDashboardSummary();
+    const labels = [];
+    const data = [];
+    Object.keys(s).forEach((k) => {
+      const v = s[k];
+      if (v && typeof v === "object") {
+        const firstNumKey = Object.keys(v).find((kk) => typeof v[kk] === "number");
+        if (firstNumKey) { labels.push(k.replace(/_/g, " ")); data.push(v[firstNumKey]); }
+      }
+    });
+    if (!labels.length) return null;
+    const spec = { type: "bar", title: "نظرة سريعة على أحجام البيانات بكل قسم", labels, datasets: [{ label: "عدد السجلات", data }] };
+    return "📊 هذا مخطط تجريبي مبني على بيانات اللوحة الحالية:\n\n```chart\n" + JSON.stringify(spec) + "\n```";
+  }
+
+  /* رد ديناميكي: أولويات وحلول فعلية من محرك الأولويات (يعمل بدون مفتاح API) */
+  function fcbDynamicPriorityReply() {
+    const p = fcbBuildPriorityActions(8);
+    if (!p || !p.top.length) return null;
+    let md = "🧮 **محرك الأولويات** — ترتيب المباني حسب درجة الحالة الفعلية من 100 (مبنية على FCA + عمر المبنى + البيئة + البلاغات):\n\n";
+    md += "| المبنى | الدرجة من 100 | التصنيف |\n|---|---|---|\n";
+    p.top.forEach((r) => { md += `| ${r.name} | ${r.conditionScore} | ${r.tier} |\n`; });
+    md += "\n**الإجراء المقترح للحالة الأكثر احتياجاً:**\n" + p.top[0].action;
+    md += `\n\n📌 توزيع عام: ${p.tierCounts["حرج 🔴"]} حرج، ${p.tierCounts["متوسط 🟠"]} متوسط، ${p.tierCounts["جيد 🟡"]} جيد، ${p.tierCounts["جيد جداً 🟢"]} جيد جداً، من إجمالي ${p.totalScored} مبنى مقيّم.`;
+    return md;
+  }
+
   function fcbReplyFor(text) {
+    if (/حل|حلول|أولوي|اولوي|priority|priorities|إيش أعمل|ايش اعمل|توصي|اقترح/i.test(text)) {
+      const p = fcbDynamicPriorityReply();
+      if (p) return p;
+    }
+    if (/جدول|table/i.test(text)) {
+      const t = fcbDynamicTableReply();
+      if (t) return t;
+    }
+    if (/رسم|مخطط|chart|graph|بياني|رسمة/i.test(text)) {
+      const c = fcbDynamicChartReply();
+      if (c) return c;
+    }
     for (const r of FCB_RULES) if (r.test.test(text)) return r.reply;
     return FCB_FALLBACK;
   }
+
+  /* ════════════════════════════════════════════════════════════════
+     🖋️ تحويل Markdown مبسّط إلى HTML — يدعم الآن أيضاً:
+     • جداول Markdown (| ... | ... |)
+     • كتل رسوم بيانية ```chart {json} ``` → تُرسم بـ Chart.js
+  ════════════════════════════════════════════════════════════════ */
+  function fcbEscapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  let FCB_CHART_SEQ = 0;
+  const FCB_CHART_PALETTE = ["#0891b2", "#0d9488", "#7c3aed", "#d97706", "#dc2626", "#059669", "#2563eb", "#db2777"];
+
+  /* ════════════════════════════════════════════════════════════════
+     📤 ExportEngine — تصدير أي محتوى يولّده المساعد الذكي (جدول/رسم/نص)
+     إلى CSV / Excel / PDF / PNG، يعمل بالكامل من المتصفح بدون سيرفر.
+
+     ملاحظة عن PDF والعربي: تصدير PDF يعتمد على نافذة طباعة المتصفح
+     (window.print) لا على تحويل العنصر لصورة، لأن محرّك المتصفح نفسه
+     هو الوحيد الذي يرسم تشكيل الحروف العربية (Shaping/Ligatures)
+     والاتجاه RTL بشكل صحيح دائماً. التفاصيل والأسباب موجودة في تعليق
+     دالة elementToPDF بالأسفل.
+  ════════════════════════════════════════════════════════════════ */
+  const ExportEngine = {
+    _ts() {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    },
+    _downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    },
+    _csvCell(v) {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    },
+
+    /** تصدير جدول (مصفوفة رؤوس + مصفوفة صفوف) إلى CSV */
+    tableToCSV(headers, rows, filenameBase = "جدول") {
+      const lines = [headers.map(this._csvCell).join(",")];
+      rows.forEach((r) => lines.push(r.map(this._csvCell).join(",")));
+      // BOM لضمان ظهور العربي بشكل صحيح في Excel عند فتح CSV
+      const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      this._downloadBlob(blob, `${filenameBase}_${this._ts()}.csv`);
+      if (typeof showToast === "function") showToast("تم تصدير CSV ✅", "ok");
+    },
+
+    /** تصدير جدول إلى ملف Excel حقيقي (.xlsx) عبر SheetJS المُحمّلة بالفعل */
+    tableToExcel(headers, rows, filenameBase = "جدول") {
+      if (typeof XLSX === "undefined") {
+        if (typeof showToast === "function") showToast("⚠️ مكتبة Excel لم تُحمَّل بعد، حاول مرة أخرى", "err");
+        return;
+      }
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+      XLSX.writeFile(wb, `${filenameBase}_${this._ts()}.xlsx`);
+      if (typeof showToast === "function") showToast("تم تصدير Excel ✅", "ok");
+    },
+
+    /**
+     * تصدير أي عنصر DOM (جدول/رسم/نص) إلى PDF عبر نافذة طباعة مخصّصة
+     * يفتحها المتصفح، باستخدام window.print() ثم اختيار المستخدم
+     * "حفظ كـ PDF" من نافذة الطباعة.
+     *
+     * ⚠️ لماذا ليس html2canvas + jsPDF؟ تم تجربة هذا النهج وفشل مع
+     * العربي: html2canvas يبني محرّك قياس/تخطيط نص خاص به بدل استخدام
+     * محرّك المتصفح، فلا يدعم تشكيل الحروف العربية (ligatures) ولا
+     * ترتيب الاتجاه (RTL bidi) بشكل صحيح — وهذه مشكلة معروفة وموجودة
+     * في المكتبة منذ سنوات بدون حل جذري (انظر niklasvh/html2canvas
+     * issues #289 #686 #948 #2432 #2488). النتيجة كانت حروفاً عربية
+     * متقطعة/متراكبة بدل متصلة، خصوصاً بالكلمات الطويلة.
+     *
+     * الحل الموثوق: نفتح نافذة طباعة جديدة، نضع فيها نسخة من العنصر
+     * المطلوب تصديره بنفس تنسيقه (CSS الأساسي للوحة)، ثم نستدعي
+     * window.print(). هنا محرّك المتصفح نفسه (الذي يعرض العربي بشكل
+     * صحيح على الشاشة أصلاً) هو من يرسم الصفحة، فيظهر العربي متصلاً
+     * وسليماً 100%. المستخدم يختار "حفظ كـ PDF" كوجهة الطباعة بدل
+     * طابعة فعلية — هذه هي الطريقة القياسية لإنتاج PDF بعربي سليم من
+     * صفحة بدون أي سيرفر خلفي (GitHub Pages).
+     */
+    elementToPDF(el, filenameBase = "تقرير", title = "") {
+      if (!el) return;
+      try {
+        const printWin = window.open("", "_blank", "width=900,height=1100");
+        if (!printWin) {
+          if (typeof showToast === "function") {
+            showToast("⚠️ المتصفح منع فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى", "err");
+          }
+          return;
+        }
+        // ننسخ العنصر ونحذف صف أزرار التصدير نفسه من النسخة، حتى لا
+        // تظهر أزرار "نسخ / PDF / Excel" داخل الصفحة المطبوعة
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll(".fcb-export-row").forEach((n) => n.remove());
+
+        const fontLink = '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">';
+        const styles = `
+          * { box-sizing: border-box; }
+          body {
+            font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
+            direction: rtl;
+            padding: 24px;
+            color: #1a2b33;
+            margin: 0;
+          }
+          .fcb-print-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; color: #083D4F; }
+          .fcb-bubble, .fcb-table-wrap, .fcb-chart-wrap { max-width: 100%; }
+          .fcb-table-wrap { border: 1px solid #e2e8ec; border-radius: 10px; overflow: hidden; }
+          .fcb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          .fcb-table thead th { background: #083D4F; color: #fff; padding: 8px 10px; text-align: center; }
+          .fcb-table tbody td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #e2e8ec; }
+          .fcb-table tbody tr:nth-child(even) { background: #f7f9fa; }
+          .fcb-chart-canvas-box { position: relative; height: 320px; width: 100%; }
+          .fcb-bubble p { margin: 0 0 10px; line-height: 1.8; }
+          .fcb-bubble strong { font-weight: 800; }
+          .fcb-bubble code { background: #f1f5f7; padding: 1px 6px; border-radius: 6px; direction: ltr; display: inline-block; }
+          @media print {
+            @page { margin: 14mm; }
+            body { padding: 0; }
+          }
+        `;
+        printWin.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">${fontLink}<style>${styles}</style></head><body>${title ? `<div class="fcb-print-title">${fcbEscapeHtml(title)}</div>` : ""}${clone.outerHTML}</body></html>`);
+        printWin.document.close();
+
+        const triggerPrint = () => {
+          // إن كان العنصر يحتوي رسماً بيانياً (canvas)، ننسخ محتوى الرسم
+          // كصورة لأن canvas الأصلي بقيمه لا يُستنسخ تلقائياً بـ cloneNode
+          el.querySelectorAll("canvas").forEach((srcCanvas, idx) => {
+            const destCanvas = printWin.document.querySelectorAll("canvas")[idx];
+            if (destCanvas && srcCanvas.toDataURL) {
+              try {
+                const img = printWin.document.createElement("img");
+                img.src = srcCanvas.toDataURL("image/png");
+                img.style.width = "100%";
+                destCanvas.replaceWith(img);
+              } catch (_) {}
+            }
+          });
+          printWin.focus();
+          printWin.print();
+        };
+
+        // ننتظر تحميل خطوط نافذة الطباعة فعلياً قبل استدعاء الطباعة، حتى
+        // يرسم المتصفح العربي بالخط الصحيح المتصل من أول مرة
+        if (printWin.document.fonts && printWin.document.fonts.ready) {
+          printWin.document.fonts.ready.then(() => setTimeout(triggerPrint, 150));
+        } else {
+          setTimeout(triggerPrint, 400);
+        }
+        if (typeof showToast === "function") showToast("افتحت نافذة الطباعة — اختر «حفظ كـ PDF» 🖨️", "info");
+      } catch (e) {
+        console.warn("[ExportEngine] PDF export failed:", e);
+        if (typeof showToast === "function") showToast("⚠️ تعذّر تحضير الطباعة: " + (e?.message || e), "err");
+      }
+    },
+
+    /** تصدير Canvas الرسم البياني مباشرة كصورة PNG (بدون إعادة رسم) */
+    chartCanvasToPNG(canvasEl, filenameBase = "رسم_بياني") {
+      if (!canvasEl) return;
+      try {
+        // نرسم على خلفية بيضاء لأن canvas الأصلي شفاف، فتظهر الصورة المُصدّرة سليمة على أي عارض صور
+        const tmp = document.createElement("canvas");
+        tmp.width = canvasEl.width;
+        tmp.height = canvasEl.height;
+        const ctx = tmp.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, tmp.width, tmp.height);
+        ctx.drawImage(canvasEl, 0, 0);
+        tmp.toBlob((blob) => {
+          this._downloadBlob(blob, `${filenameBase}_${this._ts()}.png`);
+          if (typeof showToast === "function") showToast("تم تصدير الصورة ✅", "ok");
+        }, "image/png");
+      } catch (e) {
+        console.warn("[ExportEngine] PNG export failed:", e);
+        if (typeof showToast === "function") showToast("⚠️ تعذّر تصدير الصورة: " + (e?.message || e), "err");
+      }
+    },
+
+    /** نسخ نص خام (بدون تنسيق Markdown) إلى الحافظة */
+    async copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        if (typeof showToast === "function") showToast("تم النسخ 📋", "ok");
+      } catch (e) {
+        if (typeof showToast === "function") showToast("⚠️ تعذّر النسخ", "err");
+      }
+    },
+  };
+
+  /** يقرأ جدول HTML (الذي بنته fcbBuildTableHtml) ويرجع رؤوسه وصفوفه كنص خام للتصدير */
+  function fcbExtractTableData(tableEl) {
+    const headers = [...tableEl.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+    const rows = [...tableEl.querySelectorAll("tbody tr")].map((tr) =>
+      [...tr.querySelectorAll("td")].map((td) => td.textContent.trim()),
+    );
+    return { headers, rows };
+  }
+
+  function fcbBuildTableExportRow(tableWrapId) {
+    return `<div class="fcb-export-row">
+      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','csv')">📋 CSV</button>
+      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','excel')">📊 Excel</button>
+      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','pdf')">📄 PDF</button>
+    </div>`;
+  }
+
+  function fcbExportTable(wrapId, format) {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    const table = wrap.querySelector("table");
+    if (format === "pdf") {
+      ExportEngine.elementToPDF(wrap, "جدول");
+      return;
+    }
+    const { headers, rows } = fcbExtractTableData(table);
+    if (format === "csv") ExportEngine.tableToCSV(headers, rows, "جدول");
+    else if (format === "excel") ExportEngine.tableToExcel(headers, rows, "جدول");
+  }
+
+  function fcbBuildChartExportRow(chartWrapId, canvasId) {
+    return `<div class="fcb-export-row">
+      <button type="button" class="fcb-export-btn" onclick="fcbExportChart('${canvasId}','png')">🖼 PNG</button>
+      <button type="button" class="fcb-export-btn" onclick="fcbExportChart('${chartWrapId}','pdf')">📄 PDF</button>
+    </div>`;
+  }
+
+  function fcbExportChart(id, format) {
+    if (format === "png") {
+      const canvas = document.getElementById(id);
+      ExportEngine.chartCanvasToPNG(canvas, "رسم_بياني");
+    } else if (format === "pdf") {
+      const wrap = document.getElementById(id);
+      if (wrap) ExportEngine.elementToPDF(wrap, "رسم_بياني");
+    }
+  }
+
+  /** يصدّر فقاعة رد كاملة (نص/كود/خطاب/اقتراح) كـ PDF بنفس مظهرها في الشات */
+  function fcbExportBubble(bubbleId) {
+    const bubble = document.getElementById(bubbleId);
+    if (bubble) ExportEngine.elementToPDF(bubble, "رد_المساعد");
+  }
+
+  function fcbCopyBubble(bubbleId) {
+    const bubble = document.getElementById(bubbleId);
+    if (bubble) ExportEngine.copyText(bubble.innerText || bubble.textContent || "");
+  }
+
+  let FCB_MSG_SEQ = 0;
+
+  function fcbParseChartBlock(jsonText) {
+    let spec;
+    try { spec = JSON.parse(jsonText); } catch (e) { return null; }
+    if (!spec || !Array.isArray(spec.labels) || !Array.isArray(spec.datasets)) return null;
+    return spec;
+  }
+
+  function fcbBuildChartHtml(spec) {
+    const id = "fcbChart_" + (++FCB_CHART_SEQ);
+    const wrapId = id + "_wrap";
+    const title = spec.title ? `<div class="fcb-chart-title">${fcbEscapeHtml(spec.title)}</div>` : "";
+    // نخزّن المخطط ليُرسم بعد إدراج الـ HTML في الصفحة (Canvas يحتاج يكون موجوداً بالـ DOM فعلياً)
+    FCB_PENDING_CHARTS.push({ id, spec });
+    return `<div class="fcb-chart-wrap" id="${wrapId}">${title}<div class="fcb-chart-canvas-box"><canvas id="${id}"></canvas></div>${fcbBuildChartExportRow(wrapId, id)}</div>`;
+  }
+
+  function fcbBuildTableHtml(headerCells, rows) {
+    const wrapId = "fcbTable_" + (++FCB_MSG_SEQ) + "_wrap";
+    let html = `<div class="fcb-table-wrap" id="${wrapId}"><table class="fcb-table"><thead><tr>`;
+    headerCells.forEach((h) => { html += `<th>${h}</th>`; });
+    html += "</tr></thead><tbody>";
+    rows.forEach((r) => {
+      html += "<tr>";
+      r.forEach((c) => { html += `<td>${c}</td>`; });
+      html += "</tr>";
+    });
+    html += "</tbody></table>" + fcbBuildTableExportRow(wrapId) + "</div>";
+    return html;
+  }
+
+  let FCB_PENDING_CHARTS = [];
+
+  function fcbRenderMarkdown(raw) {
+    const escaped = fcbEscapeHtml(raw).replace(/\r\n/g, "\n");
+    const lines = escaped.split("\n");
+    let html = "";
+    let listType = null; // 'ul' | 'ol' | null
+    let paraBuf = [];
+
+    function inlineFormat(line) {
+      return line
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, "<em>$1</em>")
+        .replace(/`([^`]+?)`/g, "<code>$1</code>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    }
+    function flushPara() {
+      if (paraBuf.length) {
+        html += "<p>" + paraBuf.join(" ") + "</p>";
+        paraBuf = [];
+      }
+    }
+    function closeList() {
+      if (listType) { html += "</" + listType + ">"; listType = null; }
+    }
+    function isTableSepRow(line) {
+      return /^\|?[\s:|-]+\|?$/.test(line) && line.includes("-");
+    }
+    function splitTableRow(line) {
+      let l = line.trim();
+      if (l.startsWith("|")) l = l.slice(1);
+      if (l.endsWith("|")) l = l.slice(0, -1);
+      return l.split("|").map((c) => inlineFormat(c.trim()));
+    }
+
+    let i = 0;
+    while (i < lines.length) {
+      const raw_line = lines[i];
+      const line = raw_line.trim();
+
+      // كتلة كود ```chart ... ``` أو ```json-chart ... ```
+      const codeFenceMatch = line.match(/^```(\w[\w-]*)?\s*$/);
+      if (codeFenceMatch) {
+        const lang = (codeFenceMatch[1] || "").toLowerCase();
+        const bodyLines = [];
+        i++;
+        while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) {
+          bodyLines.push(lines[i]);
+          i++;
+        }
+        i++; // تجاوز سطر الإغلاق ```
+        const bodyText = bodyLines.join("\n")
+          .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+        if (lang === "chart" || lang === "json-chart") {
+          flushPara(); closeList();
+          const spec = fcbParseChartBlock(bodyText);
+          if (spec) {
+            html += fcbBuildChartHtml(spec);
+          } else {
+            html += '<div class="fcb-chart-error">⚠️ تعذّر رسم المخطط البياني</div>';
+          }
+        } else {
+          flushPara(); closeList();
+          html += `<p><code>${fcbEscapeHtml(bodyText).replace(/\n/g, "<br>")}</code></p>`;
+        }
+        continue;
+      }
+
+      if (!line) { flushPara(); closeList(); i++; continue; }
+
+      if (/^---+$/.test(line)) { flushPara(); closeList(); html += "<hr>"; i++; continue; }
+
+      const hMatch = line.match(/^#{1,4}\s+(.+)/);
+      if (hMatch) { flushPara(); closeList(); html += "<h4>" + inlineFormat(hMatch[1]) + "</h4>"; i++; continue; }
+
+      // جدول Markdown: سطر header | سطر فاصل --- | صفوف بيانات
+      if (line.includes("|") && i + 1 < lines.length && isTableSepRow(lines[i + 1].trim())) {
+        flushPara(); closeList();
+        const headerCells = splitTableRow(line);
+        i += 2; // تجاوز الهيدر وسطر الفاصل
+        const rows = [];
+        while (i < lines.length && lines[i].trim().includes("|") && lines[i].trim() !== "") {
+          rows.push(splitTableRow(lines[i]));
+          i++;
+        }
+        html += fcbBuildTableHtml(headerCells, rows);
+        continue;
+      }
+
+      const ulMatch = line.match(/^[-•*]\s+(.+)/);
+      if (ulMatch) {
+        flushPara();
+        if (listType !== "ul") { closeList(); html += "<ul>"; listType = "ul"; }
+        html += "<li>" + inlineFormat(ulMatch[1]) + "</li>";
+        i++; continue;
+      }
+
+      const olMatch = line.match(/^\d+[.)]\s+(.+)/);
+      if (olMatch) {
+        flushPara();
+        if (listType !== "ol") { closeList(); html += "<ol>"; listType = "ol"; }
+        html += "<li>" + inlineFormat(olMatch[1]) + "</li>";
+        i++; continue;
+      }
+
+      closeList();
+      paraBuf.push(inlineFormat(line));
+      i++;
+    }
+    flushPara();
+    closeList();
+    return html || "<p></p>";
+  }
+
+  /* يرسم كل المخططات البيانية المؤجلة بعد إدراج الفقاعة في الـ DOM فعلياً */
+  function fcbMountPendingCharts() {
+    if (!FCB_PENDING_CHARTS.length) return;
+    const queue = FCB_PENDING_CHARTS;
+    FCB_PENDING_CHARTS = [];
+    queue.forEach(({ id, spec }) => {
+      const canvas = document.getElementById(id);
+      if (!canvas || typeof Chart === "undefined") return;
+      const type = ["bar", "line", "pie", "doughnut", "radar"].includes(spec.type) ? spec.type : "bar";
+
+      // 🛡️ تنظيف شامل: spec قادمة من نص يولّده الذكاء الاصطناعي، لذا قد تحتوي
+      // على قيم ناقصة أو null — ننظفها هنا قبل أي استخدام لمنع ظهور undefined/NaN
+      const { labels: cleanLabels, datasets: cleanRawDatasets } = normalizeChartData(
+        spec.labels,
+        spec.datasets,
+      );
+
+      if (!cleanLabels.length || !cleanRawDatasets.length) {
+        canvas.closest(".fcb-chart-wrap").innerHTML =
+          '<div class="fcb-chart-error">📭 لا توجد بيانات كافية لعرض هذا المخطط</div>';
+        return;
+      }
+
+      const isFill = type === "pie" || type === "doughnut";
+      const datasets = cleanRawDatasets.map((ds, idx) => {
+        const color = ds.color || FCB_CHART_PALETTE[idx % FCB_CHART_PALETTE.length];
+        return {
+          label: ds.label || "",
+          data: ds.data,
+          backgroundColor: isFill
+            ? cleanLabels.map((_, i2) => FCB_CHART_PALETTE[i2 % FCB_CHART_PALETTE.length])
+            : (type === "line" ? color + "22" : color + "cc"),
+          borderColor: color,
+          borderWidth: type === "line" ? 2.5 : 1,
+          borderRadius: type === "bar" ? 6 : 0,
+          fill: type === "line" ? true : undefined,
+          tension: type === "line" ? 0.35 : undefined,
+          pointRadius: type === "line" ? 3 : undefined,
+        };
+      });
+      try {
+        new Chart(canvas, {
+          type,
+          data: { labels: cleanLabels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: datasets.length > 1 || type === "pie" || type === "doughnut", position: "bottom", labels: { font: { size: 10, family: "IBM Plex Sans Arabic" }, boxWidth: 10, padding: 8 } },
+              tooltip: {
+                rtl: true,
+                titleFont: { family: "IBM Plex Sans Arabic" },
+                bodyFont: { family: "IBM Plex Sans Arabic" },
+                callbacks: {
+                  // طبقة حماية أخيرة: حتى لو وصل عنوان/قيمة فاسدة، لا تظهر undefined في الـ tooltip
+                  title: (items) => items.map((it) => sanitizeText(it.label, "")),
+                  label: (item) => {
+                    const v = safeNumber(item.parsed?.y ?? item.parsed, null);
+                    const dsLabel = sanitizeText(item.dataset?.label, "");
+                    return `${dsLabel ? dsLabel + ": " : ""}${v === null ? "غير متوفر" : v.toLocaleString("ar-SA")}`;
+                  },
+                },
+              },
+            },
+            scales: (type === "pie" || type === "doughnut" || type === "radar") ? {} : {
+              x: { ticks: { font: { size: 9.5, family: "IBM Plex Sans Arabic" }, callback: safeTickCallback }, grid: { display: false } },
+              y: { ticks: { font: { size: 9.5, family: "IBM Plex Sans Arabic" }, callback: safeTickCallback }, grid: { color: "rgba(8,45,60,0.06)" }, beginAtZero: true },
+            },
+          },
+        });
+      } catch (e) {
+        console.warn("[fcb] chart render error:", e);
+        canvas.closest(".fcb-chart-wrap").innerHTML = '<div class="fcb-chart-error">⚠️ تعذّر رسم المخطط البياني</div>';
+      }
+    });
+  }
+
 
   function fcbTimeNow() {
     const d = new Date();
@@ -14146,12 +15358,30 @@ function renderTajheezAllTable() {
     const wrap = document.getElementById("fcbMessages");
     const row = document.createElement("div");
     row.className = "fcb-row " + who;
+    const bubbleId = who === "bot" ? "fcbBubble_" + (++FCB_MSG_SEQ) : "";
     row.innerHTML =
-      (who === "bot" ? '<div class="fcb-msg-avatar">🤖</div>' : "") +
-      '<div class="fcb-col"><div class="fcb-bubble"></div><div class="fcb-time"></div></div>';
-    row.querySelector(".fcb-bubble").textContent = text;
+      (who === "bot" ? '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>' : "") +
+      `<div class="fcb-col"><div class="fcb-bubble"${bubbleId ? ` id="${bubbleId}"` : ""}></div><div class="fcb-time"></div></div>`;
+    const bubble = row.querySelector(".fcb-bubble");
+    if (who === "bot") {
+      bubble.innerHTML = fcbRenderMarkdown(text);
+      // صف تصدير عام (نسخ + PDF) لأي رد فيه محتوى يستحق الحفظ: نص/كود/خطاب/
+      // اقتراح... نتجاهله للردود القصيرة جداً (تحيات، تأكيدات) لتجنّب ازدحام الواجهة
+      const meaningfulLen = (text || "").replace(/```[\s\S]*?```/g, "").trim().length;
+      if (meaningfulLen > 40) {
+        const exportRow = document.createElement("div");
+        exportRow.className = "fcb-export-row fcb-export-row-msg";
+        exportRow.innerHTML =
+          `<button type="button" class="fcb-export-btn" onclick="fcbCopyBubble('${bubbleId}')">📋 نسخ</button>` +
+          `<button type="button" class="fcb-export-btn" onclick="fcbExportBubble('${bubbleId}')">📄 PDF</button>`;
+        bubble.appendChild(exportRow);
+      }
+    } else {
+      bubble.textContent = text;
+    }
     row.querySelector(".fcb-time").textContent = fcbTimeNow();
     wrap.appendChild(row);
+    if (who === "bot") fcbMountPendingCharts();
     const body = document.getElementById("fcbBody");
     body.scrollTop = body.scrollHeight;
   }
@@ -14162,7 +15392,7 @@ function renderTajheezAllTable() {
     row.className = "fcb-row bot";
     row.id = "fcbTyping";
     row.innerHTML =
-      '<div class="fcb-msg-avatar">🤖</div><div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
+      '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div><div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
     wrap.appendChild(row);
     const body = document.getElementById("fcbBody");
     body.scrollTop = body.scrollHeight;
@@ -14183,25 +15413,77 @@ function renderTajheezAllTable() {
      🤖 استدعاء OpenAI API مع تمرير ملخص بيانات الداشبورد كسياق
   ════════════════════════════════════════════════════════════════ */
   async function fcbAskOpenAI(userText) {
-    const apiKey = fcbGetApiKey();
-    if (!apiKey) {
-      throw new Error("NO_API_KEY");
+    if (!AIService.hasKey()) {
+      const err = new Error("NO_API_KEY");
+      err.code = "NO_API_KEY";
+      throw err;
     }
-    const model = fcbGetModel();
     const dashboardData = fcbBuildDashboardSummary();
+    const priorityData = fcbBuildPriorityActions(10);
 
-    const systemPrompt = `أنت "المساعد الذكي" للوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
-مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة واعتماداً على بيانات اللوحة الفعلية المرفقة لك بصيغة JSON بالأسفل.
+    const systemPrompt = `أنت خبير إدارة مرافق (Facilities Management) محترف ومتخصص بالذكاء، تعمل كمستشار فني داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard). أنت لست مجرد قارئ أرقام — أنت محلّل فني يفهم منطق إدارة الأصول، السلامة، والصيانة بمعايير عملية واقعية.
+
+نظام التصنيف الموحّد (مهم جداً — التزم به دوماً):
+أي تقييم أو مؤشر من 100 تذكره (FCA، البيئة المدرسية، تقييم عاين، درجة الحالة من محرك الأولويات، أو أي رقم آخر من 0 إلى 100) يجب أن يُصنَّف حصرياً وفق هذا السلّم الموحّد فقط، بدون استثناء وبدون اخترع تصنيفات أخرى:
+- 0 إلى أقل من 25 → "حرج 🔴"
+- 25 إلى أقل من 50 → "متوسط 🟠"
+- 50 إلى أقل من 75 → "جيد 🟡"
+- 75 إلى 100 → "جيد جداً 🟢"
+استخدم هذه المسميات بالضبط (حرج / متوسط / جيد / جيد جداً) في كل مكان بدون ابتكار مسميات بديلة (لا تستخدم "ممتاز" أو "مرتفعة" أو "منخفضة" أو غيرها).
+
+خبرتك التخصصية تشمل:
+- تقييم الحالة الفنية للمنشآت (FCA - Facility Condition Assessment): تفسير نسب FCA حسب نظام التصنيف الموحّد بالمعرض بالأسفل.
+- دورة حياة الأصول (Asset Lifecycle): عمر المبنى، استهلاك الأنظمة (تكييف، كهرباء، صرف)، ومتى يكون "الإصلاح" أرخص من "الاستبدال" (كقاعدة عامة: لو تكلفة الإصلاح المتكرر تجاوزت ~60% من تكلفة الاستبدال أو عمر المبنى تجاوز 35-40 سنة مع FCA متدني، الاستبدال غالباً أجدى اقتصادياً).
+- الصيانة الوقائية مقابل التصحيحية: تشجّع دوماً على الانتقال من "رد الفعل على الأعطال" إلى "جدولة دورية تمنع حدوثها"، وتوضح أن كل 1 ريال يُصرف بالصيانة الوقائية يوفر عادة 3-5 ريال صيانة تصحيحية طارئة.
+- إدارة العقود والمقاولين: مدد العقود، التجديد قبل الانتهاء بفترة كافية (60-90 يوم)، وربط أداء المقاول بجودة الصيانة الفعلية.
+- السلامة والبيئة المدرسية: جودة البيئة (envScore) كمؤشر مباشر على سلامة المستخدمين ورضاهم، وليس رقماً تجميلياً فقط.
+- إدارة الأولويات بالموارد المحدودة: ترتيب التدخلات حسب الخطورة والتأثير (Risk-based prioritization) بدل التعامل العشوائي.
+
+مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة، معتمداً على بيانات اللوحة الفعلية المرفقة بالأسفل (ملخص شامل + محرك أولويات محسوب فعلياً من البيانات الخام).
 
 تعليمات مهمة:
-- اعتمد فقط على البيانات المرفقة فعلياً في الإجابة عن أي أرقام أو إحصائيات. لا تخترع أرقاماً غير موجودة.
-- لو سؤال المستخدم عن رقم أو تفصيل غير متوفر في البيانات المرفقة، وضّح أن هذه التفاصيل غير متاحة في الملخص الحالي ووجّهه للتبويب المناسب في اللوحة ليشوف التفصيل الكامل.
+- اعتمد فقط على البيانات المرفقة فعلياً في أي رقم أو إحصائية. لا تخترع أرقاماً غير موجودة.
+- البيانات المرفقة بالأسفل أصبحت تغطي كل تبويبات اللوحة فعلياً (لا تقتصر على المباني فقط): تحليل_FCA، البيئة_المدرسية، الطلاب_وعمر_المبنى، الفصول_والتكييف، البلاغات_الصيانة، الصيانة_الوقائية_حسب_المبنى، التجهيزات_حسب_المبنى، تجهيزات_المخزون (تفاصيل المخصص/الاحتياج/الفروقات لتبويب التجهيزات الكامل)، خنادق_الصرف_حسب_المبنى وخنادق_الصرف (تبويب كامل)، العقود، تقييم_عاين، الأنظمة_الرئيسية_والتفصيلية، المصاعد، التكلفة، بلاغات_CSV، قطع_الغيار، عقود_FM، متابعة_الفواتير، المدفوعات_والعقود. لو السؤال عن أي تبويب من هذي، البيانات موجودة بالأسفل فعلياً — ابحث فيها أولاً قبل ما تقول "غير متوفر".
+- فقط لو القسم المطلوب ظهر في الملخص بمفتاح "تنبيه" (يعني تعذّر تحميله من مصدره أو لم يُحمَّل بعد في اللوحة)، وضّح للمستخدم أن البيانات لم تُحمَّل حالياً واطلب منه الضغط على زر التحديث ↻ في التبويب المعني، أو تحقق من نشر مصدر البيانات (Apps Script/CSV) المرتبط بهذا التبويب.
+- لو سؤال المستخدم عن رقم أو تفصيل دقيق جداً (مثل سجل واحد بعينه، أو فلتر معقّد) غير متوفر في مستوى التلخيص الحالي، وضّح ذلك ووجّهه للتبويب المناسب في اللوحة ليشوف الجدول التفصيلي الكامل.
 - اللوحة فيها 20 تبويب رئيسي: نظرة عامة، تحليل FCA، البيئة المدرسية، المرحلة الدراسية، العقود، عقود غير المجال، البلاغات، التجهيزات، الأنظمة الرئيسية، الأنظمة التفصيلية، الصيانة الوقائية، خنادق الصرف، المصاعد، التكلفة، الخريطة، الطلاب وعمر المبنى، قطع الغيار، تقييم عاين، المدفوعات والعقود، الجدول التفصيلي.
-- كن مختصراً ومباشراً، استخدم نقاطاً أو أرقاماً عند الحاجة، وأضف إيموجي مناسب بشكل خفيف.
 - لو المستخدم سأل سؤال عام لا يخص اللوحة، جاوبه بشكل طبيعي ومفيد بدون افتراض إنه يتكلم عن اللوحة.
 
+سلوكك كخبير حلول (هذا أهم جزء):
+- لا تكتفِ بعرض الأرقام — فسّرها مهنياً ("هذي النسبة تعني..."، "هذا يستدعي..."). تصرّف كمستشار فني حقيقي وليس قارئ تقرير.
+- إذا سأل المستخدم عن "أولويات" أو "حلول" أو "إيش أعمل" أو ما شابه، استخدم بيانات "محرك_الأولويات" المرفقة بالأسفل مباشرة — هي محسوبة فعلياً من البيانات الحقيقية بمعادلة تجمع FCA وعمر المبنى والبيئة والبلاغات، وتُصنَّف كل حالة بنظام التصنيف الموحّد أعلاه (حرج/متوسط/جيد/جيد جداً). اعرض المباني الأكثر احتياجاً أولاً، تصنيفها، والإجراء المقترح المرفق لكل تصنيف.
+- إذا سأل المستخدم عن "التجهيزات" أو "الأصول" أو "المعدات" أو "الجرد"، استخدم قسم "تجهيزات_المخزون": اشرح الفرق بين المخصص الحالي والاحتياج الفعلي (الفرق_الإجمالي_قيمة_ريال السالب يعني عجزاً يستدعي ميزانية إضافية)، وحدد أعلى الأقسام والأصناف احتياجاً والمدن الأكثر نقصاً، مع اقتراح أولوية شراء وفق حجم الفرق.
+- عند تقديم حل، اذكر: (1) ما المشكلة بالضبط بالأرقام، (2) لماذا هي مشكلة بمنطق إدارة المرافق، (3) خطوة عملية فورية، (4) خطوة متابعة على المدى المتوسط. اجعلها مرتبطة بنوع المبنى وسياقه الفعلي من البيانات، لا نصائح عامة فاضية.
+- عند المقارنة بين مدارس أو فئات، رتّبها دوماً من الأكثر إلحاحاً للأقل.
+
+تنسيق الجداول:
+- إذا كان السؤال يحتاج عرض بيانات بشكل مقارنة أو قائمة منظمة (أرقام لعدة عناصر)، اعرضها كجدول Markdown بهذا الشكل:
+| العمود الأول | العمود الثاني |
+|---|---|
+| قيمة 1 | قيمة 2 |
+- لا تستخدم الجدول لإجابة بسيطة من رقم واحد فقط.
+- عند عرض أولويات/حلول لعدة مبانٍ، الجدول مثالي: أعمدة (المبنى، الدرجة/المؤشر، التصنيف، الإجراء المقترح).
+
+تنسيق الرسوم البيانية:
+- إذا كان السؤال يطلب رسم بياني، أو مقارنة بين عدة عناصر، أو توزيع/اتجاه بمرور الوقت، أرفق كتلة رسم بياني بالشكل التالي (JSON صارم وصحيح بالكامل داخل سياج \`\`\`chart):
+\`\`\`chart
+{"type":"bar","title":"عنوان قصير للرسم","labels":["تسمية1","تسمية2","تسمية3"],"datasets":[{"label":"اسم السلسلة","data":[10,20,15]}]}
+\`\`\`
+- اختر "type" تلقائياً حسب طبيعة البيانات وبدون أن يطلب المستخدم نوعاً معيناً:
+  • "bar" للمقارنات بين فئات (مدارس، أنظمة، أنواع بلاغات...).
+  • "line" للبيانات عبر الزمن (تواريخ، أشهر، اتجاه تاريخي).
+  • "pie" أو "doughnut" للنسب والتوزيع من إجمالي واحد (حصص، نسب مئوية).
+  • "radar" لمقارنة عدة مؤشرات لعنصر واحد أو أكثر (مثلاً: مقارنة FCA/البيئة/البلاغات لنفس المبنى).
+- اجعل "labels" قصيرة وواضحة، واستخدم بيانات حقيقية فقط من الملخص المرفق. لا تخترع أرقاماً.
+- يمكن وضع أكثر من dataset إذا كانت هناك مقارنة بين فئتين (مثل قبل/بعد، أو سنتين).
+- لا تكرر نفس البيانات نصاً وجدولاً ورسماً معاً في نفس الرد؛ اختر الأنسب أو أنسبين فقط حسب السؤال، مع جملة قصيرة توضّح أهم استنتاج.
+- إذا لم تكن هناك بيانات كافية في الملخص المرفق لرسم مخطط دقيق، لا تخترعه — اعتذر بلطف ووجّه المستخدم للتبويب المناسب.
+
 بيانات اللوحة الحالية (محدّثة لحظة هذا السؤال):
-${JSON.stringify(dashboardData)}`;
+${JSON.stringify(dashboardData)}
+
+محرك الأولويات (مبانٍ مرتّبة حسب درجة الخطورة المحسوبة من FCA + عمر المبنى + البيئة + البلاغات، مع التصنيف والإجراء المقترح لكل تصنيف):
+${JSON.stringify(priorityData)}`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -14209,32 +15491,7 @@ ${JSON.stringify(dashboardData)}`;
       { role: "user", content: userText },
     ];
 
-    const resp = await fetch(CFG.OPENAI_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        temperature: 0.4,
-        max_completion_tokens: 700,
-      }),
-    });
-
-    if (!resp.ok) {
-      let errMsg = "HTTP " + resp.status;
-      try {
-        const errJson = await resp.json();
-        errMsg = errJson?.error?.message || errMsg;
-      } catch (_) {}
-      throw new Error(errMsg);
-    }
-
-    const data = await resp.json();
-    const reply = data?.choices?.[0]?.message?.content?.trim();
-    if (!reply) throw new Error("EMPTY_RESPONSE");
+    const reply = await AIService.chat(messages);
 
     FCB_HISTORY.push({ role: "user", content: userText });
     FCB_HISTORY.push({ role: "assistant", content: reply });
@@ -14249,18 +15506,24 @@ ${JSON.stringify(dashboardData)}`;
   ════════════════════════════════════════════════════════════════ */
   async function fcbSend(presetText) {
     const inputEl = document.getElementById("fcbInput");
+    const sendBtn = document.getElementById("fcbSendBtn");
     const val = (typeof presetText === "string" ? presetText : inputEl.value).trim();
     if (!val) return;
     fcbAppendMsg(val, "user");
     inputEl.value = "";
+    inputEl.style.height = "auto";
+    sendBtn.disabled = true;
     fcbShowTyping();
 
     try {
-      const apiKey = fcbGetApiKey();
-      if (!apiKey) {
-        // لا يوجد مفتاح API — استخدم الردود المبرمجة فوراً بدون محاولة الاتصال
+      if (!AIService.hasKey()) {
+        // لا يوجد مفتاح API محفوظ — نوضّح ذلك بصراحة للمستخدم، ثم نكمل
+        // بالردود المبرمجة (Rule-based) كحل احتياطي مفيد بدل توقف كامل
         fcbHideTyping();
-        fcbAppendMsg(fcbReplyFor(val), "bot");
+        fcbAppendMsg(
+          "⚠️ لم تُدخل مفتاح OpenAI API بعد، فالردود الحالية مبرمجة (محدودة) وليست من الذكاء الاصطناعي الكامل.\n\nلتفعيل المساعد الذكي الكامل: اضغط ⚙️ بالأعلى وأدخل مفتاحك الخاص — يُخزَّن في متصفحك فقط ولا يُرسل لأي مكان عدا OpenAI مباشرة.\n\nوإليك إجابة مبدئية:\n\n" + fcbReplyFor(val),
+          "bot",
+        );
         return;
       }
       const reply = await fcbAskOpenAI(val);
@@ -14269,7 +15532,15 @@ ${JSON.stringify(dashboardData)}`;
     } catch (err) {
       console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       fcbHideTyping();
-      fcbAppendMsg(fcbReplyFor(val), "bot");
+      const prefix = err?.code === "INVALID_KEY"
+        ? "⚠️ تعذّر التحقق من مفتاح API (قد يكون غير صحيح أو منتهي) — راجعه من ⚙️ الإعدادات.\n\n"
+        : err?.code === "REQUEST_FAILED" || err?.message
+          ? "⚠️ تعذّر الاتصال بخدمة الذكاء الاصطناعي حالياً، إليك إجابة من الردود المبرمجة بدلاً منها:\n\n"
+          : "";
+      fcbAppendMsg(prefix + fcbReplyFor(val), "bot");
+    } finally {
+      sendBtn.disabled = false;
+      inputEl.focus();
     }
   }
 </script>

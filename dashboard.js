@@ -555,6 +555,7 @@ function applyFilters() {
     if (activeId === "tab-env") safeRun(renderEnvCharts, "env");
     if (activeId === "tab-stages") safeRun(renderStageCharts, "stages");
     if (activeId === "tab-stage-compare") safeRun(renderStageCompareTab, "stage-compare");
+    if (activeId === "tab-fca-ref") safeRun(renderFcaRefTab, "fca-ref");
     if (activeId === "tab-contracts") safeRun(renderContractCharts, "contracts");
     if (activeId === "tab-all-contracts") safeRun(renderAllContracts, "all-contracts");
     if (activeId === "tab-sys-main") safeRun(renderSysMain, "sys-main");
@@ -617,28 +618,40 @@ function renderKPIs() {
     classes = D.reduce((s, r) => s + (r.classrooms || 0), 0),
     alertsTotal = D.reduce((s, r) => s + (r.alerts || 0), 0),
     acTotal = D.reduce((s, r) => s + (r.acUnits || 0), 0);
+
+  // حساب آخر تاريخ تقييم FCA ظهر في البيانات (لعرضه كمرجع)
+  const fcaWithDate = D.filter((r) => null != r.fca && r.fcaDateObj);
+  const latestDateObj = fcaWithDate.length
+    ? fcaWithDate.reduce((mx, r) => (r.fcaDateObj > mx.fcaDateObj ? r : mx), fcaWithDate[0]).fcaDateObj
+    : null;
+  const latestDateLabel = latestDateObj
+    ? latestDateObj.toLocaleDateString("ar-SA-u-nu-latn", { month: "long", year: "numeric" })
+    : null;
+
   (setText("k-total", total.toLocaleString()),
     setText(
       "k-total-sub",
-      `${fcaArr.length.toLocaleString()} ${"en" === LANG ? "with FCA score" : "لها درجة FCA"} · ${sectors} ${"en" === LANG ? "governorate" : "محافظة"}`,
+      `${fcaArr.length.toLocaleString()} ${LANG === "en" ? "with FCA score" : "لها درجة FCA"} · ${sectors} ${LANG === "en" ? "governorate" : "محافظة"}`,
     ),
     setText("k-govt", govt.toLocaleString()),
-    setText("k-rented", `${rented.toLocaleString()} ${"en" === LANG ? "rented" : "مستأجرة"}`),
+    setText("k-rented", `${rented.toLocaleString()} ${LANG === "en" ? "rented" : "مستأجرة"}`),
     setText("k-fca-avg", pct(avg(fcaArr))),
     setText(
       "k-fca-cnt",
-      `${fcaArr.length.toLocaleString()} ${"en" === LANG ? "schools assessed" : "مدرسة مقيّمة"}`,
+      latestDateLabel
+        ? `${fcaArr.length.toLocaleString()} مدرسة · آخر تقييم: ${latestDateLabel}`
+        : `${fcaArr.length.toLocaleString()} ${LANG === "en" ? "schools assessed" : "مدرسة مقيّمة"}`,
     ),
     setText("k-env-avg", pct(avg(envArr))),
     setText(
       "k-env-cnt",
-      `${envArr.length.toLocaleString()} ${"en" === LANG ? "schools with score" : "مدرسة لها درجة"}`,
+      `${envArr.length.toLocaleString()} ${LANG === "en" ? "schools with score" : "مدرسة لها درجة"}`,
     ),
     setText("k-low-fca", lowFca.toLocaleString()),
     setText("k-districts", dists.toLocaleString()),
     setText(
       "k-classrooms",
-      `${classes.toLocaleString()} ${"en" === LANG ? "total classrooms" : "فصل إجمالي"}`,
+      `${classes.toLocaleString()} ${LANG === "en" ? "total classrooms" : "فصل إجمالي"}`,
     ),
     setText("k-alerts-total", alertsTotal.toLocaleString()),
     setText("k-ac-total", acTotal.toLocaleString()));
@@ -749,6 +762,7 @@ function showTab(name, el) {
     "env" === name && renderEnvCharts(),
     "stages" === name && renderStageCharts(),
     "stage-compare" === name && renderStageCompareTab(),
+    "fca-ref" === name && renderFcaRefTab(),
     "contracts" === name && renderContractCharts(),
     "all-contracts" === name && renderAllContracts(),
     "sys-main" === name && renderSysMain(),
@@ -1558,706 +1572,509 @@ function renderStageCharts() {
 }
 
 
+// ════════════════════════════════════════════════════════════════════════
+// renderStageCompareTab — ديناميكي: يتكيف مع أي عدد من المراحل والأشهر
+// ════════════════════════════════════════════════════════════════════════
 function renderStageCompareTab() {
-  const normText = (v) =>
-    String(v ?? "")
-      .replace(/\uFEFF/g, "")
-      .trim()
-      .replace(/\s+/g, " ");
+  /* ── helpers ── */
+  const normText = (v) => String(v ?? "").replace(/\uFEFF/g, "").trim().replace(/\s+/g, " ");
+  const stripAr  = (v) => normText(v).replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ـ/g,"").replace(/[\u064B-\u065F\u0670]/g,"");
+  const schoolKey = (v) => stripAr(v).toLowerCase().replace(/[^\u0600-\u06FF0-9a-z]+/gi,"");
 
-  const stripArabic = (v) =>
-    normText(v)
-      .replace(/[أإآ]/g, "ا")
-      .replace(/ى/g, "ي")
-      .replace(/ة/g, "ه")
-      .replace(/ـ/g, "")
-      .replace(/[\u064B-\u065F\u0670]/g, "");
-
-  const schoolKey = (v) =>
-    stripArabic(v)
-      .toLowerCase()
-      .replace(/[^\u0600-\u06FF0-9a-z]+/gi, "");
-
-  const normStage = (v) => {
-    const s = stripArabic(v);
-    if (!s) return "";
-    const low = s.toLowerCase();
-    if (
-      s.includes("المرحلة الاولى") ||
-      s.includes("المرحله الاولى") ||
-      s.includes("المرحلة الاولي") ||
-      s.includes("المرحله الاولي") ||
-      low.includes("phase 1") ||
-      low.includes("stage 1") ||
-      low.includes("first stage") ||
-      low === "first"
-    ) {
-      return "المرحلة الأولى";
-    }
-    if (
-      s.includes("المرحلة الثانية") ||
-      s.includes("المرحله الثانية") ||
-      s.includes("المرحلة الثانيه") ||
-      s.includes("المرحله الثانيه") ||
-      low.includes("phase 2") ||
-      low.includes("stage 2") ||
-      low.includes("second stage") ||
-      low === "second"
-    ) {
-      return "المرحلة الثانية";
-    }
-    return s;
-  };
-
-  const rawHistory = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
-  const fallbackRows = Array.isArray(FILTERED) ? FILTERED : [];
-  const source = rawHistory.length ? rawHistory : fallbackRows;
-
-  const getSchool = (r) =>
-    normText(
-      r["اسم_المدرسة"] ??
-        r.schoolName ??
-        r.school ??
-        r.name ??
-        r.buildingName ??
-        r["School Name"] ??
-        "",
-    );
-
-  const normMinId = (v) => {
-    let s = String(v ?? "").replace(/\uFEFF/g, "").trim();
-    if (!s || "—" === s) return "";
-    s = s.replace(/\.0+$/, ""); // CSV/Sheets export of numbers as "12345.0"
-    return s;
-  };
-
-  const getMinId = (r) =>
-    normMinId(
-      r["الرقم الوزاري"] ??
-        r["رقم_وزاري"] ??
-        r["رقم وزاري"] ??
-        r["رقم_المدرسة_الوزاري"] ??
-        r["الرقم الوزاري / ID"] ??
-        r.ministerialId ??
-        r.minId ??
-        r.schoolId ??
-        r["Min. ID"] ??
-        r["Min ID"] ??
-        r["School ID"] ??
-        r.id ??
-        r["ID"] ??
-        "",
-    );
-
-  const getSector = (r) =>
-    normText(
-      r["المحافظة"] ??
-        r["محافظة"] ??
-        r.sector ??
-        r["Sector"] ??
-        r["Governorate"] ??
-        r.governorate ??
-        "",
-    );
-
-  const getCity = (r) =>
-    normText(
-      r["المدينة_الرئيسية"] ??
-        r["المدينة الرئيسية"] ??
-        r["المدينة"] ??
-        r.city ??
-        r["City"] ??
-        r["Main Region"] ??
-        "",
-    );
-
-  const getStage = (r) =>
-    normStage(
-      r["المرحلة"] ??
-        r.stage ??
-        r.phase ??
-        r["Stage"] ??
-        r["Phase"] ??
-        r["الفئة"] ??
-        "",
-    );
-
-  const getScore = (r) => {
-    const v =
-      r["تقييم_FCA_المرحلة"] ??
-      r["قيمة_FCA"] ??
-      r.fca ??
-      r.score ??
-      r["FCA"] ??
-      r["Score"] ??
-      r["تقييم"] ??
-      r["درجة_FCA"] ??
-      null;
+  const normMinId = (v) => { let s=String(v??"").replace(/\uFEFF/g,"").trim(); if(!s||s==="—")return""; return s.replace(/\.0+$/,""); };
+  const getMinId  = (r) => normMinId(r["رقم_المدرسة_الوزاري"]??r["رقم_وزاري"]??r["رقم وزاري"]??r.minId??"");
+  const getSchool = (r) => normText(r["اسم_المدرسة"]??r.schoolName??r.name??"");
+  const getSector = (r) => normText(r["المحافظة"]??r.sector??"");
+  const getCity   = (r) => normText(r["المدينة_الرئيسية"]??r["المدينة"]??r.city??"");
+  const getStage  = (r) => normText(r["المرحلة"]??r.stage??r.phase??"");
+  const getScore  = (r) => {
+    const v = r["تقييم_FCA"]??r["تقييم_FCA_المرحلة"]??r["قيمة_FCA"]??r.fca??r.score??r["FCA"]??null;
     return num(v);
   };
-
+  const monMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
   const getDate = (r) => {
-    const v = r["التاريخ"] ?? r.date ?? r.Date ?? r.creationDate ?? r["تاريخ_الزيارة"] ?? r["Survey Date"] ?? null;
-    if (!v) return null;
-    // handle "May-26", "Jun-26" → MMM-YY format
-    const monMap = {
-      jan:0,feb:1,mar:2,apr:3,may:4,jun:5,
-      jul:6,aug:7,sep:8,oct:9,nov:10,dec:11
-    };
-    const shortMatch = String(v).match(/^([A-Za-z]{3})-(\d{2})$/);
-    if (shortMatch) {
-      const mon = monMap[shortMatch[1].toLowerCase()];
-      const yr = 2000 + parseInt(shortMatch[2], 10);
-      if (mon !== undefined) return new Date(yr, mon, 1);
-    }
-    const d = new Date(v);
-    return isNaN(d) ? null : d;
+    const v = r["التاريخ"]??r.date??null; if(!v)return null;
+    const sm = String(v).match(/^([A-Za-z]{3})[- ](\d{2})$/);
+    if(sm){ const m=monMap[sm[1].toLowerCase()]; if(m!==undefined)return new Date(2000+parseInt(sm[2]),m,1); }
+    const d=new Date(v); return isNaN(d)?null:d;
   };
+  const monthKey   = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  const monthLabel = (k) => { const mm=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]; const[y,m]=k.split("-").map(Number); return `${mm[m-1]} ${y}`; };
 
-  const sourceRows = source
-    .map((r) => ({
-      school: getSchool(r),
-      schoolK: schoolKey(getSchool(r)),
-      sector: getSector(r),
-      sectorK: schoolKey(getSector(r)),
-      city: getCity(r),
-      minId: getMinId(r),
-      stage: getStage(r),
-      score: getScore(r),
-      date: getDate(r),
-    }))
-    .filter(
-      (r) =>
-        (r.minId || r.schoolK) &&
-        r.score != null &&
-        (r.stage === "المرحلة الأولى" || r.stage === "المرحلة الثانية"),
-    );
+  // ألوان ديناميكية لأي عدد من المراحل
+  const STAGE_PALETTE = [
+    {bg:"rgba(8,145,178,0.55)",  bd:"#0891B2", kc:"kc-blue"},
+    {bg:"rgba(124,58,237,0.55)", bd:"#7C3AED", kc:"kc-purple"},
+    {bg:"rgba(5,150,105,0.55)",  bd:"#059669", kc:"kc-green"},
+    {bg:"rgba(245,158,11,0.55)", bd:"#D97706", kc:"kc-amber"},
+    {bg:"rgba(239,68,68,0.55)",  bd:"#DC2626", kc:"kc-red"},
+    {bg:"rgba(99,102,241,0.55)", bd:"#6366F1", kc:"kc-blue"},
+    {bg:"rgba(20,184,166,0.55)", bd:"#14B8A6", kc:"kc-teal"},
+    {bg:"rgba(249,115,22,0.55)", bd:"#EA580C", kc:"kc-amber"},
+  ];
 
-  // ── مفتاح الربط: الرقم الوزاري أولاً، وإن لم يتوفر فالاسم + المحافظة ──
-  const groupKey = (r) =>
-    r.minId ? "ID::" + r.minId : "NM::" + r.sectorK + "::" + r.schoolK;
+  /* ── مصدر البيانات ── */
+  const rawHistory = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
+  const source     = rawHistory.length ? rawHistory : (Array.isArray(FILTERED) ? FILTERED : []);
 
-  // ── Build school dropdown (first time or refresh) ──────────────────
-  const schoolFilterEl = document.getElementById("stageCompareSchoolFilter");
-  if (schoolFilterEl) {
-    const currentVal = schoolFilterEl.value;
-    const allSchoolNames = [...new Set(sourceRows.map((r) => r.school))]
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, "ar"));
-    const prevOptions = [...schoolFilterEl.options].map((o) => o.value).slice(1).join("|");
-    const newOptions = allSchoolNames.join("|");
-    if (prevOptions !== newOptions) {
-      schoolFilterEl.innerHTML = '<option value="">— كل المدارس —</option>';
-      allSchoolNames.forEach((name) => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name.length > 40 ? name.slice(0, 40) + "…" : name;
-        schoolFilterEl.appendChild(opt);
-      });
-      if (allSchoolNames.includes(currentVal)) schoolFilterEl.value = currentVal;
+  // بناء الصفوف الأولية — نقبل أي مرحلة غير فارغة
+  const allRows = source.map(r => ({
+    school:  getSchool(r),
+    schoolK: schoolKey(getSchool(r)),
+    sector:  getSector(r),
+    city:    getCity(r),
+    minId:   getMinId(r),
+    stage:   getStage(r),
+    score:   getScore(r),
+    date:    getDate(r),
+  })).filter(r => (r.minId||r.schoolK) && r.score!=null && r.stage);
+
+  /* ── المراحل الفريدة — مرتبة بأول تاريخ ظهرت فيه (Apr→May→Jun→...) ── */
+  const stageFirstDate = {};
+  allRows.forEach(r => {
+    if(r.date && r.stage){
+      const k = monthKey(r.date);
+      if(!stageFirstDate[r.stage] || k < stageFirstDate[r.stage]) stageFirstDate[r.stage] = k;
     }
+  });
+  // عنوان كل مرحلة = اسم الشهر العربي (أبريل/مايو/يونيو...) بدل "المرحلة الأولى/الثانية/..."
+  const MM_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const stageLabel = (s) => {
+    const k = stageFirstDate[s];
+    if(!k) return s;
+    const [,m] = k.split("-").map(Number);
+    return MM_AR[m-1];
+  };
+  const allStages = [...new Set(allRows.map(r=>r.stage))].filter(Boolean).sort((a,b) => {
+    const da = stageFirstDate[a] || "9999-99";
+    const db = stageFirstDate[b] || "9999-99";
+    return da !== db ? da.localeCompare(db) : a.localeCompare(b,"ar");
+  });
+
+  /* ── الأشهر الفريدة ── */
+  const allMonthKeys = [...new Set(allRows.filter(r=>r.date).map(r=>monthKey(r.date)))].sort();
+
+  /* ── فلتر المدينة ── */
+  const cityEl = document.getElementById("stageCompareCity");
+  if(cityEl){
+    const cities=[...new Set(allRows.map(r=>r.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));
+    const cur=cityEl.value;
+    cityEl.innerHTML='<option value="">— كل المناطق —</option>'+cities.map(c=>`<option value="${esc(c)}"${c===cur?" selected":""}>${esc(c)}</option>`).join("");
   }
 
+  /* ── فلتر المرحلة ── */
+  const stageFilterEl = document.getElementById("stageCompareStageFilter");
+  if(stageFilterEl){
+    const cur=stageFilterEl.value;
+    stageFilterEl.innerHTML='<option value="">— كل المراحل —</option>'+allStages.map(s=>`<option value="${esc(s)}"${s===cur?" selected":""}>${esc(s)}</option>`).join("");
+  }
+
+  /* ── قراءة الفلاتر الحالية ── */
+  const search      = (document.getElementById("stageCompareSearch")?.value||"").trim().toLowerCase();
+  const cityFilter  = cityEl?.value||"";
+  const stageFilter = stageFilterEl?.value||"";
+  const sortMode    = document.getElementById("stageCompareSort")?.value||"avg_asc";
+
+  /* ── تجميع البيانات per school ── */
+  const groupKey = (r) => r.minId ? "ID::"+r.minId : "NM::"+schoolKey(r.sector)+"::"+r.schoolK;
   const bySchool = new Map();
-  sourceRows.forEach((r) => {
+  allRows.forEach(r => {
+    if(cityFilter  && r.city!==cityFilter) return;
+    if(stageFilter && r.stage!==stageFilter) return;
     const key = groupKey(r);
-    const entry = bySchool.get(key) || {
-      school: r.school,
-      minId: r.minId,
-      sector: r.sector,
-      city: r.city,
-      matchedBy: r.minId ? "id" : "name",
-      stage1: [],
-      stage2: [],
-      dates1: [],
-      dates2: [],
-    };
-    if (!entry.school && r.school) entry.school = r.school;
-    if (!entry.minId && r.minId) entry.minId = r.minId;
-    if (!entry.sector && r.sector) entry.sector = r.sector;
-    if (!entry.city && r.city) entry.city = r.city;
-    if (r.stage === "المرحلة الأولى") { entry.stage1.push(r.score); if (r.date) entry.dates1.push({score: r.score, date: r.date}); }
-    if (r.stage === "المرحلة الثانية") { entry.stage2.push(r.score); if (r.date) entry.dates2.push({score: r.score, date: r.date}); }
-    bySchool.set(key, entry);
+    if(!bySchool.has(key)) bySchool.set(key,{school:r.school,minId:r.minId,sector:r.sector,city:r.city,stages:{}});
+    const entry = bySchool.get(key);
+    if(!entry.stages[r.stage]) entry.stages[r.stage]={scores:[],dates:[]};
+    entry.stages[r.stage].scores.push(r.score);
+    if(r.date) entry.stages[r.stage].dates.push({score:r.score,date:r.date});
   });
 
-  let rows = [...bySchool.values()].map((o) => {
-    const s1 = avg(o.stage1);
-    const s2 = avg(o.stage2);
-    return {
-      school: o.school || o.minId,
-      minId: o.minId,
-      sector: o.sector,
-      city: o.city,
-      matchedBy: o.matchedBy,
-      s1,
-      s2,
-      c1: o.stage1.length,
-      c2: o.stage2.length,
-      diff: null != s1 && null != s2 ? s2 - s1 : null,
-      dates1: o.dates1,
-      dates2: o.dates2,
-    };
-  });
-
-  const search = (document.getElementById("stageCompareSearch")?.value || "")
-    .trim()
-    .toLowerCase();
-  const sortMode = document.getElementById("stageCompareSort")?.value || "diff_desc";
-  const schoolFilter = schoolFilterEl?.value || "";
-
-  if (search)
-    rows = rows.filter(
-      (r) =>
-        r.school.toLowerCase().includes(search) ||
-        String(r.minId ?? "").toLowerCase().includes(search) ||
-        String(r.sector ?? "").toLowerCase().includes(search) ||
-        String(r.city ?? "").toLowerCase().includes(search),
-    );
-  if (schoolFilter) rows = rows.filter((r) => r.school === schoolFilter);
-
-  rows.sort((a, b) => {
-    switch (sortMode) {
-      case "diff_asc":
-        return (a.diff ?? 1e9) - (b.diff ?? 1e9);
-      case "name":
-        return a.school.localeCompare(b.school, "ar");
-      case "stage1_desc":
-        return (b.s1 ?? -1) - (a.s1 ?? -1);
-      case "stage2_desc":
-        return (b.s2 ?? -1) - (a.s2 ?? -1);
-      case "diff_desc":
-      default:
-        return (b.diff ?? -1e9) - (a.diff ?? -1e9);
-    }
-  });
-
-  const stage1Schools = rows.filter((r) => r.c1 > 0).length;
-  const stage2Schools = rows.filter((r) => r.c2 > 0).length;
-  const bothSchools = rows.filter((r) => r.c1 > 0 && r.c2 > 0).length;
-  const only1 = rows.filter((r) => r.c1 > 0 && r.c2 === 0).length;
-  const only2 = rows.filter((r) => r.c2 > 0 && r.c1 === 0).length;
-  const avgDiff = avg(rows.filter((r) => r.diff != null).map((r) => r.diff));
-
-  setText("sc-k1", stage1Schools);
-  setText("sc-k2", stage2Schools);
-  setText("sc-k3", bothSchools);
-  setText("sc-k4", null != avgDiff ? (avgDiff > 0 ? "+" : "") + avgDiff.toFixed(1) : "—");
-
-  const metaEl = document.getElementById("stageCompareMeta");
-  if (metaEl) {
-    metaEl.textContent =
-      rawHistory.length > 0
-        ? `المعروض: ${rows.length} مدرسة · مكتملتان: ${bothSchools}`
-        : "لا توجد بيانات تاريخ FCA محمّلة بعد";
-  }
-
-  const emptyEl = document.getElementById("stageCompareEmpty");
-  if (emptyEl) emptyEl.style.display = rows.length ? "none" : "block";
-
-  // ── 1. أكبر الفروقات (Top 10 by absolute diff) ───────────────────
-  const ranked = rows
-    .filter((r) => r.diff != null)
-    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
-    .slice(0, 10);
-
-  killChart("ch-stage-compare-main");
-  if (ranked.length) {
-    const improveBg = ranked.map((r) => r.diff >= 0 ? "rgba(5,150,105,0.75)" : "rgba(220,38,38,0.75)");
-    const improveBd = ranked.map((r) => r.diff >= 0 ? "#059669" : "#DC2626");
-    CHARTS["ch-stage-compare-main"] = new Chart(
-      document.getElementById("ch-stage-compare-main"),
-      {
-        type: "bar",
-        data: {
-          labels: ranked.map((r) => (r.school.length > 18 ? r.school.slice(0, 18) + "…" : r.school)),
-          datasets: [
-            {
-              label: "المرحلة الأولى",
-              data: ranked.map((r) => (r.s1 != null ? +r.s1.toFixed(1) : null)),
-              backgroundColor: "rgba(8,145,178,0.55)",
-              borderColor: "#0891B2",
-              borderWidth: 1.5,
-              borderRadius: 4,
-              order: 2,
-            },
-            {
-              label: "المرحلة الثانية",
-              data: ranked.map((r) => (r.s2 != null ? +r.s2.toFixed(1) : null)),
-              backgroundColor: "rgba(124,58,237,0.55)",
-              borderColor: "#7C3AED",
-              borderWidth: 1.5,
-              borderRadius: 4,
-              order: 2,
-            },
-          ],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: "top", labels: { font: { size: 11, weight: "700" }, boxWidth: 12 } },
-            tooltip: {
-              callbacks: {
-                title: (ctx) => ranked[ctx[0].dataIndex]?.school || ctx[0].label || "—",
-                afterBody: (ctx) => {
-                  const r = ranked[ctx[0].dataIndex];
-                  if (!r || r.diff == null) return [];
-                  const sign = r.diff > 0 ? "+" : "";
-                  const arrow = r.diff > 0 ? "▲ تحسّن" : r.diff < 0 ? "▼ تراجع" : "= ثابت";
-                  return [`الفرق Δ: ${sign}${r.diff.toFixed(1)}  ${arrow}`];
-                },
-              },
-            },
-            // Annotation-style: draw diff labels on chart
-          },
-          scales: {
-            x: { ticks: { font: { size: 10 }, maxRotation: 35 }, grid: { display: false } },
-            y: {
-              beginAtZero: true,
-              suggestedMax: 100,
-              ticks: { font: { size: 10 } },
-              grid: { color: "rgba(168,195,214,0.2)" },
-              title: { display: true, text: "تقييم FCA", font: { size: 10, weight: "700" }, color: "#6B8795" },
-            },
-          },
-        },
-      },
-    );
-  }
-
-  // ── 2. مخطط الفرق Δ (diverging bar) ─────────────────────────────
-  const diffRows = rows.filter((r) => r.diff != null).sort((a, b) => b.diff - a.diff).slice(0, 15);
-  killChart("ch-stage-diff-bar");
-  if (diffRows.length) {
-    CHARTS["ch-stage-diff-bar"] = new Chart(document.getElementById("ch-stage-diff-bar"), {
-      type: "bar",
-      data: {
-        labels: diffRows.map((r) => (r.school.length > 20 ? r.school.slice(0, 20) + "…" : r.school)),
-        datasets: [{
-          label: "الفرق Δ (الثانية − الأولى)",
-          data: diffRows.map((r) => +r.diff.toFixed(1)),
-          backgroundColor: diffRows.map((r) => r.diff >= 0 ? "rgba(5,150,105,0.7)" : "rgba(220,38,38,0.7)"),
-          borderColor: diffRows.map((r) => r.diff >= 0 ? "#059669" : "#DC2626"),
-          borderWidth: 1.5,
-          borderRadius: 4,
-        }],
-      },
-      options: {
-        indexAxis: "y",
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (ctx) => diffRows[ctx[0].dataIndex]?.school || "—",
-              label: (ctx) => {
-                const v = ctx.raw;
-                const sign = v > 0 ? "+" : "";
-                const label = v > 0 ? "تحسّن ▲" : v < 0 ? "تراجع ▼" : "ثابت";
-                return ` ${label}: ${sign}${v}`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: { font: { size: 10 } },
-            grid: { color: "rgba(168,195,214,0.2)" },
-            title: { display: true, text: "الفرق (Δ)", font: { size: 10, weight: "700" }, color: "#6B8795" },
-          },
-          y: { ticks: { font: { size: 10 } }, grid: { display: false } },
-        },
-      },
+  /* ── بناء صفوف الجدول ── */
+  let rows = [...bySchool.values()].map(o => {
+    const stageData = {};
+    allStages.forEach(s => {
+      const sd = o.stages[s];
+      stageData[s] = sd ? { avg: avg(sd.scores), count: sd.scores.length, dates: sd.dates } : { avg: null, count: 0, dates: [] };
     });
-  }
+    const scored = Object.values(stageData).filter(d=>d.avg!=null);
+    const overallAvg = scored.length ? avg(scored.map(d=>d.avg)) : null;
+    return { school: o.school||o.minId, minId: o.minId, sector: o.sector, city: o.city, stageData, overallAvg };
+  });
 
-  // ── 3. تغطية البيانات ─────────────────────────────────────────────
-  killChart("ch-stage-compare-cover");
-  CHARTS["ch-stage-compare-cover"] = new Chart(
-    document.getElementById("ch-stage-compare-cover"),
-    {
-      type: "doughnut",
-      data: {
-        labels: ["كلا المرحلتين", "المرحلة الأولى فقط", "المرحلة الثانية فقط"],
-        datasets: [
-          {
-            data: [bothSchools, only1, only2],
-            backgroundColor: ["#059669", "#0891B2", "#7C3AED"],
-            borderColor: "#fff",
-            borderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 10 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${ctx.raw} مدرسة`,
-            },
-          },
-        },
-      },
-    },
+  /* ── بحث ── */
+  if(search) rows = rows.filter(r =>
+    r.school.toLowerCase().includes(search)||String(r.minId??"").toLowerCase().includes(search)||
+    String(r.sector??"").toLowerCase().includes(search)||String(r.city??"").toLowerCase().includes(search)
   );
 
-  // ── 4. Time Chart — تطور FCA عبر الزمن (لاين تشارت بمتوسط شهري) ───
-  killChart("ch-stage-time");
-  const timeEmpty = document.getElementById("stageTimeChartEmpty");
-  const timeCanvas = document.getElementById("ch-stage-time");
-
-  // تجميع كل القراءات المؤرَّخة لكل مرحلة
-  const allPts1 = [], allPts2 = [];
-  rows.forEach((r) => {
-    r.dates1.forEach((d) => allPts1.push(d));
-    r.dates2.forEach((d) => allPts2.push(d));
+  /* ── ترتيب ── */
+  rows.sort((a,b)=>{
+    if(sortMode==="avg_asc")  return (a.overallAvg??1e9)-(b.overallAvg??1e9);
+    if(sortMode==="avg_desc") return (b.overallAvg??-1)-(a.overallAvg??-1);
+    return a.school.localeCompare(b.school,"ar");
   });
 
-  // نجمّع القراءات شهرياً (متوسط لكل مرحلة)، ثم نملأ كل الأشهر بين
-  // أول وآخر شهر فيها بيانات — حتى يكون المحور الزمني متصلاً ومتساوي
-  // المسافات، فيظهر كخط بياني (Line Chart) واضح ومتدرّج بدون فجوات غريبة
-  const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const monthLabel = (k) => {
-    const mm = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-    const [y, m] = k.split("-").map(Number);
-    return `${mm[m - 1]} ${y}`;
-  };
-  const groupMonthly = (pts) => {
-    const map = new Map();
-    pts.forEach((p) => {
-      const k = monthKey(p.date);
-      (map.get(k) || map.set(k, []).get(k)).push(p.score);
-    });
-    return map;
-  };
-  const monthly1 = groupMonthly(allPts1);
-  const monthly2 = groupMonthly(allPts2);
-  const observedKeys = [...new Set([...monthly1.keys(), ...monthly2.keys()])].sort();
+  /* ── KPIs ── */
+  const kpisEl = document.getElementById("stageCompareKpis");
+  if(kpisEl){
+    kpisEl.innerHTML = allStages.map((s,i)=>{
+      const col = STAGE_PALETTE[i%STAGE_PALETTE.length];
+      const cnt = rows.filter(r=>r.stageData[s]?.count>0).length;
+      const avgV = avg(rows.filter(r=>r.stageData[s]?.avg!=null).map(r=>r.stageData[s].avg));
+      return `<div class="kpi ${col.kc}" style="border-top:3px solid ${col.bd}">
+        <div class="kpi-val" style="color:${col.bd}">${cnt}</div>
+        <div class="kpi-lbl">${esc(stageLabel(s))}</div>
+        <div class="kpi-sub">متوسط: ${avgV!=null?avgV.toFixed(1)+"%":"—"}</div>
+      </div>`;
+    }).join("")+`<div class="kpi kc-navy">
+      <div class="kpi-val">${rows.length}</div>
+      <div class="kpi-lbl">إجمالي المدارس</div>
+      <div class="kpi-sub">بعد الفلاتر</div>
+    </div>`;
+  }
 
-  let allMonthKeys = [];
-  if (observedKeys.length) {
-    const [minY, minM] = observedKeys[0].split("-").map(Number);
-    const [maxY, maxM] = observedKeys[observedKeys.length - 1].split("-").map(Number);
-    let cy = minY, cm = minM;
-    while (cy < maxY || (cy === maxY && cm <= maxM)) {
-      allMonthKeys.push(`${cy}-${String(cm).padStart(2, "0")}`);
-      cm++;
-      if (cm > 12) { cm = 1; cy++; }
+  const metaEl = document.getElementById("stageCompareMeta");
+  if(metaEl) metaEl.textContent = `${rows.length} مدرسة · ${allStages.length} مراحل · ${allMonthKeys.length} شهر`;
+
+  /* ── Chart 1: متوسط FCA لكل مرحلة (bar chart) ── */
+  killChart("ch-stage-compare-main");
+  // Top 15 schools by lowest avg
+  const topRows = [...rows].sort((a,b)=>(a.overallAvg??1e9)-(b.overallAvg??1e9)).slice(0,15);
+  if(topRows.length){
+    CHARTS["ch-stage-compare-main"] = new Chart(document.getElementById("ch-stage-compare-main"),{
+      type:"bar",
+      data:{
+        labels: topRows.map(r=>r.school.length>18?r.school.slice(0,18)+"…":r.school),
+        datasets: allStages.map((s,i)=>{
+          const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+          return { label:stageLabel(s), data:topRows.map(r=>r.stageData[s]?.avg!=null?+r.stageData[s].avg.toFixed(1):null),
+            backgroundColor:col.bg, borderColor:col.bd, borderWidth:1.5, borderRadius:4 };
+        }),
+      },
+      options:{ maintainAspectRatio:false,
+        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
+        scales:{ x:{ticks:{font:{size:9},maxRotation:35},grid:{display:false}},
+          y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:10}},
+            title:{display:true,text:"تقييم FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
+    });
+  }
+
+  /* ── Chart 2: التطور الزمني لكل مرحلة ── */
+  killChart("ch-stage-time");
+  const timeEmpty  = document.getElementById("stageTimeChartEmpty");
+  const timeCanvas = document.getElementById("ch-stage-time");
+  // تجميع شهري لكل مرحلة
+  const monthlyByStage = {};
+  allStages.forEach(s=>{ monthlyByStage[s]=new Map(); });
+  rows.forEach(r=>{
+    allStages.forEach(s=>{
+      (r.stageData[s]?.dates||[]).forEach(d=>{
+        const k=monthKey(d.date);
+        if(!monthlyByStage[s].has(k)) monthlyByStage[s].set(k,[]);
+        monthlyByStage[s].get(k).push(d.score);
+      });
+    });
+  });
+  // نملأ كل الشهور من أول لآخر
+  let chartMonthKeys=[];
+  if(allMonthKeys.length){
+    const[minY,minM]=allMonthKeys[0].split("-").map(Number);
+    const[maxY,maxM]=allMonthKeys[allMonthKeys.length-1].split("-").map(Number);
+    let cy=minY,cm=minM;
+    while(cy<maxY||(cy===maxY&&cm<=maxM)){
+      chartMonthKeys.push(`${cy}-${String(cm).padStart(2,"0")}`);
+      cm++; if(cm>12){cm=1;cy++;}
     }
   }
-
-  const hasTimeData = allMonthKeys.length > 0;
-  if (timeEmpty) timeEmpty.style.display = hasTimeData ? "none" : "block";
-  if (timeCanvas) timeCanvas.style.display = hasTimeData ? "block" : "none";
-
-  if (hasTimeData && timeCanvas) {
-    const buildSeries = (map) =>
-      allMonthKeys.map((k) => {
-        const scores = map.get(k);
-        const a = scores ? avg(scores) : null;
-        return a != null ? +a.toFixed(1) : null;
-      });
-    const buildCounts = (map) => allMonthKeys.map((k) => (map.get(k) ? map.get(k).length : 0));
-    const series1 = buildSeries(monthly1);
-    const series2 = buildSeries(monthly2);
-    const counts1 = buildCounts(monthly1);
-    const counts2 = buildCounts(monthly2);
-
-    CHARTS["ch-stage-time"] = new Chart(timeCanvas, {
-      type: "line",
-      data: {
-        labels: allMonthKeys.map(monthLabel),
-        datasets: [
-          {
-            label: "المرحلة الأولى — متوسط شهري",
-            data: series1,
-            borderColor: "#0891B2",
-            backgroundColor: "rgba(8,145,178,0.08)",
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#fff",
-            pointBorderColor: "#0891B2",
-            pointBorderWidth: 2.5,
-            fill: false,
-            tension: 0.35,
-            spanGaps: true,
-          },
-          {
-            label: "المرحلة الثانية — متوسط شهري",
-            data: series2,
-            borderColor: "#7C3AED",
-            backgroundColor: "rgba(124,58,237,0.08)",
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#fff",
-            pointBorderColor: "#7C3AED",
-            pointBorderWidth: 2.5,
-            fill: false,
-            tension: 0.35,
-            spanGaps: true,
-          },
-        ],
+  const hasTimeData = chartMonthKeys.length>0;
+  if(timeEmpty) timeEmpty.style.display=hasTimeData?"none":"block";
+  if(timeCanvas) timeCanvas.style.display=hasTimeData?"block":"none";
+  if(hasTimeData && timeCanvas){
+    CHARTS["ch-stage-time"]=new Chart(timeCanvas,{
+      type:"line",
+      data:{
+        labels:chartMonthKeys.map(monthLabel),
+        datasets:allStages.map((s,i)=>{
+          const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+          const series=chartMonthKeys.map(k=>{
+            const scores=monthlyByStage[s].get(k);
+            return scores?+avg(scores).toFixed(1):null;
+          });
+          return { label:stageLabel(s), data:series, borderColor:col.bd,
+            backgroundColor:col.bd.replace(")",",0.08)").replace("rgb","rgba"),
+            borderWidth:2.5, pointRadius:5, pointHoverRadius:8,
+            pointBackgroundColor:"#fff", pointBorderColor:col.bd, pointBorderWidth:2.5,
+            fill:false, tension:0.3, spanGaps:true };
+        }),
       },
-      options: {
-        maintainAspectRatio: false,
-        interaction: { mode: "index", intersect: false },
-        plugins: {
-          legend: { position: "top", labels: { font: { size: 11, weight: "700" }, boxWidth: 12 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const v = ctx.parsed.y;
-                const counts = ctx.datasetIndex === 0 ? counts1 : counts2;
-                const n = counts[ctx.dataIndex] || 0;
-                if (v == null) return ` ${ctx.dataset.label}: لا توجد بيانات`;
-                return ` ${ctx.dataset.label}: ${v.toFixed(1)} (${n} ${n === 1 ? "سجل" : "سجلات"})`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: { font: { size: 10 }, maxRotation: 40, color: "#6B8795" },
-            grid: { display: false },
-          },
-          y: {
-            beginAtZero: false,
-            suggestedMin: 0,
-            suggestedMax: 100,
-            ticks: { font: { size: 10 } },
-            grid: { color: "rgba(168,195,214,0.2)" },
-            title: { display: true, text: "متوسط تقييم FCA", font: { size: 10, weight: "700" }, color: "#6B8795" },
-          },
-        },
-      },
+      options:{ maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
+        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
+        scales:{ x:{ticks:{font:{size:10},maxRotation:40},grid:{display:false}},
+          y:{beginAtZero:false,suggestedMin:0,suggestedMax:100,ticks:{font:{size:10}},
+            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
     });
   }
 
-  // ── 5. تحليل حسب المنطقة الرئيسية ──────────────────────────────────
-  const byRegion = new Map();
-  rows.forEach((r) => {
-    const reg = r.city || "غير محدد";
-    const entry = byRegion.get(reg) || { region: reg, s1: [], s2: [] };
-    if (r.s1 != null) entry.s1.push(r.s1);
-    if (r.s2 != null) entry.s2.push(r.s2);
-    byRegion.set(reg, entry);
-  });
-  const regionRows = [...byRegion.values()]
-    .map((o) => ({
-      region: o.region,
-      avg1: avg(o.s1),
-      avg2: avg(o.s2),
-      n1: o.s1.length,
-      n2: o.s2.length,
-    }))
-    .filter((o) => o.n1 > 0 || o.n2 > 0)
-    .sort((a, b) => (b.n1 + b.n2) - (a.n1 + a.n2));
-
+  /* ── Chart 3: حسب المنطقة ── */
   killChart("ch-stage-region");
-  const regionEmptyEl = document.getElementById("stageRegionEmpty");
+  const regionEmpty  = document.getElementById("stageRegionEmpty");
   const regionCanvas = document.getElementById("ch-stage-region");
-  if (regionEmptyEl) regionEmptyEl.style.display = regionRows.length ? "none" : "block";
-  if (regionCanvas) regionCanvas.style.display = regionRows.length ? "block" : "none";
-  if (regionRows.length && regionCanvas) {
-    CHARTS["ch-stage-region"] = new Chart(regionCanvas, {
-      type: "bar",
-      data: {
-        labels: regionRows.map((r) => r.region),
-        datasets: [
-          {
-            label: "المرحلة الأولى",
-            data: regionRows.map((r) => (r.avg1 != null ? +r.avg1.toFixed(1) : null)),
-            backgroundColor: "rgba(8,145,178,0.55)",
-            borderColor: "#0891B2",
-            borderWidth: 1.5,
-            borderRadius: 4,
-          },
-          {
-            label: "المرحلة الثانية",
-            data: regionRows.map((r) => (r.avg2 != null ? +r.avg2.toFixed(1) : null)),
-            backgroundColor: "rgba(124,58,237,0.55)",
-            borderColor: "#7C3AED",
-            borderWidth: 1.5,
-            borderRadius: 4,
-          },
-        ],
+  const byRegion = new Map();
+  rows.forEach(r=>{
+    const reg=r.city||"غير محدد";
+    if(!byRegion.has(reg)) byRegion.set(reg,{region:reg,stages:{}});
+    const entry=byRegion.get(reg);
+    allStages.forEach(s=>{
+      if(!entry.stages[s]) entry.stages[s]=[];
+      if(r.stageData[s]?.avg!=null) entry.stages[s].push(r.stageData[s].avg);
+    });
+  });
+  const regionRows=[...byRegion.values()].sort((a,b)=>{
+    const na=allStages.reduce((s,st)=>s+(a.stages[st]?.length||0),0);
+    const nb=allStages.reduce((s,st)=>s+(b.stages[st]?.length||0),0);
+    return nb-na;
+  });
+  if(regionEmpty) regionEmpty.style.display=regionRows.length?"none":"block";
+  if(regionCanvas) regionCanvas.style.display=regionRows.length?"block":"none";
+  if(regionRows.length && regionCanvas){
+    CHARTS["ch-stage-region"]=new Chart(regionCanvas,{
+      type:"bar",
+      data:{
+        labels:regionRows.map(r=>r.region),
+        datasets:allStages.map((s,i)=>{
+          const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+          return { label:stageLabel(s), data:regionRows.map(r=>{ const sc=r.stages[s]; return sc&&sc.length?+avg(sc).toFixed(1):null; }),
+            backgroundColor:col.bg, borderColor:col.bd, borderWidth:1.5, borderRadius:4 };
+        }),
       },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "top", labels: { font: { size: 11, weight: "700" }, boxWidth: 12 } },
-          tooltip: {
-            callbacks: {
-              afterBody: (ctx) => {
-                const r = regionRows[ctx[0].dataIndex];
-                if (!r) return [];
-                const n = ctx[0].datasetIndex === 0 ? r.n1 : r.n2;
-                return [`عدد المدارس: ${n}`];
-              },
-            },
-          },
-        },
-        scales: {
-          x: { ticks: { font: { size: 10 }, maxRotation: 35 }, grid: { display: false } },
-          y: {
-            beginAtZero: true,
-            suggestedMax: 100,
-            ticks: { font: { size: 10 } },
-            grid: { color: "rgba(168,195,214,0.2)" },
-            title: { display: true, text: "متوسط FCA", font: { size: 10, weight: "700" }, color: "#6B8795" },
-          },
-        },
-      },
+      options:{ maintainAspectRatio:false,
+        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
+        scales:{ x:{ticks:{font:{size:9},maxRotation:35},grid:{display:false}},
+          y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:10}},
+            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
     });
   }
 
-  // ── 6. الجدول ──────────────────────────────────────────────────────
-  const tbody = document.getElementById("stageCompareBody");
-  if (tbody) {
-    tbody.innerHTML = "";
-    if (rows.length) {
-      const frag = document.createDocumentFragment();
-      rows.forEach((r) => {
-        const tr = document.createElement("tr");
-        const diffTxt =
-          r.diff == null ? "—" : `${r.diff > 0 ? "+" : ""}${r.diff.toFixed(1)}`;
-        const diffColor =
-          r.diff == null ? "var(--tx-muted)" : r.diff > 0 ? "#059669" : r.diff < 0 ? "#DC2626" : "#0E7490";
-        const diffArrow = r.diff == null ? "" : r.diff > 0 ? " ▲" : r.diff < 0 ? " ▼" : "";
-        const diffBg = r.diff == null ? "" : r.diff > 0 ? "background:#ECFDF5;border-radius:8px;padding:2px 6px" : r.diff < 0 ? "background:#FEF2F2;border-radius:8px;padding:2px 6px" : "";
-        const status =
-          r.c1 > 0 && r.c2 > 0 ? "مكتملة" : r.c1 > 0 ? "مرحلة أولى فقط" : "مرحلة ثانية فقط";
-        const statusBadge = r.c1 > 0 && r.c2 > 0
-          ? `<span class="badge" style="background:#ECFDF5;color:#065F46">${status}</span>`
-          : r.c1 > 0
-          ? `<span class="badge" style="background:#ECFEFF;color:#0E7490">${status}</span>`
-          : `<span class="badge" style="background:#F5F3FF;color:#6D28D9">${status}</span>`;
-        const matchBadge =
-          r.matchedBy === "id"
-            ? `<span class="badge" style="background:#ECFEFF;color:#0E7490">🆔 رقم وزاري</span>`
-            : `<span class="badge" style="background:#FFF7ED;color:#B45309">🏫 اسم + محافظة</span>`;
-        tr.innerHTML =
-          `<td style="text-align:right;padding-right:14px;font-weight:700;white-space:normal;line-height:1.4">${esc(r.school)}</td>` +
-          `<td>${esc(r.city || "—")}</td>` +
-          `<td>${esc(r.sector || "—")}</td>` +
-          `<td style="font-weight:700">${esc(r.minId || "—")}</td>` +
-          `<td>${matchBadge}</td>` +
-          `<td>${null != r.s1 ? r.s1.toFixed(1) : "—"} <span class="badge" style="margin-inline-start:6px;background:#ECFEFF;color:#0E7490">${r.c1}</span></td>` +
-          `<td>${null != r.s2 ? r.s2.toFixed(1) : "—"} <span class="badge" style="margin-inline-start:6px;background:#F5F3FF;color:#6D28D9">${r.c2}</span></td>` +
-          `<td style="font-weight:800;color:${diffColor}"><span style="${diffBg}">${diffTxt}${diffArrow}</span></td>` +
-          `<td>${statusBadge}</td>`;
+  /* ── Chart 4: تغطية البيانات — doughnut per stage ── */
+  const coverEl = document.getElementById("stageCoverCharts");
+  if(coverEl){
+    coverEl.innerHTML="";
+    // نحسب عرض كل donut بناءً على عدد المراحل (max 4 في صف)
+    const perRow = Math.min(allStages.length, 4);
+    const cellW  = Math.floor(100 / perRow);
+    allStages.forEach((s,i)=>{
+      const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+      const cnt=rows.filter(r=>r.stageData[s]?.count>0).length;
+      const total=rows.length;
+      const missing=total-cnt;
+      const div=document.createElement("div");
+      div.style.cssText=`width:${cellW}%;max-width:220px;min-width:120px;flex-shrink:0;text-align:center;padding:0 8px;box-sizing:border-box`;
+      div.innerHTML=`<div style="font-size:11px;font-weight:700;margin-bottom:6px;color:${col.bd}">${esc(stageLabel(s))}</div>
+        <div style="position:relative;height:160px"><canvas id="ch-stage-cover-${i}"></canvas></div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${cnt} من ${total}</div>`;
+      coverEl.appendChild(div);
+      const chartId=`ch-stage-cover-${i}`;
+      killChart(chartId);
+      CHARTS[chartId]=new Chart(document.getElementById(chartId),{
+        type:"doughnut",
+        data:{ labels:["مقيّمة","بدون تقييم"],
+          datasets:[{data:[cnt,missing],backgroundColor:[col.bd,"#E5E7EB"],borderColor:"#fff",borderWidth:2}] },
+        options:{ maintainAspectRatio:false,
+          plugins:{ legend:{position:"bottom",labels:{font:{size:9},boxWidth:8}},
+            tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${ctx.raw} مدرسة`}} } }
+      });
+    });
+  }
+
+  /* ── الجدول ── */
+  const headEl = document.getElementById("stageCompareHead");
+  const tbody  = document.getElementById("stageCompareBody");
+  const emptyEl= document.getElementById("stageCompareEmpty");
+
+  if(headEl){
+    headEl.innerHTML="<tr>"+
+      '<th style="text-align:right;padding-right:14px;min-width:180px">اسم المدرسة</th>'+
+      '<th style="min-width:90px">الرقم الوزاري</th>'+
+      '<th style="min-width:90px">المنطقة</th>'+
+      '<th style="min-width:90px">المحافظة</th>'+
+      allStages.map((s,i)=>{const col=STAGE_PALETTE[i%STAGE_PALETTE.length];return`<th style="min-width:80px;color:${col.bd}" title="${esc(s)}">${esc(stageLabel(s))}</th>`;}).join("")+
+      '<th style="min-width:70px">متوسط</th>'+
+      "</tr>";
+  }
+
+  if(emptyEl) emptyEl.style.display=rows.length?"none":"block";
+
+  if(tbody){
+    tbody.innerHTML="";
+    if(rows.length){
+      const frag=document.createDocumentFragment();
+      // pagination simple: show all (could add paging later)
+      rows.slice(0,500).forEach(r=>{
+        const tr=document.createElement("tr");
+        const stageCells=allStages.map((s,i)=>{
+          const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+          const sd=r.stageData[s];
+          if(!sd||sd.avg==null) return `<td style="color:#ccc">—</td>`;
+          const fc=tierColor(sd.avg);
+          return `<td><span style="font-weight:800;color:${fc}">${sd.avg.toFixed(1)}%</span><span style="font-size:9px;color:var(--tx-muted);margin-inline-start:4px">(${sd.count})</span></td>`;
+        }).join("");
+        const avgColor = r.overallAvg!=null?tierColor(r.overallAvg):"#ccc";
+        tr.innerHTML=
+          `<td style="text-align:right;padding-right:14px;font-weight:700;white-space:normal;line-height:1.4">${esc(r.school)}</td>`+
+          `<td style="font-size:11px;color:var(--tx-muted)">${esc(r.minId||"—")}</td>`+
+          `<td style="font-size:11px">${esc(r.city||"—")}</td>`+
+          `<td style="font-size:11px">${esc(r.sector||"—")}</td>`+
+          stageCells+
+          `<td><span style="font-weight:900;color:${avgColor}">${r.overallAvg!=null?r.overallAvg.toFixed(1)+"%":"—"}</span></td>`;
         frag.appendChild(tr);
       });
       tbody.appendChild(frag);
     } else {
-      tbody.innerHTML =
-        '<tr><td colspan="9" class="empty-msg" style="border-radius:0">لا توجد مدارس مطابقة (لا بالرقم الوزاري ولا بالاسم + المحافظة) في المرحلتين.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="20" class="empty-msg">لا توجد بيانات مطابقة.</td></tr>';
     }
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// renderFcaRefTab — جدول FCA المرجعي (آخر تقييم لكل مدرسة)
+// ════════════════════════════════════════════════════════════════════════
+(function(){
+  let _pageSize = 50; // قابل للتغيير من المستخدم
+  let _page = 0;
+  let _lastRows = [];
+
+  window.setFcaRefPageSize = function(n){ _pageSize = parseInt(n)||50; _page=0; renderFcaRefTab(); };
+
+  window.renderFcaRefTab = function renderFcaRefTab(resetPage) {
+    if(resetPage) _page=0;
+    const search   = (document.getElementById("fcaRefSearch")?.value||"").trim().toLowerCase();
+    const cityF    = document.getElementById("fcaRefCity")?.value||"";
+    const sectorF  = document.getElementById("fcaRefSector")?.value||"";
+    const dateF    = document.getElementById("fcaRefDate")?.value||"";
+    const tierF    = document.getElementById("fcaRefTier")?.value||"";
+    const sortMode = document.getElementById("fcaRefSort")?.value||"fca_asc";
+
+    // مصدر البيانات: RAW (كل المباني) مع fca و fcaDate
+    const D = Array.isArray(RAW) ? RAW : [];
+
+    // بناء قائمة المدن والمحافظات والتواريخ للفلاتر
+    const cities  = [...new Set(D.map(r=>r.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));
+    const sectors = [...new Set(D.map(r=>r.sector).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));
+    const dates   = [...new Set(D.map(r=>r.fcaDate).filter(Boolean))].sort();
+
+    const cityEl   = document.getElementById("fcaRefCity");
+    const secEl    = document.getElementById("fcaRefSector");
+    const dateEl   = document.getElementById("fcaRefDate");
+    if(cityEl   && cityEl.options.length<=1)
+      cityEl.innerHTML='<option value="">— كل —</option>'+cities.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    if(secEl    && secEl.options.length<=1)
+      secEl.innerHTML='<option value="">— كل —</option>'+sectors.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    if(dateEl   && dateEl.options.length<=1)
+      dateEl.innerHTML='<option value="">— كل —</option>'+dates.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join("");
+
+    // فلترة — نستخدم نفس getTier الموجود في الداشبورد (critical/fair/good/vgood)
+    let rows = D.filter(r=>{
+      if(search && !r.name.toLowerCase().includes(search) && !String(r.minId??"").toLowerCase().includes(search)) return false;
+      if(cityF   && r.city!==cityF)   return false;
+      if(sectorF && r.sector!==sectorF) return false;
+      if(dateF   && (r.fcaDate||"")!==dateF) return false;
+      if(tierF){
+        if(tierF==="none" && r.fca!=null) return false;
+        if(tierF!=="none" && (r.fca==null || getTier(r.fca)!==tierF)) return false;
+      }
+      return true;
+    });
+
+    // ترتيب
+    rows.sort((a,b)=>{
+      if(sortMode==="fca_asc")  return (a.fca??1e9)-(b.fca??1e9);
+      if(sortMode==="fca_desc") return (b.fca??-1)-(a.fca??-1);
+      if(sortMode==="date_desc"){
+        const da=a.fcaDateObj||new Date(0), db=b.fcaDateObj||new Date(0);
+        return db-da;
+      }
+      return (a.name||"").localeCompare(b.name||"","ar");
+    });
+
+    _lastRows = rows;
+
+    // KPIs
+    const kpisEl = document.getElementById("fcaRefKpis");
+    if(kpisEl){
+      const withFca = rows.filter(r=>r.fca!=null);
+      const avgFca  = withFca.length ? avg(withFca.map(r=>r.fca)) : null;
+      const low     = withFca.filter(r=>r.fca<50).length;
+      const dates_dist = {};
+      withFca.forEach(r=>{ const d=r.fcaDate||"غير محدد"; dates_dist[d]=(dates_dist[d]||0)+1; });
+      const latestDate = Object.entries(dates_dist).sort((a,b)=>b[0].localeCompare(a[0])).map(e=>`${e[0]}: ${e[1]}`).slice(0,3).join(" · ");
+      kpisEl.innerHTML=
+        `<div class="kpi kc-blue"><div class="kpi-val">${rows.length.toLocaleString()}</div><div class="kpi-lbl">إجمالي المدارس</div><div class="kpi-sub">بعد الفلاتر</div></div>`+
+        `<div class="kpi kc-green"><div class="kpi-val">${withFca.length.toLocaleString()}</div><div class="kpi-lbl">لديها تقييم FCA</div><div class="kpi-sub">متوسط: ${avgFca!=null?avgFca.toFixed(1)+"%":"—"}</div></div>`+
+        `<div class="kpi kc-amber"><div class="kpi-val">${(rows.length-withFca.length).toLocaleString()}</div><div class="kpi-lbl">بدون تقييم</div><div class="kpi-sub">لم يُقيَّم بعد</div></div>`+
+        `<div class="kpi kc-red"><div class="kpi-val">${low.toLocaleString()}</div><div class="kpi-lbl">FCA أقل من 50%</div><div class="kpi-sub">تحتاج تدخل</div></div>`;
+    }
+
+    // الجدول مع pagination
+    const tbody  = document.getElementById("fcaRefBody");
+    const pagEl  = document.getElementById("fcaRefPag");
+    if(!tbody) return;
+
+    const pages   = Math.ceil(rows.length/_pageSize);
+    _page         = Math.min(_page, Math.max(0,pages-1));
+    const pageRows= rows.slice(_page*_pageSize, (_page+1)*_pageSize);
+
+    tbody.innerHTML="";
+    if(pageRows.length){
+      const frag=document.createDocumentFragment();
+      pageRows.forEach(r=>{
+        const tr=document.createElement("tr");
+        const fc = r.fca!=null ? tierColor(r.fca) : "#ccc";
+        const tierLabel = r.fca!=null ? (TIER[getTier(r.fca)]?.label||"") : "—";
+        tr.innerHTML=
+          `<td style="text-align:right;padding-right:14px;font-weight:700;white-space:normal;line-height:1.4">${esc(r.name)}</td>`+
+          `<td style="font-size:11px;color:var(--tx-muted)">${esc(r.minId||"—")}</td>`+
+          `<td style="font-size:11px">${esc(r.city||"—")}</td>`+
+          `<td style="font-size:11px">${esc(r.sector||"—")}</td>`+
+          `<td>${r.fca!=null?`<span style="font-size:14px;font-weight:900;color:${fc}">${r.fca.toFixed(1)}%</span>`:'<span style="color:#ddd">—</span>'}</td>`+
+          `<td>${r.fca!=null?`<span class="badge" style="background:${tierColor(r.fca)}22;color:${fc};border:1px solid ${fc}44">${tierLabel}</span>`:'—'}</td>`+
+          `<td style="font-size:11px;color:var(--tx-muted)">${esc(r.fcaDate||"—")}</td>`;
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+    } else {
+      tbody.innerHTML='<tr><td colspan="7" class="empty-msg">لا توجد نتائج مطابقة.</td></tr>';
+    }
+
+    // Pagination
+    if(pagEl){
+      if(pages<=1){ pagEl.innerHTML=""; return; }
+      const prev = _page>0?`<button class="pag-btn" onclick="window.__fcaRefGo(${_page-1})">◀ السابق</button>`:`<button class="pag-btn" disabled>◀ السابق</button>`;
+      const next = _page<pages-1?`<button class="pag-btn" onclick="window.__fcaRefGo(${_page+1})">التالي ▶</button>`:`<button class="pag-btn" disabled>التالي ▶</button>`;
+      pagEl.innerHTML=`<span class="pag-info">الصفحة ${(_page+1).toLocaleString()} من ${pages.toLocaleString()} · ${rows.length.toLocaleString()} مدرسة</span><div class="pag-btns">${prev}<button class="pag-btn active">${_page+1}</button>${next}</div>`;
+    }
+  };
+
+  window.__fcaRefGo = function(p){ _page=p; renderFcaRefTab(); };
+
+  // ── Export CSV ──
+  window.exportFcaRefCSV = function(){
+    const rows = _lastRows;
+    if(!rows||!rows.length){ alert("لا توجد بيانات للتصدير"); return; }
+    const headers=["اسم_المدرسة","الرقم_الوزاري","المنطقة","المحافظة","آخر_FCA","التصنيف","آخر_شهر_تقييم"];
+    const escCSV=(v)=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+    const getTierLabel=(v)=>v==null?"—": TIER[getTier(v)]?.label || "—";
+    const lines=[headers.map(escCSV).join(",")];
+    rows.forEach(r=>{
+      lines.push([r.name,r.minId,r.city,r.sector,r.fca!=null?r.fca.toFixed(2):"",getTierLabel(r.fca),r.fcaDate||""].map(escCSV).join(","));
+    });
+    const blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="FCA_المرجعي_"+new Date().toISOString().slice(0,10)+".csv"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+})();
+
+
 
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📋  JS تبويب: العقود
@@ -2531,7 +2348,7 @@ function renderTable() {
               ? "background:#ECFEFF;color:#0891B2;border-color:#A5F3FC"
               : "",
         tr = document.createElement("tr");
-      ((tr.innerHTML = `\n      <td style="text-align:right;padding-right:14px">\n        <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div>\n      </td>\n      <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td>\n      <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td>\n      <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td>\n      <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td>\n      <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td>\n      <td>\n        <span class="badge" style="background:${"حكومي" === r.ownership ? "#ECFEFF" : "#FFFBEB"};\n          color:${"حكومي" === r.ownership ? "#0891B2" : "#D97706"};\n          border:1px solid ${"حكومي" === r.ownership ? "#A5F3FC" : "#FDE68A"}">\n          ${esc(r.ownership)}\n        </span>\n      </td>\n      <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td>\n      <td style="font-weight:700">${r.classrooms ?? "—"}</td>\n      <td style="font-size:11px">${esc(r.schoolSize)}</td>\n      <td>\n        ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>\n            <div style="font-size:9px;font-weight:700;color:${fc}">${TIER[getTier(r.fca)]?.label || ""}</div>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td>\n        ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center">\n        ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span>\n            <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="font-weight:700;color:${null != r.students ? "#059669" : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td>\n      <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669") : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td>\n      <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td>\n      <td style="font-weight:700;color:${null != r.quantity ? "#059669" : "#ccc"}">${r.quantity ?? "—"}</td>\n      <td style="font-weight:700;color:${null != r.unitValue ? "#0891B2" : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
+      ((tr.innerHTML = `\n      <td style="text-align:right;padding-right:14px">\n        <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div>\n      </td>\n      <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td>\n      <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td>\n      <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td>\n      <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td>\n      <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td>\n      <td>\n        <span class="badge" style="background:${"حكومي" === r.ownership ? "#ECFEFF" : "#FFFBEB"};\n          color:${"حكومي" === r.ownership ? "#0891B2" : "#D97706"};\n          border:1px solid ${"حكومي" === r.ownership ? "#A5F3FC" : "#FDE68A"}">\n          ${esc(r.ownership)}\n        </span>\n      </td>\n      <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td>\n      <td style="font-weight:700">${r.classrooms ?? "—"}</td>\n      <td style="font-size:11px">${esc(r.schoolSize)}</td>\n      <td>\n        ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>\n            <div style="font-size:9px;font-weight:700;color:${fc}">${TIER[getTier(r.fca)]?.label || ""}</div>\\n            ${r.fcaDate ? `<div style="font-size:9px;color:var(--tx-muted);margin-top:1px">${esc(r.fcaDate)}</div>` : ""}` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td>\n        ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center">\n        ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span>\n            <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="font-weight:700;color:${null != r.students ? "#059669" : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td>\n      <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669") : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td>\n      <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td>\n      <td style="font-weight:700;color:${null != r.quantity ? "#059669" : "#ccc"}">${r.quantity ?? "—"}</td>\n      <td style="font-weight:700;color:${null != r.unitValue ? "#0891B2" : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
         frag.appendChild(tr));
     }),
     tbody.appendChild(frag),
@@ -2641,6 +2458,67 @@ function renderTable() {
       }
     }
     if (!Array.isArray(fcaHistory)) fcaHistory = [];
+
+    // ══════════════════════════════════════════════════════════════════════
+    // بناء خريطة "آخر تقييم FCA" لكل مدرسة من ملف تقييمات_FCA_المراحل
+    // المنطق: أحدث تاريخ يحتوي قيمة فعلية (Jun > May > Apr)
+    //         لو Jun فارغ → نرجع May، لو May فارغ → نرجع Apr
+    // مفتاح الربط: رقم_المدرسة_الوزاري (S-42671) — يطابق 3673 مدرسة
+    // ══════════════════════════════════════════════════════════════════════
+    const latestFcaMap = {}; // key: رقم_المدرسة_الوزاري → { score, dateObj, dateRaw }
+    (function buildLatestFcaMap() {
+      const monMap = {
+        jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
+        jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+        يناير:0, فبراير:1, مارس:2, أبريل:3, ابريل:3,
+        مايو:4, يونيو:5, يوليو:6, أغسطس:7, اغسطس:7,
+        سبتمبر:8, أكتوبر:9, اكتوبر:9, نوفمبر:10, ديسمبر:11
+      };
+      function parseFcaDate(v) {
+        if (!v) return null;
+        const s = String(v).trim();
+        // "Apr-26" / "May-26" / "Jun-26"
+        const short = s.match(/^([A-Za-z]{3})[- ](\d{2})$/);
+        if (short) {
+          const m = monMap[short[1].toLowerCase()];
+          if (m !== undefined) return new Date(2000 + parseInt(short[2], 10), m, 1);
+        }
+        const d = new Date(s);
+        return isNaN(d) ? null : d;
+      }
+      for (const row of fcaHistory) {
+        // مفتاح الربط الصحيح: رقم_المدرسة_الوزاري (يحتوي على S- prefix)
+        const rawId = String(
+          row["رقم_المدرسة_الوزاري"] ?? row["رقم_وزاري"] ?? row["رقم وزاري"] ?? ""
+        ).replace(/\uFEFF/g, "").trim();
+        if (!rawId || rawId === "—") continue;
+
+        // اسم العمود الصحيح في ملف تقييمات_FCA_المراحل: تقييم_FCA
+        const scoreRaw = row["تقييم_FCA"] ?? row["تقييم_FCA_المرحلة"] ?? row["قيمة_FCA"] ?? row["FCA"] ?? null;
+        const score = (scoreRaw !== null && String(scoreRaw).trim() !== "" && !isNaN(parseFloat(scoreRaw)))
+          ? parseFloat(scoreRaw) : null;
+
+        // نتجاهل الصفوف الفارغة — نريد فقط السجلات التي فيها قيمة فعلية
+        if (score === null) continue;
+
+        const dateObj = parseFcaDate(row["التاريخ"] ?? null);
+        const existing = latestFcaMap[rawId];
+        if (!existing) {
+          latestFcaMap[rawId] = { score, dateObj, dateRaw: String(row["التاريخ"] ?? "").trim() || null };
+        } else {
+          // نحتفظ بالأحدث تاريخاً الذي يحتوي قيمة (Jun > May > Apr)
+          const existDate = existing.dateObj;
+          if (!existDate && dateObj) {
+            latestFcaMap[rawId] = { score, dateObj, dateRaw: String(row["التاريخ"] ?? "").trim() || null };
+          } else if (dateObj && existDate && dateObj > existDate) {
+            latestFcaMap[rawId] = { score, dateObj, dateRaw: String(row["التاريخ"] ?? "").trim() || null };
+          }
+        }
+      }
+      window.LATEST_FCA_MAP = latestFcaMap;
+      console.log("[FCA] latestFcaMap:", Object.keys(latestFcaMap).length, "مدرسة مقيّمة");
+    })();
+
     const servicesMap = {};
     for (const s of services) {
       const k = String(s["رقم_وزاري_مبنى"] ?? s["رقم_وزاري"] ?? "")
@@ -2708,7 +2586,26 @@ function renderTable() {
             buildingSize: String(b["نوع_المبنى"] ?? b["حجم_المبنى"] ?? "").trim(),
             lng: num(b["خط_الطول"]),
             lat: num(b["خط_العرض"]),
-            fca: num(b["قيمة_FCA"]),
+            fca: (() => {
+              // آخر تقييم FCA من ملف تقييمات_FCA_المراحل
+              // مفتاح الربط: رقم_المدرسة_الوزاري (S-42671) أولاً — يطابق 3673 مدرسة
+              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
+                .replace(/\uFEFF/g, "").trim();
+              const entry = latestFcaMap[id];
+              return entry ? entry.score : null;
+            })(),
+            fcaDate: (() => {
+              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
+                .replace(/\uFEFF/g, "").trim();
+              const entry = latestFcaMap[id];
+              return entry ? (entry.dateRaw ?? null) : null;
+            })(),
+            fcaDateObj: (() => {
+              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
+                .replace(/\uFEFF/g, "").trim();
+              const entry = latestFcaMap[id];
+              return entry ? (entry.dateObj ?? null) : null;
+            })(),
             envScore: num(b["درجة_البيئة_المدرسية"]),
             envRating: String(b["تقدير_البيئة_المدرسية"] ?? "").trim(),
             students: num(b["عدد_الطلاب"]),

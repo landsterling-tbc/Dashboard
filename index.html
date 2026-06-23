@@ -186,9 +186,9 @@
       <div class="kpi-lbl" data-ar="حكومية" data-en="Government">حكومية</div>
       <div class="kpi-sub" id="k-rented">—</div>
     </div>
-    <div class="kpi kc-green">
+    <div class="kpi kc-green" title="متوسط FCA المحسوب من آخر تقييم تم الحصول عليه لكل مدرسة من ملف تقييمات_FCA_المراحل">
       <div class="kpi-val" id="k-fca-avg">—</div>
-      <div class="kpi-lbl" data-ar="متوسط FCA" data-en="Avg FCA">متوسط FCA</div>
+      <div class="kpi-lbl" data-ar="متوسط FCA (آخر تقييم)" data-en="Avg FCA (Latest)">متوسط FCA (آخر تقييم)</div>
       <div class="kpi-sub" id="k-fca-cnt">—</div>
     </div>
     <div class="kpi kc-amber">
@@ -273,6 +273,7 @@
     <div class="tab active" id="tabbtn-overview" onclick="showTab('overview',this)">نظرة عامة</div>
     <div class="tab" onclick="showTab('fca',this)">تحليل FCA</div>
     <div class="tab" onclick="showTab('stage-compare',this)">مقارنة مراحل FCA</div>
+    <div class="tab" onclick="showTab('fca-ref',this)">📋 FCA المرجعي</div>
     <div class="tab" onclick="showTab('env',this)">البيئة المدرسية</div>
     <div class="tab" id="tabbtn-students" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
     <div class="tab" onclick="showTab('stages',this)">المرحلة الدراسية</div>
@@ -489,152 +490,207 @@
   </div>
   <div class="panel" id="tab-stage-compare">
     <div class="card mb14">
-      <div class="card-title">مقارنة المرحلة الأولى والثانية (الرقم الوزاري، وإن لم يتوفر: الاسم + المحافظة)</div>
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">📊</span>
+        مقارنة مراحل FCA — ديناميكي (يتكيف مع أي عدد من المراحل تلقائياً)
+      </div>
 
       <div class="filters-row" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
         <div class="fg" style="flex:1;min-width:200px">
           <div class="fg-lbl">بحث بالاسم أو الرقم الوزاري</div>
-          <input
-            class="finp"
-            id="stageCompareSearch"
-            type="text"
+          <input class="finp" id="stageCompareSearch" type="text"
             placeholder="اكتب اسم المدرسة أو الرقم الوزاري..."
-            oninput="renderStageCompareTab()"
-          />
+            oninput="renderStageCompareTab()" />
         </div>
-
-        <div class="fg" style="flex:1;min-width:200px">
-          <div class="fg-lbl">فلتر باسم المدرسة</div>
-          <select class="fsel" id="stageCompareSchoolFilter" onchange="renderStageCompareTab()">
-            <option value="">— كل المدارس —</option>
+        <div class="fg">
+          <div class="fg-lbl">المنطقة</div>
+          <select class="fsel" id="stageCompareCity" onchange="renderStageCompareTab()">
+            <option value="">— كل المناطق —</option>
           </select>
         </div>
-
+        <div class="fg">
+          <div class="fg-lbl">المرحلة (فلتر)</div>
+          <select class="fsel" id="stageCompareStageFilter" onchange="renderStageCompareTab()">
+            <option value="">— كل المراحل —</option>
+          </select>
+        </div>
         <div class="fg">
           <div class="fg-lbl">الترتيب</div>
           <select class="fsel" id="stageCompareSort" onchange="renderStageCompareTab()">
-            <option value="diff_desc">أكبر فرق أولاً</option>
-            <option value="diff_asc">أصغر فرق أولاً</option>
+            <option value="avg_asc">الأدنى FCA أولاً</option>
+            <option value="avg_desc">الأعلى FCA أولاً</option>
             <option value="name">الاسم</option>
-            <option value="stage1_desc">المرحلة الأولى</option>
-            <option value="stage2_desc">المرحلة الثانية</option>
           </select>
         </div>
-
         <div class="fg" style="min-width:180px">
-          <div class="fg-lbl">حالة المقارنة</div>
+          <div class="fg-lbl">حالة البيانات</div>
           <div id="stageCompareMeta" style="font-size:12px;font-weight:800;color:var(--tx-main);padding:10px 0 0">—</div>
         </div>
       </div>
 
-      <div class="kpi-grid" id="stageCompareKpis">
-        <div class="kpi kc-blue">
-          <div class="kpi-icon">1</div>
-          <div class="kpi-val" id="sc-k1">—</div>
-          <div class="kpi-lbl">مدارس المرحلة الأولى</div>
-          <div class="kpi-sub">عدد المدارس التي ظهر لها تقييم في المرحلة الأولى</div>
+      <!-- KPIs — تُولَّد ديناميكياً بالـ JS -->
+      <div class="kpi-grid" id="stageCompareKpis" style="margin-bottom:14px"></div>
+
+      <!-- Chart 1: متوسط كل مرحلة (bar grouped) -->
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">📊</span>
+          متوسط FCA لكل مرحلة — مقارنة شاملة
+          <span class="sub">كل مرحلة موجودة في الملف تظهر تلقائياً</span>
         </div>
-        <div class="kpi kc-purple">
-          <div class="kpi-icon">2</div>
-          <div class="kpi-val" id="sc-k2">—</div>
-          <div class="kpi-lbl">مدارس المرحلة الثانية</div>
-          <div class="kpi-sub">عدد المدارس التي ظهر لها تقييم في المرحلة الثانية</div>
-        </div>
-        <div class="kpi kc-green">
-          <div class="kpi-icon">✓</div>
-          <div class="kpi-val" id="sc-k3">—</div>
-          <div class="kpi-lbl">مدارس مكتملة</div>
-          <div class="kpi-sub">مدارس لديها المرحلتان معاً</div>
-        </div>
-        <div class="kpi kc-amber">
-          <div class="kpi-icon">Δ</div>
-          <div class="kpi-val" id="sc-k4">—</div>
-          <div class="kpi-lbl">متوسط الفرق</div>
-          <div class="kpi-sub">متوسط (المرحلة الثانية − الأولى)</div>
-        </div>
+        <div class="chart-box" style="height:320px"><canvas id="ch-stage-compare-main"></canvas></div>
       </div>
 
-      <!-- Row 1: أكبر الفروقات (full width, prominent) -->
-      <div class="card mb14" style="border:2px solid rgba(220,38,38,0.18);background:linear-gradient(180deg,#fffbfb 0,#fff8f8 100%)">
-        <div class="card-title" style="color:#991B1B;font-size:13px">
-          <span class="card-title-icon" style="background:#FEE2E2">🔥</span>
-          أكبر الفروقات بين المرحلتين — Top 10
-          <span class="sub" style="background:#FEE2E2;color:#991B1B">مرتبة تنازلياً حسب الفرق المطلق</span>
-        </div>
-        <div class="chart-box" style="height:340px"><canvas id="ch-stage-compare-main"></canvas></div>
-      </div>
-
-      <!-- Row 2: مخطط الفروقات Δ + تغطية البيانات -->
-      <div class="g2 mb14">
-        <div class="card" style="border:1.5px solid rgba(124,58,237,0.18)">
-          <div class="card-title">
-            <span class="card-title-icon" style="background:#F5F3FF">📊</span>
-            الفرق (Δ) لكل مدرسة — الأعلى والأدنى
-          </div>
-          <div class="chart-box" style="height:300px"><canvas id="ch-stage-diff-bar"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-icon" style="background:#ECFDF5">🥧</span>
-            تغطية البيانات حسب المدرسة
-          </div>
-          <div class="chart-box" style="height:300px"><canvas id="ch-stage-compare-cover"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Row 3: Time Chart — تطور FCA عبر الزمن لمدرسة محددة -->
+      <!-- Chart 2: التطور الزمني لكل مرحلة -->
       <div class="card mb14" style="border:1.5px solid rgba(8,145,178,0.2)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#ECFEFF">📈</span>
-          تطور تقييم FCA عبر الزمن — مقارنة المرحلتين
-          <span class="sub">متوسط شهري لكل مرحلة على مستوى جميع المدارس</span>
+          <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">📈</span>
+          تطور متوسط FCA عبر الشهور — كل المراحل
+          <span class="sub">كل شهر موجود في الملف يظهر تلقائياً</span>
         </div>
         <div id="stageTimeChartEmpty" style="display:none;text-align:center;padding:32px;color:var(--tx-muted);font-size:13px">
-          لا توجد بيانات زمنية كافية للعرض — تأكد من تحميل بيانات FCA مع حقل التاريخ
+          لا توجد بيانات زمنية كافية للعرض
         </div>
         <div class="chart-box" style="height:300px"><canvas id="ch-stage-time"></canvas></div>
       </div>
 
-      <!-- Row 4: تحليل حسب المنطقة الرئيسية -->
+      <!-- Chart 3: حسب المنطقة -->
       <div class="card mb14" style="border:1.5px solid rgba(5,150,105,0.18)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#ECFDF5">🗺️</span>
-          متوسط FCA حسب المنطقة الرئيسية — المرحلة الأولى مقابل الثانية
-          <span class="sub">متوسط المدارس المطابقة بين المرحلتين في كل منطقة</span>
+          <span class="card-title-icon" style="background:#ECFDF5;color:#065F46">🗺️</span>
+          متوسط FCA حسب المنطقة الرئيسية — مقارنة المراحل
         </div>
         <div id="stageRegionEmpty" style="display:none;text-align:center;padding:32px;color:var(--tx-muted);font-size:13px">
-          لا توجد بيانات منطقة (المنطقة الرئيسية) كافية للعرض — تأكد من توفر هذا الحقل في شيت FCA History
+          لا توجد بيانات منطقة كافية
         </div>
-        <div class="chart-box" style="height:320px"><canvas id="ch-stage-region"></canvas></div>
+        <div class="chart-box" style="height:340px"><canvas id="ch-stage-region"></canvas></div>
       </div>
 
-      <!-- Row 5: الجدول -->
-      <div class="card">
-        <div class="card-title">المدارس المرتبطة (بالرقم الوزاري أو بالاسم + المحافظة)</div>
-        <div id="stageCompareEmpty" class="empty-msg" style="display:none;margin-bottom:14px">
-          لا توجد بيانات كافية للمقارنة بين المرحلة الأولى والثانية.
+      <!-- Chart 4: تغطية البيانات per stage (doughnut row) -->
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F5F3FF;color:#6D28D9">🥧</span>
+          تغطية البيانات حسب المرحلة
+          <span class="sub">عدد المدارس لكل مرحلة</span>
         </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>اسم المدرسة</th>
-                <th>المنطقة الرئيسية</th>
-                <th>المحافظة</th>
-                <th>الرقم الوزاري</th>
-                <th>طريقة الربط</th>
-                <th>المرحلة الأولى</th>
-                <th>المرحلة الثانية</th>
-                <th>الفرق Δ</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
+        <div id="stageCoverCharts" style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;padding:10px 0;width:100%;overflow:hidden"></div>
+      </div>
+
+      <!-- جدول ديناميكي -->
+      <div class="card">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">📋</span>
+          جدول المدارس — كل المراحل
+        </div>
+        <div id="stageCompareEmpty" class="empty-msg" style="display:none;margin-bottom:14px">
+          لا توجد بيانات كافية لعرضها.
+        </div>
+        <div class="tbl-wrap" id="stageCompareTblWrap">
+          <table id="stageCompareTable">
+            <thead id="stageCompareHead"></thead>
             <tbody id="stageCompareBody"></tbody>
           </table>
         </div>
+        <div class="pag-bar" id="stageComparePag" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
+
+  <div class="panel" id="tab-fca-ref">
+    <div class="card mb14">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#ECFDF5;color:#065F46">📋</span>
+        FCA المرجعي — آخر تقييم لكل مدرسة
+        <span class="sub">مبني على أحدث تقييم متاح (Jun &gt; May &gt; Apr)</span>
+      </div>
+
+      <!-- فلاتر -->
+      <div class="filters-row" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div class="fg" style="flex:1;min-width:220px">
+          <div class="fg-lbl">بحث</div>
+          <input class="finp" id="fcaRefSearch" type="text"
+            placeholder="🔍 اسم المدرسة أو الرقم الوزاري..."
+            oninput="renderFcaRefTab()" />
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المنطقة</div>
+          <select class="fsel" id="fcaRefCity" onchange="renderFcaRefTab()">
+            <option value="">— كل —</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المحافظة</div>
+          <select class="fsel" id="fcaRefSector" onchange="renderFcaRefTab()">
+            <option value="">— كل —</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">آخر شهر تقييم</div>
+          <select class="fsel" id="fcaRefDate" onchange="renderFcaRefTab()">
+            <option value="">— كل —</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">التصنيف</div>
+          <select class="fsel" id="fcaRefTier" onchange="renderFcaRefTab()">
+            <option value="">— كل —</option>
+            <option value="critical">🔴 حرج (&lt;25%)</option>
+            <option value="fair">🟡 متوسط (25–50%)</option>
+            <option value="good">🟢 جيد (50–75%)</option>
+            <option value="vgood">🔵 جيد جداً (≥75%)</option>
+            <option value="none">⬜ بدون تقييم</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الترتيب</div>
+          <select class="fsel" id="fcaRefSort" onchange="renderFcaRefTab()">
+            <option value="fca_asc">الأدنى FCA أولاً</option>
+            <option value="fca_desc">الأعلى FCA أولاً</option>
+            <option value="name">اسم المدرسة</option>
+            <option value="date_desc">الأحدث تاريخاً</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">عدد الصفوف</div>
+          <select class="fsel" id="fcaRefPageSize" onchange="setFcaRefPageSize(this.value)">
+            <option value="50">50 مدرسة</option>
+            <option value="100">100 مدرسة</option>
+            <option value="200">200 مدرسة</option>
+            <option value="99999">الكل</option>
+          </select>
+        </div>
+        <div class="fg" style="align-self:flex-end">
+          <button class="export-btn export-btn-csv" onclick="exportFcaRefCSV()" style="margin-top:0">
+            ⬇ تصدير CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="fcaRefKpis" style="margin-bottom:14px"></div>
+
+      <!-- جدول -->
+      <div class="tbl-wrap" id="fcaRefTblWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>
+              <th style="min-width:90px">الرقم الوزاري</th>
+              <th style="min-width:100px">المنطقة</th>
+              <th style="min-width:100px">المحافظة</th>
+              <th style="min-width:80px">آخر FCA</th>
+              <th style="min-width:80px">التصنيف</th>
+              <th style="min-width:80px">آخر شهر تقييم</th>
+            </tr>
+          </thead>
+          <tbody id="fcaRefBody"></tbody>
+        </table>
+      </div>
+      <div class="pag-bar" id="fcaRefPag" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+</div>
 
 
 <!--

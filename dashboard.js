@@ -41,20 +41,11 @@ window.LANG = window.LANG || "ar";
 
 
 /* وضع العرض المؤقت: إخفاء/إظهار عناصر محددة بدون حذف أي كود */
-window.__PRESENTATION_MODE_KEY__ = "dashboard_presentation_mode";
-window.__PRESENTATION_TOTAL__ = "3643";
-try {
-  window.__PRESENTATION_MODE__ = localStorage.getItem(window.__PRESENTATION_MODE_KEY__) !== "0";
-} catch (e) {
-  window.__PRESENTATION_MODE__ = true;
-}
-window.__ACTUAL_K_TOTAL__ = null;
+// عند الفتح دايماً كل التبويبات ظاهرة (OFF) — لا يتذكر آخر حالة
+window.__PRESENTATION_MODE__ = false;
 
 function setPresentationMode(nextMode) {
   window.__PRESENTATION_MODE__ = !!nextMode;
-  try {
-    localStorage.setItem(window.__PRESENTATION_MODE_KEY__, window.__PRESENTATION_MODE__ ? "1" : "0");
-  } catch (e) {}
   applyPresentationModeUI();
 }
 
@@ -80,20 +71,17 @@ function applyPresentationModeUI() {
     if (el) el.classList.toggle("presentation-hidden", on);
   });
 
+  // الرقم الحقيقي دايماً — لا يُستبدل بأي رقم وهمي
   const kTotal = document.getElementById("k-total");
-  if (kTotal) {
-    if (on) {
-      kTotal.textContent = window.__PRESENTATION_TOTAL__;
-    } else if (window.__ACTUAL_K_TOTAL__ != null) {
-      kTotal.textContent = window.__ACTUAL_K_TOTAL__;
-    }
+  if (kTotal && window.__ACTUAL_K_TOTAL__ != null) {
+    kTotal.textContent = window.__ACTUAL_K_TOTAL__;
   }
 
   const btn = document.getElementById("btnPresentationMode");
   if (btn) {
     btn.classList.toggle("on", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
-    btn.title = on ? "Presentation Mode: ON" : "Presentation Mode: OFF";
+    btn.title = on ? "إخفاء التبويبات: ON" : "إخفاء التبويبات: OFF";
     btn.textContent = on ? "👁" : "◌";
   }
 
@@ -107,6 +95,8 @@ function applyPresentationModeUI() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // عند كل فتح: تأكد إن الوضع OFF (كل حاجة ظاهرة)
+  window.__PRESENTATION_MODE__ = false;
   applyPresentationModeUI();
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.shiftKey && (e.key || "").toLowerCase() === "p") {
@@ -628,6 +618,8 @@ function renderKPIs() {
     ? latestDateObj.toLocaleDateString("ar-SA-u-nu-latn", { month: "long", year: "numeric" })
     : null;
 
+  // دايماً احفظ الرقم الحقيقي واعرضه
+  window.__ACTUAL_K_TOTAL__ = total.toLocaleString();
   (setText("k-total", total.toLocaleString()),
     setText(
       "k-total-sub",
@@ -782,6 +774,7 @@ function showTab(name, el) {
     "table" === name && ((TBL.cur = 0), renderTable()),
     "ac-plan" === name && renderAcPlanTab(),
     "mag-kpi" === name && renderMagKpiTab());
+
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
   killChart(id);
@@ -2338,7 +2331,7 @@ function renderTable() {
   const frag = document.createDocumentFragment(),
     tbody = document.getElementById("tbl-body");
   ((tbody.innerHTML = ""),
-    page.forEach((r) => {
+    page.forEach((r, pageIdx) => {
       const fc = null != r.fca ? tierColor(r.fca) : "#ccc",
         ec = null != r.envScore ? tierColor(r.envScore) : "#ccc",
         genderStyle =
@@ -2348,7 +2341,10 @@ function renderTable() {
               ? "background:#ECFEFF;color:#0891B2;border-color:#A5F3FC"
               : "",
         tr = document.createElement("tr");
-      ((tr.innerHTML = `\n      <td style="text-align:right;padding-right:14px">\n        <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div>\n      </td>\n      <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td>\n      <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td>\n      <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td>\n      <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td>\n      <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td>\n      <td>\n        <span class="badge" style="background:${"حكومي" === r.ownership ? "#ECFEFF" : "#FFFBEB"};\n          color:${"حكومي" === r.ownership ? "#0891B2" : "#D97706"};\n          border:1px solid ${"حكومي" === r.ownership ? "#A5F3FC" : "#FDE68A"}">\n          ${esc(r.ownership)}\n        </span>\n      </td>\n      <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td>\n      <td style="font-weight:700">${r.classrooms ?? "—"}</td>\n      <td style="font-size:11px">${esc(r.schoolSize)}</td>\n      <td>\n        ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>\n            <div style="font-size:9px;font-weight:700;color:${fc}">${TIER[getTier(r.fca)]?.label || ""}</div>\\n            ${r.fcaDate ? `<div style="font-size:9px;color:var(--tx-muted);margin-top:1px">${esc(r.fcaDate)}</div>` : ""}` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td>\n        ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center">\n        ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span>\n            <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'}\n      </td>\n      <td style="font-weight:700;color:${null != r.students ? "#059669" : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td>\n      <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669") : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td>\n      <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td>\n      <td style="font-weight:700;color:${null != r.quantity ? "#059669" : "#ccc"}">${r.quantity ?? "—"}</td>\n      <td style="font-weight:700;color:${null != r.unitValue ? "#0891B2" : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
+      tr.dataset.rowIdx = String(start + pageIdx);
+      tr.dataset.minId = r.minId || "";
+      ((tr.innerHTML = `
+ <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div> </td> <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td> <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td> <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td> <td> <span class="badge" style="background:${"حكومي" === r.ownership ? "#ECFEFF" : "#FFFBEB"}; color:${"حكومي" === r.ownership ? "#0891B2" : "#D97706"}; border:1px solid ${"حكومي" === r.ownership ? "#A5F3FC" : "#FDE68A"}"> ${esc(r.ownership)} </span> </td> <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td> <td style="font-weight:700">${r.classrooms ?? "—"}</td> <td style="font-size:11px">${esc(r.schoolSize)}</td> <td> ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td> ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center"> ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span> <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'} </td> <td style="font-weight:700;color:${null != r.students ? "#059669" : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td> <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669") : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td> <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td> <td style="font-weight:700;color:${null != r.quantity ? "#059669" : "#ccc"}">${r.quantity ?? "—"}</td> <td style="font-weight:700;color:${null != r.unitValue ? "#0891B2" : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
         frag.appendChild(tr));
     }),
     tbody.appendChild(frag),
@@ -2402,7 +2398,6 @@ function renderTable() {
   try {
     setProgress(20);
     let buildings = [],
-      services = [],
       contracts = [],
       districts = [],
       fcaHistory = [],
@@ -2417,7 +2412,6 @@ function renderTable() {
     if ("error" === json.status) throw new Error(json.message || "Apps Script error");
     const d = json.data || {};
     ((buildings = d.buildings || []),
-      (services = d.services || []),
       (contracts = d.contracts || []),
       (districts = d.districts || []),
       (fcaHistory = d.fcaHistory || []),
@@ -2519,13 +2513,6 @@ function renderTable() {
       console.log("[FCA] latestFcaMap:", Object.keys(latestFcaMap).length, "مدرسة مقيّمة");
     })();
 
-    const servicesMap = {};
-    for (const s of services) {
-      const k = String(s["رقم_وزاري_مبنى"] ?? s["رقم_وزاري"] ?? "")
-        .trim()
-        .replace(/^\uFEFF/, "");
-      k && "null" !== k && (servicesMap[k] = s);
-    }
     const contractsMap = {};
     for (const c of contracts) {
       const k = String(c["معرف_العقد"] ?? "")
@@ -2557,8 +2544,7 @@ function renderTable() {
             minIdRaw = String(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"] ?? "")
               .trim()
               .replace(/^\uFEFF/, ""),
-            svc = servicesMap[schoolId] || servicesMap[minIdRaw] || {},
-            cid = String(svc["معرف_العقد"] ?? b["معرف_العقد"] ?? "1").trim(),
+            cid = String(b["معرف_العقد"] ?? "1").trim(),
             con = contractsMap[cid] || contractsMap[1] || {},
             did = String(b["معرف_المحافظة"] ?? "").trim(),
             dist = districtsMap[did] || {},
@@ -2612,11 +2598,11 @@ function renderTable() {
             buildingAge: num(b["عمر_المبني"]),
             ayenScore: num(b["تقييم_عاين"]),
             subscriptionStatus: normalizeStatus(b["حالة_الاشتراك"]),
-            alerts: num(svc["عدد_البلاغات"]),
-            equipment: num(svc["التجهيزات"]),
-            preventive: num(svc["الصيانة_الوقائية"]),
-            drainage: num(svc["خنادق_الصرف"]),
-            acUnits: num(svc["وحدات_التكييف"]),
+            alerts: num(b["عدد_البلاغات"]) ?? 0,
+            equipment: num(b["التجهيزات"]),
+            preventive: num(b["الصيانة_الوقائية"]),
+            drainage: num(b["خنادق_الصرف"]),
+            acUnits: num(b["وحدات_التكييف"]),
             contractMaint: String(b["رقم_عقد_الصيانة"] ?? con["رقم_عقد_الصيانة"] ?? "").trim(),
             contractAC: String(b["رقم_عقد_التكييف"] ?? con["رقم_عقد_التكييف"] ?? "").trim(),
             contractClean: String(b["رقم_عقد_النظافة"] ?? con["رقم_عقد_النظافة"] ?? "").trim(),
@@ -2662,6 +2648,56 @@ function renderTable() {
       (retryCount = 0),
       setProgress(90),
       setDot("live"));
+
+    // ══════════════════════════════════════════════════════════════════
+    // 🔄 استبدال حقل alerts بالعدد الفعلي من ملف COW (RAW_BALAGH)
+    // الربط: School Number (COW) ↔ رقم_المدرسة_الوزاري (RAW)
+    // ══════════════════════════════════════════════════════════════════
+    (function patchAlertsFromCOW() {
+      try {
+        const balaghRaw = window.RAW_BALAGH;
+        if (!Array.isArray(balaghRaw) || !balaghRaw.length) return;
+
+        // دالة تطبيع الرقم الوزاري (إزالة BOM + مسافات + ".0")
+        function normId(v) {
+          return String(v ?? "").replace(/\uFEFF/g, "").trim().replace(/\.0+$/, "").toUpperCase();
+        }
+        // نسخة بدون S- prefix
+        function normIdPlain(v) {
+          const k = normId(v);
+          return k.startsWith("S-") ? k.slice(2) : k;
+        }
+
+        // بناء خريطتين: بالرقم كما هو + بدون S-
+        const alertsMap = {};
+        const alertsMapPlain = {};
+        balaghRaw.forEach((row) => {
+          const sn = normId(row["School Number"]);
+          if (!sn) return;
+          alertsMap[sn] = (alertsMap[sn] || 0) + 1;
+          const plain = normIdPlain(row["School Number"]);
+          if (plain !== sn) alertsMapPlain[plain] = (alertsMapPlain[plain] || 0) + 1;
+        });
+
+        // تحديث حقل alerts في كل مدرسة في RAW — يجرب الأشكال المختلفة للرقم
+        let patched = 0;
+        RAW.forEach((r) => {
+          const id = normId(r.minId || r.schoolSeq);
+          if (!id) { r.alerts = 0; return; }
+          const idPlain = normIdPlain(r.minId || r.schoolSeq);
+          const count = alertsMap[id] ?? alertsMapPlain[idPlain] ??
+                        alertsMap["S-" + idPlain] ?? alertsMapPlain[id.replace(/^S-/i, "")] ?? null;
+          r.alerts = count != null ? count : 0;
+          if (count != null) patched++;
+        });
+
+        console.log(
+          `[COW Alerts] ربط ${patched} مدرسة · إجمالي البلاغات: ${Object.values(alertsMap).reduce((a, b) => a + b, 0)}`
+        );
+      } catch (e) {
+        console.warn("[COW Alerts] خطأ في حساب البلاغات:", e);
+      }
+    })();
     const now = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
     (setText("lastTime", now),
       buildDynamicFilters(),
@@ -5631,8 +5667,17 @@ function _sysExcelTableHTML(title, headers, rows) {
   function buildSchoolByMinIdMap() {
     const map = {};
     (Array.isArray(RAW) ? RAW : []).forEach((s) => {
-      const k = normSchoolNo(s.minId ?? s.schoolSeq);
-      k && !map[k] && (map[k] = s);
+      // نسجّل الرقم بأشكاله المختلفة لضمان أعلى نسبة ربط
+      const keys = new Set();
+      [s.minId, s.schoolSeq, s.mainMinId, s.buildingSeq].forEach(v => {
+        const k = normSchoolNo(v);
+        if (k) keys.add(k);
+        // بدون S- prefix (لو كان S-12345 نضيف 12345 أيضاً)
+        if (k && k.toUpperCase().startsWith("S-")) keys.add(k.slice(2));
+        // مع S- prefix (لو كان 12345 نضيف S-12345 أيضاً)
+        if (k && !k.toUpperCase().startsWith("S-") && /^\d/.test(k)) keys.add("S-" + k);
+      });
+      keys.forEach(k => { if (!map[k]) map[k] = s; });
     });
     return map;
   }
@@ -5862,11 +5907,17 @@ function _sysExcelTableHTML(title, headers, rows) {
 
     // أكثر المدارس تكراراً: نستخدم اسم المدرسة الموحّد من الربط (إن وُجد) بدل الاسم الخام،
     // لتفادي تكرار نفس المدرسة بأكثر من اسم/تهجئة في ملف البلاغات
-    const schoolCounts = topCounts(
-      rows.map((r) => ({ ...r, schoolName: r.isLinked ? r.linkedSchoolName : r.schoolName })),
-      "schoolName",
-      STATE.topSchoolN || 10,
-    );
+    // نعد بـ schoolNumber (الرقم الثابت) لتجنب تكرار نفس المدرسة بأسماء مختلفة
+    // ونبني خريطة: schoolNumber → displayName لعرض الاسم
+    const schoolNumberNameMap = {};
+    rows.forEach((r) => {
+      const sn = r.schoolNumber || "";
+      if (!sn) return;
+      if (!schoolNumberNameMap[sn]) {
+        schoolNumberNameMap[sn] = r.isLinked ? r.linkedSchoolName : (r.schoolName || sn);
+      }
+    });
+    const schoolCounts = topCounts(rows, "schoolNumber", STATE.topSchoolN || 10);
     const categoryCounts = topCounts(rows, "category", 6);
     const priorityCounts = topCounts(rows, "priority", 6);
     const locationCounts = topCounts(rows, "location", 6);
@@ -6014,7 +6065,10 @@ function _sysExcelTableHTML(title, headers, rows) {
               </select>
             </span>
           </div>
-          ${renderBarList(schoolCounts, totalForBars, "#D97706")}
+          ${renderBarList(schoolCounts, totalForBars, "#D97706", (sn) => {
+            const name = schoolNumberNameMap[sn] || sn;
+            return `<span onclick="window.__BALAGH_STATE__.search='${sn}';window.__BALAGH_STATE__.page=0;renderBalaghTab();document.getElementById('balagh-table-search')&&(document.getElementById('balagh-table-search').value='${sn}')" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${name}</span>`;
+          })}
         </div>
         <div class="card">
           <div class="card-title">
@@ -6138,8 +6192,8 @@ function _sysExcelTableHTML(title, headers, rows) {
                   <td style="font-weight:800">${escText(r.recordNo)}</td>
                   <td>${escText(r.creationDate)}</td>
                   <td><span class="badge" style="background:${r.isClosed ? "#ECFDF5" : r.isOverdue ? "#FEF2F2" : "#FFF7ED"};color:${r.isClosed ? "#047857" : r.isOverdue ? "#B91C1C" : "#B45309"}">${escText(balaghStatusLabel(r.status))}</span></td>
-                  <td style="text-align:right;font-weight:700">${escText(r.schoolName)}<div style="font-size:10px;color:var(--tx-muted)">${escText(r.schoolNumber)}</div></td>
-                  <td style="font-size:11px;font-weight:700;color:${r.isLinked ? "#0891B2" : "#ccc"}">${r.isLinked ? escText(r.linkedMinId) : "غير مربوط"}</td>
+                  <td style="text-align:right;font-weight:700">${escText(r.schoolName)}</td>
+                  <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? '#0891B2' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
                   <td>${escText(r.location)}</td>
                   <td>${escText(r.category)}</td>
                   <td><span class="badge" style="background:${r.priority === "Critical" ? "#FEE2E2" : r.priority === "High" ? "#FEF3C7" : "#ECFDF5"};color:${r.priority === "Critical" ? "#991B1B" : r.priority === "High" ? "#B45309" : "#047857"}">${escText(balaghPriorityLabel(r.priority))}</span></td>
@@ -10975,21 +11029,23 @@ function renderTajheezAllTable() {
      لو ما فيه مفتاح API أو فشل الاتصال بـ OpenAI
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
-    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا خبير إدارة المرافق الذكي 🛡️ — متخصص بتحليل الحالة الفنية للمنشآت، ترتيب الأولويات، واقتراح حلول عملية. اللوحة تجمع بيانات منشآت المدارس في مكان واحد: تقييمات الحالة الفنية (FCA)، البيئة المدرسية، العقود، الصيانة، التجهيزات، والخريطة الجغرافية. اسألني عن أي قسم، أو قل لي 'ايش الحلول والأولويات' وأرتّب لك المباني الأكثر احتياجاً 📊" },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة البيئة والترتيب\n• العقود — حالة ومدد التعاقدات\n• الصيانة — البلاغات والأعمال\n• التجهيزات — الأصول والمعدات\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
-    { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تبويب تحليل FCA يعرض تقييم الحالة الفنية للمباني (Facility Condition Assessment): مؤشر حالة المنشأة، أعلى وأدنى المدارس أداءً، والأنظمة التي تحتاج تدخّل عاجل. يساعدك في ترتيب أولويات الإصلاح والميزانية 🏗️" },
-    { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "تبويب البيئة المدرسية يقيس جودة بيئة كل مدرسة (نظافة، سلامة، جاهزية المرافق) ويعرض أفضل 10 وأسوأ 10 مدارس، عشان تركّز جهود التحسين على المواقع الأكثر احتياجاً 🌿" },
-    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "تبويب العقود يتابع التعاقدات النشطة: نوع العقد، المورّد، تاريخ البداية والانتهاء، والعقود القريبة من الانتهاء التي تحتاج تجديد — حتى لا تنقطع الخدمة 📁" },
-    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل/i, reply: "تبويب الصيانة يعرض بلاغات وأوامر العمل: المفتوحة، قيد التنفيذ، والمغلقة، مع توزيعها حسب النوع والأولوية — لمتابعة سرعة الاستجابة وحجم الأعطال 🔧" },
-    { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد/i, reply: "تبويب التجهيزات يحصر أصول ومعدات المدارس (التكييف، الأثاث، الأجهزة...) مع حالتها وأعمارها التشغيلية، لدعم قرارات الاستبدال والصيانة الوقائية 🪑" },
-    { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة يعرض توزيع المدارس جغرافياً، وتقدر تشوف حالة كل موقع على الخريطة مباشرة لتحديد التجمعات والمناطق ذات الأولوية 🗺️" },
-    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "تبويب نظرة عامة يجمع أهم المؤشرات (KPIs) في بطاقات سريعة: عدد المدارس، حالة المنشآت، البلاغات، والعقود — نقطة بداية مثالية قبل التعمّق في أي قسم 📈" },
-    { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل التحديث «◷ تلقائي» ليجلب أحدث الأرقام دورياً. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
-    { test: /لغة|عربي|english|انجليزي|ترجم/i, reply: "اللوحة تدعم العربية والإنجليزية، وتقدر تبدّل اللغة من إعدادات العرض في الشريط العلوي 🌐" },
-    { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌 — لو احتجت أي توضيح عن أقسام إدارة المرافق، أنا هنا." },
-    { test: /سلام|أهلا|اهلا|مرحب|هلا|hi|hello/i, reply: "أهلًا وسهلًا 👋 أنا مساعد لوحة إدارة المرافق. اسألني عن FCA، الصيانة، العقود، التجهيزات، البيئة، أو الخريطة." },
+    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، الصيانة الوقائية والتصحيحية، إدارة العقود والأصول، التجهيزات المدرسية، وأنظمة المباني. اسألني عن أي قسم في اللوحة أو قل 'ايش الحلول والأولويات' 📊" },
+    { test: /دليل وطني|إكسبرو|اكسبرو|دليل الأصول|دليل المرافق/i, reply: "الدليل الوطني لإدارة الأصول والمرافق 📖 — صادر عن هيئة كفاءة الإنفاق والمشروعات الحكومية «إكسبرو» بتاريخ 12 يونيو 2022م، بالتعاون مع كوادر وطنية من الجهات الحكومية.\n\nأبرز ما يُرسّخه الدليل:\n• إدارة دورة حياة الأصول من الاقتناء حتى التخلص.\n• الصيانة الوقائية أولاً (كل 1 ريال وقائي يوفر 3-5 ريال طارئة).\n• تقييم الحالة الفنية FCA ركيزة أساسية لترتيب الأولويات.\n• تجديد العقود قبل 60-90 يوم من انتهائها.\n• مؤشرات أداء KPI قابلة للقياس لكل عملية.\n• الاستدامة وكفاءة الطاقة في التشغيل اليومي." },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• الصيانة الوقائية — جدولة الأعمال المبرمجة\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nوفق الدليل الوطني، هو ركيزة أساسية لإدارة المرافق: يقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
+    { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — ليست رقماً تجميلياً بل مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nوفق منهجية الدليل الوطني، جودة بيئة التعلم تشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
+    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\nوفق الدليل الوطني، العقود تُدار بشكل منظم مع:\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب العقود يعرض كل التعاقدات مع حالتها ومدتها." },
+    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة الوقائية والتصحيحية 🔧\n\nالدليل الوطني يُشدّد على الانتقال من 'رد الفعل على الأعطال' إلى 'التخطيط المسبق':\n• كل 1 ريال صيانة وقائية يوفر 3-5 ريال صيانة طارئة.\n• نسبة الصيانة الوقائية للتصحيحية تُعدّ من أهم KPIs أداء المرافق.\n\nتبويب الصيانة الوقائية يعرض الأعمال المجدولة، وتبويب البلاغات يتابع الأعطال وسرعة الاستجابة." },
+    { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\nوفق الدليل الوطني، إدارة دورة حياة الأصول تشمل:\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n• قاعدة: إذا تجاوز عمر المبنى 35-40 سنة مع FCA متدنٍ، الاستبدال أجدى.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي." },
+    { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\nهذه الأنظمة من أكثر عوامل الخطورة على حالة المبنى. وفق الدليل الوطني:\n• التكييف: العمر الافتراضي 10-15 سنة — جدولة صيانة وقائية كل 3 أشهر.\n• الكهرباء: فحص دوري سنوي كحد أدنى وفق متطلبات السلامة.\n• السباكة: مراقبة الصرف وضغط المياه بشكل ربع سنوي.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
+    { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة 🗺️ يعرض توزيع المدارس جغرافياً مع مؤشرات حالتها (FCA والبيئة)، لتحديد التجمعات الجغرافية ذات الأولوية وتخطيط جولات الفحص الميداني بكفاءة." },
+    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈\n\nالدليل الوطني يُلزم بمؤشرات قابلة للقياس، أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• نسبة الصيانة الوقائية للتصحيحية.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
+    { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل «◷ تلقائي» للتحديث الدوري. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
+    { test: /لغة|عربي|english|انجليزي|ترجم/i, reply: "اللوحة تدعم العربية والإنجليزية — تقدر تبدّل اللغة من الشريط العلوي 🌐" },
+    { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌 — إدارة المرافق التعليمية مهمة محورية وأنا هنا لأساعدك باتخاذ قرارات مبنية على البيانات والمعايير الوطنية." },
+    { test: /سلام|أهلا|اهلا|مرحب|هلا|hi|hello/i, reply: "أهلًا وسهلًا 👋 أنا مساعد إدارة المرافق الذكي. اسألني عن FCA، الصيانة الوقائية، العقود، التجهيزات، البيئة المدرسية، أو الدليل الوطني لإكسبرو." },
   ];
-  const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن أحد أقسام إدارة المرافق: تحليل FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، أو الخريطة، وأوضح لك مكانه ووظيفته.";
+  const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن أحد أقسام إدارة المرافق: تحليل FCA، البيئة المدرسية، العقود، الصيانة الوقائية، التجهيزات، الأنظمة الرئيسية، أو الدليل الوطني لإكسبرو — وأوضح لك المعيار والممارسة الصحيحة.";
 
   /* رد ديناميكي: جدول من بيانات الداشبورد الفعلية (يعمل بدون مفتاح API) */
   function fcbDynamicTableReply() {
@@ -11608,63 +11664,97 @@ function renderTajheezAllTable() {
     const dashboardData = fcbBuildDashboardSummary();
     const priorityData = fcbBuildPriorityActions(10);
 
-    const systemPrompt = `أنت خبير إدارة مرافق (Facilities Management) محترف ومتخصص بالذكاء، تعمل كمستشار فني داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard). أنت لست مجرد قارئ أرقام — أنت محلّل فني يفهم منطق إدارة الأصول، السلامة، والصيانة بمعايير عملية واقعية.
+    const systemPrompt = `أنت مساعد إدارة المرافق الذكي، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
 
-نظام التصنيف الموحّد (مهم جداً — التزم به دوماً):
-أي تقييم أو مؤشر من 100 تذكره (FCA، البيئة المدرسية، تقييم عاين، درجة الحالة من محرك الأولويات، أو أي رقم آخر من 0 إلى 100) يجب أن يُصنَّف حصرياً وفق هذا السلّم الموحّد فقط، بدون استثناء وبدون اخترع تصنيفات أخرى:
-- 0 إلى أقل من 25 → "حرج 🔴"
-- 25 إلى أقل من 50 → "متوسط 🟠"
-- 50 إلى أقل من 75 → "جيد 🟡"
-- 75 إلى 100 → "جيد جداً 🟢"
-استخدم هذه المسميات بالضبط (حرج / متوسط / جيد / جيد جداً) في كل مكان بدون ابتكار مسميات بديلة (لا تستخدم "ممتاز" أو "مرتفعة" أو "منخفضة" أو غيرها).
+══════════════════════════════════════════════════════
+الدليل الوطني لإدارة الأصول والمرافق — المرجع الأساسي
+══════════════════════════════════════════════════════
+أنت ملمّ بالدليل الوطني لإدارة الأصول والمرافق الصادر عن هيئة كفاءة الإنفاق والمشروعات الحكومية "إكسبرو"، الذي تم تدشينه بتاريخ 13 ذو القعدة 1443هـ / 12 يونيو 2022م، بالتعاون مع الكوادر الوطنية من ذوي الخبرة في الجهات الحكومية، وفق الممارسات المحلية والعالمية.
 
-خبرتك التخصصية تشمل:
-- تقييم الحالة الفنية للمنشآت (FCA - Facility Condition Assessment): تفسير نسب FCA حسب نظام التصنيف الموحّد بالمعرض بالأسفل.
-- دورة حياة الأصول (Asset Lifecycle): عمر المبنى، استهلاك الأنظمة (تكييف، كهرباء، صرف)، ومتى يكون "الإصلاح" أرخص من "الاستبدال" (كقاعدة عامة: لو تكلفة الإصلاح المتكرر تجاوزت ~60% من تكلفة الاستبدال أو عمر المبنى تجاوز 35-40 سنة مع FCA متدني، الاستبدال غالباً أجدى اقتصادياً).
-- الصيانة الوقائية مقابل التصحيحية: تشجّع دوماً على الانتقال من "رد الفعل على الأعطال" إلى "جدولة دورية تمنع حدوثها"، وتوضح أن كل 1 ريال يُصرف بالصيانة الوقائية يوفر عادة 3-5 ريال صيانة تصحيحية طارئة.
-- إدارة العقود والمقاولين: مدد العقود، التجديد قبل الانتهاء بفترة كافية (60-90 يوم)، وربط أداء المقاول بجودة الصيانة الفعلية.
-- السلامة والبيئة المدرسية: جودة البيئة (envScore) كمؤشر مباشر على سلامة المستخدمين ورضاهم، وليس رقماً تجميلياً فقط.
-- إدارة الأولويات بالموارد المحدودة: ترتيب التدخلات حسب الخطورة والتأثير (Risk-based prioritization) بدل التعامل العشوائي.
+الدليل مرجع وطني شامل يهدف إلى دعم الجودة والاستدامة والكفاءة لإدارة الأصول والمرافق لدى الجهات الحكومية في المملكة العربية السعودية. المبادئ والمعايير الأساسية في الدليل التي تستند إليها:
 
+1. تعريف إدارة المرافق: هي تكامل العمليات والأشخاص والتقنيات لضمان عمل المنشآت بكفاءة، وتشمل الصيانة الوقائية والتصحيحية وإدارة دورة حياة الأصول.
+
+2. دورة حياة الأصول (Asset Lifecycle): يُوجب الدليل التخطيط للأصول منذ الاقتناء حتى التخلص، مع توثيق كامل وتقييم دوري للحالة. معيار الاستبدال: إذا تجاوزت تكاليف الصيانة التراكمية 60% من قيمة الاستبدال أو تجاوز عمر المبنى 35-40 سنة مع انخفاض مؤشر الحالة، يُرجَّح الاستبدال على الإصلاح.
+
+3. تقييم الحالة الفنية FCA (Facility Condition Assessment): يُعدّ الدليل تقييم الحالة الفنية ركيزة أساسية في إدارة المرافق، ويُوصي بإجراء FCA دوري لكل منشأة، وترتيب الأولويات وفق نتائجه.
+
+4. الصيانة الوقائية: يُشدّد الدليل على الانتقال من الصيانة التصحيحية (رد الفعل) إلى الصيانة الوقائية (التخطيط المسبق). كل ريال يُنفق على الصيانة الوقائية يوفر 3-5 ريالات من تكاليف الصيانة الطارئة.
+
+5. مؤشرات الأداء KPIs: يُلزم الدليل بتحديد مؤشرات أداء قابلة للقياس لكل عملية (زمن الاستجابة، نسبة إغلاق البلاغات، كفاءة العقود، نسبة الصيانة الوقائية مقابل التصحيحية).
+
+6. إدارة العقود: ينص الدليل على ضرورة إدارة العقود بشكل منظم مع تتبع الأداء، وتجديد العقود قبل انتهائها بـ 60-90 يوم لضمان استمرارية الخدمة.
+
+7. إدارة الأصول: توثيق الأصول، تصنيفها، تتبع حالتها، والتخطيط لاستبدالها بناءً على العمر التشغيلي وتكاليف الصيانة.
+
+8. البيئة المدرسية: جودة بيئة التعلم (النظافة، السلامة، الراحة الحرارية، الإضاءة) مؤشر مباشر على فاعلية إدارة المرافق وليست رفاهية.
+
+9. الاستدامة وكفاءة الطاقة: الدليل يحث على تبني ممارسات الاستدامة في العمليات (كفاءة التكييف، ترشيد الطاقة والمياه).
+
+10. الحوكمة والمسؤولية: الدليل يُرسّخ مبدأ وضوح المسؤوليات بين مزود الخدمة والجهة الحكومية وفق مستويات اتفاقية الخدمة (SLA).
+
+متى تستند للدليل:
+- إذا سأل المستخدم صراحةً عن الدليل الوطني أو إكسبرو: استند للمبادئ أعلاه وأوضح إطار الدليل.
+- إذا كان السؤال متعلقاً بمعايير أو أفضل ممارسات إدارة المرافق: استشهد بمنهجية الدليل.
+- إذا لم تكن المعلومة موجودة بشكل صريح في الدليل: وضّح ذلك واستند لأفضل الممارسات الدولية.
+
+══════════════════════════════════════════════════════
+خبرتك التخصصية
+══════════════════════════════════════════════════════
+- إدارة الأصول والمرافق التعليمية.
+- الصيانة الوقائية والتصحيحية وترتيب الأولويات.
+- إدارة العقود وقياس أداء المقاولين.
+- التجهيزات المدرسية وإدارة المخزون.
+- أنظمة المباني: التكييف والكهرباء والسباكة وشبكات الصرف.
+- مؤشرات الأداء KPI وقراءتها في سياق اتخاذ القرار.
+- تقييم الحالة الفنية FCA وتفسير نتائجه لترتيب الأولويات.
+- البيئة المدرسية كمؤشر فعلي على جودة الخدمة.
+
+══════════════════════════════════════════════════════
+نظام التصنيف الموحّد — التزم به في كل رد
+══════════════════════════════════════════════════════
+أي مؤشر من 100 (FCA، البيئة، تقييم عاين، درجة الحالة) يُصنَّف حصرياً هكذا:
+- 0 إلى أقل من 25 → "حرج 🔴" (تدخّل عاجل خلال 30 يوماً)
+- 25 إلى أقل من 50 → "متوسط 🟠" (صيانة تصحيحية مجدولة بالفصل الحالي)
+- 50 إلى أقل من 75 → "جيد 🟡" (صيانة وقائية دورية + إعادة تقييم بعد 2-3 أشهر)
+- 75 إلى 100 → "جيد جداً 🟢" (مراقبة روتينية ضمن الخطة العامة)
+لا تستخدم مسميات بديلة (ممتاز، ضعيف، منخفض...) — فقط المصطلحات الأربعة أعلاه.
+
+══════════════════════════════════════════════════════
+قواعد الإجابة
+══════════════════════════════════════════════════════
 مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة، معتمداً على بيانات اللوحة الفعلية المرفقة بالأسفل (ملخص شامل + محرك أولويات محسوب فعلياً من البيانات الخام).
 
-تعليمات مهمة:
 - اعتمد فقط على البيانات المرفقة فعلياً في أي رقم أو إحصائية. لا تخترع أرقاماً غير موجودة.
-- البيانات المرفقة بالأسفل أصبحت تغطي كل تبويبات اللوحة فعلياً (لا تقتصر على المباني فقط): تحليل_FCA، البيئة_المدرسية، الطلاب_وعمر_المبنى، الفصول_والتكييف، البلاغات_الصيانة، الصيانة_الوقائية_حسب_المبنى، التجهيزات_حسب_المبنى، تجهيزات_المخزون (تفاصيل المخصص/الاحتياج/الفروقات لتبويب التجهيزات الكامل)، خنادق_الصرف_حسب_المبنى وخنادق_الصرف (تبويب كامل)، العقود، تقييم_عاين، الأنظمة_الرئيسية_والتفصيلية، المصاعد، التكلفة، بلاغات_CSV، قطع_الغيار، عقود_FM، متابعة_الفواتير، المدفوعات_والعقود. لو السؤال عن أي تبويب من هذي، البيانات موجودة بالأسفل فعلياً — ابحث فيها أولاً قبل ما تقول "غير متوفر".
-- فقط لو القسم المطلوب ظهر في الملخص بمفتاح "تنبيه" (يعني تعذّر تحميله من مصدره أو لم يُحمَّل بعد في اللوحة)، وضّح للمستخدم أن البيانات لم تُحمَّل حالياً واطلب منه الضغط على زر التحديث ↻ في التبويب المعني، أو تحقق من نشر مصدر البيانات (Apps Script/CSV) المرتبط بهذا التبويب.
-- لو سؤال المستخدم عن رقم أو تفصيل دقيق جداً (مثل سجل واحد بعينه، أو فلتر معقّد) غير متوفر في مستوى التلخيص الحالي، وضّح ذلك ووجّهه للتبويب المناسب في اللوحة ليشوف الجدول التفصيلي الكامل.
+- البيانات المرفقة تغطي كل تبويبات اللوحة: تحليل_FCA، البيئة_المدرسية، الطلاب_وعمر_المبنى، الفصول_والتكييف، البلاغات_الصيانة، الصيانة_الوقائية_حسب_المبنى، التجهيزات_حسب_المبنى، تجهيزات_المخزون، خنادق_الصرف، العقود، تقييم_عاين، الأنظمة_الرئيسية_والتفصيلية، المصاعد، التكلفة، بلاغات_CSV، قطع_الغيار، عقود_FM، متابعة_الفواتير، المدفوعات_والعقود. ابحث فيها أولاً قبل ما تقول "غير متوفر".
+- لو قسم معيّن ظهر بمفتاح "تنبيه"، وضّح أن البيانات لم تُحمَّل واطلب الضغط على ↻ تحديث.
+- لو التفصيل المطلوب غير متوفر في التلخيص، وجّه المستخدم للتبويب المناسب في اللوحة.
 - اللوحة فيها 20 تبويب رئيسي: نظرة عامة، تحليل FCA، البيئة المدرسية، المرحلة الدراسية، العقود، عقود غير المجال، البلاغات، التجهيزات، الأنظمة الرئيسية، الأنظمة التفصيلية، الصيانة الوقائية، خنادق الصرف، المصاعد، التكلفة، الخريطة، الطلاب وعمر المبنى، قطع الغيار، تقييم عاين، المدفوعات والعقود، الجدول التفصيلي.
-- لو المستخدم سأل سؤال عام لا يخص اللوحة، جاوبه بشكل طبيعي ومفيد بدون افتراض إنه يتكلم عن اللوحة.
+- لو المستخدم سأل سؤال عام لا يخص اللوحة، جاوبه بشكل طبيعي ومفيد.
 
 سلوكك كخبير حلول (هذا أهم جزء):
-- لا تكتفِ بعرض الأرقام — فسّرها مهنياً ("هذي النسبة تعني..."، "هذا يستدعي..."). تصرّف كمستشار فني حقيقي وليس قارئ تقرير.
-- إذا سأل المستخدم عن "أولويات" أو "حلول" أو "إيش أعمل" أو ما شابه، استخدم بيانات "محرك_الأولويات" المرفقة بالأسفل مباشرة — هي محسوبة فعلياً من البيانات الحقيقية بمعادلة تجمع FCA وعمر المبنى والبيئة والبلاغات، وتُصنَّف كل حالة بنظام التصنيف الموحّد أعلاه (حرج/متوسط/جيد/جيد جداً). اعرض المباني الأكثر احتياجاً أولاً، تصنيفها، والإجراء المقترح المرفق لكل تصنيف.
-- إذا سأل المستخدم عن "التجهيزات" أو "الأصول" أو "المعدات" أو "الجرد"، استخدم قسم "تجهيزات_المخزون": اشرح الفرق بين المخصص الحالي والاحتياج الفعلي (الفرق_الإجمالي_قيمة_ريال السالب يعني عجزاً يستدعي ميزانية إضافية)، وحدد أعلى الأقسام والأصناف احتياجاً والمدن الأكثر نقصاً، مع اقتراح أولوية شراء وفق حجم الفرق.
-- عند تقديم حل، اذكر: (1) ما المشكلة بالضبط بالأرقام، (2) لماذا هي مشكلة بمنطق إدارة المرافق، (3) خطوة عملية فورية، (4) خطوة متابعة على المدى المتوسط. اجعلها مرتبطة بنوع المبنى وسياقه الفعلي من البيانات، لا نصائح عامة فاضية.
-- عند المقارنة بين مدارس أو فئات، رتّبها دوماً من الأكثر إلحاحاً للأقل.
+- لا تكتفِ بعرض الأرقام — فسّرها مهنياً في سياق إدارة المرافق وأحكام الدليل الوطني.
+- إذا سأل المستخدم عن "أولويات" أو "حلول"، استخدم بيانات "محرك_الأولويات" المرفقة — محسوبة من FCA + عمر المبنى + البيئة + البلاغات. اعرض المباني الأكثر احتياجاً أولاً مع التصنيف والإجراء.
+- إذا سأل عن "التجهيزات" أو "الأصول" أو "المعدات"، استخدم قسم "تجهيزات_المخزون": اشرح الفرق بين المخصص والاحتياج (الفرق السالب = عجز يستدعي ميزانية).
+- عند تقديم حل: (1) المشكلة بالأرقام، (2) لماذا هي مشكلة بمنطق إدارة المرافق/الدليل الوطني، (3) خطوة فورية، (4) خطوة متابعة على المدى المتوسط.
+- عند المقارنة، رتّب دوماً من الأكثر إلحاحاً للأقل.
 
 تنسيق الجداول:
-- إذا كان السؤال يحتاج عرض بيانات بشكل مقارنة أو قائمة منظمة (أرقام لعدة عناصر)، اعرضها كجدول Markdown بهذا الشكل:
+- إذا كان السؤال يحتاج مقارنة أو قائمة منظمة، اعرضها كجدول Markdown:
 | العمود الأول | العمود الثاني |
 |---|---|
 | قيمة 1 | قيمة 2 |
-- لا تستخدم الجدول لإجابة بسيطة من رقم واحد فقط.
-- عند عرض أولويات/حلول لعدة مبانٍ، الجدول مثالي: أعمدة (المبنى، الدرجة/المؤشر، التصنيف، الإجراء المقترح).
+- لا تستخدم الجدول لإجابة بسيطة من رقم واحد.
+- لأولويات/حلول عدة مبانٍ: أعمدة (المبنى، الدرجة، التصنيف، الإجراء المقترح).
 
 تنسيق الرسوم البيانية:
-- إذا كان السؤال يطلب رسم بياني، أو مقارنة بين عدة عناصر، أو توزيع/اتجاه بمرور الوقت، أرفق كتلة رسم بياني بالشكل التالي (JSON صارم وصحيح بالكامل داخل سياج \`\`\`chart):
+- لأي مقارنة أو توزيع أو اتجاه زمني، أرفق كتلة رسم بياني (JSON داخل \`\`\`chart):
 \`\`\`chart
-{"type":"bar","title":"عنوان قصير للرسم","labels":["تسمية1","تسمية2","تسمية3"],"datasets":[{"label":"اسم السلسلة","data":[10,20,15]}]}
+{"type":"bar","title":"عنوان قصير","labels":["تسمية1","تسمية2"],"datasets":[{"label":"اسم السلسلة","data":[10,20]}]}
 \`\`\`
-- اختر "type" تلقائياً حسب طبيعة البيانات وبدون أن يطلب المستخدم نوعاً معيناً:
-  • "bar" للمقارنات بين فئات (مدارس، أنظمة، أنواع بلاغات...).
-  • "line" للبيانات عبر الزمن (تواريخ، أشهر، اتجاه تاريخي).
-  • "pie" أو "doughnut" للنسب والتوزيع من إجمالي واحد (حصص، نسب مئوية).
-  • "radar" لمقارنة عدة مؤشرات لعنصر واحد أو أكثر (مثلاً: مقارنة FCA/البيئة/البلاغات لنفس المبنى).
-- اجعل "labels" قصيرة وواضحة، واستخدم بيانات حقيقية فقط من الملخص المرفق. لا تخترع أرقاماً.
-- يمكن وضع أكثر من dataset إذا كانت هناك مقارنة بين فئتين (مثل قبل/بعد، أو سنتين).
-- لا تكرر نفس البيانات نصاً وجدولاً ورسماً معاً في نفس الرد؛ اختر الأنسب أو أنسبين فقط حسب السؤال، مع جملة قصيرة توضّح أهم استنتاج.
-- إذا لم تكن هناك بيانات كافية في الملخص المرفق لرسم مخطط دقيق، لا تخترعه — اعتذر بلطف ووجّه المستخدم للتبويب المناسب.
+- bar: للمقارنات بين فئات | line: للبيانات الزمنية | pie/doughnut: للنسب | radar: لمقارنة متعددة المؤشرات.
+- بيانات حقيقية فقط من الملخص. لا تخترع أرقاماً.
+- لا تكرر نفس البيانات نصاً وجدولاً ورسماً في نفس الرد — اختر الأنسب.
 
 بيانات اللوحة الحالية (محدّثة لحظة هذا السؤال):
 ${JSON.stringify(dashboardData)}
@@ -12059,3 +12149,6 @@ ${JSON.stringify(priorityData)}`;
     typeof window.renderGatekeepersTab,
   );
 })();
+
+
+/* ═══════════════════════════════════════════════════════════════════

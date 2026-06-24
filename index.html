@@ -38,17 +38,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>لوحة بيانات إدارة المرافق التعليمية | Educational Facilities Management Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
 <link rel="stylesheet" href="dashboard.css">
-
-<script src="dashboard.js"></script>
-
 
 <!-- طبقة التحديث البصري — Executive Theme Layer (v2)
      لا تغيّر أي IDs / منطق JS — تنسيق بصري فقط (ألوان، مسافات، ظلال،
@@ -297,7 +294,6 @@
     <div class="tab" onclick="showTab('mag-kpi',this)">📊 مؤشرات الأداء للمقاول</div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  📊  تبويب رقم 1: نظرة عامة
@@ -346,7 +342,6 @@
     </div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  📈  تبويب رقم 2: تحليل FCA
@@ -389,7 +384,6 @@
       </div>
     </div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -442,7 +436,6 @@
       </div>
     </div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -691,7 +684,6 @@
 
 </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  📋  تبويب رقم 5: العقود
@@ -729,7 +721,6 @@
     </div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  📌  تبويب رقم 6: عقود غير المجال
@@ -757,7 +748,6 @@
     </div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  📢  تبويب رقم 8: البلاغات
@@ -777,7 +767,6 @@
   <div class="panel" id="tab-balagh">
     <div id="balagh-content"></div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -804,7 +793,6 @@
     </div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  🧍  تبويب: البوابين
@@ -823,8 +811,6 @@
       </div>
     </div>
   </div>
-
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -846,7 +832,6 @@
     <div id="sys-main-content"><div class="card loading-placeholder"><div class="loading-placeholder-icon">⚙️</div><div class="loading-placeholder-text">جاري التحميل…</div></div></div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  🔩  تبويب رقم 11: الأنظمة التفصيلية
@@ -866,7 +851,6 @@
   <div class="panel" id="tab-sys-detail">
     <div id="sys-detail-content"><div class="card loading-placeholder"><div class="loading-placeholder-icon">🔩</div><div class="loading-placeholder-text">جاري التحميل…</div></div></div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -888,7 +872,6 @@
     <div id="seyana-content"></div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  🌊  تبويب رقم 13: خنادق الصرف
@@ -908,7 +891,6 @@
   <div class="panel" id="tab-khanadeq">
     <div id="khanadeq-content"></div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -1024,7 +1006,6 @@
     <div id="map-container"></div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  👨‍🎓  تبويب رقم 17: الطلاب وعمر المبنى
@@ -1045,7 +1026,6 @@
     <div id="students-content"></div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  🔩  تبويب رقم 18: قطع الغيار
@@ -1065,7 +1045,6 @@
   <div class="panel" id="tab-spare">
     <div id="spare-content"></div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -1114,7 +1093,6 @@
     </div>
   </div>
 
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  ❄️  تبويب: خطة استبدال المكيفات (شباك ↔ سبلت)
@@ -1127,7 +1105,6 @@
   <div class="panel" id="tab-ac-plan">
     <div id="ac-plan-content"></div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -1149,7 +1126,6 @@
       </div>
     </div>
   </div>
-
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -1259,18 +1235,6 @@
   </div>
 </footer>
 
-
-
-
-
-
-
-
-
-
-
-
-
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
 ║  💬  المساعد الذكي — واجهة شات بوت + ردود تجريبية مبرمجة
@@ -1354,8 +1318,6 @@
   </div>
 </div>
 
-
-
 <script>
 /* ============================================================
    dashboard-interactive.js
@@ -1384,7 +1346,6 @@
     try { if (typeof RAW !== "undefined" && RAW.length) return RAW; } catch(e) {}
     return getRaw();
   }
-
 
   /* ──────────────────────────────────────────────
      0. انتظر تحميل DOM + البيانات
@@ -1657,6 +1618,79 @@
       /* ── hover pointer for school rows in lists ── */
       .school-row[data-school-idx] { cursor: pointer; }
       .school-row[data-school-idx]:hover { background: var(--bg-2) !important; }
+
+      /* ── Mini Map in school panel ── */
+      .ix-mini-map-wrap {
+        border-radius: 14px; overflow: hidden;
+        border: 1px solid var(--bd-mid);
+        margin-bottom: 14px;
+        position: relative;
+        box-shadow: 0 2px 12px rgba(6,20,28,.12);
+      }
+      .ix-mini-map {
+        width: 100%; height: 200px;
+        display: block;
+      }
+      .ix-mini-map-no-coords {
+        height: 54px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg-2); border-radius: 12px;
+        font-size: 11px; color: var(--tx-muted);
+        border: 1px dashed var(--bd-mid);
+        gap: 8px;
+      }
+
+      /* ── Action Buttons Row ── */
+      .ix-action-row {
+        display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+      }
+      .ix-action-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; border-radius: 10px; font-size: 11px; font-weight: 700;
+        border: 1px solid var(--bd-mid); background: var(--bg-2);
+        color: var(--tx-sec); cursor: pointer; text-decoration: none;
+        transition: all .18s; white-space: nowrap;
+      }
+      .ix-action-btn:hover { background: var(--bg-3); border-color: var(--teal); color: var(--teal); transform: translateY(-1px); }
+      .ix-action-btn.ix-btn-primary {
+        background: linear-gradient(135deg,#0c7a8a,#0891B2);
+        border-color: #0891B2; color: #fff;
+      }
+      .ix-action-btn.ix-btn-primary:hover { background: linear-gradient(135deg,#0891B2,#06b6d4); color: #fff; }
+      .ix-action-btn.ix-btn-copied { background:#059669!important; border-color:#059669!important; color:#fff!important; }
+
+      /* ── Score cards enhancement ── */
+      .ix-score-card {
+        background: var(--bg-2); border-radius: 12px; padding: 13px 16px;
+        border: 1px solid var(--bd-light); position: relative; overflow: hidden;
+      }
+      .ix-score-card::before {
+        content: ''; position: absolute; top: 0; right: 0;
+        width: 4px; height: 100%; border-radius: 0 12px 12px 0;
+        background: var(--ix-sc-color, #94a3b8);
+      }
+      .ix-score-lbl { font-size: 10px; color: var(--tx-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+      .ix-score-val { font-size: 22px; font-weight: 900; letter-spacing: -.02em; color: var(--ix-sc-color, var(--tx-main)); }
+      .ix-score-tier { font-size: 10px; font-weight: 700; margin-top: 2px; color: var(--ix-sc-color, var(--tx-muted)); }
+      .ix-score-bar2 { height: 6px; border-radius: 3px; background: var(--bd-light); overflow: hidden; margin-top: 8px; }
+      .ix-score-fill2 { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.22,.6,.34,1); background: var(--ix-sc-color, #94a3b8); }
+
+      /* ── Info grid enhanced ── */
+      .ix-info-grid2 {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 8px; margin-bottom: 4px;
+      }
+      .ix-info-item2 {
+        background: var(--bg-2); border-radius: 10px; padding: 10px 13px;
+        border: 1px solid var(--bd-light);
+      }
+      .ix-info-item2.ix-full2 { grid-column: 1 / -1; }
+      .ix-info-lbl2 { font-size: 10px; color: var(--tx-muted); font-weight: 600; margin-bottom: 3px; }
+      .ix-info-val2 { font-size: 13px; font-weight: 700; color: var(--tx-main); }
+
+      /* ── Leaflet popup override inside mini-map ── */
+      .ix-mini-map-wrap .leaflet-popup-content-wrapper { border-radius: 10px; font-family: Tajawal, sans-serif; }
+      .ix-mini-map-wrap .leaflet-popup-content { font-size: 12px; font-weight: 700; direction: rtl; }
     `;
     document.head.appendChild(style);
   }
@@ -1766,34 +1800,55 @@
   window.__IXCloseSchool = closeSchoolPanel;
 
   function renderSchoolDetails(r) {
-    const nameEl  = document.getElementById("ix-school-name-title");
+    const nameEl   = document.getElementById("ix-school-name-title");
     const badgesEl = document.getElementById("ix-panel-badges");
-    const bodyEl  = document.getElementById("ix-panel-body");
+    const bodyEl   = document.getElementById("ix-panel-body");
 
     // ── اسم المدرسة ──
     nameEl.textContent = safeStr(r.name || r.buildingName) || "—";
 
-    // ── شارات المرحلة / الجنس ──
+    // ── شارات المرحلة / الجنس / الرقم الوزاري ──
     const badges = [];
     if (r.stage)  badges.push(safeStr(r.stage));
     if (r.gender) badges.push(safeStr(r.gender.trim()));
+    if (r.minId)  badges.push("🔢 " + safeStr(r.minId));
     badgesEl.innerHTML = badges.map(b => `<span class="ix-panel-badge">${esc(b)}</span>`).join("");
 
     // ── مساعدات التقييم ──
     const fcaColor  = v => v == null ? "#94a3b8" : v < 25 ? "#DC2626" : v < 50 ? "#D97706" : v < 75 ? "#059669" : "#0891B2";
     const tierLabel = v => v == null ? "—" : v < 25 ? "حرج" : v < 50 ? "متوسط" : v < 75 ? "جيد" : "جيد جداً";
-    const scoreBar  = (v, c) => v == null ? "" :
-      `<div style="height:5px;border-radius:3px;background:#e2e8f0;margin-top:5px;overflow:hidden">
-         <div style="height:100%;width:${Math.min(v,100)}%;background:${c};border-radius:3px"></div></div>`;
-    const infoItem  = (lbl, val, style="") =>
-      `<div class="ix-info-item">
-         <div class="ix-info-lbl">${lbl}</div>
-         <div class="ix-info-val"${style ? ` style="${style}"` : ""}>${val}</div>
+    const tierIcon  = v => v == null ? "⚪" : v < 25 ? "🔴" : v < 50 ? "🟡" : v < 75 ? "🟢" : "🔵";
+
+    const scoreCard = (label, v) => {
+      const c = fcaColor(v);
+      return `<div class="ix-score-card" style="--ix-sc-color:${c}">
+        <div class="ix-score-lbl">${label}</div>
+        <div class="ix-score-val">${v != null ? v.toFixed(1) + "%" : "—"}</div>
+        ${v != null ? `<div class="ix-score-tier">${tierIcon(v)} ${tierLabel(v)}</div>
+        <div class="ix-score-bar2"><div class="ix-score-fill2" style="width:${Math.min(v,100)}%"></div></div>` : ""}
+      </div>`;
+    };
+
+    const infoItem = (lbl, val, extra="") =>
+      `<div class="ix-info-item2${extra}">
+         <div class="ix-info-lbl2">${lbl}</div>
+         <div class="ix-info-val2">${val}</div>
        </div>`;
 
-    const fca  = r.fca      ?? null;
-    const env  = r.envScore ?? null;
+    const fca  = r.fca       ?? null;
+    const env  = r.envScore  ?? null;
     const ayen = r.ayenScore ?? null;
+
+    // ── إحداثيات ──
+    const hasCoords = r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1;
+    const mapId = "ix-sp-map-" + Math.random().toString(36).slice(2,8);
+    const schoolName = esc(r.name || r.buildingName || "");
+    const cityName   = esc(r.city || r.sector || "");
+
+    // Google Maps URL: بالإحداثيات لو موجودة، وإلا بالاسم والمدينة
+    const gmapsUrl = hasCoords
+      ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
+      : `https://www.google.com/maps/search/${encodeURIComponent((r.name||r.buildingName||"") + " " + (r.city||r.sector||"") + " السعودية")}`;
 
     // ── قسم العقود ──
     const contractRow = (icon, label, num, contractor, project, status) => !num ? "" : `
@@ -1811,58 +1866,141 @@
       contractRow("🧹","عقد النظافة", r.contractClean, r.contrClean, r.projClean, r.expClean),
     ].filter(Boolean).join("");
 
+    // ── عمر المبنى لون ──
+    const ageColor = r.buildingAge != null
+      ? (r.buildingAge >= 40 ? "color:#DC2626;font-weight:800"
+        : r.buildingAge >= 25 ? "color:#D97706;font-weight:800"
+        : "color:#059669;font-weight:800")
+      : "";
+
     bodyEl.innerHTML = `
+
+      <!-- ── أزرار الأكشن ── -->
+      <div class="ix-action-row">
+        <a class="ix-action-btn ix-btn-primary" href="${gmapsUrl}" target="_blank" rel="noopener">
+          🗺️ افتح في الخريطة
+        </a>
+        <button class="ix-action-btn" id="ix-copy-btn" onclick="
+          const txt = '${schoolName} - ${cityName}';
+          navigator.clipboard.writeText(txt).then(()=>{
+            const b=document.getElementById('ix-copy-btn');
+            b.textContent='✓ تم النسخ';
+            b.classList.add('ix-btn-copied');
+            setTimeout(()=>{b.textContent='📋 نسخ الاسم';b.classList.remove('ix-btn-copied');},2000);
+          });
+        ">📋 نسخ الاسم</button>
+        <button class="ix-action-btn" id="ix-share-btn" onclick="
+          const url = window.location.href.split('?')[0]+'?school='+encodeURIComponent('${schoolName}');
+          navigator.clipboard.writeText(url).then(()=>{
+            const b=document.getElementById('ix-share-btn');
+            b.textContent='✓ تم النسخ';
+            b.classList.add('ix-btn-copied');
+            setTimeout(()=>{b.textContent='🔗 نسخ رابط';b.classList.remove('ix-btn-copied');},2000);
+          }).catch(()=>{});
+        ">🔗 نسخ رابط</button>
+      </div>
+
+      <!-- ── الخريطة الصغيرة ── -->
+      <div class="ix-section-title">🗺️ الموقع على الخريطة</div>
+      ${hasCoords
+        ? `<div class="ix-mini-map-wrap"><div id="${mapId}" class="ix-mini-map"></div></div>`
+        : `<div class="ix-mini-map-no-coords">
+             <span style="font-size:18px">📍</span>
+             <span>لا تتوفر إحداثيات — <a href="${gmapsUrl}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline">ابحث في Google Maps</a></span>
+           </div>`
+      }
+
       <!-- ── معلومات المدرسة ── -->
       <div class="ix-section-title">🏫 معلومات المدرسة</div>
-      <div class="ix-info-grid">
-        ${infoItem("الرقم الوزاري",             esc(r.minId)   || "—", "font-family:monospace;font-weight:700")}
-        ${infoItem("رقم التسلسل",              esc(r.schoolSeq || r.buildingSeq) || "—", "font-family:monospace;font-size:12px")}
-        ${infoItem("المدينة / المنطقة الرئيسية", esc(r.city)    || "—")}
-        ${infoItem("المحافظة",                  esc(r.sector)  || "—")}
-        ${infoItem("الحي",                      esc(r.district)|| "—")}
-        ${infoItem("الملكية",                   esc(r.ownership)||"—")}
-        ${infoItem("حالة الاشتراك",             esc(r.subscriptionStatus)||"—")}
+      <div class="ix-info-grid2">
+        ${infoItem("الرقم الوزاري",              `<span style="font-family:monospace;font-size:14px;font-weight:800">${esc(r.minId)||"—"}</span>`)}
+        ${infoItem("رقم التسلسل",               `<span style="font-family:monospace;font-size:12px">${esc(r.schoolSeq||r.buildingSeq)||"—"}</span>`)}
+        ${infoItem("المدينة / المنطقة",          esc(r.city)||"—")}
+        ${infoItem("المحافظة",                   esc(r.sector)||"—")}
+        ${infoItem("الحي",                       esc(r.district)||"—")}
+        ${infoItem("الملكية",                    esc(r.ownership)||"—")}
+        ${infoItem("حالة الاشتراك",              esc(r.subscriptionStatus)||"—")}
+        ${infoItem("نوع الارتباط",               esc(r.linkType)||"—")}
       </div>
 
       <!-- ── الإحصائيات ── -->
       <div class="ix-section-title">📊 الإحصائيات</div>
-      <div class="ix-info-grid">
-        ${infoItem("عدد الطلاب",   r.students   != null ? Number(r.students).toLocaleString()   : "—", r.students   != null ? "color:#059669;font-weight:700" : "")}
-        ${infoItem("عدد الفصول",   r.classrooms != null ? r.classrooms                           : "—")}
+      <div class="ix-info-grid2">
+        ${infoItem("عدد الطلاب",
+          r.students != null ? `<span style="color:#059669;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : "—")}
+        ${infoItem("عدد الفصول",
+          r.classrooms != null ? `<span style="font-weight:800">${r.classrooms}</span>` : "—")}
         ${infoItem("حجم المدرسة",  esc(r.schoolSize)||"—")}
-        ${infoItem("عمر المبنى",   r.buildingAge!= null ? r.buildingAge + " سنة"                 : "—",
-            r.buildingAge >= 40 ? "color:#DC2626;font-weight:700" : r.buildingAge >= 25 ? "color:#D97706;font-weight:700" : "color:#059669;font-weight:700")}
-
+        ${infoItem("عمر المبنى",
+          r.buildingAge != null ? `<span style="${ageColor};font-size:15px">${r.buildingAge} سنة</span>` : "—")}
       </div>
 
       <!-- ── التقييمات ── -->
       <div class="ix-section-title">🎯 التقييمات</div>
-      <div class="ix-info-grid">
-        <div class="ix-info-item">
-          <div class="ix-info-lbl">تقييم FCA</div>
-          <div class="ix-info-val" style="color:${fcaColor(fca)};font-size:20px;font-weight:800">${fca != null ? fca.toFixed(1) + "%" : "—"}</div>
-          ${fca != null ? `<div style="font-size:10px;font-weight:700;color:${fcaColor(fca)}">${tierLabel(fca)}</div>${scoreBar(fca, fcaColor(fca))}` : ""}
-        </div>
-        <div class="ix-info-item">
-          <div class="ix-info-lbl">تقييم البيئة المدرسية</div>
-          <div class="ix-info-val" style="color:${fcaColor(env)};font-size:20px;font-weight:800">${env != null ? env.toFixed(1) + "%" : "—"}</div>
-          ${env != null ? `<div style="font-size:10px;font-weight:700;color:${fcaColor(env)}">${tierLabel(env)}</div>${scoreBar(env, fcaColor(env))}` : ""}
-        </div>
-        <div class="ix-info-item">
-          <div class="ix-info-lbl">تقييم عاين</div>
-          <div class="ix-info-val" style="color:${fcaColor(ayen)};font-size:20px;font-weight:800">${ayen != null ? ayen.toFixed(1) + "%" : "—"}</div>
-          ${ayen != null ? `<div style="font-size:10px;font-weight:700;color:${fcaColor(ayen)}">${tierLabel(ayen)}</div>${scoreBar(ayen, fcaColor(ayen))}` : ""}
-        </div>
+      <div class="ix-info-grid2">
+        ${scoreCard("تقييم FCA", fca)}
+        ${scoreCard("البيئة المدرسية", env)}
+        ${scoreCard("تقييم عاين", ayen)}
       </div>
 
       <!-- ── العقود ── -->
       ${contractsHTML ? `<div class="ix-section-title">📋 العقود</div>${contractsHTML}` : ""}
 
       ${r.notes ? `<div class="ix-section-title">📝 ملاحظات</div>
-        <div class="ix-info-item" style="margin-bottom:12px">
-          <div class="ix-info-val" style="font-size:12px;line-height:1.6">${esc(r.notes)}</div>
+        <div class="ix-info-item2 ix-full2" style="margin-bottom:12px">
+          <div class="ix-info-val2" style="font-size:12px;line-height:1.7;font-weight:500">${esc(r.notes)}</div>
         </div>` : ""}
     `;
+
+    // ── تشغيل الخريطة الصغيرة بعد render ──
+    if (hasCoords) {
+      requestAnimationFrame(function() {
+        try {
+          const mapEl = document.getElementById(mapId);
+          if (!mapEl || !window.L) return;
+          // تأكد إن الـ container ظاهر
+          setTimeout(function() {
+            const miniMap = L.map(mapId, {
+              zoomControl: true,
+              attributionControl: false,
+              scrollWheelZoom: false,
+              doubleClickZoom: true,
+              dragging: true
+            }).setView([r.lat, r.lng], 15);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 19
+            }).addTo(miniMap);
+
+            // Marker مع popup باسم المدرسة
+            const marker = L.circleMarker([r.lat, r.lng], {
+              radius: 10,
+              fillColor: "#0891B2",
+              color: "#fff",
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 0.92
+            }).addTo(miniMap);
+
+            marker.bindPopup(
+              `<div style="font-family:Tajawal,sans-serif;font-weight:700;font-size:12px;direction:rtl;text-align:right">
+                📍 ${safeStr(r.name||r.buildingName)}<br>
+                <span style="font-weight:400;color:#64748b">${safeStr(r.district||"")}${r.district&&r.city?" · ":""}${safeStr(r.city||"")}</span>
+              </div>`,
+              { direction: "right" }
+            ).openPopup();
+
+            // فتح Google Maps بكليك على الخريطة
+            miniMap.on("click", function() {
+              window.open(gmapsUrl, "_blank", "noopener");
+            });
+
+            // اعمل invalidateSize عشان الـ Leaflet يعرف حجم الـ container صح
+            setTimeout(function() { miniMap.invalidateSize(); }, 120);
+          }, 60);
+        } catch(e) { console.warn("[MiniMap]", e); }
+      });
+    }
   }
 
   /* ──────────────────────────────────────────────
@@ -2494,4 +2632,5 @@
 })();
 
 </script>
+<script src="dashboard.js" defer></script>
 </body></html>

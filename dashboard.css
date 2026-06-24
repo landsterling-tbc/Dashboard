@@ -1974,14 +1974,14 @@ tbody tr:hover td {
    2) GLOBAL — خلفية، طباعة، تمرير
 ───────────────────────────────────────────────── */
 body, html {
-  font-size: 14.5px !important;
-  line-height: 1.66 !important;
+  font-size: 14.5px;
+  line-height: 1.66;
   letter-spacing: 0.001em;
   background:
     radial-gradient(1100px 560px at 102% -8%, rgba(12, 127, 147, 0.07), transparent 48%),
     radial-gradient(820px 460px at -2% 102%, rgba(176, 138, 78, 0.05), transparent 46%),
-    linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%) !important;
-  color: var(--tx-main) !important;
+    linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%);
+  color: var(--tx-main);
 }
 b, strong { font-weight: 700; }
 :focus-visible {
@@ -1990,27 +1990,27 @@ b, strong { font-weight: 700; }
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(110, 143, 160, 0.5) !important;
+  background: rgba(110, 143, 160, 0.5);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(12, 127, 147, 0.65) !important;
+  background: rgba(12, 127, 147, 0.65);
 }
 
 /* ─────────────────────────────────────────────
    3) TOPBAR — شريط قيادة فاخر بزجاج خفيف
 ───────────────────────────────────────────────── */
 .topbar {
-  height: 60px !important;
+  height: 60px;
   background:
-    linear-gradient(180deg, rgba(5, 18, 26, 0.98) 0%, rgba(7, 31, 44, 0.96) 100%) !important;
-  backdrop-filter: blur(16px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+    linear-gradient(180deg, rgba(5, 18, 26, 0.98) 0%, rgba(7, 31, 44, 0.96) 100%);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.05),
-    0 10px 28px rgba(3, 12, 18, 0.28) !important;
+    0 10px 28px rgba(3, 12, 18, 0.28);
 }
 .topbar::after {
-  height: 2px !important;
+  height: 2px;
   background: linear-gradient(
     to left,
     transparent 0,
@@ -2021,419 +2021,419 @@ b, strong { font-weight: 700; }
     var(--brass) 70%,
     var(--teal-2) 88%,
     transparent 100%
-  ) !important;
-  opacity: 1 !important;
+  );
+  opacity: 1;
 }
 .tb-ls {
-  min-width: auto !important;
-  padding: 0 18px !important;
-  background: transparent !important;
-  border-left: none !important;
-  display: flex !important;
-  align-items: center !important;
+  min-width: auto;
+  padding: 0 18px;
+  background: transparent;
+  border-left: none;
+  display: flex;
+  align-items: center;
 }
-.tb-tbc { gap: 14px !important; padding: 0 18px !important; border-left: none !important; }
-.tb-right { gap: 9px !important; padding: 0 16px !important; }
+.tb-tbc { gap: 14px; padding: 0 18px; border-left: none; }
+.tb-right { gap: 9px; padding: 0 16px; }
 .tb-divider {
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.24) 25%, rgba(255, 255, 255, 0.24) 75%, transparent) !important;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.24) 25%, rgba(255, 255, 255, 0.24) 75%, transparent);
 }
 .tb-logo, .tb-tbc img {
-  filter: brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3)) !important;
+  filter: brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
 }
 .tb-title {
-  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif !important;
-  font-size: 13.5px !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.005em !important;
-  color: #fff !important;
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  color: #fff;
 }
 .tb-sub {
-  font-size: 10.5px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.05em !important;
-  color: rgba(255, 255, 255, 0.42) !important;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.42);
 }
 .tb-btn {
-  min-height: 33px !important;
-  border-radius: 11px !important;
-  padding: 7px 15px !important;
-  font-size: 11.5px !important;
-  font-weight: 700 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: rgba(255, 255, 255, 0.85) !important;
-  box-shadow: none !important;
-  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease !important;
+  min-height: 33px;
+  border-radius: 11px;
+  padding: 7px 15px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.2s ease;
 }
 .tb-btn:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.26) !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18) !important;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.26);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 #btnAuto.on {
-  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 16px rgba(12, 127, 147, 0.32) !important;
+  background: linear-gradient(135deg, var(--teal-3), var(--teal));
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(12, 127, 147, 0.32);
 }
 .dot {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
-.prog-bar { top: 60px !important; }
+.prog-bar { top: 60px; }
 .prog-fill {
-  background: linear-gradient(to left, var(--teal-2), var(--brass)) !important;
-  box-shadow: 0 0 10px rgba(12, 127, 147, 0.5) !important;
+  background: linear-gradient(to left, var(--teal-2), var(--brass));
+  box-shadow: 0 0 10px rgba(12, 127, 147, 0.5);
 }
 
 /* ─────────────────────────────────────────────
    4) CONTENT — مسافات متوازنة
 ───────────────────────────────────────────────── */
 .content {
-  padding: 24px 28px 34px !important;
-  max-width: 1820px !important;
+  padding: 24px 28px 34px;
+  max-width: 1820px;
 }
 
 /* ─────────────────────────────────────────────
    5) CARDS — زجاج خفيف + شريط تمييز علوي + ظل فاخر
 ───────────────────────────────────────────────── */
 .card {
-  background: rgba(255, 255, 255, 0.94) !important;
-  border: 1px solid var(--bd-light) !important;
-  border-radius: var(--r-2xl) !important;
-  padding: 22px 24px !important;
-  box-shadow: var(--sh-card) !important;
-  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-2xl);
+  padding: 22px 24px;
+  box-shadow: var(--sh-card);
+  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .card::before {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 0 auto 0 !important;
-  height: 3px !important;
-  border-radius: var(--r-2xl) var(--r-2xl) 0 0 !important;
-  background: linear-gradient(90deg, var(--teal-3), var(--teal-2) 55%, var(--brass-2)) !important;
-  opacity: 0.85 !important;
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  background: linear-gradient(90deg, var(--teal-3), var(--teal-2) 55%, var(--brass-2));
+  opacity: 0.85;
 }
 .card:hover {
-  transform: translateY(-2px) !important;
-  border-color: #c9dde7 !important;
-  box-shadow: var(--sh-hover) !important;
+  transform: translateY(-2px);
+  border-color: #c9dde7;
+  box-shadow: var(--sh-hover);
 }
 .card-title {
-  display: flex !important;
-  align-items: center !important;
-  gap: 11px !important;
-  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif !important;
-  font-size: 12.5px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.01em !important;
-  color: var(--tx-main) !important;
-  padding-bottom: 13px !important;
-  margin-bottom: 16px !important;
-  border-bottom: 1px solid #e7eff4 !important;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--tx-main);
+  padding-bottom: 13px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e7eff4;
 }
 .card-title-icon {
-  width: 30px !important;
-  height: 30px !important;
-  border-radius: 11px !important;
-  font-size: 14px !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+  font-size: 14px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 .card-title .sub {
-  background: #eef6f9 !important;
-  color: var(--tx-sec) !important;
-  font-weight: 700 !important;
-  padding: 3px 10px !important;
-  border-radius: var(--r-pill) !important;
+  background: #eef6f9;
+  color: var(--tx-sec);
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
 }
 
-.g12, .g2, .g21, .g3, .g4 { gap: 18px !important; margin-bottom: 18px !important; }
+.g12, .g2, .g21, .g3, .g4 { gap: 18px; margin-bottom: 18px; }
 
 .chart-box {
-  background: linear-gradient(180deg, #fdfeff 0%, #fafcfe 100%) !important;
-  border: 1px solid #eaf1f6 !important;
-  border-radius: var(--r-lg) !important;
-  padding: 12px !important;
+  background: linear-gradient(180deg, #fdfeff 0%, #fafcfe 100%);
+  border: 1px solid #eaf1f6;
+  border-radius: var(--r-lg);
+  padding: 12px;
 }
 
 /* ─────────────────────────────────────────────
    6) KPI TILES — بطاقات مؤشرات بصرة فاخرة
 ───────────────────────────────────────────────── */
-.kpi-grid { gap: 16px !important; margin-bottom: 18px !important; }
+.kpi-grid { gap: 16px; margin-bottom: 18px; }
 .kpi {
-  background: #fff !important;
-  border: 1px solid var(--bd-light) !important;
-  border-radius: var(--r-xl) !important;
-  padding: 19px 19px 17px !important;
-  box-shadow: 0 3px 10px rgba(8, 35, 48, 0.05) !important;
-  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+  background: #fff;
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-xl);
+  padding: 19px 19px 17px;
+  box-shadow: 0 3px 10px rgba(8, 35, 48, 0.05);
+  transition: transform 0.2s cubic-bezier(.22,.61,.36,1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .kpi:hover {
-  transform: translateY(-3px) !important;
-  box-shadow: var(--sh-soft) !important;
-  border-color: #d0e1ea !important;
+  transform: translateY(-3px);
+  box-shadow: var(--sh-soft);
+  border-color: #d0e1ea;
 }
-.kpi::before { height: 3px !important; border-radius: var(--r-xl) var(--r-xl) 0 0 !important; }
-.kpi::after { opacity: 0.06 !important; width: 84px !important; height: 84px !important; }
+.kpi::before { height: 3px; border-radius: var(--r-xl) var(--r-xl) 0 0; }
+.kpi::after { opacity: 0.06; width: 84px; height: 84px; }
 .kpi-icon {
-  width: 34px !important;
-  height: 34px !important;
-  border-radius: 11px !important;
-  opacity: 0.14 !important;
-  font-size: 16px !important;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  opacity: 0.14;
+  font-size: 16px;
 }
 .kpi-val {
-  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif !important;
-  font-size: 29px !important;
-  font-weight: 900 !important;
-  letter-spacing: -0.025em !important;
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif;
+  font-size: 29px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
 }
-.kpi-lbl { font-size: 12.5px !important; font-weight: 700 !important; margin-top: 8px !important; }
-.kpi-sub { font-size: 11px !important; margin-top: 4px !important; opacity: 0.95; }
+.kpi-lbl { font-size: 12.5px; font-weight: 700; margin-top: 8px; }
+.kpi-sub { font-size: 11px; margin-top: 4px; opacity: 0.95; }
 
 /* ─────────────────────────────────────────────
    7) TIER STRIP
 ───────────────────────────────────────────────── */
-.tier-strip { gap: 11px !important; }
+.tier-strip { gap: 11px; }
 .tier-seg {
-  border-radius: var(--r-lg) !important;
-  padding: 16px 15px 14px !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  border-radius: var(--r-lg);
+  padding: 16px 15px 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.tier-seg:hover { transform: translateY(-2px) !important; box-shadow: 0 12px 26px rgba(0,0,0,.09) !important; }
-.tier-num { font-family: "Tajawal", sans-serif !important; font-size: 27px !important; font-weight: 900 !important; }
+.tier-seg:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.09); }
+.tier-num { font-family: "Tajawal", sans-serif; font-size: 27px; font-weight: 900; }
 
 /* ─────────────────────────────────────────────
    8) FILTERS — زجاج خفيف + حقول مصقولة
 ───────────────────────────────────────────────── */
 .filters-row {
-  gap: 14px !important;
-  padding: 17px 20px !important;
-  border-radius: var(--r-xl) !important;
-  background: var(--glass-bg) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7) !important;
-  margin-bottom: 18px !important;
+  gap: 14px;
+  padding: 17px 20px;
+  border-radius: var(--r-xl);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7);
+  margin-bottom: 18px;
 }
 .fg-lbl {
-  font-size: 10.5px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.04em !important;
-  text-transform: uppercase !important;
-  color: var(--teal-3) !important;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-3);
   opacity: 0.85;
 }
 .finp, .fsel {
-  min-height: 42px !important;
-  padding: 10px 14px !important;
-  border-radius: 12px !important;
-  border: 1px solid var(--bd-light) !important;
-  background: #fff !important;
-  font-size: 13px !important;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease !important;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--bd-light);
+  background: #fff;
+  font-size: 13px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease;
 }
-.finp:hover, .fsel:hover { border-color: var(--bd-mid) !important; }
+.finp:hover, .fsel:hover { border-color: var(--bd-mid); }
 .finp:focus, .fsel:focus {
-  border-color: var(--teal) !important;
-  box-shadow: 0 0 0 3.5px var(--teal-glow) !important;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3.5px var(--teal-glow);
 }
 .f-clear {
-  min-height: 42px !important;
-  padding: 10px 16px !important;
-  border-radius: 12px !important;
-  font-weight: 800 !important;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 800;
 }
 .f-clear:hover {
-  background: #fdf2f2 !important;
-  color: var(--red-2) !important;
-  border-color: rgba(184, 66, 90, 0.4) !important;
-  transform: translateY(-1px) !important;
+  background: #fdf2f2;
+  color: var(--red-2);
+  border-color: rgba(184, 66, 90, 0.4);
+  transform: translateY(-1px);
 }
 
 /* Pills */
 .pill span {
-  border-radius: var(--r-pill) !important;
-  font-weight: 700 !important;
-  transition: all 0.16s ease !important;
+  border-radius: var(--r-pill);
+  font-weight: 700;
+  transition: all 0.16s ease;
 }
 .pill input:checked + span {
-  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
-  border-color: var(--teal-3) !important;
-  box-shadow: 0 3px 12px rgba(12, 127, 147, 0.26) !important;
+  background: linear-gradient(135deg, var(--teal-3), var(--teal));
+  border-color: var(--teal-3);
+  box-shadow: 0 3px 12px rgba(12, 127, 147, 0.26);
 }
 
 /* ─────────────────────────────────────────────
    9) TABS — شريط زجاجي + مؤشر نشط بتدرج هادئ
 ───────────────────────────────────────────────── */
 .tabs {
-  gap: 7px !important;
-  padding: 11px !important;
-  border-radius: var(--r-xl) !important;
-  background: var(--glass-bg) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7) !important;
-  top: 60px !important;
+  gap: 7px;
+  padding: 11px;
+  border-radius: var(--r-xl);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7);
+  top: 60px;
 }
 .tab {
-  padding: 10.5px 17px !important;
-  border-radius: 12px !important;
-  font-size: 12.5px !important;
-  font-weight: 700 !important;
-  color: #7c98a6 !important;
-  border: 1px solid transparent !important;
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease !important;
+  padding: 10.5px 17px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #7c98a6;
+  border: 1px solid transparent;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
 }
 .tab:hover {
-  background: #f1f8fa !important;
-  color: var(--tx-sec) !important;
-  border-color: rgba(185, 208, 219, 0.55) !important;
-  transform: translateY(-1px) !important;
+  background: #f1f8fa;
+  color: var(--tx-sec);
+  border-color: rgba(185, 208, 219, 0.55);
+  transform: translateY(-1px);
 }
 .tab.active {
-  color: #fff !important;
-  background: linear-gradient(135deg, var(--navy) 0%, var(--teal-3) 70%, var(--teal) 100%) !important;
-  box-shadow: 0 10px 22px -4px rgba(12, 127, 147, 0.32) !important;
+  color: #fff;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--teal-3) 70%, var(--teal) 100%);
+  box-shadow: 0 10px 22px -4px rgba(12, 127, 147, 0.32);
 }
 .tab.tab-premium {
-  background: linear-gradient(135deg, rgba(176, 138, 78, 0.14), rgba(212, 175, 106, 0.07)) !important;
-  color: #8a6526 !important;
-  border: 1px solid rgba(176, 138, 78, 0.32) !important;
-  font-weight: 800 !important;
+  background: linear-gradient(135deg, rgba(176, 138, 78, 0.14), rgba(212, 175, 106, 0.07));
+  color: #8a6526;
+  border: 1px solid rgba(176, 138, 78, 0.32);
+  font-weight: 800;
 }
 .tab.tab-premium:hover {
-  background: linear-gradient(135deg, rgba(176, 138, 78, 0.22), rgba(212, 175, 106, 0.12)) !important;
-  border-color: rgba(176, 138, 78, 0.48) !important;
-  color: #6f4f1a !important;
+  background: linear-gradient(135deg, rgba(176, 138, 78, 0.22), rgba(212, 175, 106, 0.12));
+  border-color: rgba(176, 138, 78, 0.48);
+  color: #6f4f1a;
 }
 .tab.tab-premium.active {
-  background: linear-gradient(135deg, #8a6526, var(--brass)) !important;
-  color: #fff !important;
-  border-color: transparent !important;
-  box-shadow: var(--sh-gold) !important;
+  background: linear-gradient(135deg, #8a6526, var(--brass));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-gold);
 }
 
 /* ─────────────────────────────────────────────
    10) TABLES — رؤوس غامقة، صفوف هادئة، تمييز عند التحويم
 ───────────────────────────────────────────────── */
 .tbl-wrap {
-  border-radius: var(--r-lg) !important;
-  border: 1px solid var(--bd-light) !important;
-  box-shadow: var(--sh-card) !important;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--bd-light);
+  box-shadow: var(--sh-card);
 }
-table { font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif !important; }
+table { font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif; }
 thead th {
-  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%) !important;
-  color: rgba(255, 255, 255, 0.85) !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.045em !important;
-  padding: 13px 12px !important;
-  border-bottom: 2px solid rgba(176, 138, 78, 0.35) !important;
+  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  padding: 13px 12px;
+  border-bottom: 2px solid rgba(176, 138, 78, 0.35);
 }
-tbody td { font-size: 12px !important; padding: 12px 12px !important; }
-tbody tr:nth-child(2n) td { background: #fbfdfe !important; }
+tbody td { font-size: 12px; padding: 12px 12px; }
+tbody tr:nth-child(2n) td { background: #fbfdfe; }
 tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
 
-.pag-bar { padding: 11px 16px !important; border-radius: 0 0 var(--r-lg) var(--r-lg) !important; }
-.pag-btn { border-radius: 10px !important; font-weight: 700 !important; }
+.pag-bar { padding: 11px 16px; border-radius: 0 0 var(--r-lg) var(--r-lg); }
+.pag-btn { border-radius: 10px; font-weight: 700; }
 .pag-btn:hover:not(:disabled) {
-  background: var(--teal) !important;
-  border-color: var(--teal) !important;
-  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22) !important;
+  background: var(--teal);
+  border-color: var(--teal);
+  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22);
 }
 .pag-btn.active {
-  background: linear-gradient(135deg, var(--teal-3), var(--teal)) !important;
-  border-color: transparent !important;
+  background: linear-gradient(135deg, var(--teal-3), var(--teal));
+  border-color: transparent;
 }
 
 .badge {
-  padding: 4px 11px !important;
-  border-radius: var(--r-pill) !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.025em !important;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  font-weight: 800;
+  letter-spacing: 0.025em;
 }
 
 /* ─────────────────────────────────────────────
    11) SCHOOL ROWS / MINI BARS
 ───────────────────────────────────────────────── */
-.school-row:hover { background: var(--bg-2) !important; }
-.mini-track { background: var(--bg-deep) !important; }
+.school-row:hover { background: var(--bg-2); }
+.mini-track { background: var(--bg-deep); }
 
 /* ─────────────────────────────────────────────
    12) CONTRACT CARDS / EMPTY STATES
 ───────────────────────────────────────────────── */
 .contract-card {
-  border-radius: var(--r-lg) !important;
-  border-right: 3px solid var(--teal) !important;
-  background: #fff !important;
+  border-radius: var(--r-lg);
+  border-right: 3px solid var(--teal);
+  background: #fff;
 }
 .contract-card:hover {
-  box-shadow: 0 8px 22px rgba(12, 127, 147, 0.12) !important;
-  border-color: #cfe3ea !important;
+  box-shadow: 0 8px 22px rgba(12, 127, 147, 0.12);
+  border-color: #cfe3ea;
 }
 .empty-msg {
-  border-radius: var(--r-lg) !important;
-  background: linear-gradient(135deg, var(--bg-2), var(--bg-deep)) !important;
-  border: 1.5px dashed var(--bd-mid) !important;
+  border-radius: var(--r-lg);
+  background: linear-gradient(135deg, var(--bg-2), var(--bg-deep));
+  border: 1.5px dashed var(--bd-mid);
 }
 
 /* ─────────────────────────────────────────────
    13) MAP — خريطة فاخرة بزجاج خفيف للوسيلة والإحصاءات
 ───────────────────────────────────────────────── */
 #map-container {
-  border-radius: var(--r-xl) !important;
-  border: 1px solid var(--bd-light) !important;
-  box-shadow: var(--sh-card) !important;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--bd-light);
+  box-shadow: var(--sh-card);
 }
 .map-legend, .map-stat {
-  background: var(--glass-bg) !important;
-  backdrop-filter: var(--glass-blur) !important;
-  -webkit-backdrop-filter: var(--glass-blur) !important;
-  border: 1px solid var(--glass-border) !important;
-  border-radius: var(--r-lg) !important;
-  box-shadow: var(--sh-card) !important;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-card);
 }
-.map-stat:hover { box-shadow: var(--sh-soft) !important; transform: translateY(-1px) !important; }
-.map-ctrl-btn { border-radius: 11px !important; font-weight: 800 !important; }
+.map-stat:hover { box-shadow: var(--sh-soft); transform: translateY(-1px); }
+.map-ctrl-btn { border-radius: 11px; font-weight: 800; }
 .map-ctrl-btn.active, .map-ctrl-btn:hover {
-  background: var(--teal) !important;
-  border-color: var(--teal) !important;
-  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22) !important;
+  background: var(--teal);
+  border-color: var(--teal);
+  box-shadow: 0 3px 10px rgba(12, 127, 147, 0.22);
 }
 /* Leaflet popup polish */
 .leaflet-popup-content-wrapper {
-  border-radius: 14px !important;
-  box-shadow: 0 14px 34px rgba(8, 35, 48, 0.22) !important;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(8, 35, 48, 0.22);
 }
-.leaflet-popup-content { margin: 13px 15px !important; }
+.leaflet-popup-content { margin: 13px 15px; }
 .map-popup-name {
-  font-weight: 800 !important;
-  font-size: 12.5px !important;
-  color: var(--tx-main) !important;
-  margin-bottom: 6px !important;
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--tx-main);
+  margin-bottom: 6px;
 }
 .map-popup-row {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 10px !important;
-  padding: 4px 0 !important;
-  border-bottom: 1px solid #eef3f6 !important;
-  font-size: 11px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid #eef3f6;
+  font-size: 11px;
 }
-.map-popup-row:last-child { border-bottom: none !important; }
-.map-popup-lbl { color: var(--tx-muted) !important; font-weight: 600 !important; }
-.map-popup-val { font-weight: 800 !important; color: var(--tx-main) !important; }
+.map-popup-row:last-child { border-bottom: none; }
+.map-popup-lbl { color: var(--tx-muted); font-weight: 600; }
+.map-popup-val { font-weight: 800; color: var(--tx-main); }
 
 /* ─────────────────────────────────────────────
    14) TOASTS / SKELETONS
 ───────────────────────────────────────────────── */
-.toast { border-radius: 13px !important; box-shadow: 0 6px 18px rgba(8, 35, 48, 0.09) !important; }
+.toast { border-radius: 13px; box-shadow: 0 6px 18px rgba(8, 35, 48, 0.09); }
 
 /* ─────────────────────────────────────────────
    15) RESPONSIVE — تعزيز قوي لتجربة الموبايل
@@ -2461,20 +2461,20 @@ tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
     padding: 9px 14px 11px !important;
     border-top: 1px solid rgba(255, 255, 255, 0.07) !important;
   }
-  .prog-bar { top: auto !important; position: sticky !important; }
+  .prog-bar { top: auto; position: sticky; }
   .tabs {
-    position: relative !important;
-    top: auto !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    scroll-snap-type: x proximity !important;
+    position: relative;
+    top: auto;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
   }
-  .tab { scroll-snap-align: start !important; white-space: nowrap !important; }
-  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
-  .filters-row { padding: 14px !important; }
-  .finp, .fsel, .f-clear { width: 100% !important; min-width: 0 !important; }
-  .map-stat { min-width: calc(50% - 6px) !important; }
-  #map-container { height: 460px !important; }
+  .tab { scroll-snap-align: start; white-space: nowrap; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .filters-row { padding: 14px; }
+  .finp, .fsel, .f-clear { width: 100%; min-width: 0; }
+  .map-stat { min-width: calc(50% - 6px); }
+  #map-container { height: 460px; }
 }
 @media (max-width: 560px) {
   .kpi-grid { grid-template-columns: 1fr !important; }

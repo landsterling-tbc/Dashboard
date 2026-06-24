@@ -225,6 +225,27 @@ const num = (v) => {
       (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m],
     ),
   avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+/* ─── Normalization Helpers ─── */
+/** يُعيد رقماً صحيحاً للإحداثيات (lat/lng) أو null لو القيمة خارج النطاق المعقول */
+function normCoord(v, minVal, maxVal) {
+  const n = num(v);
+  return (n !== null && n >= minVal && n <= maxVal) ? n : null;
+}
+/** lat صحيح: بين ‑90 و 90 */
+const normLat = (v) => normCoord(v, -90, 90);
+/** lng صحيح: بين ‑180 و 180 */
+const normLng = (v) => normCoord(v, -180, 180);
+/** تُعيد نسبة مئوية صحيحة (0–100) أو null */
+const normPct = (v) => normCoord(v, 0, 100);
+/** تُعيد رقماً موجباً أو null */
+const normPositive = (v) => { const n = num(v); return (n !== null && n >= 0) ? n : null; };
+/** قيمة نصية آمنة للعرض — لا تعرض undefined/null/#N/A */
+const safeLabel = (v, fallback = "—") => {
+  if (v == null) return fallback;
+  const s = String(v).trim();
+  return (s === "" || s === "#N/A" || s === "NaT" || s === "undefined" || s === "null") ? fallback : s;
+};
+
 function getTier(v) {
   return null == v
     ? null
@@ -351,127 +372,59 @@ function clearToast() {
 function debounceFilter() {
   (clearTimeout(_filterTimer), (_filterTimer = setTimeout(applyFilters, 300)));
 }
+
+/* ─── مساعد مشترك: يُعيد قائمة فريدة منقّاة ومرتّبة ─── */
+function buildUniqueList(items) {
+  const INVALID = new Set(["", "—", "#N/A", "NaT", "undefined", "null"]);
+  return [...new Set(items.filter((v) => v != null && !INVALID.has(String(v).trim())))]
+    .sort((a, b) => a.localeCompare(b, LANG === "en" ? "en" : "ar"));
+}
+
+/* ─── مساعد مشترك: يملأ قائمة select بخيارات آمنة ─── */
+function fillSelectOptions(el, values, prevValue) {
+  if (!el) return;
+  const allLabel = LANG === "en" ? "All" : "الكل";
+  const sorted = buildUniqueList(values);
+  el.innerHTML =
+    `<option value="">${esc(allLabel)}</option>` +
+    sorted.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if (prevValue && sorted.includes(prevValue)) el.value = prevValue;
+}
 function updateDistrictBySector() {
-  const city = document.getElementById("fCity").value;
+  const city   = document.getElementById("fCity").value;
   const sector = document.getElementById("fSector").value;
-  const el = document.getElementById("fDistrict");
+  const el     = document.getElementById("fDistrict");
   if (!el) return;
   const prevDistrict = el.value;
-  const allLabel = "en" === LANG ? "All" : "الكل";
-  // Filter source: if sector selected → districts of that sector; else if city selected → districts of that city; else all
-  let filtered;
-  if (sector) {
-    filtered = [
-      ...new Set(
-        RAW.filter((r) => r.sector === sector)
-          .map((r) => r.district)
-          .filter((d) => d && "—" !== d && "#N/A" !== d),
-      ),
-    ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-  } else if (city) {
-    filtered = [
-      ...new Set(
-        RAW.filter((r) => r.city === city)
-          .map((r) => r.district)
-          .filter((d) => d && "—" !== d && "#N/A" !== d),
-      ),
-    ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-  } else {
-    filtered = [
-      ...new Set(RAW.map((r) => r.district).filter((d) => d && "—" !== d && "#N/A" !== d)),
-    ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-  }
-  el.innerHTML =
-    `<option value="">${allLabel}</option>` +
-    filtered.map((v) => `<option value="${v}">${v}</option>`).join("");
-  // Restore previous value if still valid
-  if (prevDistrict && [...el.options].some((o) => o.value === prevDistrict)) {
-    el.value = prevDistrict;
-  } else {
-    el.value = "";
-  }
+  /* مصدر القائمة: حسب sector أولاً ثم city ثم الكل */
+  const source = sector
+    ? RAW.filter((r) => r.sector === sector)
+    : city
+      ? RAW.filter((r) => r.city === city)
+      : RAW;
+  fillSelectOptions(el, source.map((r) => r.district), prevDistrict);
 }
 function updateSectorByCity() {
   const city = document.getElementById("fCity").value;
-  const el = document.getElementById("fSector");
+  const el   = document.getElementById("fSector");
   if (!el) return;
   const prevSector = el.value;
-  // Build filtered sector list based on selected city
-  const allLabel = "en" === LANG ? "All" : "الكل";
-  if (!city) {
-    // No city selected: show all sectors
-    const allSectors = [
-      ...new Set(RAW.map((r) => r.sector).filter((s) => s && "—" !== s && "#N/A" !== s)),
-    ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-    el.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      allSectors.map((v) => `<option value="${v}">${v}</option>`).join("");
-  } else {
-    // Filter sectors to only those belonging to the selected city
-    const filtered = [
-      ...new Set(
-        RAW.filter((r) => r.city === city)
-          .map((r) => r.sector)
-          .filter((s) => s && "—" !== s && "#N/A" !== s),
-      ),
-    ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-    el.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      filtered.map((v) => `<option value="${v}">${v}</option>`).join("");
-  }
-  // Restore previous sector if still valid, otherwise reset
-  if (prevSector && [...el.options].some((o) => o.value === prevSector)) {
-    el.value = prevSector;
-  } else {
-    el.value = "";
-  }
+  const source = city ? RAW.filter((r) => r.city === city) : RAW;
+  fillSelectOptions(el, source.map((r) => r.sector), prevSector);
 }
 function buildDynamicFilters() {
-  function fillSelect(id, values) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const prev = el.value,
-      sorted = [...new Set(values.filter((v) => v && "—" !== v && "#N/A" !== v))].sort((a, b) =>
-        a.localeCompare(b, "en" === LANG ? "en" : "ar"),
-      ),
-      allLabel = "en" === LANG ? "All" : "الكل";
-    ((el.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      sorted.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")),
-      prev && sorted.includes(prev) && (el.value = prev));
-  }
-  (fillSelect(
-    "fCity",
-    RAW.map((r) => r.city),
-  ),
-    fillSelect(
-      "fStage",
-      RAW.map((r) => r.stage),
-    ),
-    fillSelect(
-      "fGender",
-      RAW.map((r) => r.gender.replace(/\s+$/, "")),
-    ),
-    fillSelect(
-      "fSize",
-      RAW.map((r) => r.schoolSize),
-    ),
-    fillSelect(
-      "fOwner",
-      RAW.map((r) => r.ownership),
-    ),
-    fillSelect(
-      "fDistrict",
-      RAW.map((r) => r.district),
-    ),
-    fillSelect(
-      "fSector",
-      RAW.map((r) => r.sector),
-    ),
-    fillSelect(
-      "fSubStatus",
-      RAW.map((r) => r.subscriptionStatus),
-    ));
+  /* استخدام fillSelectOptions المشتركة لكل الفلاتر */
+  const prev = (id) => { const e = document.getElementById(id); return e ? e.value : ""; };
+  [
+    { id: "fCity",      vals: RAW.map((r) => r.city) },
+    { id: "fStage",     vals: RAW.map((r) => r.stage) },
+    { id: "fGender",    vals: RAW.map((r) => (r.gender || "").replace(/\s+$/, "")) },
+    { id: "fSize",      vals: RAW.map((r) => r.schoolSize) },
+    { id: "fOwner",     vals: RAW.map((r) => r.ownership) },
+    { id: "fDistrict",  vals: RAW.map((r) => r.district) },
+    { id: "fSector",    vals: RAW.map((r) => r.sector) },
+    { id: "fSubStatus", vals: RAW.map((r) => r.subscriptionStatus) },
+  ].forEach(({ id, vals }) => fillSelectOptions(document.getElementById(id), vals, prev(id)));
   const cities = [...new Set(RAW.map((r) => r.city).filter((c) => c))],
     sectors = [...new Set(RAW.map((r) => r.sector).filter((s) => s && "#N/A" !== s))];
   ((document.getElementById("fg-city").style.display = cities.length > 1 ? "" : "none"),
@@ -527,52 +480,15 @@ function applyFilters() {
     renderKPIs();
     renderTierStrip();
 
+    /* إعادة رسم التبويب النشط باستخدام dispatch map */
     const activeId = document.querySelector(".panel.active")?.id;
-    const safeRun = (fn, name) => {
-      try {
-        fn();
-      } catch (e) {
-        console.error("[render:" + name + "]", e);
+    if (activeId) {
+      const tabName = activeId.replace(/^tab-/, "");
+      const renderFn = TAB_RENDER_MAP[tabName];
+      if (renderFn) {
+        try { renderFn(); } catch (e) { console.error("[applyFilters:" + tabName + "]", e); }
       }
-    };
-
-    if (activeId === "tab-overview") safeRun(renderOverviewCharts, "overview");
-    if (activeId === "tab-fca") safeRun(renderFcaCharts, "fca");
-    if (activeId === "tab-env") safeRun(renderEnvCharts, "env");
-    if (activeId === "tab-stages") safeRun(renderStageCharts, "stages");
-    if (activeId === "tab-stage-compare") safeRun(renderStageCompareTab, "stage-compare");
-    if (activeId === "tab-fca-ref") safeRun(renderFcaRefTab, "fca-ref");
-    if (activeId === "tab-contracts") safeRun(renderContractCharts, "contracts");
-    if (activeId === "tab-all-contracts") safeRun(renderAllContracts, "all-contracts");
-    if (activeId === "tab-sys-main") safeRun(renderSysMain, "sys-main");
-    if (activeId === "tab-sys-detail") safeRun(renderSysDetail, "sys-detail");
-    if (activeId === "tab-balagh") safeRun(renderBalaghTab, "balagh");
-    if (activeId === "tab-tajheez") safeRun(renderTajheezInventoryTab, "tajheez");
-    if (activeId === "tab-gatekeepers" && typeof renderGatekeepersTab === "function")
-      safeRun(renderGatekeepersTab, "gatekeepers");
-    if (activeId === "tab-seyana")
-      safeRun(
-        () =>
-          renderSingleMetricTab(
-            "seyana",
-            "preventive",
-            "الصيانة الوقائية",
-            "#0891B2",
-            "#ECFEFF",
-            "🔧",
-          ),
-        "seyana",
-      );
-    if (activeId === "tab-khanadeq") safeRun(renderKhanadeqTab, "khanadeq");
-    if (activeId === "tab-map") safeRun(renderMap, "map");
-    if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
-    if (activeId === "tab-students") safeRun(renderStudentsTab, "students");
-    if (activeId === "tab-ayen") safeRun(renderAyenTab, "ayen");
-    if (activeId === "tab-table") {
-      TBL.cur = 0;
-      safeRun(renderTable, "table");
     }
-    if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
   } catch (err) {
     console.error("[applyFilters]", err);
     if (typeof showToast === "function") showToast("خطأ أثناء تحديث العرض: " + err.message, "err");
@@ -736,41 +652,51 @@ function renderTierStrip() {
    ║       "tab-MY_TAB"===activeId && renderMyTab()                 ║
    ║                                                                ║
    ╚════════════════════════════════════════════════════════════════╝ */
+/* ─── خريطة التبويبات: كل إدخال { id: دالة_الرسم } ─── */
+const TAB_RENDER_MAP = {
+  "overview":       () => renderOverviewCharts(),
+  "fca":            () => renderFcaCharts(),
+  "env":            () => renderEnvCharts(),
+  "stages":         () => renderStageCharts(),
+  "stage-compare":  () => renderStageCompareTab(),
+  "fca-ref":        () => renderFcaRefTab(),
+  "contracts":      () => renderContractCharts(),
+  "all-contracts":  () => renderAllContracts(),
+  "sys-main":       () => renderSysMain(),
+  "sys-detail":     () => renderSysDetail(),
+  "balagh":         () => renderBalaghTab(),
+  "tajheez":        () => renderTajheezInventoryTab(),
+  "gatekeepers":    () => typeof renderGatekeepersTab === "function" && renderGatekeepersTab(),
+  "seyana":         () => renderSingleMetricTab("seyana", "preventive", "الصيانة الوقائية", "#0891B2", "#ECFEFF", "🔧"),
+  "khanadeq":       () => renderKhanadeqTab(),
+  "elevators":      () => renderElevatorsTab(),
+  "cost":           () => renderCostTab(),
+  "map":            () => renderMap(),
+  "spare":          () => renderSpareTab(),
+  "students":       () => renderStudentsTab(),
+  "ayen":           () => renderAyenTab(),
+  "table":          () => { TBL.cur = 0; renderTable(); },
+  "ac-plan":        () => renderAcPlanTab(),
+  "mag-kpi":        () => renderMagKpiTab(),
+};
+
 function showTab(name, el) {
+  /* حماية Presentation Mode */
   if (window.__PRESENTATION_MODE__ && (name === "students" || name === "seyana")) {
     const fallback = document.getElementById("tabbtn-overview");
     return showTab("overview", fallback);
   }
-  (document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active")),
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active")),
-    document.getElementById("tab-" + name).classList.add("active"),
-    el && el.classList.add("active"),
-    "overview" === name && renderOverviewCharts(),
-    "fca" === name && renderFcaCharts(),
-    "env" === name && renderEnvCharts(),
-    "stages" === name && renderStageCharts(),
-    "stage-compare" === name && renderStageCompareTab(),
-    "fca-ref" === name && renderFcaRefTab(),
-    "contracts" === name && renderContractCharts(),
-    "all-contracts" === name && renderAllContracts(),
-    "sys-main" === name && renderSysMain(),
-    "sys-detail" === name && renderSysDetail(),
-    "balagh" === name && renderBalaghTab(),
-    "tajheez" === name && renderTajheezInventoryTab(),
-    "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
-    "seyana" === name &&
-      renderSingleMetricTab("seyana", "preventive", "الصيانة الوقائية", "#0891B2", "#ECFEFF", "🔧"),
-    "khanadeq" === name && renderKhanadeqTab(),
-    "elevators" === name && renderElevatorsTab(),
-    "cost" === name && renderCostTab(),
-    "map" === name && renderMap(),
-    "spare" === name && renderSpareTab(),
-    "students" === name && renderStudentsTab(),
-    "ayen" === name && renderAyenTab(),
-    "table" === name && ((TBL.cur = 0), renderTable()),
-    "ac-plan" === name && renderAcPlanTab(),
-    "mag-kpi" === name && renderMagKpiTab());
-
+  /* إخفاء كل التبويبات والـ panels */
+  document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  const panel = document.getElementById("tab-" + name);
+  if (panel) panel.classList.add("active");
+  if (el) el.classList.add("active");
+  /* تشغيل دالة الرسم المقابلة إن وُجدت */
+  const renderFn = TAB_RENDER_MAP[name];
+  if (renderFn) {
+    try { renderFn(); } catch (e) { console.error("[showTab:" + name + "]", e); }
+  }
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
   killChart(id);
@@ -2566,8 +2492,8 @@ function renderTable() {
             classrooms: num(b["عدد_الفصول"]),
             schoolSize: String(b["حجم_المدرسة"] ?? "").trim(),
             buildingSize: String(b["نوع_المبنى"] ?? b["حجم_المبنى"] ?? "").trim(),
-            lng: num(b["خط_الطول"]),
-            lat: num(b["خط_العرض"]),
+            lng: normLng(b["خط_الطول"]),
+            lat: normLat(b["خط_العرض"]),
             fca: (() => {
               // آخر تقييم FCA من ملف تقييمات_FCA_المراحل
               // مفتاح الربط: رقم_المدرسة_الوزاري (S-42671) أولاً — يطابق 3673 مدرسة
@@ -2588,7 +2514,7 @@ function renderTable() {
               const entry = latestFcaMap[id];
               return entry ? (entry.dateObj ?? null) : null;
             })(),
-            envScore: num(b["درجة_البيئة_المدرسية"]),
+            envScore: normPct(b["درجة_البيئة_المدرسية"]),
             envRating: String(b["تقدير_البيئة_المدرسية"] ?? "").trim(),
             students: num(b["عدد_الطلاب"]),
             buildingAge: num(b["عمر_المبني"]),

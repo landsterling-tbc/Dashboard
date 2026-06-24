@@ -1,8 +1,4 @@
-/* ============================================================
-   dashboard.js — كل منطق JavaScript للوحة بيانات إدارة المرافق التعليمية
-   مستخرج من index19.html (دمج 13 كتلة <script>)
-   ============================================================ */
-
+/* dashboard.js — updated 2026-06-24 07:40 */
 /* تنسيقات الشارتات بعد تحميل الصفحة */
 document.addEventListener("DOMContentLoaded", () => {
   "undefined" != typeof Chart &&
@@ -12149,6 +12145,3 @@ ${JSON.stringify(priorityData)}`;
     typeof window.renderGatekeepersTab,
   );
 })();
-
-
-/* ═══════════════════════════════════════════════════════════════════

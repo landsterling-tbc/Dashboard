@@ -5809,7 +5809,7 @@ function _sysExcelTableHTML(title, headers, rows) {
         // لو لم يكن موجوداً — نُطبّق escText على النص الخام لمنع XSS
         const labelHtml = typeof labelFormatter === "function"
           ? labelFormatter(it.k)
-          : escText(it.k);
+          : escText(String(it.k ?? ""));
         return `
         <div class="school-row" style="align-items:flex-start">
           <div style="min-width:120px;flex:0 0 120px;font-size:12px;font-weight:700;color:var(--tx-main)">${labelHtml}</div>
@@ -5984,7 +5984,7 @@ function _sysExcelTableHTML(title, headers, rows) {
         <div class="fg">
           <div class="fg-lbl">بحث</div>
           <input class="finp" id="balagh-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}"
-            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;renderBalaghTab()">
         </div>
         <div class="fg">
           <div class="fg-lbl">الحالة</div>
@@ -6067,7 +6067,10 @@ function _sysExcelTableHTML(title, headers, rows) {
           </div>
           ${renderBarList(schoolCounts, totalForBars, "#D97706", (sn) => {
             const name = schoolNumberNameMap[sn] || sn;
-            return `<span onclick="window.__BALAGH_STATE__.search='${sn}';window.__BALAGH_STATE__.page=0;renderBalaghTab();document.getElementById('balagh-table-search')&&(document.getElementById('balagh-table-search').value='${sn}')" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${name}</span>`;
+            // نستخدم data-sn بدل onclick inline لتفادي كسر الـ JS لو كان sn يحتوي '
+            const safeAttr = escText(sn);
+            const safeName = escText(name);
+            return `<span data-balagh-filter="${safeAttr}" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${safeName}</span>`;
           })}
         </div>
         <div class="card">
@@ -6151,7 +6154,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           <div class="fg" style="flex:1;min-width:220px">
             <div class="fg-lbl">بحث في التفاصيل</div>
             <input class="finp" id="balagh-table-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}" style="width:100%"
-              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-search');if(s)s.value=this.value;renderBalaghTab()">
           </div>
           <div class="fg">
             <div class="fg-lbl">الترتيب</div>
@@ -6215,6 +6218,21 @@ function _sysExcelTableHTML(title, headers, rows) {
         ${renderPager(filteredTotal)}
       </div>
     `;
+
+    // === ربط data-balagh-filter بالبحث (بديل onclick inline) ===
+    el.querySelectorAll("[data-balagh-filter]").forEach((span) => {
+      span.addEventListener("click", function () {
+        const sn = this.dataset.balaghFilter;
+        window.__BALAGH_STATE__.search = sn;
+        window.__BALAGH_STATE__.page = 0;
+        renderBalaghTab();
+        // مزامنة حقلَي البحث بعد إعادة الرسم
+        ["balagh-search", "balagh-table-search"].forEach((id) => {
+          const el2 = document.getElementById(id);
+          if (el2) el2.value = sn;
+        });
+      });
+    });
 
     // === رسم الشارتات الزمنية — مرتبطة بالفلاتر ===
     requestAnimationFrame(() => {
@@ -6484,8 +6502,9 @@ function _sysExcelTableHTML(title, headers, rows) {
         if (!r.isClosed) return;
         const k = parseMonthKey(r.creationDateObj || r.creationDate);
         if (!k || !last18Months.includes(k)) return;
-        const sla = parseFloat(r.slaDays);
-        if (!isNaN(sla) && sla >= 0) {
+        // نستخدم slaNum (مُحوَّل مسبقاً في normalizeRows بـ parseNumFromText) بدل parseFloat على نص خام
+        const sla = r.slaNum;
+        if (Number.isFinite(sla) && sla >= 0) {
           slaMonthlySumMap.set(k, (slaMonthlySumMap.get(k) || 0) + sla);
           slaMonthlyCntMap.set(k, (slaMonthlyCntMap.get(k) || 0) + 1);
         }
@@ -6639,7 +6658,6 @@ function _sysExcelTableHTML(title, headers, rows) {
       }
     });
     // === نهاية الشارتات الزمنية ===
-    STATE.search = document.getElementById("balagh-search")?.value || STATE.search;
   }
 
   window.renderBalaghTab = renderBalaghTab;

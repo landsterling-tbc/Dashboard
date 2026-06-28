@@ -83,7 +83,7 @@ function applyPresentationModeUI() {
 
   if (on) {
     const activeTab = document.querySelector(".tab.active");
-    if (activeTab && (activeTab.id === "tabbtn-students" || activeTab.id === "tabbtn-seyana")) {
+    if (activeTab && activeTab.id === "tabbtn-students") {
       const fallback = document.querySelector('.tab[onclick*="showTab(\'overview\'"]');
       if (fallback && typeof showTab === "function") showTab("overview", fallback);
     }
@@ -135,7 +135,6 @@ const CFG = {
     gender: ["الجنس"],
     stage: ["المرحلة"],
     ownership: ["حكومي_مستأجر"],
-    linkType: ["نوع_الربط"],
     city: ["المدينة_الرئيسية"],
     district: ["الحي"],
     sector: ["المحافظة"],
@@ -147,9 +146,7 @@ const CFG = {
     lat: ["خط_العرض"],
     acUnits: ["وحدات_التكييف"],
     alerts: ["عدد_البلاغات"],
-    equipment: ["التجهيزات"],
-    preventive: ["الصيانة_الوقائية"],
-    drainage: ["خنادق_الصرف"],
+
     fca: ["قيمة_FCA"],
     envScore: ["درجة_البيئة_المدرسية"],
     envText: ["البيئة_المدرسية_نص"],
@@ -157,9 +154,7 @@ const CFG = {
     contractMaint: ["رقم_عقد_الصيانة"],
     contractAC: ["رقم_عقد_التكييف"],
     contractClean: ["رقم_عقد_النظافة"],
-    contrMaint: ["مقاول_الصيانة"],
-    contrAC: ["مقاول_التكييف"],
-    contrClean: ["مقاول_النظافة"],
+
     projMaint: ["رقم_مشروع_الصيانة"],
     projAC: ["رقم_مشروع_التكييف"],
     projClean: ["رقم_مشروع_النظافة"],
@@ -170,7 +165,6 @@ const CFG = {
     description: ["وصف_الصنف"],
     quantity: ["الكمية"],
     unitValue: ["قيمة_وحدة_البيئة", "سعر_الوحدة"],
-    subscriptionStatus: ["حالة_الاشتراك"],
     students: ["عدد_الطلاب"],
     buildingAge: ["عمر_المبني"],
     ayenScore: ["تقييم_عاين"],
@@ -470,7 +464,6 @@ function buildDynamicFilters() {
     ),
     fillSelect(
       "fSubStatus",
-      RAW.map((r) => r.subscriptionStatus),
     ));
   const cities = [...new Set(RAW.map((r) => r.city).filter((c) => c))],
     sectors = [...new Set(RAW.map((r) => r.sector).filter((s) => s && "#N/A" !== s))];
@@ -495,7 +488,6 @@ function applyFilters() {
       owner = document.getElementById("fOwner").value,
       fcaMin = parseFloat(document.getElementById("fFcaMin").value) || 0,
       district = document.getElementById("fDistrict").value,
-      subStatus = document.getElementById("fSubStatus")?.value || "",
       search = document.getElementById("fSearch").value.trim().toLowerCase(),
       linkChecked = [...document.querySelectorAll("#fLinkType input:checked")].map(
         (cb) => cb.value,
@@ -510,8 +502,6 @@ function applyFilters() {
         (!size || r.schoolSize === size) &&
         (!owner || r.ownership === owner) &&
         (!district || r.district === district) &&
-        (!subStatus || r.subscriptionStatus === subStatus) &&
-        !(linkChecked.length && !linkChecked.includes(r.linkType)) &&
         (!fcaMin || !(null == r.fca || r.fca < fcaMin)) &&
         !(
           search &&
@@ -550,19 +540,18 @@ function applyFilters() {
     if (activeId === "tab-tajheez") safeRun(renderTajheezInventoryTab, "tajheez");
     if (activeId === "tab-gatekeepers" && typeof renderGatekeepersTab === "function")
       safeRun(renderGatekeepersTab, "gatekeepers");
-    if (activeId === "tab-seyana")
-      safeRun(
-        () =>
-          renderSingleMetricTab(
-            "seyana",
-            "preventive",
-            "الصيانة الوقائية",
-            "#0891B2",
-            "#ECFEFF",
-            "🔧",
-          ),
-        "seyana",
-      );
+    if (activeId === "tab-seyana") {
+      const _el = document.getElementById("seyana-content");
+      if (_el) _el.innerHTML = `
+        <div class="card" style="text-align:center;padding:48px 24px">
+          <div style="font-size:48px;margin-bottom:12px">🔧</div>
+          <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">الصيانة الوقائية</div>
+          <div style="font-size:13px;color:var(--tx-sec);max-width:480px;margin:0 auto;line-height:1.8">
+            بيانات الصيانة الوقائية كانت تأتي من شيت الخدمات الذي تم حذفه.<br>
+            للاطلاع على بلاغات الصيانة الفعلية راجع تبويب <strong>البلاغات</strong>.
+          </div>
+        </div>`;
+    }
     if (activeId === "tab-khanadeq") safeRun(renderKhanadeqTab, "khanadeq");
     if (activeId === "tab-map") safeRun(renderMap, "map");
     if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
@@ -737,7 +726,7 @@ function renderTierStrip() {
    ║                                                                ║
    ╚════════════════════════════════════════════════════════════════╝ */
 function showTab(name, el) {
-  if (window.__PRESENTATION_MODE__ && (name === "students" || name === "seyana")) {
+  if (window.__PRESENTATION_MODE__ && name === "students") {
     const fallback = document.getElementById("tabbtn-overview");
     return showTab("overview", fallback);
   }
@@ -758,8 +747,7 @@ function showTab(name, el) {
     "balagh" === name && renderBalaghTab(),
     "tajheez" === name && renderTajheezInventoryTab(),
     "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
-    "seyana" === name &&
-      renderSingleMetricTab("seyana", "preventive", "الصيانة الوقائية", "#0891B2", "#ECFEFF", "🔧"),
+
     "khanadeq" === name && renderKhanadeqTab(),
     "elevators" === name && renderElevatorsTab(),
     "cost" === name && renderCostTab(),
@@ -966,24 +954,13 @@ function renderOverviewCharts() {
       },
     })));
   const sizeMap = {},
-    ownerMap = {},
-    linkMap = {};
+    ownerMap = {};
   (D.forEach((r) => {
-    (r.schoolSize && (sizeMap[r.schoolSize] = (sizeMap[r.schoolSize] || 0) + 1),
-      r.ownership && (ownerMap[r.ownership] = (ownerMap[r.ownership] || 0) + 1),
-      r.linkType &&
-        "#N/A" !== r.linkType &&
-        (linkMap[r.linkType] = (linkMap[r.linkType] || 0) + 1));
+    r.schoolSize && (sizeMap[r.schoolSize] = (sizeMap[r.schoolSize] || 0) + 1);
+    r.ownership  && (ownerMap[r.ownership]  = (ownerMap[r.ownership]  || 0) + 1);
   }),
-    makeDoughnut("ch-size", sizeMap, { كبير: "#083D4F", متوسط: "#0891B2", صغير: "#059669" }),
-    makeDoughnut("ch-owner", ownerMap, { حكومي: "#083D4F", مستأجر: "#D97706" }),
-    makeDoughnut("ch-link", linkMap, { مستقل: "#0891B2", "مشترك أساسي": "#059669" }));
-  const subMap = {};
-  (D.forEach((r) => {
-    r.subscriptionStatus &&
-      (subMap[r.subscriptionStatus] = (subMap[r.subscriptionStatus] || 0) + 1);
-  }),
-    makeDoughnut("ch-sub-status", subMap, { مستقل: "#0891B2", "مشترك أساسي": "#059669" }));
+    makeDoughnut("ch-size",  sizeMap,  { كبير: "#083D4F", متوسط: "#0891B2", صغير: "#059669" }),
+    makeDoughnut("ch-owner", ownerMap, { حكومي: "#083D4F", مستأجر: "#D97706" }));
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📈  JS تبويب: تحليل FCA
@@ -2070,66 +2047,19 @@ function renderStageCompareTab() {
    ║  (tab-contracts) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
 function renderContractCharts() {
-  const D = FILTERED,
-    mMap = {},
-    acMap = {},
-    clMap = {};
-  (D.forEach((r) => {
-    const m = r.contrMaint?.trim();
-    m && (mMap[m] = (mMap[m] || 0) + 1);
-    const a = r.contrAC?.trim();
-    a && (acMap[a] = (acMap[a] || 0) + 1);
-    const c = r.contrClean?.trim();
-    c && (clMap[c] = (clMap[c] || 0) + 1);
-  }),
-    makeDoughnut("ch-cont-maint", mMap),
-    makeDoughnut("ch-cont-ac", acMap),
-    makeDoughnut("ch-cont-clean", clMap));
-  document.getElementById("contracts-expiry").innerHTML = [
-    { key: "expMaint", label: "الصيانة", color: "#0891B2", icon: "🔧" },
-    { key: "expClean", label: "النظافة", color: "#059669", icon: "🧹" },
-    { key: "expAC", label: "التكييف", color: "#D97706", icon: "❄️" },
-  ]
-    .map((f) => {
-      const vals = D.map((r) => r[f.key]).filter(
-          (v) => v && "NaT" !== v && null !== v && "" !== String(v).trim(),
-        ),
-        unique = [
-          ...new Set(
-            vals.map((v) => {
-              const s = String(v).trim();
-              try {
-                const d = new Date(s);
-                if (!isNaN(d.getTime()))
-                  return d.toLocaleDateString("en" === LANG ? "en-US" : "ar-SA", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  });
-              } catch (_) {}
-              return s;
-            }),
-          ),
-        ].filter(Boolean),
-        count = D.filter((r) => r[f.key] && "NaT" !== r[f.key]).length,
-        pctCov = D.length ? Math.round((count / D.length) * 100) : 0;
-      return `<div class="contract-card" style="border-right-color:${f.color}">\n      <div style="font-size:12px;font-weight:800;color:${f.color};margin-bottom:6px">${f.icon} عقود ${f.label}</div>\n      <div style="font-size:18px;font-weight:800;color:${f.color};margin-bottom:4px">${count.toLocaleString()} مبنى</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-bottom:8px">التغطية: ${pctCov}%</div>\n      <div style="font-size:11px;color:var(--tx-muted)">\n        ${
-        unique.length
-          ? unique
-              .slice(0, 3)
-              .map((d) => `<div style="margin-bottom:3px">📅 ${d}</div>`)
-              .join("")
-          : "<div>— لا توجد بيانات</div>"
-      }\n        ${unique.length > 3 ? `<div style="color:var(--tx-sec)">+${unique.length - 3} تاريخ آخر</div>` : ""}\n      </div>\n    </div>`;
-    })
-    .join("");
+  const el = document.getElementById("contracts-content");
+  if (!el) return;
+  el.innerHTML = `
+    <div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">📋</div>
+      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">بيانات العقود</div>
+      <div style="font-size:13px;color:var(--tx-sec);max-width:420px;margin:0 auto;line-height:1.7">
+        بيانات مقاولي الصيانة والتكييف والنظافة موجودة في تبويب
+        <strong>عقود عدا المجال</strong> مع كامل التفاصيل المالية وحالة المستخلصات.
+      </div>
+    </div>`;
 }
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  📢  JS مشترك: تبويب البلاغات (balagh) + الصيانة الوقائية (seyana)
-   ║  كلا التبويبين يستخدمان نفس الدالة: renderSingleMetricTab()
-   ║  البلاغات: renderSingleMetricTab("balagh", "alerts", ...)
-   ║  الصيانة:  renderSingleMetricTab("seyana", "preventive", ...)
-   ╚════════════════════════════════════════════════════════════╝ */
+
 function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
   const el = document.getElementById(tabId + "-content");
   if (!el) return;
@@ -2561,7 +2491,6 @@ function renderTable() {
               .replace(/\s+$/, ""),
             stage: String(b["المرحلة"] ?? "").trim(),
             ownership: String(b["حكومي_مستأجر"] ?? "").trim(),
-            linkType: normalizeStatus(b["حالة_الاشتراك"] ?? ""),
             city: String(b["المدينة_الرئيسية"] ?? dist["المدينة_الرئيسية"] ?? "").trim(),
             district: String(b["الحي"] ?? "").trim(),
             sector: String(b["المحافظة"] ?? dist["المحافظة"] ?? "").trim(),
@@ -2595,18 +2524,11 @@ function renderTable() {
             students: num(b["عدد_الطلاب"]),
             buildingAge: num(b["عمر_المبني"]),
             ayenScore: num(b["تقييم_عاين"]),
-            subscriptionStatus: normalizeStatus(b["حالة_الاشتراك"]),
             alerts: num(b["عدد_البلاغات"]) ?? 0,
-            equipment: num(b["التجهيزات"]),
-            preventive: num(b["الصيانة_الوقائية"]),
-            drainage: num(b["خنادق_الصرف"]),
             acUnits: num(b["وحدات_التكييف"]),
             contractMaint: String(b["رقم_عقد_الصيانة"] ?? con["رقم_عقد_الصيانة"] ?? "").trim(),
             contractAC: String(b["رقم_عقد_التكييف"] ?? con["رقم_عقد_التكييف"] ?? "").trim(),
             contractClean: String(b["رقم_عقد_النظافة"] ?? con["رقم_عقد_النظافة"] ?? "").trim(),
-            contrMaint: String(b["مقاول_الصيانة"] ?? con["مقاول_الصيانة"] ?? "").trim(),
-            contrAC: String(b["مقاول_التكييف"] ?? con["مقاول_التكييف"] ?? "").trim(),
-            contrClean: String(b["مقاول_النظافة"] ?? con["مقاول_النظافة"] ?? "").trim(),
             projMaint: String(b["رقم_مشروع_الصيانة"] ?? con["رقم_مشروع_الصيانة"] ?? "").trim(),
             projAC: String(b["رقم_مشروع_التكييف"] ?? con["رقم_مشروع_التكييف"] ?? "").trim(),
             projClean: String(b["رقم_مشروع_النظافة"] ?? con["رقم_مشروع_النظافة"] ?? "").trim(),
@@ -10118,32 +10040,9 @@ function renderTajheezAllTable() {
         إجمالي_وحدات_التكييف: D.reduce((s, r) => s + (r.acUnits || 0), 0),
       },
 
-      البلاغات_الصيانة: {
-        إجمالي_البلاغات_من_بيانات_المباني: D.reduce((s, r) => s + (r.alerts || 0), 0),
-        أعلى_10_مدارس_بلاغات: fcbTopN(D, "alerts", 10, false),
-      },
-
-      الصيانة_الوقائية_حسب_المبنى: {
-        ملاحظة: "هذا عدد أعمال/بنود الصيانة الوقائية المسجّلة لكل مبنى من بيانات الخدمات — لتفاصيل أوسع راجع تبويب الصيانة الوقائية مباشرة.",
-        إجمالي_بنود_الصيانة_الوقائية: D.reduce((s, r) => s + (r.preventive || 0), 0),
-        أعلى_10_مدارس_صيانة_وقائية: fcbTopN(D, "preventive", 10, false),
-      },
-
-      التجهيزات_حسب_المبنى: {
-        ملاحظة: "هذا عدد بنود التجهيزات المسجّلة لكل مبنى من بيانات الخدمات — لتفاصيل المخزون والاحتياج الكامل راجع قسم تجهيزات_المخزون بالأسفل (من تبويب التجهيزات نفسه).",
-        إجمالي_بنود_التجهيزات: D.reduce((s, r) => s + (r.equipment || 0), 0),
-        أعلى_10_مدارس_تجهيزات: fcbTopN(D, "equipment", 10, false),
-      },
-
-      خنادق_الصرف_حسب_المبنى: {
-        إجمالي_من_بيانات_الخدمات: D.reduce((s, r) => s + (r.drainage || 0), 0),
-      },
 
       العقود: {
-        أهم_مقاولي_الصيانة: fcbCountBy(D, "contrMaint", 8),
-        أهم_مقاولي_التكييف: fcbCountBy(D, "contrAC", 8),
-        أهم_مقاولي_النظافة: fcbCountBy(D, "contrClean", 8),
-        حالة_الاشتراك_توزيع: fcbCountBy(D, "subscriptionStatus", 8),
+        ملاحظة: "بيانات مقاولي الصيانة/التكييف/النظافة تأتي من تبويب عقود_FM — راجع قسم عقود_FM في الملخص",
       },
 
       تقييم_عاين: {
@@ -10315,11 +10214,15 @@ function renderTajheezAllTable() {
         const totalSchools = khRaw.reduce((s, r) => s + (r.schools || 0), 0);
         const totalKhanadeq = khRaw.reduce((s, r) => s + (r.khanadeq || 0), 0);
         summary.خنادق_الصرف = {
-          مصدر: "تبويب خنادق الصرف",
-          إجمالي_المدارس: totalSchools,
+          مصدر: "تبويب خنادق الصرف — بيانات ثابتة مُدخلة يدوياً في الكود",
+          ملاحظة: "تُعدَّل مباشرة داخل renderKhanadeqTab في dashboard.js",
+          إجمالي_المدارس_المغطاة: totalSchools,
           إجمالي_خنادق_الصرف: totalKhanadeq,
-          متوسط_خندق_لكل_مدرسة: totalSchools ? +(totalKhanadeq / totalSchools).toFixed(2) : null,
-          توزيع_حسب_المدينة: khRaw.map((r) => ({ المدينة: r.city, المدارس: r.schools, الخنادق: r.khanadeq })),
+          عدد_المدن_بها_بيانات: khRaw.filter(r=>r.khanadeq>0).length,
+          توزيع_حسب_المدينة: khRaw.map(r => ({
+            المدينة: r.city, المدارس: r.schools, الخنادق: r.khanadeq,
+            نسبة_خندق_لكل_مدرسة: r.schools > 0 ? +(r.khanadeq/r.schools).toFixed(2) : 0,
+          })),
         };
       }
     } catch (e) {
@@ -10914,16 +10817,16 @@ function renderTajheezAllTable() {
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
     { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، الصيانة الوقائية والتصحيحية، إدارة العقود والأصول، التجهيزات المدرسية، والبوابين وأنظمة المباني. اسألني عن أي قسم في اللوحة 📊" },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• عقود غير المجال — عقود FM\n• الصيانة الوقائية — جدولة الأعمال المبرمجة\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• عقود غير المجال — عقود FM\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
     { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nيقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
     { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nتشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
     { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب العقود يعرض كل التعاقدات مع حالتها ومدتها، وتبويب عقود غير المجال يعرض عقود FM." },
-    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة الوقائية والتصحيحية 🔧\n\n• الصيانة الوقائية: تخطيط مسبق لتفادي الأعطال قبل وقوعها.\n• الصيانة التصحيحية: استجابة سريعة لإصلاح الأعطال الطارئة.\n\nتبويب الصيانة الوقائية يعرض الأعمال المجدولة، وتبويب البلاغات يتابع الأعطال وسرعة الاستجابة." },
+    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة والبلاغات 🔧\n\nبلاغات الصيانة والأعطال موجودة في تبويب البلاغات مع كامل التفاصيل (الحالة، الأولوية، SLA، الفئة)." },
     { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي — الفرق السالب يعني عجزاً يحتاج ميزانية." },
     { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\n• التكييف: العمر الافتراضي 10-15 سنة — يحتاج صيانة وقائية دورية.\n• الكهرباء: فحص دوري سنوي كحد أدنى.\n• السباكة: مراقبة الصرف وضغط المياه بشكل منتظم.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
     { test: /بواب|بوابين|حارس|gatekeeper/i, reply: "تبويب البوابين 🧍 — يعرض قائمة كاملة بجميع البوابين مع اسم المدرسة ورقم الجوال ورقم الهوية والمدينة. اسألني مباشرة عن بواب مدرسة معينة وسأخبرك." },
     { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة 🗺️ يعرض توزيع المدارس جغرافياً مع مؤشرات حالتها (FCA والبيئة)، لتحديد التجمعات الجغرافية ذات الأولوية وتخطيط جولات الفحص الميداني بكفاءة." },
-    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈 — أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• نسبة الصيانة الوقائية للتصحيحية.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
+    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈 — أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
     { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل «◷ تلقائي» للتحديث الدوري. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
     { test: /لغة|عربي|english|انجليزي|ترجم/i, reply: "اللوحة تدعم العربية والإنجليزية — تقدر تبدّل اللغة من الشريط العلوي 🌐" },
     { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌" },
@@ -11651,7 +11554,7 @@ function renderTajheezAllTable() {
 خبرتك التخصصية
 ══════════════════════════════════════════════════════
 - إدارة الأصول والمرافق التعليمية.
-- الصيانة الوقائية والتصحيحية وترتيب الأولويات.
+- الصيانة التصحيحية وترتيب الأولويات (من بيانات البلاغات).
 - إدارة العقود وقياس أداء المقاولين.
 - التجهيزات المدرسية وإدارة المخزون.
 - أنظمة المباني: التكييف والكهرباء والسباكة وشبكات الصرف.
@@ -11685,27 +11588,29 @@ function renderTajheezAllTable() {
 ══════════════════════════════════════════════════════
 • نظرة عامة              → عدد_المباني_الإجمالي، توزيع_المدن، توزيع_المراحل
 • تحليل FCA              → تحليل_FCA: متوسط، حرجة، أسوأ/أفضل مدارس
-• تاريخ تقييمات FCA      → تاريخ_تقييمات_FCA: متوسط حسب المرحلة، اتجاه عبر السنوات
+• مقارنة مراحل FCA       → تاريخ_تقييمات_FCA: متوسط حسب المرحلة، اتجاه عبر السنوات
+• FCA المرجعي            → تاريخ_تقييمات_FCA (بيانات المراحل التاريخية)
 • البيئة المدرسية         → البيئة_المدرسية: متوسط، أسوأ/أفضل مدارس
+• الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي: أقدم مباني، أكبر مدارس، توزيع أعمار
 • المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب)
 • العقود (المجال)         → العقود: مقاولو الصيانة/التكييف/النظافة
-• عقود غير المجال (FM)   → عقود_FM: إجمالي، مالي، منتهية، مستحقة، توزيع
+• عقود عدا المجال        → عقود_FM: إجمالي، مالي، منتهية، مستحقة، توزيع حسب مقاول/منطقة
+• الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات حسب النظام
+• الأنظمة التفصيلية      → الأنظمة_الرئيسية_والتفصيلية (نفس المصدر، تفصيل أعمق)
+• الصيانة الوقائية        → لا توجد بيانات حالياً — التبويب موجود في الواجهة لكن بدون شيت أو ملف بيانات
+• التجهيزات              → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام، مدن
+• البوابين               → البوابين: إحصائيات + توزيع (القايمة الكاملة تُحقن تلقائياً لو السؤال عن بواب)
+• قطع الغيار             → قطع_الغيار: إجمالي، أعلى أصناف قيمة
 • البلاغات               → البلاغات: إجمالي، حالة، SLA، فئات، أولويات، أعلى مدارس
-• التجهيزات (مخزون)      → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام
-• الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات
-• الصيانة الوقائية        → الصيانة_الوقائية_حسب_المبنى
-• خنادق الصرف            → خنادق_الصرف: إجمالي، توزيع حسب المدينة
-• المصاعد                → المصاعد: إجمالي، متعطلة، عاملة، توزيع
+• خنادق الصرف            → خنادق_الصرف: بيانات ثابتة مُدخلة يدوياً (مكة/جدة/الطائف/المدينة…)، لا تأتي من ملف خارجي
+• تقييم عاين             → تقييم_عاين_تفصيلي: متوسط، تصنيفات، أسوأ مدارس، حسب المدينة
+• المصاعد                → المصاعد: إجمالي، متعطلة، عاملة، توزيع حسب المدينة
 • التكلفة                → التكلفة: إجمالي، أعلى فئات، توزيع حسب المدينة
 • الخريطة                → الخريطة: مباني بإحداثيات، توزيع حسب المدينة
-• الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي + الطلاب_وعمر_المبنى
-• قطع الغيار             → قطع_الغيار: إجمالي، أعلى أصناف قيمة
-• تقييم عاين             → تقييم_عاين_تفصيلي: متوسط، تصنيفات، أسوأ مدارس
-• المدفوعات والعقود       → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
-• متابعة الفواتير         → متابعة_الفواتير
-• مؤشرات أداء المقاول    → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة، توقع مستقبلي
+• الجدول التفصيلي        → بيانات كل مبنى (من RAW الرئيسي — FCA + بيئة + طلاب + عمر المبنى + تقييم عاين)
+• المدفوعات              → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
 • خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
-• البوابين               → البوابين: إحصائيات + توزيع (القايمة الكاملة تُحقن تلقائياً لو السؤال عن بواب)
+• مؤشرات الأداء للمقاول  → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف)
 
 ══════════════════════════════════════════════════════
 تعليمات خاصة لكل نوع سؤال

@@ -122,6 +122,10 @@ const CFG = {
     // OpenAI مباشرة. راجع وحدة AIService بالأسفل لكل منطق الاتصال —
     // لو احتجت لاحقاً تمرير الطلبات عبر سيرفر/بروكسي خاص بك، التعديل
     // يكون في AIService فقط دون لمس بقية اللوحة.
+    // ── البلاغات تُحمَّل بشكل منفصل (ملف ضخم 90K+ صف) ──
+    // اتركه فارغاً لو البلاغات في نفس الـ GAS_URL كشيت منفصلة
+    // أو ضع رابط CSV مباشر من Google Drive: ?export&format=csv
+    BALAGH_SHEET_KEY: "balaghReports", // المفتاح في SHEET_NAMES
     OPENAI_MODEL: "gpt-5.4-mini", // الموديل الافتراضي لو المستخدم لم يحدد موديل آخر في الإعدادات
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   },
@@ -2332,7 +2336,8 @@ function renderTable() {
       (allSystems = d.allSystems || []),
       (elevators = d.elevators || []),
       (window.RAW_TAJHEEZ_INV = d.tajheezInventory || []),
-      (window.RAW_BALAGH = d.balaghReports || d.balagh || d.alertsCsv || []),
+      // ── البلاغات تُحمَّل بعدين بشكل منفصل لأن حجمها كبير ──
+      (window.RAW_BALAGH = []),
       (window.RAW_INVOICES_TRACKER = d.kpiContractor || d.invoicesTracker || []),
       (window.RAW_GATEKEEPERS = d.gatekeepers || []),
       // ── تبويب المدفوعات — من شيت المدفوعات مباشرة ──
@@ -2577,6 +2582,37 @@ function renderTable() {
       setProgress(100),
       (document.getElementById("filtersRow").style.display = "flex"),
       applyFilters());
+
+    // ── تحميل البلاغات بشكل منفصل (ملف ضخم — لا يحجب باقي اللوحة) ──
+    (async () => {
+      try {
+        const bResp = await fetch(CFG.GAS_URL + "?sheet=balaghReports");
+        if (bResp.ok) {
+          const bJson = await bResp.json();
+          if (bJson.status === "ok" && Array.isArray(bJson.data)) {
+            window.RAW_BALAGH = bJson.data;
+            // ربط البلاغات بالمباني بعد التحميل
+            const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
+            const aMap = {};
+            window.RAW_BALAGH.forEach(r => {
+              const sn = normId_(r["رقم المدرسة"]);
+              if (sn) aMap[sn] = (aMap[sn] || 0) + 1;
+            });
+            RAW.forEach(r => {
+              const id = normId_(r.minId || r.schoolSeq);
+              r.alerts = aMap[id] || r.alerts || 0;
+            });
+            console.log(`[BALAGH] تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
+            // لو تبويب البلاغات مفتوح — نحدثه
+            if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+              safeRun(renderBalaghTab, "balagh");
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[BALAGH] فشل تحميل البلاغات:", e);
+      }
+    })();
   } catch (err) {
     if (
       (console.error("[loadData]", err), setDot("error"), setProgress(0), retryCount++, !silent)

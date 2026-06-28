@@ -138,7 +138,6 @@ const CFG = {
     city: ["المدينة_الرئيسية"],
     district: ["الحي"],
     sector: ["المحافظة"],
-    districtId: ["معرف_المحافظة"],
     classrooms: ["عدد_الفصول"],
     schoolSize: ["حجم_المدرسة"],
     buildingSize: ["نوع_المبنى", "حجم_المبنى"],
@@ -150,17 +149,7 @@ const CFG = {
     fca: ["قيمة_FCA"],
     envScore: ["درجة_البيئة_المدرسية"],
     envText: ["البيئة_المدرسية_نص"],
-    contractId: ["معرف_العقد"],
-    contractMaint: ["رقم_عقد_الصيانة"],
-    contractAC: ["رقم_عقد_التكييف"],
-    contractClean: ["رقم_عقد_النظافة"],
 
-    projMaint: ["رقم_مشروع_الصيانة"],
-    projAC: ["رقم_مشروع_التكييف"],
-    projClean: ["رقم_مشروع_النظافة"],
-    expMaint: ["حالة_الصيانة", "تاريخ_انتهاء_الصيانة"],
-    expClean: ["حالة_النظافة", "تاريخ_انتهاء_النظافة"],
-    expAC: ["حالة_التكييف", "تاريخ_انتهاء_التكييف"],
     notes: ["ملاحظات"],
     description: ["وصف_الصنف"],
     quantity: ["الكمية"],
@@ -547,7 +536,7 @@ function applyFilters() {
           <div style="font-size:48px;margin-bottom:12px">🔧</div>
           <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">الصيانة الوقائية</div>
           <div style="font-size:13px;color:var(--tx-sec);max-width:480px;margin:0 auto;line-height:1.8">
-            بيانات الصيانة الوقائية كانت تأتي من شيت الخدمات الذي تم حذفه.<br>
+            لا توجد بيانات لهذا التبويب حالياً.<br>
             للاطلاع على بلاغات الصيانة الفعلية راجع تبويب <strong>البلاغات</strong>.
           </div>
         </div>`;
@@ -2324,8 +2313,6 @@ function renderTable() {
   try {
     setProgress(20);
     let buildings = [],
-      contracts = [],
-      districts = [],
       fcaHistory = [],
       spareParts = [],
       fmContracts = [],
@@ -2338,8 +2325,7 @@ function renderTable() {
     if ("error" === json.status) throw new Error(json.message || "Apps Script error");
     const d = json.data || {};
     ((buildings = d.buildings || []),
-      (contracts = d.contracts || []),
-      (districts = d.districts || []),
+
       (fcaHistory = d.fcaHistory || []),
       (spareParts = d.spareParts || []),
       (fmContracts = d.fmContracts || []),
@@ -2441,28 +2427,8 @@ function renderTable() {
       console.log("[FCA] latestFcaMap:", Object.keys(latestFcaMap).length, "مدرسة مقيّمة");
     })();
 
-    const contractsMap = {};
-    for (const c of contracts) {
-      const k = String(c["معرف_العقد"] ?? "")
-        .trim()
-        .replace(/^\uFEFF/, "");
-      k && (contractsMap[k] = c);
-    }
-    const districtsMap = {};
-    for (const d of districts) {
-      const k = String(d["معرف_المحافظة"] ?? "")
-        .trim()
-        .replace(/^\uFEFF/, "");
-      k && (districtsMap[k] = d);
-    }
-    function normalizeStatus(v) {
-      if (!v) return "";
-      return String(v)
-        .trim()
-        .replace(/\s+/g, " ")
-        .replace(/مستقلة/g, "مستقل")
-        .replace(/اساسي مشترك|مشترك اساسي/g, "مشترك أساسي");
-    }
+
+
     (setProgress(75),
       (RAW = buildings
         .map((b) => {
@@ -2471,14 +2437,7 @@ function renderTable() {
               .replace(/^\uFEFF/, ""),
             minIdRaw = String(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"] ?? "")
               .trim()
-              .replace(/^\uFEFF/, ""),
-            cid = String(b["معرف_العقد"] ?? "1").trim(),
-            con = contractsMap[cid] || contractsMap[1] || {},
-            did = String(b["معرف_المحافظة"] ?? "").trim(),
-            dist = districtsMap[did] || {},
-            expMaint = con["تاريخ_انتهاء_الصيانة"] ?? b["تاريخ_انتهاء_الصيانة"] ?? null,
-            expClean = con["تاريخ_انتهاء_النظافة"] ?? b["تاريخ_انتهاء_النظافة"] ?? null,
-            expAC = con["تاريخ_انتهاء_التكييف"] ?? b["تاريخ_انتهاء_التكييف"] ?? null;
+              .replace(/^\uFEFF/, "");
           return {
             buildingSeq: schoolId,
             schoolSeq: schoolId,
@@ -2491,9 +2450,9 @@ function renderTable() {
               .replace(/\s+$/, ""),
             stage: String(b["المرحلة"] ?? "").trim(),
             ownership: String(b["حكومي_مستأجر"] ?? "").trim(),
-            city: String(b["المدينة_الرئيسية"] ?? dist["المدينة_الرئيسية"] ?? "").trim(),
+            city: String(b["المدينة_الرئيسية"] ?? "").trim(),
             district: String(b["الحي"] ?? "").trim(),
-            sector: String(b["المحافظة"] ?? dist["المحافظة"] ?? "").trim(),
+            sector: String(b["المحافظة"] ?? "").trim(),
             classrooms: num(b["عدد_الفصول"]),
             schoolSize: String(b["حجم_المدرسة"] ?? "").trim(),
             buildingSize: String(b["نوع_المبنى"] ?? b["حجم_المبنى"] ?? "").trim(),
@@ -2526,15 +2485,6 @@ function renderTable() {
             ayenScore: num(b["تقييم_عاين"]),
             alerts: num(b["عدد_البلاغات"]) ?? 0,
             acUnits: num(b["وحدات_التكييف"]),
-            contractMaint: String(b["رقم_عقد_الصيانة"] ?? con["رقم_عقد_الصيانة"] ?? "").trim(),
-            contractAC: String(b["رقم_عقد_التكييف"] ?? con["رقم_عقد_التكييف"] ?? "").trim(),
-            contractClean: String(b["رقم_عقد_النظافة"] ?? con["رقم_عقد_النظافة"] ?? "").trim(),
-            projMaint: String(b["رقم_مشروع_الصيانة"] ?? con["رقم_مشروع_الصيانة"] ?? "").trim(),
-            projAC: String(b["رقم_مشروع_التكييف"] ?? con["رقم_مشروع_التكييف"] ?? "").trim(),
-            projClean: String(b["رقم_مشروع_النظافة"] ?? con["رقم_مشروع_النظافة"] ?? "").trim(),
-            expMaint: expMaint,
-            expClean: expClean,
-            expAC: expAC,
             notes: String(b["ملاحظات"] ?? "").trim(),
             description: "",
             quantity: null,
@@ -2592,10 +2542,10 @@ function renderTable() {
         const alertsMap = {};
         const alertsMapPlain = {};
         balaghRaw.forEach((row) => {
-          const sn = normId(row["School Number"]);
+          const sn = normId(row["رقم المدرسة"]);
           if (!sn) return;
           alertsMap[sn] = (alertsMap[sn] || 0) + 1;
-          const plain = normIdPlain(row["School Number"]);
+          const plain = normIdPlain(row["رقم المدرسة"]);
           if (plain !== sn) alertsMapPlain[plain] = (alertsMapPlain[plain] || 0) + 1;
         });
 
@@ -5618,48 +5568,46 @@ function _sysExcelTableHTML(title, headers, rows) {
     const schoolByMinId = buildSchoolByMinIdMap();
     return getRaw()
       .map((r, idx) => {
-        const created = norm(r["Creation Date.1"] || r["Creation Date"]);
-        const finished = norm(r["Finish Date.1"] || r["Finish Date"]);
-        const status = norm(r["Status"]);
-        const slaText = norm(r["SLA DAYS"]);
-        const slaNum = parseNumFromText(slaText);
-        const openLike = !balaghIsClosed(status);
+        const created  = norm(r["تاريخ الإنشاء"]);
+        const finished = norm(r["تاريخ الحل"]);
+        const status   = norm(r["الحالة"]);
+        const slaStatus = norm(r["حالة SLA"]);
+        const openLike  = !balaghIsClosed(status);
         const creationDateObj = parseBalaghDate(created);
-        const schoolNumber = norm(r["School Number"]);
+        const schoolNumber = norm(r["رقم المدرسة"]);
         const linkedSchool = schoolByMinId[normSchoolNo(schoolNumber)] || null;
+        // حالة SLA — نحسب "متأخر" من حالة SLA مباشرة
+        const isOverdue = slaStatus === "تم اختراقه";
         return {
           idx: idx + 1,
-          recordNo: norm(r["Record No."]),
-          creationDate: created,
+          recordNo:          norm(r["مُعرّف الحالة"]),
+          creationDate:      created,
           creationDateObj,
-          finishDate: finished,
-          slaDays: slaText,
-          slaNum,
-          slaStatus: norm(r["Sla Status"]),
-          reopen: norm(r["Re-Open"]),
+          finishDate:        finished,
+          slaDays:           slaStatus,          // بنستخدم حالة SLA بدل الأيام
+          slaNum:            isOverdue ? -1 : 0, // -1 = متأخر
+          slaStatus,
           status,
           schoolNumber,
-          schoolName: norm(r["School Name"]),
+          schoolName:        norm(r["اسم المبنى"]),
           // ── ربط البلاغ بسجل المدرسة (من المباني) عبر الرقم الوزاري ──
-          linkedMinId: linkedSchool ? linkedSchool.minId : "",
-          linkedSchoolName: linkedSchool ? linkedSchool.name : "",
-          linkedSector: linkedSchool ? linkedSchool.sector : "",
-          linkedCity: linkedSchool ? linkedSchool.city : "",
-          isLinked: !!linkedSchool,
-          location: norm(r["Location"]),
-          category: norm(r["Category"]),
-          problemDescription: norm(r["Problem Description"]),
-          priority: norm(r["Priority"]),
-          issueDescription: norm(r["Issue Description"]),
-          creator: norm(r["Creator"]),
-          notes: norm(r["service provider notes"]),
-          package: norm(r["Package"]),
-          cleaning: norm(r["Cleaning"]),
-          hvac: norm(r["HVAC"]),
-          om: norm(r["OM "]),
-          isOpen: openLike,
-          isClosed: !openLike,
-          isOverdue: Number.isFinite(slaNum) ? slaNum < 0 : false,
+          linkedMinId:       linkedSchool ? linkedSchool.minId       : "",
+          linkedSchoolName:  linkedSchool ? linkedSchool.name        : "",
+          linkedSector:      linkedSchool ? linkedSchool.sector      : "",
+          linkedCity:        linkedSchool ? linkedSchool.city        : "",
+          isLinked:          !!linkedSchool,
+          location:          norm(r["المحافظة التابع لها المدرسة"]),
+          city:              norm(r["TBC مدينة"]),
+          category:          norm(r["الفئة الرئيسية"]),
+          subCategory:       norm(r["الفئة الفرعية"]),
+          problemDescription: norm(r["الوصف"]),
+          resolutionDesc:    norm(r["وصف الحل"]),
+          priority:          norm(r["الأولوية"]),
+          needsAttention:    norm(r["بحاجة إلى الانتباه"]),
+          buildingNo:        norm(r["رقم المبنى"]),
+          isOpen:            openLike,
+          isClosed:          !openLike,
+          isOverdue,
         };
       })
       .filter((r) => r.recordNo || r.schoolName || r.problemDescription);
@@ -5780,20 +5728,20 @@ function _sysExcelTableHTML(title, headers, rows) {
 
   function exportCSV(rows) {
     const headers = [
-      "Record No.",
-      "Creation Date",
-      "Finish Date",
-      "SLA DAYS",
-      "Status",
-      "School Number",
-      "School Name",
-      "Location",
-      "Category",
-      "Problem Description",
-      "Priority",
-      "Issue Description",
-      "Creator",
-      "service provider notes",
+      "مُعرّف الحالة",
+      "تاريخ الإنشاء",
+      "تاريخ الحل",
+      "حالة SLA",
+      "الحالة",
+      "رقم المدرسة",
+      "اسم المبنى",
+      "المحافظة التابع لها المدرسة",
+      "TBC مدينة",
+      "الفئة الرئيسية",
+      "الفئة الفرعية",
+      "الوصف",
+      "الأولوية",
+      "وصف الحل",
     ];
     const csv = [headers.map((h) => `"${String(h).replace(/"/g, '""')}"`).join(",")];
     rows.forEach((r) => {
@@ -5801,17 +5749,17 @@ function _sysExcelTableHTML(title, headers, rows) {
         r.recordNo,
         r.creationDate,
         r.finishDate,
-        r.slaDays,
+        r.slaStatus,
         r.status,
         r.schoolNumber,
         r.schoolName,
         r.location,
+        r.city,
         r.category,
+        r.subCategory,
         r.problemDescription,
         r.priority,
-        r.issueDescription,
-        r.creator,
-        r.notes,
+        r.resolutionDesc,
       ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`);
       csv.push(vals.join(","));
     });
@@ -7478,10 +7426,10 @@ window.renderElevatorsTab = function () {
       .filter((r) => r && typeof r === "object")
       .map((r) => ({
         schoolId: clean(r["School ID"] ?? r.schoolId ?? r.school_id),
-        schoolName: clean(r["School Name"] ?? r.schoolName ?? r.school_name),
+        schoolName: clean(r["اسم المبنى"] ?? r["School Name"] ?? r.schoolName ?? r.school_name),
         city: clean(r["City"] ?? r.city),
         sr: clean(r["SR"] ?? r.sr),
-        category: clean(r["Category"] ?? r.category),
+        category: clean(r["الفئة الرئيسية"] ?? r["Category"] ?? r.category),
         subCategory: clean(r["Sub Category"] ?? r.subCategory ?? r.sub_category),
         quantity: num(r["Quantity"] ?? r.quantity),
         link: clean(r["Link"] ?? r.link),
@@ -10206,28 +10154,28 @@ function renderTajheezAllTable() {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 🌊 تبويب خنادق الصرف (window.RAW_KHANADEQ_CITY_DATA)
+    // 🌊 تبويب خنادق الصرف — بيانات ثابتة مكتوبة مباشرة هنا
+    // (لا تعتمد على RAW أو ملف خارجي — تُعدَّل يدوياً في الكود)
     // ════════════════════════════════════════════════════════════════
-    try {
-      const khRaw = Array.isArray(window.RAW_KHANADEQ_CITY_DATA) ? window.RAW_KHANADEQ_CITY_DATA : [];
-      if (khRaw.length) {
-        const totalSchools = khRaw.reduce((s, r) => s + (r.schools || 0), 0);
-        const totalKhanadeq = khRaw.reduce((s, r) => s + (r.khanadeq || 0), 0);
-        summary.خنادق_الصرف = {
-          مصدر: "تبويب خنادق الصرف — بيانات ثابتة مُدخلة يدوياً في الكود",
-          ملاحظة: "تُعدَّل مباشرة داخل renderKhanadeqTab في dashboard.js",
-          إجمالي_المدارس_المغطاة: totalSchools,
-          إجمالي_خنادق_الصرف: totalKhanadeq,
-          عدد_المدن_بها_بيانات: khRaw.filter(r=>r.khanadeq>0).length,
-          توزيع_حسب_المدينة: khRaw.map(r => ({
-            المدينة: r.city, المدارس: r.schools, الخنادق: r.khanadeq,
-            نسبة_خندق_لكل_مدرسة: r.schools > 0 ? +(r.khanadeq/r.schools).toFixed(2) : 0,
-          })),
-        };
-      }
-    } catch (e) {
-      summary.خنادق_الصرف = { تنبيه: "تعذّر تلخيص بيانات خنادق الصرف: " + (e?.message || e) };
-    }
+    const KHANADEQ_DATA = [
+      { city: "مكة",      schools: 46,  khanadeq: 46  },
+      { city: "جدة",      schools: 161, khanadeq: 161 },
+      { city: "الطائف",   schools: 528, khanadeq: 528 },
+      { city: "المدينة",  schools: 142, khanadeq: 142 },
+      { city: "العلا",    schools: 73,  khanadeq: 73  },
+      { city: "ينبع",     schools: 178, khanadeq: 178 },
+      { city: "المهد",    schools: 86,  khanadeq: 86  },
+      { city: "الليث",    schools: 157, khanadeq: 157 },
+      { city: "القنفذة",  schools: 261, khanadeq: 261 },
+    ];
+    summary.خنادق_الصرف = {
+      ملاحظة: "بيانات ثابتة مُدخلة يدوياً في الكود — تُعدَّل في KHANADEQ_DATA داخل fcbBuildDashboardSummary",
+      إجمالي_المدارس: KHANADEQ_DATA.reduce((s, r) => s + r.schools,  0),
+      إجمالي_الخنادق: KHANADEQ_DATA.reduce((s, r) => s + r.khanadeq, 0),
+      توزيع_حسب_المدينة: KHANADEQ_DATA.map(r => ({
+        المدينة: r.city, المدارس: r.schools, الخنادق: r.khanadeq,
+      })),
+    };
 
     // ════════════════════════════════════════════════════════════════
     // 💰 تبويب التكلفة (window.RAW_COST_STATE)
@@ -10569,23 +10517,26 @@ function renderTajheezAllTable() {
       const bal = Array.isArray(window.RAW_BALAGH) ? window.RAW_BALAGH : [];
       if (bal.length) {
         const n = (v) => String(v ?? "").replace(/\uFEFF/g, "").trim();
-        const CLOSED = new Set(["تم حله","ملغى","ملغي","مغلق","closed","cancelled","resolved"]);
-        const INPROG = new Set(["قيد التنفيذ","موافقة الاستشاري قيد التنفيذ","in progress","consultant approval in progress"]);
-        const isClosed = (s) => CLOSED.has(n(s).toLowerCase());
-        const isInProg = (s) => INPROG.has(n(s).toLowerCase());
+        const CLOSED = new Set(["تم حله","ملغى","مغلق","مغلقة"]);
+        const INPROG = new Set(["قيد التنفيذ","موافقة الاستشاري قيد التنفيذ","تم التعيين"]);
+        const OPEN   = new Set(["جديد"]);
+        const isClosed = (s) => CLOSED.has(n(s));
+        const isInProg = (s) => INPROG.has(n(s));
 
         const rows = bal.map(r => ({
-          recordNo:    n(r["Record No."]),
-          status:      n(r["Status"]),
-          category:    n(r["Category"]),
-          priority:    n(r["Priority"]),
-          schoolName:  n(r["School Name"]),
-          schoolNo:    n(r["School Number"]),
-          location:    n(r["Location"]),
-          problem:     n(r["Problem Description"]),
-          slaDays:     n(r["SLA DAYS"]),
-          slaStatus:   n(r["Sla Status"]),
-          created:     n(r["Creation Date.1"] || r["Creation Date"]),
+          recordNo:   n(r["مُعرّف الحالة"]),
+          status:     n(r["الحالة"]),
+          category:   n(r["الفئة الرئيسية"]),
+          subCat:     n(r["الفئة الفرعية"]),
+          priority:   n(r["الأولوية"]),
+          schoolName: n(r["اسم المبنى"]),
+          schoolNo:   n(r["رقم المدرسة"]),
+          location:   n(r["المحافظة التابع لها المدرسة"]),
+          city:       n(r["TBC مدينة"]),
+          problem:    n(r["الوصف"]),
+          slaStatus:  n(r["حالة SLA"]),
+          created:    n(r["تاريخ الإنشاء"]),
+          resolved:   n(r["تاريخ الحل"]),
         })).filter(r => r.recordNo || r.schoolName);
 
         const closed   = rows.filter(r => isClosed(r.status)).length;
@@ -10602,7 +10553,7 @@ function renderTajheezAllTable() {
         const أعلى_10_مدارس = Object.entries(bySchool).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({المدرسة:k,عدد_البلاغات:v}));
 
         // متأخرة (SLA سالبة)
-        const overdue = rows.filter(r => { const m=String(r.slaDays||"").match(/-?\d+/); return m && Number(m[0])<0; });
+        const overdue = rows.filter(r => r.slaStatus === "تم اختراقه");
 
         summary.البلاغات = {
           مصدر: "تبويب البلاغات — ملف البلاغات CSV",
@@ -11512,17 +11463,20 @@ function renderTajheezAllTable() {
       // نبعت أعلى 30 بلاغ مفتوح بالتفاصيل
       const n = (v) => String(v ?? "").trim();
       const CLOSED = new Set(["تم حله","ملغى","ملغي","مغلق","closed","cancelled","resolved"]);
+      const OPEN_ST = new Set(["جديد","قيد التنفيذ","موافقة الاستشاري قيد التنفيذ","تم التعيين"]);
       const open30 = window.RAW_BALAGH
-        .filter(r => !CLOSED.has(n(r["Status"]).toLowerCase()))
+        .filter(r => OPEN_ST.has((r["الحالة"] || "").trim()))
         .slice(0, 30)
         .map(r => ({
-          رقم: n(r["Record No."]),
-          حالة: n(r["Status"]),
-          فئة: n(r["Category"]),
-          أولوية: n(r["Priority"]),
-          مدرسة: n(r["School Name"]),
-          sla: n(r["SLA DAYS"]),
-          مشكلة: n(r["Problem Description"]).slice(0, 80),
+          رقم:       (r["مُعرّف الحالة"] || "").trim(),
+          حالة:      (r["الحالة"] || "").trim(),
+          فئة:       (r["الفئة الرئيسية"] || "").trim(),
+          فئة_فرعية: (r["الفئة الفرعية"] || "").trim(),
+          أولوية:    (r["الأولوية"] || "").trim(),
+          مدرسة:     (r["اسم المبنى"] || "").trim(),
+          مدينة:     (r["TBC مدينة"] || "").trim(),
+          sla:       (r["حالة SLA"] || "").trim(),
+          مشكلة:     (r["الوصف"] || "").trim().slice(0, 80),
         }));
       extraContext += `\n\nأعلى 30 بلاغ مفتوح حالياً:\n${JSON.stringify(open30)}`;
     }

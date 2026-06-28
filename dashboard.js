@@ -417,6 +417,7 @@ function buildDynamicFilters() {
   function fillSelect(id, values) {
     const el = document.getElementById(id);
     if (!el) return;
+    if (!Array.isArray(values)) return;
     const prev = el.value,
       sorted = [...new Set(values.filter((v) => v && "—" !== v && "#N/A" !== v))].sort((a, b) =>
         a.localeCompare(b, "en" === LANG ? "en" : "ar"),
@@ -454,9 +455,6 @@ function buildDynamicFilters() {
     fillSelect(
       "fSector",
       RAW.map((r) => r.sector),
-    ),
-    fillSelect(
-      "fSubStatus",
     ));
   const cities = [...new Set(RAW.map((r) => r.city).filter((c) => c))],
     sectors = [...new Set(RAW.map((r) => r.sector).filter((s) => s && "#N/A" !== s))];
@@ -2328,20 +2326,19 @@ function renderTable() {
     const json = await resp.json();
     if ("error" === json.status) throw new Error(json.message || "Apps Script error");
     const d = json.data || {};
-    ((buildings = d.buildings || []),
-
-      (fcaHistory = d.fcaHistory || []),
-      (spareParts = d.spareParts || []),
-      (fmContracts = d.fmContracts || []),
-      (allSystems = d.allSystems || []),
-      (elevators = d.elevators || []),
-      (window.RAW_TAJHEEZ_INV = d.tajheezInventory || []),
-      // ── البلاغات تُحمَّل بعدين بشكل منفصل لأن حجمها كبير ──
-      (window.RAW_BALAGH = []),
-      (window.RAW_INVOICES_TRACKER = d.kpiContractor || d.invoicesTracker || []),
-      (window.RAW_GATEKEEPERS = d.gatekeepers || []),
-      // ── تبويب المدفوعات — من شيت المدفوعات مباشرة ──
-      (window.RAW_PAYMENTS = d.payments || []),
+    // ── تأمين كل القيم — لو جاء undefined يتحول لـ [] ──
+    const sa = (v) => (Array.isArray(v) ? v : []);
+    ((buildings                    = sa(d.buildings)),
+      (fcaHistory                  = sa(d.fcaHistory)),
+      (spareParts                  = sa(d.spareParts)),
+      (fmContracts                 = sa(d.fmContracts)),
+      (allSystems                  = sa(d.allSystems)),
+      (elevators                   = sa(d.elevators)),
+      (window.RAW_TAJHEEZ_INV      = sa(d.tajheezInventory)),
+      (window.RAW_BALAGH           = []),   // يُحمَّل بشكل منفصل
+      (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
+      (window.RAW_GATEKEEPERS      = sa(d.gatekeepers)),
+      (window.RAW_PAYMENTS         = sa(d.payments)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();

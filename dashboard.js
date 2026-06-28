@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
 /* === الإعدادات العامة + الفلاتر + التبويبات الأساسية === */
 const CFG = {
     GAS_URL:
-      "https://script.google.com/macros/s/AKfycbzOskqxjLPBsebLWOJh0Dw77x7r2PmWtxItw0mO7dyd0K5fZymyqOI_DF6a32MA5vA/exec",
+      "https://script.google.com/macros/s/AKfycbwkzDdgEXRJSzmDJqyk5LAUslLCXfqQ-nfi4VWxA4pDtb9uiG_LSFiioK9VgbI-KhAZ/exec",
     AUTO_INTERVAL_MS: 3e5,
     RETRY_MAX: 3,
     RETRY_DELAY_MS: 4e3,
@@ -2417,8 +2417,10 @@ function renderTable() {
       (elevators = d.elevators || []),
       (window.RAW_TAJHEEZ_INV = d.tajheezInventory || []),
       (window.RAW_BALAGH = d.balaghReports || d.balagh || d.alertsCsv || []),
-      (window.RAW_INVOICES_TRACKER = d.invoicesTracker || []),
+      (window.RAW_INVOICES_TRACKER = d.kpiContractor || d.invoicesTracker || []),
       (window.RAW_GATEKEEPERS = d.gatekeepers || []),
+      // ── تبويب المدفوعات — من شيت المدفوعات مباشرة ──
+      (window.RAW_PAYMENTS = d.payments || []),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
@@ -4360,7 +4362,7 @@ function renderAyenTable() {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📌  JS تبويب: عقود غير المجال
    ║  (tab-all-contracts) — الدوال الخاصة بهذا التبويب تبدأ هنا
-   ║  المصدر: window.RAW_INVOICES_TRACKER (من Invoices_Tracker.csv)
+   ║  المصدر: window.RAW_FM_CONTRACTS (شيت عقود_عدا_المجال)
    ║  يعرض كل المقاولين بدون فلترة مسبقة، مع فلتر اختياري بالمقاول
    ╚════════════════════════════════════════════════════════════╝ */
 function acNormContractor(v) {
@@ -4385,7 +4387,7 @@ window._acState = { contractor: "", search: "" };
 function renderAllContracts() {
   const el = document.getElementById("all-contracts-content");
   if (!el) return;
-  const all = window.RAW_INVOICES_TRACKER || [];
+  const all = window.RAW_FM_CONTRACTS || [];
   if (!all.length)
     return void (el.innerHTML =
       '<div class="card empty-state">\n      <div class="empty-state-icon">📌</div>\n      <div class="empty-state-title" style="margin-bottom:8px">لم يتم التحميل</div>\n    </div>');
@@ -4426,7 +4428,7 @@ function renderAllContracts() {
 function renderAllContractsBody() {
   const el = document.getElementById("ac-body");
   if (!el) return;
-  const all = window.RAW_INVOICES_TRACKER || [];
+  const all = window.RAW_FM_CONTRACTS || [];
   const st = window._acState || { contractor: "", search: "" };
   let data = all;
   if (st.contractor) data = data.filter((r) => acNormContractor(r["المقاول"]) === st.contractor);
@@ -4551,6 +4553,9 @@ function renderAllContractsBody() {
               <th>المتبقي (يوم)</th>
               <th>% الإنجاز</th>
               <th>آخر مستخلص</th>
+              <th>القيمة المستحقة</th>
+              <th>حالة مشاهد الإنجاز</th>
+              <th>المسؤل / التواصل</th>
               <th>الإجراءات والملاحظات</th>
               <th>الحالة</th>
             </tr>
@@ -4565,13 +4570,15 @@ function renderAllContractsBody() {
                       : rem <= 0
                         ? `<span style="color:#DC2626;font-weight:800">${rem} (منتهي)</span>`
                         : `<span style="color:${rem <= 90 ? "#D97706" : "#059669"};font-weight:800">${rem}</span>`,
-                  lastVal = num(r["آخر مستخلص - القيمة"]),
-                  lastMonth = r["آخر مستخلص - الشهر"],
-                  lastYear = r["آخر مستخلص - السنة"],
+                  lastVal = num(r["القيمة"]),
+                  lastMonth = r["الشهر"],
+                  lastYear = r["السنة"],
                   lastInvoice =
                     null == lastVal
                       ? "—"
-                      : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`;
+                      : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`,
+                  dueVal = num(r["القيمة المستحقة للمستخلصات حتى تاريخه"]),
+                  responsible = [r["اسم المسؤل من المقاول"], r["رقم التواصل"]].filter(Boolean).join(" · ");
                 return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:160px">${esc(r["المقاول"] || "")}</td>
                   <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
@@ -4580,8 +4587,15 @@ function renderAllContractsBody() {
                   <td style="padding:10px 8px;font-size:10px">${esc(r["النطاق"] || "—")}</td>
                   <td style="padding:10px 8px;white-space:nowrap;font-family:monospace;font-size:10px">${esc(r["تاريخ بداية العقد"] || "—")} ← ${esc(r["تاريخ نهاية العقد المحدثة"] || "—")}</td>
                   <td style="padding:10px 8px">${remBadge}</td>
-                  <td style="padding:10px 8px;font-weight:700">${esc(r["نسبة الإنجاز POC%"] || "—")}</td>
+                  <td style="padding:10px 8px;font-weight:700">${esc(r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"] || "—")}</td>
                   <td style="padding:10px 8px;white-space:nowrap">${lastInvoice}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;font-weight:600;color:#7C3AED">${null == dueVal ? "—" : fmt(dueVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;font-size:10px">${r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] === "مكتملة " || r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] === "مكتملة"
+                    ? '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">مكتملة</span>'
+                    : r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]
+                    ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">غير مكتملة</span>'
+                    : "—"}</td>
+                  <td style="padding:10px 8px;font-size:10px;color:var(--tx-sec)">${esc(responsible || "—")}</td>
                   <td style="padding:10px 12px;font-size:10px;color:var(--tx-sec);line-height:1.5;max-width:260px">${esc(r["الإجراءات المتخذة والملاحظات"] || "—")}</td>
                   <td style="padding:10px 8px">${acStatusBadge(rem)}</td>
                 </tr>`;
@@ -8325,38 +8339,14 @@ window.renderElevatorsTab = function () {
 
 
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  💳  JS تبويب: المدفوعات والعقود  (tab-payments)
-   ║  هذا الـ script block كامل مخصص لتبويب المدفوعات
+   ║  💳  JS تبويب: المدفوعات  (tab-payments)
+   ║  المصدر: شيت "المدفوعات" من Google Sheet
+   ║  العرض: سمري فقط (KPIs + تقدم لكل عقد + شارت)
    ╚════════════════════════════════════════════════════════════╝ */
-/* ══════════════════════════════════════════════════════════════════
-   تبويب المدفوعات والعقود — JavaScript كامل (مضمّن بدون fetch/API)
-   يستخدم: contract_summary.csv · invoice_detail.csv · monthly_consolidated.csv
-══════════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
 
-  /* ── بيانات CSV مضمّنة في الذاكرة ── */
-  /* سيتم تحميلها من Apps Script عند الطلب بنفس آلية loadData */
-  let PAY_RAW_CONTRACT = [];
-  let PAY_RAW_INVOICE = [];
-  let PAY_RAW_MONTHLY = [];
-  let PAY_LOADED = false;
-  let PAY_LOADING = false;
-
-  /* ── حالة الفلترة ── */
-  let PAY_STATE = {
-    region: "الكل",
-    search: "",
-    sortCol: -1,
-    sortAsc: true,
-    page: 0,
-  };
-  const PAY_PAGE_SIZE = 20;
-
-  /* ── مخازن الرسوم البيانية ── */
-  const PAY_CHARTS = {};
-
-  /* ── مساعدات ── */
+  /* ── البيانات تأتي من loadData الرئيسي عبر window.RAW_PAYMENTS ── */
   const $ = (id) => document.getElementById(id);
   const esc = (v) =>
     String(v ?? "")
@@ -8372,467 +8362,278 @@ window.renderElevatorsTab = function () {
 
   function payFmt(n) {
     if (n === null || n === undefined || isNaN(n)) return "—";
-    return (
-      Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      " SAR"
-    );
+    if (Math.abs(n) >= 1e9)
+      return (n / 1e9).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " مليار";
+    if (Math.abs(n) >= 1e6)
+      return (n / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " م";
+    return Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " SAR";
+  }
+
+  function payFmtFull(n) {
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " SAR";
   }
 
   function payPct(n) {
     if (n === null || n === undefined || isNaN(n)) return "—";
-    return Number(n).toFixed(1) + "%";
+    return (Number(n) * 100 > 1 ? Number(n).toFixed(1) : (Number(n) * 100).toFixed(1) + "%");
   }
 
-  function killPayChart(id) {
-    if (PAY_CHARTS[id]) {
-      try {
-        PAY_CHARTS[id].destroy();
-      } catch (e) {}
-      delete PAY_CHARTS[id];
-    }
-  }
+  let PAY_CHART = null;
 
-  /* ── مُحلِّل CSV قوي ── */
-  function parseCSV(text) {
-    const lines = text.split(/\r?\n/);
-    if (!lines.length) return [];
-    // إزالة BOM
-    lines[0] = lines[0].replace(/^\uFEFF/, "");
-    const headers = splitCSVLine(lines[0]).map((h) => h.trim());
-    const result = [];
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      const cells = splitCSVLine(line);
-      const obj = {};
-      headers.forEach((h, j) => {
-        obj[h] = (cells[j] ?? "").trim();
-      });
-      result.push(obj);
-    }
-    return result;
-  }
-
-  function splitCSVLine(line) {
-    const result = [];
-    let cur = "",
-      inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else inQ = !inQ;
-      } else if (ch === "," && !inQ) {
-        result.push(cur);
-        cur = "";
-      } else cur += ch;
-    }
-    result.push(cur);
-    return result;
+  function killPayChart() {
+    if (PAY_CHART) { try { PAY_CHART.destroy(); } catch (e) {} PAY_CHART = null; }
   }
 
   /* ══════════════════════════════════════
-     تحميل البيانات من Apps Script
+     حساب KPIs من بيانات المدفوعات
+     يقبل المصفوفة كاملة أو مصفوفة المناطق فقط (بدون صف TOTAL)
   ══════════════════════════════════════ */
-  async function payLoadData() {
-    if (PAY_LOADING) return;
-    PAY_LOADING = true;
-    setPayStatus("loading");
-    try {
-      const gasUrl = typeof CFG !== "undefined" && CFG.GAS_URL ? CFG.GAS_URL : "";
-      if (!gasUrl) throw new Error("لم يتم تعريف GAS_URL");
-      const resp = await fetch(gasUrl);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
-      if (json.status === "error") throw new Error(json.message || "خطأ في Apps Script");
-      const d = json.data || {};
-      PAY_RAW_CONTRACT = d.contractSummary || [];
-      PAY_RAW_INVOICE = d.invoiceDetail || [];
-      PAY_RAW_MONTHLY = d.monthlyConsolidated || [];
-      PAY_LOADED = true;
-      setPayStatus("live");
-      renderPaymentsTab();
-    } catch (err) {
-      setPayStatus("error");
-      showPayError(err.message);
-    } finally {
-      PAY_LOADING = false;
+  function calcKPIs(rows) {
+    // استخدم صف TOTAL لو موجود (أضمن)، وإلا احسب يدوياً
+    const totalRow = rows.find(r =>
+      (r["Contract No."] || r["Contract_No"] || "").toString().toUpperCase().trim() === "TOTAL" ||
+      (r["Region"] || r["المنطقة"] || "").toString().toUpperCase().trim() === "ALL REGIONS"
+    );
+    if (totalRow) {
+      return {
+        baseContract  : payNum(totalRow["Base Contract Value (SAR)"]  || totalRow["Base_Contract_Value_SAR"]  || 0),
+        updatedContract: payNum(totalRow["Updated Contract Value (SAR)"] || totalRow["Updated_Contract_Value_SAR"] || 0),
+        paid          : payNum(totalRow["Payment Released (SAR)"]     || totalRow["Payment_Released_SAR"]     || 0),
+        remaining     : payNum(totalRow["Remaining (SAR)"]            || totalRow["Remaining_SAR"]            || 0),
+        kpiDeduction  : payNum(totalRow["KPI Deduction"]              || totalRow["KPI_Deduction"]            || 0),
+        totalDeduction: payNum(totalRow["Total Deduction"]            || totalRow["Total_Deduction"]          || 0),
+        pct           : payNum(totalRow["% Paid"]                     || totalRow["Pct_Paid"]                 || 0),
+      };
     }
-  }
-
-  function setPayStatus(s) {
-    const dot = $("pay-status-dot");
-    if (!dot) return;
-    dot.className = "dot " + (s === "live" ? "live" : s === "loading" ? "loading" : "error");
-  }
-
-  function showPayError(msg) {
-    const el = $("payments-content");
-    if (!el) return;
-    el.innerHTML = `
-      <div class="card" style="text-align:center;padding:56px 24px">
-        <div style="font-size:40px;margin-bottom:14px">⚠️</div>
-        <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">تعذّر تحميل البيانات</div>
-        <div style="font-size:12px;color:var(--tx-muted);margin-bottom:18px">${esc(msg)}</div>
-        <button onclick="paymentsInitTab()" class="f-clear" style="margin:0 auto">إعادة المحاولة</button>
-      </div>`;
+    // حساب يدوي من الصفوف (بدون صف TOTAL)
+    const dataRows = rows.filter(r => {
+      const cn = (r["Contract No."] || r["Contract_No"] || "").toString().toUpperCase().trim();
+      return cn !== "TOTAL";
+    });
+    let base = 0, updated = 0, paid = 0, remaining = 0, kpi = 0, total = 0;
+    dataRows.forEach(r => {
+      base      += payNum(r["Base Contract Value (SAR)"]  || r["Base_Contract_Value_SAR"]  || 0);
+      updated   += payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0);
+      paid      += payNum(r["Payment Released (SAR)"]     || r["Payment_Released_SAR"]     || 0);
+      remaining += payNum(r["Remaining (SAR)"]            || r["Remaining_SAR"]            || 0);
+      kpi       += payNum(r["KPI Deduction"]              || r["KPI_Deduction"]            || 0);
+      total     += payNum(r["Total Deduction"]            || r["Total_Deduction"]          || 0);
+    });
+    return {
+      baseContract: base, updatedContract: updated,
+      paid, remaining, kpiDeduction: kpi, totalDeduction: total,
+      pct: updated > 0 ? paid / updated : 0,
+    };
   }
 
   /* ══════════════════════════════════════
-     نقطة الدخول الرئيسية
+     نقطة الدخول
   ══════════════════════════════════════ */
   window.paymentsInitTab = function () {
-    if (!PAY_LOADED && !PAY_LOADING) {
-      payLoadData();
-    } else if (PAY_LOADED) {
-      renderPaymentsTab();
-    }
+    const rows = Array.isArray(window.RAW_PAYMENTS) ? window.RAW_PAYMENTS : [];
+    renderPaymentsTab(rows);
   };
 
   /* ══════════════════════════════════════
-     الحساب بعد كل فلتر
+     بناء الواجهة
   ══════════════════════════════════════ */
-  function getFilteredContracts() {
-    if (PAY_STATE.region === "الكل") return PAY_RAW_CONTRACT;
-    return PAY_RAW_CONTRACT.filter((r) => (r["Region"] || r["المنطقة"] || "") === PAY_STATE.region);
-  }
-
-  function getFilteredInvoice() {
-    if (PAY_STATE.region === "الكل") return PAY_RAW_INVOICE;
-    return PAY_RAW_INVOICE.filter((r) => (r["Region"] || r["المنطقة"] || "") === PAY_STATE.region);
-  }
-
-  function getFilteredMonthly() {
-    if (PAY_STATE.region === "الكل") return PAY_RAW_MONTHLY;
-    return PAY_RAW_MONTHLY.filter((r) => (r["Region"] || r["المنطقة"] || "") === PAY_STATE.region);
-  }
-
-  function calcKPIs(contracts) {
-    let totalContract = 0,
-      totalPaid = 0,
-      totalRemaining = 0;
-    contracts.forEach((r) => {
-      totalContract += payNum(
-        r["Updated_Contract_Value_SAR"] || r["قيمة_العقد_المحدثة"] || r["Contract_Value"] || 0,
-      );
-      totalPaid += payNum(
-        r["Payment_Released_SAR"] || r["المدفوعات_المصروفة"] || r["Payment_Released"] || 0,
-      );
-      totalRemaining += payNum(r["Remaining_SAR"] || r["المتبقي"] || r["Remaining"] || 0);
-    });
-    const pct = totalContract > 0 ? (totalPaid / totalContract) * 100 : 0;
-    return { totalContract, totalPaid, totalRemaining, pct };
-  }
-
-  /* ══════════════════════════════════════
-     بناء واجهة التبويب الكاملة
-  ══════════════════════════════════════ */
-  function renderPaymentsTab() {
+  function renderPaymentsTab(rows) {
     const el = $("payments-content");
     if (!el) return;
 
-    const contracts = getFilteredContracts();
-    const invoices = getFilteredInvoice();
-    const monthly = getFilteredMonthly();
-    const kpi = calcKPIs(contracts);
-
-    /* ── استخراج المناطق ── */
-    const regionSet = new Set();
-    PAY_RAW_CONTRACT.forEach((r) => {
-      const reg = r["Region"] || r["المنطقة"] || "";
-      if (reg) regionSet.add(reg);
+    // الصفوف بدون TOTAL
+    const dataRows = rows.filter(r => {
+      const cn = (r["Contract No."] || r["Contract_No"] || "").toString().toUpperCase().trim();
+      const rg = (r["Region"] || r["المنطقة"] || "").toString().toUpperCase().trim();
+      return cn !== "TOTAL" && rg !== "ALL REGIONS";
     });
-    PAY_RAW_INVOICE.forEach((r) => {
-      const reg = r["Region"] || r["المنطقة"] || "";
-      if (reg) regionSet.add(reg);
-    });
-    const regions = ["الكل", ...Array.from(regionSet).sort()];
 
-    /* ── بناء الـ HTML ── */
+    if (!rows.length) {
+      el.innerHTML = `
+        <div class="card" style="text-align:center;padding:56px 24px">
+          <div style="font-size:40px;margin-bottom:14px">📊</div>
+          <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">لا توجد بيانات مدفوعات</div>
+          <div style="font-size:12px;color:var(--tx-muted);margin-bottom:18px">
+            تأكد من وجود شيت "المدفوعات" في Google Sheet
+          </div>
+          <button onclick="loadData()" class="f-clear" style="margin:0 auto">🔄 إعادة التحميل</button>
+        </div>`;
+      return;
+    }
+
+    const kpi = calcKPIs(rows);
+    const pctNum = kpi.pct <= 1 ? kpi.pct * 100 : kpi.pct; // نسبة مئوية
+    const pctColor = pctNum >= 70 ? "#059669" : pctNum >= 40 ? "#D97706" : "#0891B2";
+
     el.innerHTML = `
     <!-- شريط الحالة -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-      <span class="dot" id="pay-status-dot" style="background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18)"></span>
-      <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">البيانات محمّلة — ${contracts.length} عقد · ${invoices.length} فاتورة · ${monthly.length} سجل شهري</span>
-      <button onclick="paymentsInitTab()" class="f-clear" style="margin-right:auto;padding:6px 14px;font-size:11px">🔄 تحديث</button>
+      <span class="dot" style="background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18)"></span>
+      <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">البيانات محمّلة — ${dataRows.length} عقد</span>
+      <button onclick="loadData()" class="f-clear" style="margin-right:auto;padding:6px 14px;font-size:11px">🔄 تحديث</button>
     </div>
 
-    <!-- أزرار الفلترة حسب المنطقة -->
-    <div class="filters-row" style="margin-bottom:18px">
-      <div class="fg">
-        <div class="fg-lbl">تصفية حسب المنطقة</div>
-        <div style="display:flex;flex-wrap:wrap;gap:7px">
-          ${regions
-            .map(
-              (reg) => `
-            <button onclick="paySetRegion('${reg}')"
-              class="pag-btn ${PAY_STATE.region === reg ? "active" : ""}"
-              id="pay-reg-${reg.replace(/\s/g, "_")}"
-              style="font-size:12px;padding:7px 16px;border-radius:12px">${reg}</button>
-          `,
-            )
-            .join("")}
-        </div>
-      </div>
-    </div>
-
-    <!-- بطاقات KPI -->
+    <!-- بطاقات KPI الرئيسية -->
     <div class="kpi-grid" style="margin-bottom:18px">
       <div class="kpi kc-blue">
         <div class="kpi-icon">💰</div>
-        <div class="kpi-val" id="pay-kpi-contract">—</div>
+        <div class="kpi-val" title="${payFmtFull(kpi.updatedContract)}">${payFmt(kpi.updatedContract)}</div>
         <div class="kpi-lbl">إجمالي قيمة العقود المحدثة</div>
-        <div class="kpi-sub">قيمة العقود المحدثة الكاملة</div>
+        <div class="kpi-sub" style="font-size:10px;opacity:.7">القيمة الأصلية: ${payFmt(kpi.baseContract)}</div>
       </div>
       <div class="kpi kc-green">
         <div class="kpi-icon">✅</div>
-        <div class="kpi-val" id="pay-kpi-paid">—</div>
+        <div class="kpi-val" title="${payFmtFull(kpi.paid)}">${payFmt(kpi.paid)}</div>
         <div class="kpi-lbl">المدفوعات المصروفة</div>
         <div class="kpi-sub">إجمالي ما تم صرفه</div>
       </div>
       <div class="kpi kc-amber">
         <div class="kpi-icon">⏳</div>
-        <div class="kpi-val" id="pay-kpi-remaining">—</div>
+        <div class="kpi-val" title="${payFmtFull(kpi.remaining)}">${payFmt(kpi.remaining)}</div>
         <div class="kpi-lbl">المتبقي</div>
         <div class="kpi-sub">المبلغ المتبقي غير المصروف</div>
       </div>
       <div class="kpi kc-teal">
         <div class="kpi-icon">📊</div>
-        <div class="kpi-val" id="pay-kpi-pct">—</div>
+        <div class="kpi-val" style="color:${pctColor}">${pctNum.toFixed(1)}%</div>
         <div class="kpi-lbl">نسبة الصرف</div>
-        <div class="kpi-sub">مدفوعات / قيمة العقد × 100</div>
+        <div class="kpi-sub">مدفوعات ÷ قيمة العقد</div>
       </div>
     </div>
 
-    <!-- تقدم العقود -->
+    <!-- بطاقتا الخصومات -->
+    <div class="g2 mb14">
+      <div class="card" style="padding:18px 20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:22px">⚠️</span>
+          <div>
+            <div style="font-size:11px;color:var(--tx-muted);font-weight:700">خصومات KPI</div>
+            <div style="font-size:22px;font-weight:900;color:#D97706" title="${payFmtFull(kpi.kpiDeduction)}">${payFmt(kpi.kpiDeduction)}</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--tx-muted)">خصومات مؤشرات الأداء</div>
+      </div>
+      <div class="card" style="padding:18px 20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:22px">🔻</span>
+          <div>
+            <div style="font-size:11px;color:var(--tx-muted);font-weight:700">إجمالي الخصومات</div>
+            <div style="font-size:22px;font-weight:900;color:#DC2626" title="${payFmtFull(kpi.totalDeduction)}">${payFmt(kpi.totalDeduction)}</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--tx-muted)">KPI + خصومات أخرى</div>
+      </div>
+    </div>
+
+    <!-- شريط التقدم الإجمالي -->
+    <div class="card mb14" style="padding:20px 22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:800;color:var(--tx-main)">التقدم الإجمالي في الصرف</div>
+        <div style="font-size:20px;font-weight:900;color:${pctColor}">${pctNum.toFixed(1)}%</div>
+      </div>
+      <div style="height:14px;background:var(--bg-deep);border-radius:999px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;width:${Math.min(pctNum, 100).toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width 1s cubic-bezier(.22,.61,.36,1)"></div>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:11px">
+        <div><span style="color:var(--tx-muted)">مصروف: </span><strong style="color:#059669">${payFmt(kpi.paid)}</strong></div>
+        <div><span style="color:var(--tx-muted)">متبقي: </span><strong style="color:#D97706">${payFmt(kpi.remaining)}</strong></div>
+        <div><span style="color:var(--tx-muted)">الإجمالي: </span><strong style="color:var(--tx-main)">${payFmt(kpi.updatedContract)}</strong></div>
+      </div>
+    </div>
+
+    <!-- تقدم لكل عقد -->
     <div class="card mb14">
       <div class="card-title">
         <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2">📋</span>
         تقدم الصرف لكل عقد
-        <span class="sub" id="pay-contract-count">${contracts.length} عقد</span>
+        <span class="sub">${dataRows.length} عقد</span>
       </div>
-      <div id="pay-contract-progress" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding-right:4px"></div>
+      <div id="pay-contracts-list" style="display:flex;flex-direction:column;gap:12px"></div>
     </div>
 
-    <!-- شبكة الرسوم البيانية -->
-    <div class="g2 mb14">
-      <!-- الفواتير الشهرية مقابل المخطط -->
-      <div class="card">
-        <div class="card-title">
-          <span class="card-title-icon" style="background:#F0FDF4;color:#059669">📈</span>
-          الفواتير الشهرية مقابل القيمة المخططة
-        </div>
-        <div class="chart-box" style="height:300px"><canvas id="pay-ch-monthly"></canvas></div>
-      </div>
-      <!-- انحراف التكلفة -->
-      <div class="card">
-        <div class="card-title">
-          <span class="card-title-icon" style="background:#FFFBEB;color:#D97706">📉</span>
-          فرق التكلفة الشهري
-        </div>
-        <div class="chart-box" style="height:300px"><canvas id="pay-ch-variance"></canvas></div>
-      </div>
-    </div>
-
-    <!-- دائرة نسبة إرسال الفواتير -->
-    <div class="g2 mb14">
-      <div class="card">
-        <div class="card-title">
-          <span class="card-title-icon" style="background:#F0F9FF;color:#0891B2">🔵</span>
-          نسبة إرسال الفواتير حسب المنطقة
-        </div>
-        <div class="chart-box" style="height:300px"><canvas id="pay-ch-submitted"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">
-          <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626">📊</span>
-          ملخص نسبة الإرسال
-        </div>
-        <div id="pay-submit-summary" style="display:flex;flex-direction:column;gap:10px;padding:4px 0"></div>
-      </div>
-    </div>
-
-    <!-- جدول تفصيلي -->
+    <!-- شارت مقارنة العقود -->
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED">🗂️</span>
-        الجدول التفصيلي — الفواتير
-        <span class="sub" id="pay-tbl-count"></span>
+        <span class="card-title-icon" style="background:#F0FDF4;color:#059669">📈</span>
+        مقارنة قيم العقود والمصروف لكل منطقة
       </div>
-
-      <!-- بحث -->
-      <div style="margin-bottom:14px">
-        <input class="finp" id="pay-search-input"
-          placeholder="🔍 بحث في رقم أمر التوريد أو وصف المشروع…"
-          oninput="paySearch(this.value)"
-          style="min-width:280px;width:100%;max-width:480px">
-      </div>
-
-      <!-- الجدول -->
-      <div class="tbl-wrap" id="pay-tbl-wrap">
-        <table id="pay-table">
-          <thead>
-            <tr>
-              <th onclick="paySort(0)" style="cursor:pointer">المنطقة ↕</th>
-              <th onclick="paySort(1)" style="cursor:pointer">رقم أمر التوريد ↕</th>
-              <th onclick="paySort(2)" style="cursor:pointer;min-width:180px">وصف المشروع ↕</th>
-              <th onclick="paySort(3)" style="cursor:pointer">الشهر ↕</th>
-              <th onclick="paySort(4)" style="cursor:pointer">مبلغ الفاتورة</th>
-              <th onclick="paySort(5)" style="cursor:pointer">القيمة المخططة</th>
-              <th onclick="paySort(6)" style="cursor:pointer">فرق التكلفة</th>
-              <th>الحالة</th>
-              <th>الملاحظات</th>
-            </tr>
-          </thead>
-          <tbody id="pay-tbl-body"></tbody>
-        </table>
-      </div>
-
-      <!-- تصفح الصفحات -->
-      <div class="pag-bar">
-        <span class="pag-info" id="pay-pag-info"></span>
-        <div class="pag-btns" id="pay-pag-btns"></div>
-      </div>
+      <div class="chart-box" style="height:280px"><canvas id="pay-ch-contracts"></canvas></div>
     </div>`;
 
-    /* تحديث KPI */
-    updatePayKPIs(kpi);
-    /* رسم تقدم العقود */
-    renderContractProgress(contracts);
-    /* رسم الرسوم البيانية */
-    renderMonthlyChart(monthly);
-    renderVarianceChart(monthly);
-    renderSubmittedChart(invoices);
-    /* رسم الجدول */
-    renderPayTable(invoices);
+    // رسم تقدم كل عقد
+    renderContractsList(dataRows);
+
+    // رسم الشارت
+    renderContractsChart(dataRows);
   }
 
   /* ══════════════════════════════════════
-     KPI
+     تقدم كل عقد
   ══════════════════════════════════════ */
-  function updatePayKPIs(kpi) {
-    const el = (v) => {
-      const e = document.getElementById(v);
-      return e;
-    };
-    const set = (id, val) => {
-      const e = $(id);
-      if (e) e.textContent = val;
-    };
-    set("pay-kpi-contract", payFmt(kpi.totalContract));
-    set("pay-kpi-paid", payFmt(kpi.totalPaid));
-    set("pay-kpi-remaining", payFmt(kpi.totalRemaining));
-    set("pay-kpi-pct", payPct(kpi.pct));
-  }
-
-  /* ══════════════════════════════════════
-     تقدم العقود
-  ══════════════════════════════════════ */
-  function renderContractProgress(contracts) {
-    const el = $("pay-contract-progress");
+  function renderContractsList(rows) {
+    const el = $("pay-contracts-list");
     if (!el) return;
-    if (!contracts.length) {
+    if (!rows.length) {
       el.innerHTML = '<div class="empty-msg">لا توجد بيانات عقود</div>';
       return;
     }
-    el.innerHTML = contracts
-      .map((r) => {
-        const region = r["Region"] || r["المنطقة"] || "—";
-        const contNum = r["Contract_Number"] || r["رقم_العقد"] || r["Contract"] || "—";
-        const projDesc = r["Project_Description"] || r["وصف_المشروع"] || r["Project"] || "—";
-        const cv = payNum(r["Updated_Contract_Value_SAR"] || r["قيمة_العقد_المحدثة"] || 0);
-        const paid = payNum(r["Payment_Released_SAR"] || r["المدفوعات_المصروفة"] || 0);
-        const rem = payNum(r["Remaining_SAR"] || r["المتبقي"] || 0);
-        const pct = cv > 0 ? Math.min(100, (paid / cv) * 100) : 0;
-        const pctColor = pct >= 75 ? "#059669" : pct >= 40 ? "#D97706" : "#0891B2";
-        return `
-        <div style="background:var(--bg-2);border:1px solid var(--bd-light);border-radius:14px;padding:14px 16px;border-right:3px solid ${pctColor}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-            <div>
-              <div style="font-size:12px;font-weight:800;color:var(--tx-main)">${esc(projDesc.slice(0, 60))}${projDesc.length > 60 ? "…" : ""}</div>
-              <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">
-                <span style="background:#ECFEFF;color:#0891B2;padding:1px 8px;border-radius:20px;font-weight:700;font-size:10px">${esc(region)}</span>
-                &nbsp;${esc(contNum)}
-              </div>
-            </div>
-            <div style="text-align:left">
-              <div style="font-size:16px;font-weight:900;color:${pctColor}">${pct.toFixed(1)}%</div>
-              <div style="font-size:10px;color:var(--tx-muted)">نسبة الصرف</div>
-            </div>
+    el.innerHTML = rows.map(r => {
+      const contractNo = r["Contract No."] || r["Contract_No"] || "—";
+      const region     = r["Region"]       || r["المنطقة"]    || "—";
+      const updated    = payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0);
+      const paid       = payNum(r["Payment Released (SAR)"]       || r["Payment_Released_SAR"]       || 0);
+      const remaining  = payNum(r["Remaining (SAR)"]              || r["Remaining_SAR"]              || 0);
+      const kpiDed     = payNum(r["KPI Deduction"]                || r["KPI_Deduction"]              || 0);
+      const pctRaw     = payNum(r["% Paid"]                       || r["Pct_Paid"]                   || 0);
+      const pct        = pctRaw <= 1 ? pctRaw * 100 : pctRaw;
+      const pctColor   = pct >= 70 ? "#059669" : pct >= 40 ? "#D97706" : "#0891B2";
+
+      return `
+      <div style="background:var(--bg-2);border:1px solid var(--bd-light);border-radius:14px;padding:16px 18px;border-right:3px solid ${pctColor}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:13px;font-weight:800;color:var(--tx-main)">${esc(region)}</div>
+            <div style="font-size:11px;color:var(--tx-muted);margin-top:3px;font-family:monospace">${esc(contractNo)}</div>
           </div>
-          <div style="height:8px;background:var(--bg-deep);border-radius:999px;overflow:hidden;margin-bottom:8px">
-            <div style="height:100%;width:${pct.toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width .8s cubic-bezier(.22,.61,.36,1)"></div>
+          <div style="text-align:left">
+            <div style="font-size:22px;font-weight:900;color:${pctColor}">${pct.toFixed(1)}%</div>
+            <div style="font-size:10px;color:var(--tx-muted)">نسبة الصرف</div>
           </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
-            <div><span style="color:var(--tx-muted)">قيمة العقد: </span><strong style="color:var(--tx-main)">${payFmt(cv)}</strong></div>
-            <div><span style="color:var(--tx-muted)">المدفوع: </span><strong style="color:#059669">${payFmt(paid)}</strong></div>
-            <div><span style="color:var(--tx-muted)">المتبقي: </span><strong style="color:#D97706">${payFmt(rem)}</strong></div>
-          </div>
-        </div>`;
-      })
-      .join("");
+        </div>
+        <div style="height:10px;background:var(--bg-deep);border-radius:999px;overflow:hidden;margin-bottom:10px">
+          <div style="height:100%;width:${Math.min(pct, 100).toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width .9s cubic-bezier(.22,.61,.36,1)"></div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
+          <div><span style="color:var(--tx-muted)">القيمة المحدثة: </span><strong style="color:var(--tx-main)" title="${payFmtFull(updated)}">${payFmt(updated)}</strong></div>
+          <div><span style="color:var(--tx-muted)">المدفوع: </span><strong style="color:#059669" title="${payFmtFull(paid)}">${payFmt(paid)}</strong></div>
+          <div><span style="color:var(--tx-muted)">المتبقي: </span><strong style="color:#D97706" title="${payFmtFull(remaining)}">${payFmt(remaining)}</strong></div>
+          ${kpiDed > 0 ? `<div><span style="color:var(--tx-muted)">خصم KPI: </span><strong style="color:#DC2626" title="${payFmtFull(kpiDed)}">${payFmt(kpiDed)}</strong></div>` : ""}
+        </div>
+      </div>`;
+    }).join("");
   }
 
   /* ══════════════════════════════════════
-     رسم الفواتير الشهرية مقابل المخطط
+     شارت مقارنة العقود
   ══════════════════════════════════════ */
-  function renderMonthlyChart(monthly) {
-    killPayChart("pay-ch-monthly");
-    if (!monthly.length) return;
+  function renderContractsChart(rows) {
+    killPayChart();
+    const canvas = $("pay-ch-contracts");
+    if (!canvas || !rows.length) return;
 
-    /* ترتيب حسب Month_Sort */
-    const sorted = [...monthly].sort((a, b) => {
-      const sa = payNum(a["Month_Sort"] || a["ترتيب_الشهر"] || 0);
-      const sb = payNum(b["Month_Sort"] || b["ترتيب_الشهر"] || 0);
-      return sa - sb;
-    });
+    const labels   = rows.map(r => r["Region"] || r["المنطقة"] || "—");
+    const updated  = rows.map(r => payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0));
+    const paid     = rows.map(r => payNum(r["Payment Released (SAR)"]       || r["Payment_Released_SAR"]       || 0));
+    const remaining= rows.map(r => payNum(r["Remaining (SAR)"]              || r["Remaining_SAR"]              || 0));
 
-    /* تجميع حسب الشهر */
-    const monthMap = {};
-    sorted.forEach((r) => {
-      const month = r["Month"] || r["الشهر"] || r["month"] || "—";
-      const sort = payNum(r["Month_Sort"] || r["ترتيب_الشهر"] || 0);
-      if (!monthMap[month]) monthMap[month] = { sort, invoice: 0, planned: 0 };
-      monthMap[month].invoice += payNum(r["Invoice_Amount_SAR"] || r["مبلغ_الفاتورة"] || 0);
-      monthMap[month].planned += payNum(r["Planned_Value_SAR"] || r["القيمة_المخططة"] || 0);
-    });
-
-    const entries = Object.entries(monthMap).sort((a, b) => a[1].sort - b[1].sort);
-    const labels = entries.map((e) => e[0]);
-    const invoiceD = entries.map((e) => e[1].invoice);
-    const plannedD = entries.map((e) => e[1].planned);
-
-    const canvas = $("pay-ch-monthly");
-    if (!canvas) return;
-    PAY_CHARTS["pay-ch-monthly"] = new Chart(canvas, {
+    PAY_CHART = new Chart(canvas, {
       type: "bar",
       data: {
         labels,
         datasets: [
-          {
-            label: "الفاتورة الفعلية",
-            data: invoiceD,
-            backgroundColor: "#0891B288",
-            borderColor: "#0891B2",
-            borderWidth: 1.5,
-            borderRadius: 4,
-            order: 2,
-          },
-          {
-            label: "القيمة المخططة",
-            data: plannedD,
-            type: "line",
-            borderColor: "#D97706",
-            backgroundColor: "transparent",
-            borderWidth: 2.5,
-            borderDash: [6, 3],
-            pointRadius: 4,
-            pointBackgroundColor: "#D97706",
-            tension: 0.3,
-            order: 1,
-          },
+          { label: "المدفوع", data: paid,      backgroundColor: "#05966988", borderColor: "#059669", borderWidth: 1.5, borderRadius: 4 },
+          { label: "المتبقي", data: remaining, backgroundColor: "#D9770644", borderColor: "#D97706", borderWidth: 1.5, borderRadius: 4 },
         ],
       },
       options: {
@@ -8843,388 +8644,37 @@ window.renderElevatorsTab = function () {
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                const ds = ctx.dataset.label;
                 const val = ctx.raw;
-                const inv = invoiceD[ctx.dataIndex];
-                const pln = plannedD[ctx.dataIndex];
-                const variance = inv - pln;
-                if (ctx.datasetIndex === 1)
-                  return ` ${ds}: ${payFmt(val)} | فرق: ${payFmt(variance)}`;
-                return ` ${ds}: ${payFmt(val)}`;
+                const total = updated[ctx.dataIndex];
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : "0";
+                return ` ${ctx.dataset.label}: ${(val/1e6).toFixed(1)}م SAR (${pct}%)`;
               },
             },
           },
         },
         scales: {
-          x: { ticks: { font: { size: 10 }, maxRotation: 35 } },
-          y: { beginAtZero: true, ticks: { callback: (v) => (v / 1e6).toFixed(1) + "M" } },
+          x: { stacked: false, ticks: { font: { size: 11 } } },
+          y: { beginAtZero: true, ticks: { callback: (v) => (v / 1e6).toFixed(0) + "م" } },
         },
       },
     });
   }
 
   /* ══════════════════════════════════════
-     رسم فرق التكلفة
+     ربط مع loadData الرئيسي
   ══════════════════════════════════════ */
-  function renderVarianceChart(monthly) {
-    killPayChart("pay-ch-variance");
-    if (!monthly.length) return;
-
-    const monthMap = {};
-    monthly.forEach((r) => {
-      const month = r["Month"] || r["الشهر"] || "—";
-      const sort = payNum(r["Month_Sort"] || r["ترتيب_الشهر"] || 0);
-      if (!monthMap[month]) monthMap[month] = { sort, variance: 0 };
-      monthMap[month].variance += payNum(r["Cost_Variance_SAR"] || r["فرق_التكلفة"] || 0);
-    });
-
-    const entries = Object.entries(monthMap).sort((a, b) => a[1].sort - b[1].sort);
-    const labels = entries.map((e) => e[0]);
-    const varData = entries.map((e) => e[1].variance);
-    const colors = varData.map((v) => (v > 0 ? "#05966988" : v < 0 ? "#DC262688" : "#64748b88"));
-    const borders = varData.map((v) => (v > 0 ? "#059669" : v < 0 ? "#DC2626" : "#64748b"));
-
-    const canvas = $("pay-ch-variance");
-    if (!canvas) return;
-    PAY_CHARTS["pay-ch-variance"] = new Chart(canvas, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "فرق التكلفة",
-            data: varData,
-            backgroundColor: colors,
-            borderColor: borders,
-            borderWidth: 1.5,
-            borderRadius: 4,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` فرق التكلفة: ${payFmt(ctx.raw)}`,
-              labelColor: (ctx) => ({
-                backgroundColor: borders[ctx.dataIndex],
-                borderColor: borders[ctx.dataIndex],
-              }),
-            },
-          },
-        },
-        scales: {
-          x: { ticks: { font: { size: 10 }, maxRotation: 35 } },
-          y: { ticks: { callback: (v) => (v / 1e6).toFixed(1) + "M" } },
-        },
-      },
-    });
-  }
-
-  /* ══════════════════════════════════════
-     رسم نسبة إرسال الفواتير
-  ══════════════════════════════════════ */
-  function renderSubmittedChart(invoices) {
-    killPayChart("pay-ch-submitted");
-    if (!invoices.length) {
-      const el = $("pay-submit-summary");
-      if (el) el.innerHTML = '<div class="empty-msg">لا توجد بيانات</div>';
-      return;
-    }
-
-    /* تجميع حسب المنطقة */
-    const regionMap = {};
-    invoices.forEach((r) => {
-      const reg = r["Region"] || r["المنطقة"] || "غير محدد";
-      const sub = (r["Invoice_Submitted"] || r["تم_إرسال_الفاتورة"] || "").toLowerCase();
-      if (!regionMap[reg]) regionMap[reg] = { yes: 0, no: 0 };
-      if (sub === "yes" || sub === "نعم" || sub === "1") regionMap[reg].yes++;
-      else regionMap[reg].no++;
-    });
-
-    const regions = Object.keys(regionMap);
-    const yesData = regions.map((r) => regionMap[r].yes);
-    const noData = regions.map((r) => regionMap[r].no);
-    const pctData = regions.map((r) => {
-      const total = regionMap[r].yes + regionMap[r].no;
-      return total > 0 ? +((regionMap[r].yes / total) * 100).toFixed(1) : 0;
-    });
-
-    /* إجمالي */
-    const totalYes = invoices.filter((r) => {
-      const v = (r["Invoice_Submitted"] || r["تم_إرسال_الفاتورة"] || "").toLowerCase();
-      return v === "yes" || v === "نعم" || v === "1";
-    }).length;
-    const totalNo = invoices.length - totalYes;
-    const totalPct = invoices.length > 0 ? ((totalYes / invoices.length) * 100).toFixed(1) : 0;
-
-    /* ملخص نصي */
-    const summEl = $("pay-submit-summary");
-    if (summEl) {
-      summEl.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
-          <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:12px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#059669">${totalYes.toLocaleString()}</div>
-            <div style="font-size:10px;color:#059669;font-weight:700">تم إرسال الفاتورة</div>
-          </div>
-          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#DC2626">${totalNo.toLocaleString()}</div>
-            <div style="font-size:10px;color:#DC2626;font-weight:700">لم يتم الإرسال</div>
-          </div>
-          <div style="background:#ECFEFF;border:1px solid #A5F3FC;border-radius:12px;padding:12px;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#0891B2">${totalPct}%</div>
-            <div style="font-size:10px;color:#0891B2;font-weight:700">نسبة الإرسال</div>
-          </div>
-        </div>
-        ${regions
-          .map((reg, i) => {
-            const total = regionMap[reg].yes + regionMap[reg].no;
-            const pct = pctData[i];
-            return `
-          <div style="padding:8px 0;border-bottom:1px solid var(--bd-light)">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-              <span style="font-size:11px;font-weight:700">${esc(reg)}</span>
-              <span style="font-size:11px;font-weight:800;color:${pct >= 70 ? "#059669" : pct >= 40 ? "#D97706" : "#DC2626"}">${pct}%</span>
-            </div>
-            <div style="height:5px;background:var(--bg-deep);border-radius:999px;overflow:hidden">
-              <div style="height:100%;width:${pct}%;background:${pct >= 70 ? "#059669" : pct >= 40 ? "#D97706" : "#DC2626"};border-radius:999px"></div>
-            </div>
-            <div style="font-size:10px;color:var(--tx-muted);margin-top:3px">${regionMap[reg].yes} من ${total}</div>
-          </div>`;
-          })
-          .join("")}`;
-    }
-
-    const canvas = $("pay-ch-submitted");
-    if (!canvas) return;
-    PAY_CHARTS["pay-ch-submitted"] = new Chart(canvas, {
-      type: "doughnut",
-      data: {
-        labels: ["تم إرسال الفاتورة", "لم يتم الإرسال"],
-        datasets: [
-          {
-            data: [totalYes, totalNo],
-            backgroundColor: ["#05966988", "#DC262688"],
-            borderColor: ["#059669", "#DC2626"],
-            borderWidth: 2,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: "62%",
-        plugins: {
-          legend: { position: "bottom" },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                const pct = ((ctx.raw / total) * 100).toFixed(1);
-                return ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${pct}%)`;
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  /* ══════════════════════════════════════
-     الجدول التفصيلي
-  ══════════════════════════════════════ */
-  function getTableRows() {
-    const invoices = getFilteredInvoice();
-    const q = PAY_STATE.search.toLowerCase();
-    let rows = q
-      ? invoices.filter((r) => {
-          const po = (r["PO_Number"] || r["رقم_أمر_التوريد"] || "").toLowerCase();
-          const desc = (r["Project_Description"] || r["وصف_المشروع"] || "").toLowerCase();
-          return po.includes(q) || desc.includes(q);
-        })
-      : invoices;
-
-    if (PAY_STATE.sortCol >= 0) {
-      const col = PAY_STATE.sortCol;
-      const asc = PAY_STATE.sortAsc;
-      rows = [...rows].sort((a, b) => {
-        const va = getSortVal(a, col),
-          vb = getSortVal(b, col);
-        if (typeof va === "number" && typeof vb === "number") return asc ? va - vb : vb - va;
-        return asc
-          ? String(va).localeCompare(String(vb), "ar")
-          : String(vb).localeCompare(String(va), "ar");
-      });
-    }
-    return rows;
-  }
-
-  function getSortVal(r, col) {
-    switch (col) {
-      case 0:
-        return r["Region"] || r["المنطقة"] || "";
-      case 1:
-        return r["PO_Number"] || r["رقم_أمر_التوريد"] || "";
-      case 2:
-        return r["Project_Description"] || r["وصف_المشروع"] || "";
-      case 3:
-        return r["Month"] || r["الشهر"] || "";
-      case 4:
-        return payNum(r["Invoice_Amount_SAR"] || r["مبلغ_الفاتورة"] || 0);
-      case 5:
-        return payNum(r["Planned_Value_SAR"] || r["القيمة_المخططة"] || 0);
-      case 6:
-        return payNum(r["Cost_Variance_SAR"] || r["فرق_التكلفة"] || 0);
-      default:
-        return "";
-    }
-  }
-
-  function renderPayTable(invoices) {
-    const all = getTableRows();
-    const total = all.length;
-    const maxPage = Math.max(0, Math.ceil(total / PAY_PAGE_SIZE) - 1);
-    PAY_STATE.page = Math.min(PAY_STATE.page, maxPage);
-    const start = PAY_STATE.page * PAY_PAGE_SIZE;
-    const page = all.slice(start, start + PAY_PAGE_SIZE);
-
-    const tbody = $("pay-tbl-body");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    const frag = document.createDocumentFragment();
-
-    page.forEach((r) => {
-      const region = r["Region"] || r["المنطقة"] || "—";
-      const po = r["PO_Number"] || r["رقم_أمر_التوريد"] || "—";
-      const desc = r["Project_Description"] || r["وصف_المشروع"] || "—";
-      const month = r["Month"] || r["الشهر"] || "—";
-      const inv = payNum(r["Invoice_Amount_SAR"] || r["مبلغ_الفاتورة"] || 0);
-      const pln = payNum(r["Planned_Value_SAR"] || r["القيمة_المخططة"] || 0);
-      const varAmt = payNum(r["Cost_Variance_SAR"] || r["فرق_التكلفة"] || inv - pln);
-      const subRaw = (r["Invoice_Submitted"] || r["تم_إرسال_الفاتورة"] || "").toLowerCase();
-      const submitted = subRaw === "yes" || subRaw === "نعم" || subRaw === "1";
-      const remarks = r["Remarks"] || r["الملاحظات"] || "—";
-
-      const varColor = varAmt > 0 ? "#059669" : varAmt < 0 ? "#DC2626" : "#64748b";
-      const varBg = varAmt > 0 ? "#F0FDF4" : varAmt < 0 ? "#FEF2F2" : "#F8FAFC";
-      const varBorder = varAmt > 0 ? "#A7F3D0" : varAmt < 0 ? "#FECACA" : "#E2E8F0";
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><span class="badge" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC">${esc(region)}</span></td>
-        <td style="font-family:monospace;font-size:11px;font-weight:700;color:#0891B2">${esc(po)}</td>
-        <td style="text-align:right;max-width:200px;white-space:normal;line-height:1.4;font-size:11px">${esc(desc.slice(0, 80))}${desc.length > 80 ? "…" : ""}</td>
-        <td style="font-size:11px;white-space:nowrap">${esc(month)}</td>
-        <td style="font-weight:700;font-size:11px;color:#0891B2">${payFmt(inv)}</td>
-        <td style="font-weight:700;font-size:11px;color:#D97706">${payFmt(pln)}</td>
-        <td>
-          <span class="badge" style="background:${varBg};color:${varColor};border:1px solid ${varBorder}">
-            ${varAmt >= 0 ? "+" : ""}${payFmt(varAmt)}
-          </span>
-        </td>
-        <td>
-          <span class="badge" style="background:${submitted ? "#F0FDF4" : "#FEF2F2"};color:${submitted ? "#059669" : "#DC2626"};border:1px solid ${submitted ? "#A7F3D0" : "#FECACA"}">
-            ${submitted ? "تم الإرسال" : "لم يُرسل"}
-          </span>
-        </td>
-        <td style="font-size:10px;color:var(--tx-muted);max-width:160px;white-space:normal;line-height:1.4">${esc(remarks.slice(0, 80))}${remarks.length > 80 ? "…" : ""}</td>`;
-      frag.appendChild(tr);
-    });
-    tbody.appendChild(frag);
-
-    /* معلومات الصفحة */
-    const info = $("pay-tbl-count");
-    if (info) info.textContent = `${total.toLocaleString()} سجل`;
-    const pagInfo = $("pay-pag-info");
-    if (pagInfo)
-      pagInfo.textContent = `الصفوف ${(start + 1).toLocaleString()}–${Math.min(start + PAY_PAGE_SIZE, total).toLocaleString()} من ${total.toLocaleString()}`;
-
-    /* أزرار الصفحات */
-    const pagBtns = $("pay-pag-btns");
-    if (!pagBtns) return;
-    pagBtns.innerHTML = "";
-    const addBtn = (label, pg, disabled, active = false) => {
-      const b = document.createElement("button");
-      b.className = "pag-btn" + (active ? " active" : "");
-      b.textContent = label;
-      b.disabled = disabled;
-      if (!disabled)
-        b.onclick = () => {
-          PAY_STATE.page = pg;
-          renderPayTable();
-        };
-      pagBtns.appendChild(b);
-    };
-    addBtn("◄ السابق", PAY_STATE.page - 1, PAY_STATE.page === 0);
-    let lo = Math.max(0, PAY_STATE.page - 3);
-    let hi = Math.min(maxPage, PAY_STATE.page + 3);
-    if (lo > 0) {
-      addBtn("1", 0, false);
-      if (lo > 1)
-        pagBtns.appendChild(
-          Object.assign(document.createElement("span"), {
-            textContent: "…",
-            style: "padding:0 4px;color:var(--tx-muted)",
-          }),
-        );
-    }
-    for (let i = lo; i <= hi; i++) addBtn(String(i + 1), i, false, i === PAY_STATE.page);
-    if (hi < maxPage) {
-      pagBtns.appendChild(
-        Object.assign(document.createElement("span"), {
-          textContent: "…",
-          style: "padding:0 4px;color:var(--tx-muted)",
-        }),
-      );
-      addBtn(String(maxPage + 1), maxPage, false);
-    }
-    addBtn("التالي ►", PAY_STATE.page + 1, PAY_STATE.page >= maxPage);
-  }
-
-  /* ══════════════════════════════════════
-     وظائف عامة مُصدَّرة
-  ══════════════════════════════════════ */
-  window.paySetRegion = function (region) {
-    PAY_STATE.region = region;
-    PAY_STATE.page = 0;
-    renderPaymentsTab();
-  };
-
-  window.paySearch = function (val) {
-    PAY_STATE.search = val.trim();
-    PAY_STATE.page = 0;
-    const invoices = getFilteredInvoice();
-    renderPayTable(invoices);
-  };
-
-  window.paySort = function (col) {
-    if (PAY_STATE.sortCol === col) {
-      PAY_STATE.sortAsc = !PAY_STATE.sortAsc;
-    } else {
-      PAY_STATE.sortCol = col;
-      PAY_STATE.sortAsc = true;
-    }
-    PAY_STATE.page = 0;
-    const invoices = getFilteredInvoice();
-    renderPayTable(invoices);
-  };
-
-  /* إتاحة إدخال البيانات من Apps Script بعد تحميل loadData الرئيسي */
   const _origLoadData = window.loadData;
   if (typeof _origLoadData === "function") {
     window.loadData = async function (silent) {
       await _origLoadData.apply(this, arguments);
-      /* محاولة استخراج بيانات جديدة بعد تحميل loadData إذا كان التبويب مفتوحاً */
       const tabPanel = document.getElementById("tab-payments");
-      if (tabPanel && tabPanel.classList.contains("active") && !PAY_LOADED) {
+      if (tabPanel && tabPanel.classList.contains("active")) {
         paymentsInitTab();
       }
     };
   }
 })();
+
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -10522,7 +9972,7 @@ function renderTajheezAllTable() {
           model: this.getModel(),
           messages: messages,
           temperature: 0.4,
-          max_completion_tokens: 700,
+          max_completion_tokens: 1500,
         }),
       });
       if (!resp.ok) {
@@ -10963,17 +10413,84 @@ function renderTajheezAllTable() {
     try {
       if (Array.isArray(window.RAW_FM_CONTRACTS) && window.RAW_FM_CONTRACTS.length) {
         const fm = window.RAW_FM_CONTRACTS;
-        const sampleKeys = Object.keys(fm[0] || {});
-        const statusKey = sampleKeys.find((k) => /حالة|status/i.test(k));
-        const typeKey = sampleKeys.find((k) => /نوع|تصنيف/i.test(k));
+        const fmNum = (v) => { const n = parseFloat(String(v||"").replace(/,/g,"").replace(/ - /g,"").trim()); return isFinite(n)?n:null; };
+        const fmRemDays = (r) => fmNum(r["المدة المتبقية بالأيام"]);
+
+        // إحصائيات الحالة
+        const active   = fm.filter(r => { const d=fmRemDays(r); return d!=null && d>0; }).length;
+        const expired  = fm.filter(r => { const d=fmRemDays(r); return d!=null && d<=0; }).length;
+        const expiring = fm.filter(r => { const d=fmRemDays(r); return d!=null && d>0 && d<=90; }).length;
+        const noDate   = fm.filter(r => fmRemDays(r)==null).length;
+
+        // مشاهد الإنجاز
+        const scenesComplete   = fm.filter(r => String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("مكتملة") && !String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("غير")).length;
+        const scenesIncomplete = fm.filter(r => String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("غير مكتملة")).length;
+
+        // القيم المالية
+        const totalBase    = fm.reduce((s,r)=>s+(fmNum(r["قيمة العقد الأساسي"])||0),0);
+        const totalUpdated = fm.reduce((s,r)=>s+(fmNum(r["قيمة العقد المحدثة"])||0),0);
+        const totalSpent   = fm.reduce((s,r)=>s+(fmNum(r["تراكمي المستخلصات المصروفة"])||0),0);
+        const totalDue     = fm.reduce((s,r)=>s+(fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"])||0),0);
+        const totalLastInv = fm.reduce((s,r)=>s+(fmNum(r["القيمة"])||0),0);
+
+        // توزيعات
+        const byRegion     = fcbCountBy(fm, "المنطقة", 10);
+        const byScope      = fcbCountBy(fm, "النطاق", 15);
+        const byContractor = fcbCountBy(fm, "المقاول", 15);
+
+        // أعلى عقود من حيث القيمة المستحقة غير المصروفة
+        const topDue = [...fm]
+          .filter(r => fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"]) > 0)
+          .sort((a,b) => (fmNum(b["القيمة المستحقة للمستخلصات حتى تاريخه"])||0) - (fmNum(a["القيمة المستحقة للمستخلصات حتى تاريخه"])||0))
+          .slice(0,10)
+          .map(r => ({
+            المقاول: r["المقاول"],
+            المشروع: String(r["المشروع"]||"").slice(0,60),
+            رقم_العقد: r["رقم العقد"],
+            المنطقة: r["المنطقة"],
+            القيمة_المستحقة: fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"]),
+            نسبة_الإنجاز: r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"],
+            حالة_مشاهد: r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"],
+            الإجراءات: String(r["الإجراءات المتخذة والملاحظات"]||"").slice(0,120),
+          }));
+
+        // عقود منتهية مع ملاحظات
+        const expiredContracts = [...fm]
+          .filter(r => { const d=fmRemDays(r); return d!=null && d<=0; })
+          .sort((a,b) => (fmRemDays(a)||0) - (fmRemDays(b)||0))
+          .slice(0,10)
+          .map(r => ({
+            المقاول: r["المقاول"],
+            رقم_العقد: r["رقم العقد"],
+            المنطقة: r["المنطقة"],
+            المدة_المتبقية: fmRemDays(r),
+            نسبة_الإنجاز: r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"],
+            الإجراءات: String(r["الإجراءات المتخذة والملاحظات"]||"").slice(0,120),
+          }));
+
         summary.عقود_FM = {
-          مصدر: "تبويب عقود غير المجال (FM)",
-          إجمالي_السجلات: fm.length,
-          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(fm, statusKey, 10) } : {}),
-          ...(typeKey ? { توزيع_حسب_النوع: fcbCountBy(fm, typeKey, 10) } : {}),
+          مصدر: "تبويب عقود غير المجال — شيت عقود_عدا_المجال",
+          إجمالي_العقود: fm.length,
+          حالة_العقود: { جارية: active, منتهية: expired, قاربت_الانتهاء_90_يوم: expiring, بدون_تاريخ: noDate },
+          مشاهد_الإنجاز: { مكتملة: scenesComplete, غير_مكتملة: scenesIncomplete },
+          ملخص_مالي_ريال: {
+            إجمالي_قيمة_العقود_الأساسية: +totalBase.toFixed(0),
+            إجمالي_قيمة_العقود_المحدثة: +totalUpdated.toFixed(0),
+            إجمالي_المستخلصات_المصروفة: +totalSpent.toFixed(0),
+            نسبة_الصرف_من_المحدثة: totalUpdated ? +(totalSpent/totalUpdated*100).toFixed(1) : 0,
+            إجمالي_القيمة_المستحقة_غير_المصروفة: +totalDue.toFixed(0),
+            إجمالي_آخر_مستخلص_شهري: +totalLastInv.toFixed(0),
+          },
+          توزيع_حسب_المنطقة: byRegion,
+          توزيع_حسب_النطاق: byScope,
+          توزيع_حسب_المقاول: byContractor,
+          أعلى_10_عقود_من_حيث_القيمة_المستحقة_غير_المصروفة: topDue,
+          أبرز_العقود_المنتهية: expiredContracts,
         };
       }
-    } catch (_) {}
+    } catch (e) {
+      summary.عقود_FM = { تنبيه: "تعذّر تلخيص بيانات عقود غير المجال: " + (e?.message || e) };
+    }
     try {
       if (Array.isArray(window.RAW_INVOICES_TRACKER) && window.RAW_INVOICES_TRACKER.length) {
         const inv = window.RAW_INVOICES_TRACKER;
@@ -10989,15 +10506,364 @@ function renderTajheezAllTable() {
       }
     } catch (_) {}
     try {
-      if (typeof PAY_RAW_CONTRACT !== "undefined" && PAY_RAW_CONTRACT.length) {
-        summary.المدفوعات_والعقود = {
-          عدد_العقود: PAY_RAW_CONTRACT.length,
-          عدد_الفواتير: (typeof PAY_RAW_INVOICE !== "undefined" ? PAY_RAW_INVOICE.length : 0),
+      const payRows = Array.isArray(window.RAW_PAYMENTS) ? window.RAW_PAYMENTS : [];
+      const payData = payRows.filter(r => {
+        const cn = (r["Contract No."] || r["Contract_No"] || "").toString().toUpperCase().trim();
+        const rg = (r["Region"] || "").toString().toUpperCase().trim();
+        return cn !== "TOTAL" && rg !== "ALL REGIONS";
+      });
+      const totalRow = payRows.find(r =>
+        (r["Contract No."] || r["Contract_No"] || "").toString().toUpperCase().trim() === "TOTAL" ||
+        (r["Region"] || "").toString().toUpperCase().trim() === "ALL REGIONS"
+      );
+      if (payRows.length) {
+        const pn = (v) => { const n = parseFloat(String(v||0).replace(/,/g,"")); return isNaN(n)?0:n; };
+        const paid     = pn(totalRow?.["Payment Released (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Payment Released (SAR)"]||0),0);
+        const updated  = pn(totalRow?.["Updated Contract Value (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Updated Contract Value (SAR)"]||0),0);
+        const remaining= pn(totalRow?.["Remaining (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Remaining (SAR)"]||0),0);
+        const pct      = updated > 0 ? ((paid/updated)*100).toFixed(1) : "0";
+        summary.المدفوعات = {
+          عدد_العقود: payData.length,
+          إجمالي_قيمة_العقود_المحدثة: Math.round(updated).toLocaleString("en-US") + " SAR",
+          المدفوعات_المصروفة: Math.round(paid).toLocaleString("en-US") + " SAR",
+          المتبقي: Math.round(remaining).toLocaleString("en-US") + " SAR",
+          نسبة_الصرف: pct + "%",
+          تفاصيل_العقود: payData.map(r => ({
+            المنطقة: r["Region"] || "—",
+            رقم_العقد: r["Contract No."] || "—",
+            مدفوع: pn(r["Payment Released (SAR)"]||0).toLocaleString("en-US") + " SAR",
+            نسبة: (() => { const p=pn(r["% Paid"]||0); return ((p<=1?p*100:p).toFixed(1))+"%"; })(),
+          })),
         };
       }
     } catch (_) {}
 
+    // ════════════════════════════════════════════════════════════════
+    // 🧍 تبويب البوابين (window.RAW_GATEKEEPERS)
+    // أعمدة: المدينة، اسم المدرسة، الرقم الوزاري، اسم البواب، رقم الجوال، رقم الهوية
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const gkRaw = Array.isArray(window.RAW_GATEKEEPERS) ? window.RAW_GATEKEEPERS : [];
+      if (gkRaw.length) {
+        const norm = (v) => String(v == null ? "" : v).replace(/\uFEFF/g, "").trim();
+        const gk = gkRaw.map(r => ({
+          city:       norm(r["المدينة"]),
+          schoolName: norm(r["اسم المدرسة"]),
+          minId:      norm(r["الرقم الوزاري"]),
+          gateName:   norm(r["اسم البواب"]),
+          phone:      norm(r["رقم الجوال"]),
+          nationalId: norm(r["رقم الهوية"]),
+        }));
+
+        // توزيع حسب المدينة
+        const byCity = {};
+        gk.forEach(r => { if (r.city) byCity[r.city] = (byCity[r.city] || 0) + 1; });
+        const توزيع_حسب_المدينة = Object.entries(byCity)
+          .sort((a,b) => b[1]-a[1])
+          .map(([k,v]) => ({ المدينة: k, عدد_البوابين: v }));
+
+        // المدارس المغطاة لكل مدينة
+        const schoolsByCity = {};
+        gk.forEach(r => {
+          if (!r.city) return;
+          if (!schoolsByCity[r.city]) schoolsByCity[r.city] = new Set();
+          if (r.minId || r.schoolName) schoolsByCity[r.city].add(r.minId || r.schoolName);
+        });
+        const مدارس_مغطاة_حسب_المدينة = Object.entries(schoolsByCity)
+          .sort((a,b) => b[1].size - a[1].size)
+          .map(([k,v]) => ({ المدينة: k, عدد_المدارس: v.size }));
+
+        // بوابين بدون جوال
+        const noPhone = gk.filter(r => !r.phone);
+
+        // قائمة كاملة بالبوابين (للتشات يقدر يجاوب "مين بواب مدرسة X")
+        const قائمة_البوابين_كاملة = gk.map(r => ({
+          المدينة: r.city,
+          اسم_المدرسة: r.schoolName,
+          الرقم_الوزاري: r.minId,
+          اسم_البواب: r.gateName,
+          رقم_الجوال: r.phone || "—",
+          رقم_الهوية: r.nationalId || "—",
+        }));
+
+        // ⚠️ قائمة_البوابين_كاملة لا تُحفظ هنا — تُحقن في الـ context بشكل منفصل عند الطلب فقط
+        // (window.__GK_FULL__ يُستخدم داخل fcbAskOpenAI عند الكشف عن سؤال عن بواب)
+        window.__GK_FULL__ = gk;
+        summary.البوابين = {
+          مصدر: "تبويب البوابين — قائمة_البوابين_منظفة",
+          إجمالي_البوابين: gk.length,
+          عدد_المدارس_المغطاة: new Set(gk.map(r => r.minId || r.schoolName).filter(Boolean)).size,
+          عدد_المدن: Object.keys(byCity).length,
+          بدون_رقم_جوال: noPhone.length,
+          توزيع_حسب_المدينة,
+          مدارس_مغطاة_حسب_المدينة,
+        };
+      }
+    } catch (e) {
+      summary.البوابين = { تنبيه: "تعذّر تلخيص بيانات البوابين: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 📈 تاريخ تقييمات FCA (window.RAW_FCA_HISTORY)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const fcaH = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
+      if (fcaH.length) {
+        const getMrhalah = (r) => r["المرحلة"] || r["stage"] || r["مرحلة"] || "";
+        const getScore   = (r) => { const v = r["الدرجة"] ?? r["درجة"] ?? r["fca"] ?? r["score"]; const n = parseFloat(v); return isFinite(n) ? n : null; };
+        const getYear    = (r) => r["السنة"] || r["year"] || r["عام"] || "";
+        const getCity    = (r) => r["المدينة"] || r["city"] || r["مدينة"] || "";
+
+        const يقيمات_حسب_المرحلة = {};
+        fcaH.forEach(r => {
+          const m = getMrhalah(r);
+          const s = getScore(r);
+          if (m && s != null) {
+            if (!يقيمات_حسب_المرحلة[m]) يقيمات_حسب_المرحلة[m] = [];
+            يقيمات_حسب_المرحلة[m].push(s);
+          }
+        });
+        const متوسط_حسب_المرحلة = Object.entries(يقيمات_حسب_المرحلة).map(([k,v]) => ({
+          المرحلة: k,
+          متوسط_FCA: +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2),
+          عدد_التقييمات: v.length,
+        }));
+
+        const يقيمات_حسب_السنة = {};
+        fcaH.forEach(r => {
+          const y = String(getYear(r)).trim();
+          const s = getScore(r);
+          if (y && s != null) {
+            if (!يقيمات_حسب_السنة[y]) يقيمات_حسب_السنة[y] = [];
+            يقيمات_حسب_السنة[y].push(s);
+          }
+        });
+        const اتجاه_FCA_عبر_السنوات = Object.entries(يقيمات_حسب_السنة)
+          .sort((a,b) => a[0].localeCompare(b[0]))
+          .map(([k,v]) => ({
+            السنة: k,
+            متوسط_FCA: +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2),
+            عدد_التقييمات: v.length,
+          }));
+
+        summary.تاريخ_تقييمات_FCA = {
+          مصدر: "تبويب تحليل FCA — تاريخ التقييمات",
+          إجمالي_السجلات: fcaH.length,
+          متوسط_حسب_المرحلة,
+          اتجاه_FCA_عبر_السنوات,
+        };
+      }
+    } catch (e) {
+      summary.تاريخ_تقييمات_FCA = { تنبيه: "تعذّر تلخيص تاريخ تقييمات FCA: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 📋 تبويب البلاغات (window.RAW_BALAGH)
+    // الأعمدة: Record No., Status, Category, Priority, School Name, School Number,
+    //          Location, Problem Description, SLA DAYS, Sla Status, Creation Date
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const bal = Array.isArray(window.RAW_BALAGH) ? window.RAW_BALAGH : [];
+      if (bal.length) {
+        const n = (v) => String(v ?? "").replace(/\uFEFF/g, "").trim();
+        const CLOSED = new Set(["تم حله","ملغى","ملغي","مغلق","closed","cancelled","resolved"]);
+        const INPROG = new Set(["قيد التنفيذ","موافقة الاستشاري قيد التنفيذ","in progress","consultant approval in progress"]);
+        const isClosed = (s) => CLOSED.has(n(s).toLowerCase());
+        const isInProg = (s) => INPROG.has(n(s).toLowerCase());
+
+        const rows = bal.map(r => ({
+          recordNo:    n(r["Record No."]),
+          status:      n(r["Status"]),
+          category:    n(r["Category"]),
+          priority:    n(r["Priority"]),
+          schoolName:  n(r["School Name"]),
+          schoolNo:    n(r["School Number"]),
+          location:    n(r["Location"]),
+          problem:     n(r["Problem Description"]),
+          slaDays:     n(r["SLA DAYS"]),
+          slaStatus:   n(r["Sla Status"]),
+          created:     n(r["Creation Date.1"] || r["Creation Date"]),
+        })).filter(r => r.recordNo || r.schoolName);
+
+        const closed   = rows.filter(r => isClosed(r.status)).length;
+        const inprog   = rows.filter(r => isInProg(r.status)).length;
+        const open     = rows.filter(r => !isClosed(r.status) && !isInProg(r.status)).length;
+
+        // فئات وأولويات
+        const byCategory = {}; rows.forEach(r => { if(r.category) byCategory[r.category]=(byCategory[r.category]||0)+1; });
+        const byPriority = {}; rows.forEach(r => { if(r.priority) byPriority[r.priority]=(byPriority[r.priority]||0)+1; });
+        const byLocation = {}; rows.forEach(r => { if(r.location) byLocation[r.location]=(byLocation[r.location]||0)+1; });
+
+        // أعلى مدارس في عدد البلاغات
+        const bySchool = {}; rows.forEach(r => { if(r.schoolName) bySchool[r.schoolName]=(bySchool[r.schoolName]||0)+1; });
+        const أعلى_10_مدارس = Object.entries(bySchool).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({المدرسة:k,عدد_البلاغات:v}));
+
+        // متأخرة (SLA سالبة)
+        const overdue = rows.filter(r => { const m=String(r.slaDays||"").match(/-?\d+/); return m && Number(m[0])<0; });
+
+        summary.البلاغات = {
+          مصدر: "تبويب البلاغات — ملف البلاغات CSV",
+          إجمالي_البلاغات: rows.length,
+          حالة_البلاغات: { مغلقة: closed, قيد_التنفيذ: inprog, مفتوحة_أخرى: open },
+          متأخرة_عن_SLA: overdue.length,
+          توزيع_حسب_الفئة: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({الفئة:k,العدد:v})),
+          توزيع_حسب_الأولوية: Object.entries(byPriority).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الأولوية:k,العدد:v})),
+          توزيع_حسب_الموقع: Object.entries(byLocation).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({الموقع:k,العدد:v})),
+          أعلى_10_مدارس_في_عدد_البلاغات: أعلى_10_مدارس,
+        };
+      }
+    } catch (e) {
+      summary.البلاغات = { تنبيه: "تعذّر تلخيص البلاغات: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 📊 تبويب مؤشرات الأداء للمقاول (MAG_KPI_DATA — بيانات ثابتة في الكود)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      if (typeof MAG_KPI_DATA !== "undefined" && Array.isArray(MAG_KPI_DATA) && MAG_KPI_DATA.length) {
+        const months = typeof MAG_KPI_MONTHS !== "undefined" ? MAG_KPI_MONTHS : [];
+        const kpiRows = MAG_KPI_DATA.map(r => {
+          const vals = r.values || [];
+          const avg  = vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : null;
+          const last = vals.length ? vals[vals.length-1] : null;
+          const monthData = {};
+          months.forEach((m,i) => { if (vals[i] != null) monthData[m] = vals[i]; });
+          return { المنطقة: r.region, رقم_العقد: r.contract, متوسط_الأداء: avg, آخر_شهر: last, الأداء_الشهري: monthData };
+        });
+        const أقل_منطقة = kpiRows.reduce((a,b)=>(a.متوسط_الأداء||100)<(b.متوسط_الأداء||100)?a:b, kpiRows[0]);
+        summary.مؤشرات_أداء_المقاول = {
+          مصدر: "تبويب مؤشرات الأداء — MAG_KPI_DATA",
+          الشهور_المتاحة: months,
+          تفاصيل_حسب_المنطقة: kpiRows,
+          أقل_منطقة_أداءً: أقل_منطقة?.المنطقة,
+          متوسط_الأداء_الكلي: kpiRows.length ? +(kpiRows.reduce((s,r)=>s+(r.متوسط_الأداء||0),0)/kpiRows.length).toFixed(2) : null,
+        };
+      }
+    } catch (e) {
+      summary.مؤشرات_أداء_المقاول = { تنبيه: "تعذّر تلخيص مؤشرات الأداء: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ❄️ تبويب خطة استبدال المكيفات (RAW — من بيانات المباني الرئيسية)
+    // الحقول المستخدمة: acUnits, acWindowUnits, acSplitUnits, acPlanYear
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+      if (D.length) {
+        const withAC = D.filter(r => null != r.acUnits);
+        const totalWindow = D.reduce((s,r)=>s+(r.acWindowUnits||0),0);
+        const totalSplit  = D.reduce((s,r)=>s+(r.acSplitUnits||0),0);
+        const totalAC     = D.reduce((s,r)=>s+(r.acUnits||0),0);
+        const byPlanYear  = {};
+        D.forEach(r => { const y=r.acPlanYear||r.replacementYear; if(y) byPlanYear[y]=(byPlanYear[y]||0)+1; });
+        summary.خطة_استبدال_المكيفات = {
+          إجمالي_وحدات_التكييف: totalAC,
+          وحدات_شباك: totalWindow,
+          وحدات_سبلت: totalSplit,
+          مدارس_بها_وحدات_تكييف: withAC.length,
+          توزيع_خطة_الاستبدال_حسب_السنة: Object.entries(byPlanYear).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({السنة:k,عدد_المدارس:v})),
+        };
+      }
+    } catch (e) {
+      summary.خطة_استبدال_المكيفات = { تنبيه: "تعذّر تلخيص خطة المكيفات: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 🗺️ تبويب الخريطة — ملخص للمساعد (بيانات المباني مع الإحداثيات)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+      const withCoords = D.filter(r => r.lat && r.lng);
+      const byCity = {};
+      withCoords.forEach(r => { const c=r.city||"غير محدد"; byCity[c]=(byCity[c]||0)+1; });
+      summary.الخريطة = {
+        إجمالي_المباني_على_الخريطة: withCoords.length,
+        بدون_إحداثيات: D.length - withCoords.length,
+        توزيع_حسب_المدينة: Object.entries(byCity).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({المدينة:k,عدد:v})),
+      };
+    } catch (e) {}
+
+    // ════════════════════════════════════════════════════════════════
+    // 👨‍🎓 تبويب الطلاب وعمر المبنى — تفاصيل إضافية أعمق
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+      if (D.length) {
+        const ageGroups = {
+          "أقل من 10 سنوات": D.filter(r=>r.buildingAge!=null && r.buildingAge<10).length,
+          "10 إلى 20 سنة":   D.filter(r=>r.buildingAge!=null && r.buildingAge>=10 && r.buildingAge<20).length,
+          "20 إلى 30 سنة":   D.filter(r=>r.buildingAge!=null && r.buildingAge>=20 && r.buildingAge<30).length,
+          "30 إلى 40 سنة":   D.filter(r=>r.buildingAge!=null && r.buildingAge>=30 && r.buildingAge<40).length,
+          "أكثر من 40 سنة":  D.filter(r=>r.buildingAge!=null && r.buildingAge>=40).length,
+        };
+        const topStudents = [...D].filter(r=>r.students>0).sort((a,b)=>b.students-a.students).slice(0,10).map(r=>({الاسم:r.name,المدينة:r.city,عدد_الطلاب:r.students,عمر_المبنى:r.buildingAge}));
+        const topAge = [...D].filter(r=>r.buildingAge>0).sort((a,b)=>b.buildingAge-a.buildingAge).slice(0,10).map(r=>({الاسم:r.name,المدينة:r.city,عمر_المبنى:r.buildingAge,درجة_FCA:r.fca}));
+        summary.الطلاب_وعمر_المبنى_تفصيلي = {
+          توزيع_أعمار_المباني: ageGroups,
+          أعلى_10_مدارس_طلاباً: topStudents,
+          أقدم_10_مباني: topAge,
+          متوسط_عمر_المبنى: D.filter(r=>r.buildingAge!=null).length ? +(D.reduce((s,r)=>s+(r.buildingAge||0),0)/D.filter(r=>r.buildingAge!=null).length).toFixed(1) : null,
+        };
+      }
+    } catch (e) {}
+
+    // ════════════════════════════════════════════════════════════════
+    // 🔍 تبويب تقييم عاين — تفاصيل إضافية
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+      const ayenArr = D.filter(r => r.ayenScore != null);
+      if (ayenArr.length) {
+        const tiers = {
+          "حرج (أقل من 25)":      ayenArr.filter(r=>r.ayenScore<25).length,
+          "متوسط (25-50)":         ayenArr.filter(r=>r.ayenScore>=25&&r.ayenScore<50).length,
+          "جيد (50-75)":           ayenArr.filter(r=>r.ayenScore>=50&&r.ayenScore<75).length,
+          "جيد جداً (75-100)":     ayenArr.filter(r=>r.ayenScore>=75).length,
+        };
+        const worst = [...ayenArr].sort((a,b)=>a.ayenScore-b.ayenScore).slice(0,10).map(r=>({الاسم:r.name,المدينة:r.city,تقييم_عاين:r.ayenScore,FCA:r.fca}));
+        const byCity = {};
+        ayenArr.forEach(r=>{ const c=r.city||"—"; if(!byCity[c]) byCity[c]=[]; byCity[c].push(r.ayenScore); });
+        const متوسط_عاين_حسب_المدينة = Object.entries(byCity).map(([k,v])=>({المدينة:k,المتوسط:+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2),عدد:v.length})).sort((a,b)=>a.المتوسط-b.المتوسط);
+        summary.تقييم_عاين_تفصيلي = {
+          عدد_المقيّمة: ayenArr.length,
+          المتوسط_العام: +(ayenArr.reduce((s,r)=>s+r.ayenScore,0)/ayenArr.length).toFixed(2),
+          توزيع_التصنيفات: tiers,
+          أسوأ_10_مدارس: worst,
+          متوسط_حسب_المدينة: متوسط_عاين_حسب_المدينة,
+        };
+      }
+    } catch (e) {}
+
+    // ════════════════════════════════════════════════════════════════
+    // 📈 تبويب المرحلة الدراسية — تحليل حسب المرحلة
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+      if (D.length) {
+        const stageMap = {};
+        D.forEach(r => {
+          const s = r.stage || r.مرحلة || "غير محدد";
+          if (!stageMap[s]) stageMap[s] = { count:0, fcaSum:0, fcaCount:0, envSum:0, envCount:0, students:0 };
+          stageMap[s].count++;
+          if (r.fca != null) { stageMap[s].fcaSum+=r.fca; stageMap[s].fcaCount++; }
+          if (r.envScore != null) { stageMap[s].envSum+=r.envScore; stageMap[s].envCount++; }
+          stageMap[s].students += r.students||0;
+        });
+        summary.المرحلة_الدراسية = {
+          تحليل_حسب_المرحلة: Object.entries(stageMap).map(([k,v])=>({
+            المرحلة: k,
+            عدد_المدارس: v.count,
+            متوسط_FCA: v.fcaCount ? +(v.fcaSum/v.fcaCount).toFixed(2) : null,
+            متوسط_البيئة: v.envCount ? +(v.envSum/v.envCount).toFixed(2) : null,
+            إجمالي_الطلاب: v.students,
+          })),
+        };
+      }
+    } catch (e) {}
+
     return summary;
+
+
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -11047,23 +10913,23 @@ function renderTajheezAllTable() {
      لو ما فيه مفتاح API أو فشل الاتصال بـ OpenAI
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
-    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، الصيانة الوقائية والتصحيحية، إدارة العقود والأصول، التجهيزات المدرسية، وأنظمة المباني. اسألني عن أي قسم في اللوحة أو قل 'ايش الحلول والأولويات' 📊" },
-    { test: /دليل وطني|إكسبرو|اكسبرو|دليل الأصول|دليل المرافق/i, reply: "الدليل الوطني لإدارة الأصول والمرافق 📖 — صادر عن هيئة كفاءة الإنفاق والمشروعات الحكومية «إكسبرو» بتاريخ 12 يونيو 2022م، بالتعاون مع كوادر وطنية من الجهات الحكومية.\n\nأبرز ما يُرسّخه الدليل:\n• إدارة دورة حياة الأصول من الاقتناء حتى التخلص.\n• الصيانة الوقائية أولاً (كل 1 ريال وقائي يوفر 3-5 ريال طارئة).\n• تقييم الحالة الفنية FCA ركيزة أساسية لترتيب الأولويات.\n• تجديد العقود قبل 60-90 يوم من انتهائها.\n• مؤشرات أداء KPI قابلة للقياس لكل عملية.\n• الاستدامة وكفاءة الطاقة في التشغيل اليومي." },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• الصيانة الوقائية — جدولة الأعمال المبرمجة\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
-    { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nوفق الدليل الوطني، هو ركيزة أساسية لإدارة المرافق: يقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
-    { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — ليست رقماً تجميلياً بل مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nوفق منهجية الدليل الوطني، جودة بيئة التعلم تشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
-    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\nوفق الدليل الوطني، العقود تُدار بشكل منظم مع:\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب العقود يعرض كل التعاقدات مع حالتها ومدتها." },
-    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة الوقائية والتصحيحية 🔧\n\nالدليل الوطني يُشدّد على الانتقال من 'رد الفعل على الأعطال' إلى 'التخطيط المسبق':\n• كل 1 ريال صيانة وقائية يوفر 3-5 ريال صيانة طارئة.\n• نسبة الصيانة الوقائية للتصحيحية تُعدّ من أهم KPIs أداء المرافق.\n\nتبويب الصيانة الوقائية يعرض الأعمال المجدولة، وتبويب البلاغات يتابع الأعطال وسرعة الاستجابة." },
-    { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\nوفق الدليل الوطني، إدارة دورة حياة الأصول تشمل:\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n• قاعدة: إذا تجاوز عمر المبنى 35-40 سنة مع FCA متدنٍ، الاستبدال أجدى.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي." },
-    { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\nهذه الأنظمة من أكثر عوامل الخطورة على حالة المبنى. وفق الدليل الوطني:\n• التكييف: العمر الافتراضي 10-15 سنة — جدولة صيانة وقائية كل 3 أشهر.\n• الكهرباء: فحص دوري سنوي كحد أدنى وفق متطلبات السلامة.\n• السباكة: مراقبة الصرف وضغط المياه بشكل ربع سنوي.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
+    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، الصيانة الوقائية والتصحيحية، إدارة العقود والأصول، التجهيزات المدرسية، والبوابين وأنظمة المباني. اسألني عن أي قسم في اللوحة 📊" },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• عقود غير المجال — عقود FM\n• الصيانة الوقائية — جدولة الأعمال المبرمجة\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nيقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
+    { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nتشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
+    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب العقود يعرض كل التعاقدات مع حالتها ومدتها، وتبويب عقود غير المجال يعرض عقود FM." },
+    { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة الوقائية والتصحيحية 🔧\n\n• الصيانة الوقائية: تخطيط مسبق لتفادي الأعطال قبل وقوعها.\n• الصيانة التصحيحية: استجابة سريعة لإصلاح الأعطال الطارئة.\n\nتبويب الصيانة الوقائية يعرض الأعمال المجدولة، وتبويب البلاغات يتابع الأعطال وسرعة الاستجابة." },
+    { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي — الفرق السالب يعني عجزاً يحتاج ميزانية." },
+    { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\n• التكييف: العمر الافتراضي 10-15 سنة — يحتاج صيانة وقائية دورية.\n• الكهرباء: فحص دوري سنوي كحد أدنى.\n• السباكة: مراقبة الصرف وضغط المياه بشكل منتظم.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
+    { test: /بواب|بوابين|حارس|gatekeeper/i, reply: "تبويب البوابين 🧍 — يعرض قائمة كاملة بجميع البوابين مع اسم المدرسة ورقم الجوال ورقم الهوية والمدينة. اسألني مباشرة عن بواب مدرسة معينة وسأخبرك." },
     { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة 🗺️ يعرض توزيع المدارس جغرافياً مع مؤشرات حالتها (FCA والبيئة)، لتحديد التجمعات الجغرافية ذات الأولوية وتخطيط جولات الفحص الميداني بكفاءة." },
-    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈\n\nالدليل الوطني يُلزم بمؤشرات قابلة للقياس، أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• نسبة الصيانة الوقائية للتصحيحية.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
+    { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈 — أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• نسبة الصيانة الوقائية للتصحيحية.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
     { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل «◷ تلقائي» للتحديث الدوري. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
     { test: /لغة|عربي|english|انجليزي|ترجم/i, reply: "اللوحة تدعم العربية والإنجليزية — تقدر تبدّل اللغة من الشريط العلوي 🌐" },
-    { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌 — إدارة المرافق التعليمية مهمة محورية وأنا هنا لأساعدك باتخاذ قرارات مبنية على البيانات والمعايير الوطنية." },
-    { test: /سلام|أهلا|اهلا|مرحب|هلا|hi|hello/i, reply: "أهلًا وسهلًا 👋 أنا مساعد إدارة المرافق الذكي. اسألني عن FCA، الصيانة الوقائية، العقود، التجهيزات، البيئة المدرسية، أو الدليل الوطني لإكسبرو." },
+    { test: /شكر|thanks|thank you|تمام|ممتاز|رائع/i, reply: "في خدمتك دائماً 🙌" },
+    { test: /سلام|أهلا|اهلا|مرحب|هلا|hi|hello/i, reply: "أهلًا وسهلًا 👋 أنا مساعد إدارة المرافق الذكي. اسألني عن أي شيء في اللوحة — FCA، العقود، البوابين، البلاغات، التجهيزات، وأكثر." },
   ];
-  const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن أحد أقسام إدارة المرافق: تحليل FCA، البيئة المدرسية، العقود، الصيانة الوقائية، التجهيزات، الأنظمة الرئيسية، أو الدليل الوطني لإكسبرو — وأوضح لك المعيار والممارسة الصحيحة.";
+  const FCB_FALLBACK = "ما قدرت أحدد سؤالك بدقة 🙂 — جرّب تسألني عن: تحليل FCA، البيئة المدرسية، العقود، الصيانة، التجهيزات، البوابين، أو الأنظمة الرئيسية.";
 
   /* رد ديناميكي: جدول من بيانات الداشبورد الفعلية (يعمل بدون مفتاح API) */
   function fcbDynamicTableReply() {
@@ -11673,48 +11539,113 @@ function renderTajheezAllTable() {
   /* ════════════════════════════════════════════════════════════════
      🤖 استدعاء OpenAI API مع تمرير ملخص بيانات الداشبورد كسياق
   ════════════════════════════════════════════════════════════════ */
+  // ════════════════════════════════════════════════════════════════
+  // 🧠 كشف نوع السؤال — يحدد أي بيانات نضيفها للـ context
+  // ════════════════════════════════════════════════════════════════
+  function fcbDetectTopics(text) {
+    const t = text;
+    return {
+      بوابين:    /بواب|بوابين|حارس|gatekeeper/i.test(t),
+      عقود:      /عقد|عقود|مستحق|مقاول|contract|مدة|انتهاء|تجديد|fm|صروف/i.test(t),
+      بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق/i.test(t),
+      fca:       /fca|حالة فنية|تقييم|حرج|متوسط.*مبنى|أسوأ مدرسة/i.test(t),
+      أنظمة:     /نظام|تكييف|كهرباء|سباكة|hvac|درجة.*نظام/i.test(t),
+      تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t),
+      مدفوعات:   /دفع|مدفوع|متبقي|صرف.*ميزانية|payment/i.test(t),
+      أولويات:   /أولوي|حل|يستحق|أشد|أخطر|أهم|urgent/i.test(t),
+      طلاب:      /طالب|طلاب|عمر.*مبنى|مبنى.*قديم/i.test(t),
+      قطع:       /قطع.*غيار|قطعة|spare/i.test(t),
+      مصاعد:     /مصعد|مصاعد|elevator/i.test(t),
+      كبير:      false, // يتحدد بعد كشف الباقي
+    };
+  }
+
   async function fcbAskOpenAI(userText) {
     if (!AIService.hasKey()) {
       const err = new Error("NO_API_KEY");
       err.code = "NO_API_KEY";
       throw err;
     }
-    const dashboardData = fcbBuildDashboardSummary();
-    const priorityData = fcbBuildPriorityActions(10);
+
+    const topics = fcbDetectTopics(userText);
+
+    // ── الملخص الأساسي دايماً (خفيف) ──
+    const base = fcbBuildDashboardSummary();
+
+    // ── عقود FM: التفاصيل الكاملة بس لو سؤال عقود ──
+    if (!topics.عقود && base.عقود_FM) {
+      const { أعلى_10_عقود_من_حيث_القيمة_المستحقة_غير_المصروفة, أبرز_العقود_المنتهية, ...بدون } = base.عقود_FM;
+      base.عقود_FM = بدون;
+    }
+
+    // ── مدفوعات: تفاصيل العقود بس لو سؤال مدفوعات ──
+    if (!topics.مدفوعات && base.المدفوعات) {
+      const { تفاصيل_العقود, ...بدون } = base.المدفوعات;
+      base.المدفوعات = بدون;
+    }
+
+    // ── أولويات: نضيف محرك الأولويات كامل بس لو سألها ──
+    const priorityData = topics.أولويات ? fcbBuildPriorityActions(10) : fcbBuildPriorityActions(5);
+
+    // ── بيانات خام إضافية لو السؤال يحتاجها بالتفصيل ──
+    let extraContext = "";
+
+    if (topics.بوابين) {
+      const gkFull = window.__GK_FULL__ || [];
+      if (gkFull.length) {
+        // لو ذكر اسم مدرسة أو مدينة → نفلتر، وإلا نبعت كل القايمة (مضغوطة)
+        const schoolMatch = userText.match(/مدرسة\s+([\u0600-\u06FF\s]+)/)?.[1]?.trim();
+        const cityMatch   = userText.match(/(?:في|ب|مدينة)\s*(مكة|جدة|الطائف|المدينة|القنفذة|الليث|ينبع|العلا|المهد)/)?.[1];
+        let subset = gkFull;
+        if (schoolMatch) subset = gkFull.filter(r => r.schoolName.includes(schoolMatch) || r.minId.includes(schoolMatch));
+        else if (cityMatch) subset = gkFull.filter(r => r.city.includes(cityMatch));
+        // نضغط الأعمدة عشان نوفر tokens
+        const compressed = subset.map(r => `${r.schoolName}|${r.minId}|${r.city}|${r.gateName}|${r.phone}|${r.nationalId}`);
+        extraContext += `\n\nقائمة البوابين (اسم المدرسة|الرقم الوزاري|المدينة|اسم البواب|الجوال|الهوية):\n${compressed.join("\n")}`;
+      }
+    }
+
+    if (topics.بلاغات && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) {
+      // نبعت أعلى 30 بلاغ مفتوح بالتفاصيل
+      const n = (v) => String(v ?? "").trim();
+      const CLOSED = new Set(["تم حله","ملغى","ملغي","مغلق","closed","cancelled","resolved"]);
+      const open30 = window.RAW_BALAGH
+        .filter(r => !CLOSED.has(n(r["Status"]).toLowerCase()))
+        .slice(0, 30)
+        .map(r => ({
+          رقم: n(r["Record No."]),
+          حالة: n(r["Status"]),
+          فئة: n(r["Category"]),
+          أولوية: n(r["Priority"]),
+          مدرسة: n(r["School Name"]),
+          sla: n(r["SLA DAYS"]),
+          مشكلة: n(r["Problem Description"]).slice(0, 80),
+        }));
+      extraContext += `\n\nأعلى 30 بلاغ مفتوح حالياً:\n${JSON.stringify(open30)}`;
+    }
+
+    if (topics.أنظمة && Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) {
+      // أسوأ 20 مدرسة في الأنظمة
+      const scores = {};
+      window.RAW_ALL_SYSTEMS.forEach(r => {
+        const id = r["رقم المدرسة"] || r["اسم_المدرسة"];
+        const v = parseFloat(r["الدرجة الموزونة الكلية للمبنى"]);
+        if (id && isFinite(v)) scores[id] = { درجة: v, مدينة: r["المدينة الرئيسية"] || "" };
+      });
+      const worst20 = Object.entries(scores).sort((a,b)=>a[1].درجة-b[1].درجة).slice(0,20)
+        .map(([k,v])=>({ مدرسة:k, ...v }));
+      extraContext += `\n\nأسوأ 20 مدرسة في تقييم الأنظمة:\n${JSON.stringify(worst20)}`;
+    }
+
+    if (topics.مصاعد && Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
+      const broken = window.RAW_ELEVATORS
+        .filter(r => String(r["حالة المصعد"]||"").includes("متعطل"))
+        .slice(0, 20)
+        .map(r => ({ مدرسة: r["اسم_المدرسة"]||r["اسم المدرسة"], مدينة: r["المدينة"]||"", عمر: r["عمر المصعد"] }));
+      extraContext += `\n\nمصاعد متعطلة:\n${JSON.stringify(broken)}`;
+    }
 
     const systemPrompt = `أنت مساعد إدارة المرافق الذكي، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
-
-══════════════════════════════════════════════════════
-الدليل الوطني لإدارة الأصول والمرافق — المرجع الأساسي
-══════════════════════════════════════════════════════
-أنت ملمّ بالدليل الوطني لإدارة الأصول والمرافق الصادر عن هيئة كفاءة الإنفاق والمشروعات الحكومية "إكسبرو"، الذي تم تدشينه بتاريخ 13 ذو القعدة 1443هـ / 12 يونيو 2022م، بالتعاون مع الكوادر الوطنية من ذوي الخبرة في الجهات الحكومية، وفق الممارسات المحلية والعالمية.
-
-الدليل مرجع وطني شامل يهدف إلى دعم الجودة والاستدامة والكفاءة لإدارة الأصول والمرافق لدى الجهات الحكومية في المملكة العربية السعودية. المبادئ والمعايير الأساسية في الدليل التي تستند إليها:
-
-1. تعريف إدارة المرافق: هي تكامل العمليات والأشخاص والتقنيات لضمان عمل المنشآت بكفاءة، وتشمل الصيانة الوقائية والتصحيحية وإدارة دورة حياة الأصول.
-
-2. دورة حياة الأصول (Asset Lifecycle): يُوجب الدليل التخطيط للأصول منذ الاقتناء حتى التخلص، مع توثيق كامل وتقييم دوري للحالة. معيار الاستبدال: إذا تجاوزت تكاليف الصيانة التراكمية 60% من قيمة الاستبدال أو تجاوز عمر المبنى 35-40 سنة مع انخفاض مؤشر الحالة، يُرجَّح الاستبدال على الإصلاح.
-
-3. تقييم الحالة الفنية FCA (Facility Condition Assessment): يُعدّ الدليل تقييم الحالة الفنية ركيزة أساسية في إدارة المرافق، ويُوصي بإجراء FCA دوري لكل منشأة، وترتيب الأولويات وفق نتائجه.
-
-4. الصيانة الوقائية: يُشدّد الدليل على الانتقال من الصيانة التصحيحية (رد الفعل) إلى الصيانة الوقائية (التخطيط المسبق). كل ريال يُنفق على الصيانة الوقائية يوفر 3-5 ريالات من تكاليف الصيانة الطارئة.
-
-5. مؤشرات الأداء KPIs: يُلزم الدليل بتحديد مؤشرات أداء قابلة للقياس لكل عملية (زمن الاستجابة، نسبة إغلاق البلاغات، كفاءة العقود، نسبة الصيانة الوقائية مقابل التصحيحية).
-
-6. إدارة العقود: ينص الدليل على ضرورة إدارة العقود بشكل منظم مع تتبع الأداء، وتجديد العقود قبل انتهائها بـ 60-90 يوم لضمان استمرارية الخدمة.
-
-7. إدارة الأصول: توثيق الأصول، تصنيفها، تتبع حالتها، والتخطيط لاستبدالها بناءً على العمر التشغيلي وتكاليف الصيانة.
-
-8. البيئة المدرسية: جودة بيئة التعلم (النظافة، السلامة، الراحة الحرارية، الإضاءة) مؤشر مباشر على فاعلية إدارة المرافق وليست رفاهية.
-
-9. الاستدامة وكفاءة الطاقة: الدليل يحث على تبني ممارسات الاستدامة في العمليات (كفاءة التكييف، ترشيد الطاقة والمياه).
-
-10. الحوكمة والمسؤولية: الدليل يُرسّخ مبدأ وضوح المسؤوليات بين مزود الخدمة والجهة الحكومية وفق مستويات اتفاقية الخدمة (SLA).
-
-متى تستند للدليل:
-- إذا سأل المستخدم صراحةً عن الدليل الوطني أو إكسبرو: استند للمبادئ أعلاه وأوضح إطار الدليل.
-- إذا كان السؤال متعلقاً بمعايير أو أفضل ممارسات إدارة المرافق: استشهد بمنهجية الدليل.
-- إذا لم تكن المعلومة موجودة بشكل صريح في الدليل: وضّح ذلك واستند لأفضل الممارسات الدولية.
 
 ══════════════════════════════════════════════════════
 خبرتك التخصصية
@@ -11741,43 +11672,82 @@ function renderTajheezAllTable() {
 ══════════════════════════════════════════════════════
 قواعد الإجابة
 ══════════════════════════════════════════════════════
-مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة، معتمداً على بيانات اللوحة الفعلية المرفقة بالأسفل (ملخص شامل + محرك أولويات محسوب فعلياً من البيانات الخام).
+مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة، معتمداً على بيانات اللوحة الفعلية المرفقة بالأسفل.
 
-- اعتمد فقط على البيانات المرفقة فعلياً في أي رقم أو إحصائية. لا تخترع أرقاماً غير موجودة.
-- البيانات المرفقة تغطي كل تبويبات اللوحة: تحليل_FCA، البيئة_المدرسية، الطلاب_وعمر_المبنى، الفصول_والتكييف، البلاغات_الصيانة، الصيانة_الوقائية_حسب_المبنى، التجهيزات_حسب_المبنى، تجهيزات_المخزون، خنادق_الصرف، العقود، تقييم_عاين، الأنظمة_الرئيسية_والتفصيلية، المصاعد، التكلفة، بلاغات_CSV، قطع_الغيار، عقود_FM، متابعة_الفواتير، المدفوعات_والعقود. ابحث فيها أولاً قبل ما تقول "غير متوفر".
-- لو قسم معيّن ظهر بمفتاح "تنبيه"، وضّح أن البيانات لم تُحمَّل واطلب الضغط على ↻ تحديث.
-- لو التفصيل المطلوب غير متوفر في التلخيص، وجّه المستخدم للتبويب المناسب في اللوحة.
-- اللوحة فيها 20 تبويب رئيسي: نظرة عامة، تحليل FCA، البيئة المدرسية، المرحلة الدراسية، العقود، عقود غير المجال، البلاغات، التجهيزات، الأنظمة الرئيسية، الأنظمة التفصيلية، الصيانة الوقائية، خنادق الصرف، المصاعد، التكلفة، الخريطة، الطلاب وعمر المبنى، قطع الغيار، تقييم عاين، المدفوعات والعقود، الجدول التفصيلي.
-- لو المستخدم سأل سؤال عام لا يخص اللوحة، جاوبه بشكل طبيعي ومفيد.
+- اعتمد فقط على البيانات المرفقة في أي رقم أو إحصائية — لا تخترع أرقاماً.
+- البيانات تغطي كل التبويبات — ابحث فيها كلها قبل ما تقول "غير متوفر".
+- لو قسم معيّن ظهر بمفتاح "تنبيه"، وضّح أن البيانات لم تُحمَّل واطلب الضغط على ↻.
+- لو التفصيل غير موجود في الملخص، وجّه المستخدم للتبويب المناسب في اللوحة.
+- لو المستخدم سأل سؤالاً عاماً لا يخص اللوحة، جاوبه بشكل طبيعي.
 
-سلوكك كخبير حلول (هذا أهم جزء):
-- لا تكتفِ بعرض الأرقام — فسّرها مهنياً في سياق إدارة المرافق وأحكام الدليل الوطني.
-- إذا سأل المستخدم عن "أولويات" أو "حلول"، استخدم بيانات "محرك_الأولويات" المرفقة — محسوبة من FCA + عمر المبنى + البيئة + البلاغات. اعرض المباني الأكثر احتياجاً أولاً مع التصنيف والإجراء.
-- إذا سأل عن "التجهيزات" أو "الأصول" أو "المعدات"، استخدم قسم "تجهيزات_المخزون": اشرح الفرق بين المخصص والاحتياج (الفرق السالب = عجز يستدعي ميزانية).
-- عند تقديم حل: (1) المشكلة بالأرقام، (2) لماذا هي مشكلة بمنطق إدارة المرافق/الدليل الوطني، (3) خطوة فورية، (4) خطوة متابعة على المدى المتوسط.
-- عند المقارنة، رتّب دوماً من الأكثر إلحاحاً للأقل.
+══════════════════════════════════════════════════════
+دليل التبويبات — أين تجد كل بيانات
+══════════════════════════════════════════════════════
+• نظرة عامة              → عدد_المباني_الإجمالي، توزيع_المدن، توزيع_المراحل
+• تحليل FCA              → تحليل_FCA: متوسط، حرجة، أسوأ/أفضل مدارس
+• تاريخ تقييمات FCA      → تاريخ_تقييمات_FCA: متوسط حسب المرحلة، اتجاه عبر السنوات
+• البيئة المدرسية         → البيئة_المدرسية: متوسط، أسوأ/أفضل مدارس
+• المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب)
+• العقود (المجال)         → العقود: مقاولو الصيانة/التكييف/النظافة
+• عقود غير المجال (FM)   → عقود_FM: إجمالي، مالي، منتهية، مستحقة، توزيع
+• البلاغات               → البلاغات: إجمالي، حالة، SLA، فئات، أولويات، أعلى مدارس
+• التجهيزات (مخزون)      → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام
+• الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات
+• الصيانة الوقائية        → الصيانة_الوقائية_حسب_المبنى
+• خنادق الصرف            → خنادق_الصرف: إجمالي، توزيع حسب المدينة
+• المصاعد                → المصاعد: إجمالي، متعطلة، عاملة، توزيع
+• التكلفة                → التكلفة: إجمالي، أعلى فئات، توزيع حسب المدينة
+• الخريطة                → الخريطة: مباني بإحداثيات، توزيع حسب المدينة
+• الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي + الطلاب_وعمر_المبنى
+• قطع الغيار             → قطع_الغيار: إجمالي، أعلى أصناف قيمة
+• تقييم عاين             → تقييم_عاين_تفصيلي: متوسط، تصنيفات، أسوأ مدارس
+• المدفوعات والعقود       → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
+• متابعة الفواتير         → متابعة_الفواتير
+• مؤشرات أداء المقاول    → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة، توقع مستقبلي
+• خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
+• البوابين               → البوابين: إحصائيات + توزيع (القايمة الكاملة تُحقن تلقائياً لو السؤال عن بواب)
 
-تنسيق الجداول:
-- إذا كان السؤال يحتاج مقارنة أو قائمة منظمة، اعرضها كجدول Markdown:
-| العمود الأول | العمود الثاني |
-|---|---|
-| قيمة 1 | قيمة 2 |
-- لا تستخدم الجدول لإجابة بسيطة من رقم واحد.
-- لأولويات/حلول عدة مبانٍ: أعمدة (المبنى، الدرجة، التصنيف، الإجراء المقترح).
+══════════════════════════════════════════════════════
+تعليمات خاصة لكل نوع سؤال
+══════════════════════════════════════════════════════
+▸ أسئلة عن البوابين:
+  قايمة البوابين الكاملة تُحقن تلقائياً في الـ context لما تُكشف كلمة "بواب" في السؤال.
+  البيانات بصيغة: اسم المدرسة|الرقم الوزاري|المدينة|اسم البواب|الجوال|الهوية — اقرأها واعرضها مباشرة.
+  لو ذكر اسم مدرسة بعينها → أعطِ بيانات البواب المرتبط بها فقط.
 
-تنسيق الرسوم البيانية:
-- لأي مقارنة أو توزيع أو اتجاه زمني، أرفق كتلة رسم بياني (JSON داخل \`\`\`chart):
+▸ أسئلة عن الأولويات والحلول:
+  استخدم محرك_الأولويات + تحليل_FCA + البيئة_المدرسية + البلاغات.
+  قدّم: (1) المشكلة بالأرقام (2) السبب (3) خطوة فورية (4) متابعة متوسط المدى.
+
+▸ أسئلة عن العقود والمستحقات:
+  استخدم عقود_FM للعقود غير المجال، والعقود للمجال، والمدفوعات للدفعات.
+  اعرض المنتهية والقيمة المستحقة غير المصروفة والملاحظات.
+
+▸ أسئلة عن مقاول بعينه:
+  ابحث في عقود_FM.توزيع_حسب_المقاول وعقود_FM.أعلى_10_عقود، والعقود.
+  اعرض كل عقوده وحالتها وقيمتها.
+
+▸ أسئلة عن منطقة بعينها (جدة/مكة/الطائف/المدينة):
+  صفّ البيانات من كل التبويبات الخاصة بتلك المنطقة مجتمعةً.
+
+▸ أسئلة مقارنة أو توزيع → جدول Markdown.
+▸ أسئلة اتجاه زمني أو نسب → رسم بياني:
 \`\`\`chart
-{"type":"bar","title":"عنوان قصير","labels":["تسمية1","تسمية2"],"datasets":[{"label":"اسم السلسلة","data":[10,20]}]}
+{"type":"bar","title":"عنوان","labels":["أ","ب"],"datasets":[{"label":"السلسلة","data":[10,20]}]}
 \`\`\`
-- bar: للمقارنات بين فئات | line: للبيانات الزمنية | pie/doughnut: للنسب | radar: لمقارنة متعددة المؤشرات.
-- بيانات حقيقية فقط من الملخص. لا تخترع أرقاماً.
-- لا تكرر نفس البيانات نصاً وجدولاً ورسماً في نفس الرد — اختر الأنسب.
+  bar: مقارنة | line: زمني | pie/doughnut: نسب | radar: متعدد المؤشرات.
+  بيانات حقيقية فقط — لا تكرر في نص وجدول ورسم معاً، اختر الأنسب.
+
+══════════════════════════════════════════════════════
+كيف تتعامل مع التبويبات الجديدة تلقائياً
+══════════════════════════════════════════════════════
+البيانات المرفقة أسفله تتحدث لحظة كل سؤال مباشرةً من اللوحة — إذا أضاف المطوّر تبويباً جديداً وظهرت مفاتيحه في JSON أسفله، ابحث فيها واستخدمها مباشرة بدون انتظار تعليمات إضافية. مبدأ: أي مفتاح موجود في JSON = بيانات متاحة يمكنك الإجابة عنها.
 
 بيانات اللوحة الحالية (محدّثة لحظة هذا السؤال):
-${JSON.stringify(dashboardData)}
+${JSON.stringify(base)}
+${extraContext}
 
-محرك الأولويات (مبانٍ مرتّبة حسب درجة الخطورة المحسوبة من FCA + عمر المبنى + البيئة + البلاغات، مع التصنيف والإجراء المقترح لكل تصنيف):
+محرك الأولويات:
 ${JSON.stringify(priorityData)}`;
 
     const messages = [
@@ -11828,10 +11798,12 @@ ${JSON.stringify(priorityData)}`;
       console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       fcbHideTyping();
       const prefix = err?.code === "INVALID_KEY"
-        ? "⚠️ تعذّر التحقق من مفتاح API (قد يكون غير صحيح أو منتهي) — راجعه من ⚙️ الإعدادات.\n\n"
-        : err?.code === "REQUEST_FAILED" || err?.message
-          ? "⚠️ تعذّر الاتصال بخدمة الذكاء الاصطناعي حالياً، إليك إجابة من الردود المبرمجة بدلاً منها:\n\n"
-          : "";
+        ? "⚠️ مفتاح API غير صحيح أو منتهي — راجعه من ⚙️ الإعدادات.\n\n"
+        : err?.code === "REQUEST_FAILED"
+          ? `⚠️ فشل الاتصال بـ OpenAI (${err.message || "خطأ غير محدد"}) — تحقق من الاتصال أو المفتاح.\n\n`
+          : err?.code === "EMPTY_RESPONSE"
+            ? "⚠️ الموديل لم يرجع رد — جرب مرة ثانية.\n\n"
+            : "";
       fcbAppendMsg(prefix + fcbReplyFor(val), "bot");
     } finally {
       sendBtn.disabled = false;

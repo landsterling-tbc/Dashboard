@@ -455,6 +455,10 @@ function buildDynamicFilters() {
     fillSelect(
       "fSector",
       RAW.map((r) => r.sector),
+    ),
+    fillSelect(
+      "fSubStatus",
+      RAW.map((r) => r.subscriptionStatus),
     ));
   const cities = [...new Set(RAW.map((r) => r.city).filter((c) => c))],
     sectors = [...new Set(RAW.map((r) => r.sector).filter((s) => s && "#N/A" !== s))];
@@ -479,6 +483,7 @@ function applyFilters() {
       owner = document.getElementById("fOwner").value,
       fcaMin = parseFloat(document.getElementById("fFcaMin").value) || 0,
       district = document.getElementById("fDistrict").value,
+      subStatus = document.getElementById("fSubStatus")?.value || "",
       search = document.getElementById("fSearch").value.trim().toLowerCase(),
       linkChecked = [...document.querySelectorAll("#fLinkType input:checked")].map(
         (cb) => cb.value,
@@ -493,6 +498,7 @@ function applyFilters() {
         (!size || r.schoolSize === size) &&
         (!owner || r.ownership === owner) &&
         (!district || r.district === district) &&
+        (!subStatus || r.subscriptionStatus === subStatus) &&
         (!fcaMin || !(null == r.fca || r.fca < fcaMin)) &&
         !(
           search &&
@@ -2487,6 +2493,7 @@ function renderTable() {
             ayenScore: num(b["تقييم_عاين"]),
             alerts: num(b["عدد_البلاغات"]) ?? 0,
             acUnits: num(b["وحدات_التكييف"]),
+            subscriptionStatus: String(b["حالة_الاشتراك"] ?? "").trim(),
             notes: String(b["ملاحظات"] ?? "").trim(),
             description: "",
             quantity: null,
@@ -2581,35 +2588,46 @@ function renderTable() {
       applyFilters());
 
     // ── تحميل البلاغات بشكل منفصل (ملف ضخم — لا يحجب باقي اللوحة) ──
-    (async () => {
+    window.loadBalaghSeparate = async function() {
+      window.__BALAGH_LOAD_STATE__ = "loading";
+      // لو تبويب البلاغات مفتوح — نحدثه فوراً بمؤشر التحميل
+      if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+        try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+      }
       try {
         const bResp = await fetch(CFG.GAS_URL + "?sheet=balaghReports");
-        if (bResp.ok) {
-          const bJson = await bResp.json();
-          if (bJson.status === "ok" && Array.isArray(bJson.data)) {
-            window.RAW_BALAGH = bJson.data;
-            // ربط البلاغات بالمباني بعد التحميل
-            const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
-            const aMap = {};
-            window.RAW_BALAGH.forEach(r => {
-              const sn = normId_(r["رقم المدرسة"]);
-              if (sn) aMap[sn] = (aMap[sn] || 0) + 1;
-            });
-            RAW.forEach(r => {
-              const id = normId_(r.minId || r.schoolSeq);
-              r.alerts = aMap[id] || r.alerts || 0;
-            });
-            console.log(`[BALAGH] تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
-            // لو تبويب البلاغات مفتوح — نحدثه
-            if (document.getElementById("tab-balagh")?.classList.contains("active")) {
-              safeRun(renderBalaghTab, "balagh");
-            }
-          }
+        if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
+        const bJson = await bResp.json();
+        if (bJson.status === "ok" && Array.isArray(bJson.data)) {
+          window.RAW_BALAGH = bJson.data;
+          window.__BALAGH_LOAD_STATE__ = "loaded";
+          // ربط البلاغات بالمباني بعد التحميل
+          const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
+          const aMap = {};
+          window.RAW_BALAGH.forEach(r => {
+            const sn = normId_(r["رقم المدرسة"]);
+            if (sn) aMap[sn] = (aMap[sn] || 0) + 1;
+          });
+          RAW.forEach(r => {
+            const id = normId_(r.minId || r.schoolSeq);
+            r.alerts = aMap[id] || r.alerts || 0;
+          });
+          console.log(`[BALAGH] تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
+        } else {
+          throw new Error(bJson.message || "بيانات غير صحيحة");
         }
       } catch (e) {
+        window.__BALAGH_LOAD_STATE__ = "error";
+        window.__BALAGH_LOAD_ERR__ = e.message;
         console.warn("[BALAGH] فشل تحميل البلاغات:", e);
       }
-    })();
+      // تحديث التبويب بعد التحميل أو الخطأ
+      if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+        try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+      }
+    };
+    // تحميل تلقائي عند بدء اللوحة
+    window.loadBalaghSeparate();
   } catch (err) {
     if (
       (console.error("[loadData]", err), setDot("error"), setProgress(0), retryCount++, !silent)
@@ -5558,12 +5576,13 @@ function _sysExcelTableHTML(title, headers, rows) {
 
   // يحاول تفسير تاريخ من نصوص بصيغ مختلفة (YYYY-MM-DD أو DD/MM/YYYY أو غيرها)
   function parseBalaghDate(v) {
-    const s = norm(v);
+    const s = norm(v).replace(/\u200f/g, "").replace(/\u200e/g, "").trim(); // شيل LRM/RLM
     if (!s) return null;
-    let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
-    m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+    // صيغة: 24/6/2026 23:15
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -5808,6 +5827,34 @@ function _sysExcelTableHTML(title, headers, rows) {
     const el = document.getElementById("balagh-content");
     if (!el) return;
 
+    // ── حالة تحميل البلاغات ──
+    const balaghState = window.__BALAGH_LOAD_STATE__ || "idle"; // idle | loading | loaded | error
+    if (balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0) {
+      const icon   = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
+      const title  = balaghState === "loading" ? "جاري تحميل البلاغات…"
+                   : balaghState === "error"   ? "تعذّر تحميل البلاغات"
+                   : "البلاغات لم تُحمَّل بعد";
+      const sub    = balaghState === "loading"
+                   ? "يتم تحميل البيانات في الخلفية — الصفحة الرئيسية تعمل بشكل طبيعي"
+                   : balaghState === "error"
+                   ? `${window.__BALAGH_LOAD_ERR__ || "خطأ في الاتصال"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit">إعادة المحاولة</button>`
+                   : 'اضغط <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit">تحميل البلاغات</button> للبدء';
+      const spinner = balaghState === "loading"
+        ? `<div style="width:40px;height:40px;border:4px solid #E2E8F0;border-top-color:#0891B2;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+           <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`
+        : "";
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;min-height:320px">
+          <div style="text-align:center;max-width:440px;padding:32px">
+            ${spinner}
+            <div style="font-size:48px;margin-bottom:12px">${balaghState === "loading" ? "" : icon}</div>
+            <div style="font-size:17px;font-weight:800;color:var(--tx-main);margin-bottom:10px">${title}</div>
+            <div style="font-size:13px;color:var(--tx-sec);line-height:1.8">${sub}</div>
+          </div>
+        </div>`;
+      return;
+    }
+
     const all = normalizeRows();
     const rows = sortBalaghRows(filteredRows(all), STATE.sort || "date_desc");
     const total = all.length;
@@ -5816,11 +5863,24 @@ function _sysExcelTableHTML(title, headers, rows) {
     // حتى تتأثر بالفلاتر (الحالة / الفئة / الأولوية / المنطقة / البحث)
     const openCount = rows.filter((r) => r.isOpen).length;
     const closedCount = rows.filter((r) => r.isClosed).length;
-    const inProgressCount = rows.filter((r) => balaghIsInProgress(r.status)).length;
     const overdueCount = rows.filter((r) => r.isOverdue).length;
-    const schoolsCount = new Set(
-      rows.map((r) => (r.isLinked ? "ID::" + r.linkedMinId : "NM::" + (r.schoolNumber || r.schoolName))).filter(Boolean),
-    ).size;
+    const slaBreachPct = filteredTotal > 0 ? (overdueCount / filteredTotal * 100).toFixed(1) : "0.0";
+
+    // أحدث تاريخ إنشاء
+    const validDates = rows.map(r => r.creationDateObj).filter(Boolean);
+    const latestDate = validDates.length
+      ? new Date(Math.max(...validDates.map(d => d.getTime())))
+      : null;
+    const latestDateStr = latestDate
+      ? latestDate.toLocaleDateString("ar-SA", { year:"numeric", month:"short", day:"numeric" })
+      : "—";
+    // أقدم تاريخ
+    const oldestDate = validDates.length
+      ? new Date(Math.min(...validDates.map(d => d.getTime())))
+      : null;
+    const oldestDateStr = oldestDate
+      ? oldestDate.toLocaleDateString("ar-SA", { year:"numeric", month:"short", day:"numeric" })
+      : "—";
 
     // أكثر المدارس تكراراً: نستخدم اسم المدرسة الموحّد من الربط (إن وُجد) بدل الاسم الخام،
     // لتفادي تكرار نفس المدرسة بأكثر من اسم/تهجئة في ملف البلاغات
@@ -5874,25 +5934,25 @@ function _sysExcelTableHTML(title, headers, rows) {
         </div>
 
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px">
+          <div class="kpi kc-red" style="border-top-color:#DC2626">
+            <div class="kpi-val" style="color:#DC2626;font-size:28px">${slaBreachPct}%</div>
+            <div class="kpi-lbl">نسبة اختراق SLA</div>
+            <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
+          </div>
           <div class="kpi kc-navy">
-            <div class="kpi-val" style="color:#083D4F">${fmt(inProgressCount)}</div>
-            <div class="kpi-lbl">قيد التنفيذ</div>
-            <div class="kpi-sub">قيد التنفيذ + موافقة الاستشاري قيد التنفيذ</div>
+            <div class="kpi-val" style="color:#083D4F;font-size:22px">${latestDateStr}</div>
+            <div class="kpi-lbl">أحدث بلاغ</div>
+            <div class="kpi-sub">تاريخ الإنشاء</div>
           </div>
           <div class="kpi kc-teal">
-            <div class="kpi-val" style="color:#0E7490">${fmt(schoolsCount)}</div>
-            <div class="kpi-lbl">مدارس متأثرة</div>
-            <div class="kpi-sub">حسب رقم المدرسة أو الاسم</div>
+            <div class="kpi-val" style="color:#0E7490;font-size:22px">${oldestDateStr}</div>
+            <div class="kpi-lbl">أقدم بلاغ</div>
+            <div class="kpi-sub">تاريخ الإنشاء</div>
           </div>
           <div class="kpi kc-purple">
             <div class="kpi-val" style="color:#6D28D9">${fmt(new Set(rows.map((r) => r.category).filter(Boolean)).size)}</div>
             <div class="kpi-lbl">فئات البلاغات</div>
-            <div class="kpi-sub">الفئات</div>
-          </div>
-          <div class="kpi kc-amber">
-            <div class="kpi-val" style="color:#92400e">${fmt(new Set(rows.map((r) => r.priority).filter(Boolean)).size)}</div>
-            <div class="kpi-lbl">مستويات الأولوية</div>
-            <div class="kpi-sub">درجات الأولوية</div>
+            <div class="kpi-sub">${[...new Set(rows.map(r=>r.category).filter(Boolean))].join(" · ") || "—"}</div>
           </div>
         </div>
       </div>
@@ -6043,21 +6103,12 @@ function _sysExcelTableHTML(title, headers, rows) {
         <div class="chart-box" style="height:220px"><canvas id="balagh-weekly-chart"></canvas></div>
       </div>
 
-      <div class="g2 mb14" style="align-items:start">
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-icon" style="background:#ECFDF5;color:#047857">⏱️</span>
-            <span>متوسط أيام الإغلاق شهرياً</span>
-          </div>
-          <div class="chart-box" style="height:220px"><canvas id="balagh-sla-monthly-chart"></canvas></div>
-        </div>
-        <div class="card">
+      <div class="card mb14">
           <div class="card-title">
             <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">🏷️</span>
             <span>تطور الفئات الأعلى خلال 6 أشهر</span>
           </div>
           <div class="chart-box" style="height:220px"><canvas id="balagh-cat-trend-chart"></canvas></div>
-        </div>
       </div>
 
       <div class="card">
@@ -6410,85 +6461,6 @@ function _sysExcelTableHTML(title, headers, rows) {
             },
           },
         });
-      }
-
-      // ═══ 4. متوسط أيام الإغلاق شهرياً ═══
-      const slaMonthlySumMap = new Map(),
-        slaMonthlyCntMap = new Map();
-      allRowsForTime.forEach((r) => {
-        if (!r.isClosed) return;
-        const k = parseMonthKey(r.creationDateObj || r.creationDate);
-        if (!k || !last18Months.includes(k)) return;
-        // نستخدم slaNum (مُحوَّل مسبقاً في normalizeRows بـ parseNumFromText) بدل parseFloat على نص خام
-        const sla = r.slaNum;
-        if (Number.isFinite(sla) && sla >= 0) {
-          slaMonthlySumMap.set(k, (slaMonthlySumMap.get(k) || 0) + sla);
-          slaMonthlyCntMap.set(k, (slaMonthlyCntMap.get(k) || 0) + 1);
-        }
-      });
-      const slaMonthlyVals = last18Months.map((k) => {
-        const cnt = slaMonthlyCntMap.get(k) || 0;
-        return cnt ? +(slaMonthlySumMap.get(k) / cnt).toFixed(1) : null;
-      });
-      if (document.getElementById("balagh-sla-monthly-chart")) {
-        if (typeof CHARTS !== "undefined" && CHARTS["balagh-sla-monthly-chart"]) {
-          try {
-            CHARTS["balagh-sla-monthly-chart"].destroy();
-          } catch (e) {}
-          delete CHARTS["balagh-sla-monthly-chart"];
-        }
-        CHARTS["balagh-sla-monthly-chart"] = new Chart(
-          document.getElementById("balagh-sla-monthly-chart"),
-          {
-            type: "line",
-            data: {
-              labels: monthLabels,
-              datasets: [
-                {
-                  label: "متوسط أيام الإغلاق",
-                  data: slaMonthlyVals,
-                  backgroundColor: "rgba(5,150,105,0.12)",
-                  borderColor: "#059669",
-                  borderWidth: 2.5,
-                  pointBackgroundColor: "#059669",
-                  pointRadius: 5,
-                  pointHoverRadius: 7,
-                  fill: true,
-                  tension: 0.35,
-                  spanGaps: true,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  mode: "index",
-                  intersect: false,
-                  callbacks: { label: (ctx) => (ctx.raw !== null ? `${ctx.raw} يوم` : "—") },
-                },
-              },
-              scales: {
-                x: {
-                  ticks: { font: { size: 9 }, maxRotation: 45 },
-                  grid: { color: "rgba(168,195,214,.15)" },
-                },
-                y: {
-                  beginAtZero: true,
-                  ticks: { font: { size: 10 }, callback: (v) => v + " ي" },
-                  title: {
-                    display: true,
-                    text: "أيام",
-                    color: "#6B8795",
-                    font: { size: 10, weight: "700" },
-                  },
-                },
-              },
-            },
-          },
-        );
       }
 
       // ═══ 5. تطور الفئات الأعلى خلال 6 أشهر ═══

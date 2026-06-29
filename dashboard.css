@@ -2958,3 +2958,7 @@ tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
     .fcb-panel { left: 10px; bottom: 86px; width: calc(100vw - 20px); }
     .fcb-panel.open { height: min(580px, 72vh); }
   }
+
+/* ════ حالات UX الموحّدة: Spinner + Skeleton shimmer (المرحلة 5) ════ */
+@keyframes ixspin { to { transform: rotate(360deg); } }
+@keyframes ixshimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }

@@ -31,6 +31,116 @@ document.addEventListener("DOMContentLoaded", () => {
     (Chart.defaults.scale.border = { dash: [3, 3] }));
 });
 
+/* ════════════════════════════════════════════════════════════════
+   📊 ChartLabels — طبقة موحدة لعرض النصوص الكاملة في كل الرسوم
+   ----------------------------------------------------------------
+   الهدف (طلب أولاً في المواصفات): منع قص أسماء المدارس/الفئات/المحافظات
+   على المحاور، وعرضها كاملة داخل Tooltip، وتطبيق Wrap/Rotation تلقائياً
+   على المحاور الطويلة — عبر إعداد عام واحد يُطبَّق على جميع الرسوم
+   الحالية والمستقبلية بدون لمس كل رسم على حدة.
+
+   الفكرة: لا نقص مصفوفة labels في الذاكرة أبداً (تبقى كاملة، فيقرأها
+   الـ Tooltip كاملة). القص/اللف يحدث فقط لحظة الرسم على المحور عبر
+   tick callback عام.
+   ════════════════════════════════════════════════════════════════ */
+(function () {
+  if (typeof Chart === "undefined") return;
+
+  // أقصى طول للسطر الواحد قبل اللف، وأقصى عدد أسطر قبل وضع …
+  const MAX_LINE = 16;
+  const MAX_LINES = 3;
+
+  // يحوّل نصاً طويلاً إلى مصفوفة أسطر (Chart.js يعرض المصفوفة كـ multi-line)
+  function wrapLabel(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return "—";
+    if (s.length <= MAX_LINE) return s;
+    const words = s.split(/\s+/);
+    const lines = [];
+    let cur = "";
+    for (const w of words) {
+      if (!cur) {
+        cur = w;
+      } else if ((cur + " " + w).length <= MAX_LINE) {
+        cur += " " + w;
+      } else {
+        lines.push(cur);
+        cur = w;
+      }
+      if (lines.length >= MAX_LINES) break;
+    }
+    if (cur && lines.length < MAX_LINES) lines.push(cur);
+    // لو فاض النص عن الحد الأقصى للأسطر، نضع … في آخر سطر
+    if (lines.length >= MAX_LINES) {
+      const joinedLen = lines.join(" ").length;
+      if (joinedLen < s.length) lines[MAX_LINES - 1] = lines[MAX_LINES - 1] + "…";
+    }
+    return lines;
+  }
+
+  // النص الكامل لتسمية معيّنة (يُستخدم في Tooltip) — يقرأ من data.labels الكاملة
+  window.ChartLabels = {
+    wrapLabel: wrapLabel,
+    full(chart, index) {
+      const lbls = chart?.data?.labels;
+      if (Array.isArray(lbls) && index != null && lbls[index] != null) {
+        const v = lbls[index];
+        return Array.isArray(v) ? v.join(" ") : String(v);
+      }
+      return null;
+    },
+  };
+
+  // tick callback عام: يلفّ التسمية الطويلة بدل قصها بـ …
+  // يُطبَّق على المحور الفئوي (category) فقط حتى لا يلمس المحاور الرقمية.
+  function wrappingTickCallback(value, index) {
+    // على المحور الفئوي، value = الفهرس؛ نقرأ التسمية الأصلية الكاملة
+    const lbl = this.getLabelForValue ? this.getLabelForValue(value) : value;
+    return wrapLabel(lbl);
+  }
+
+  Chart.register({
+    id: "ix_full_labels",
+    // قبل أول رسم: نفعّل اللف على المحور الفئوي + نضمن tooltip بالنص الكامل
+    afterInit(chart) {
+      try {
+        const scales = chart.config.options?.scales || {};
+        for (const axisId of Object.keys(scales)) {
+          const ax = scales[axisId];
+          if (!ax) continue;
+          const isCategory =
+            ax.type === "category" ||
+            (ax.type == null && (axisId === "x" || axisId === "y"));
+          if (!isCategory) continue;
+          ax.ticks = ax.ticks || {};
+          // لا نلمس callback مخصّص موجود مسبقاً (احترام إعدادات الرسم)
+          if (typeof ax.ticks.callback !== "function") {
+            ax.ticks.callback = wrappingTickCallback;
+          }
+          if (ax.ticks.autoSkip == null) ax.ticks.autoSkip = true;
+          if (ax.ticks.maxRotation == null) ax.ticks.maxRotation = 0;
+        }
+      } catch (_) {}
+    },
+  });
+
+  // Tooltip عام: لو لم يحدّد الرسم title خاصاً به، نعرض النص الكامل للتسمية
+  const _origTitle =
+    (Chart.defaults.plugins.tooltip.callbacks &&
+      Chart.defaults.plugins.tooltip.callbacks.title) ||
+    null;
+  Chart.defaults.plugins.tooltip.callbacks =
+    Chart.defaults.plugins.tooltip.callbacks || {};
+  Chart.defaults.plugins.tooltip.callbacks.title = function (items) {
+    if (!items || !items.length) return "";
+    const it = items[0];
+    const full = window.ChartLabels.full(it.chart, it.dataIndex);
+    if (full && full !== "—") return full;
+    if (typeof _origTitle === "function") return _origTitle.call(this, items);
+    return it.label || "";
+  };
+})();
+
 
 /* تحديد لغة الصفحة (عربي افتراضياً) */
 window.LANG = window.LANG || "ar";
@@ -145,6 +255,10 @@ const CFG = {
     classrooms: ["عدد_الفصول"],
     schoolSize: ["حجم_المدرسة"],
     buildingSize: ["نوع_المبنى", "حجم_المبنى"],
+    // نوع الارتباط = نوع_المبنى (حسب اعتماد الهيدرز الموحّد)
+    linkType: ["نوع_المبنى"],
+    // حالة الاشتراك = حالة_الاشتراك
+    subscriptionStatus: ["حالة_الاشتراك"],
     lng: ["خط_الطول"],
     lat: ["خط_العرض"],
     acUnits: ["وحدات_التكييف"],
@@ -196,6 +310,103 @@ function getVal(row, field) {
   }
   return null;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   🗄️ DataService — طبقة البيانات الموحّدة (Unified Data Layer)
+   ----------------------------------------------------------------
+   نقطة الوصول الرسمية الوحيدة لبيانات اللوحة. تغلّف المصدر الموحّد
+   (RAW المُطبَّع + FILTERED بعد الفلاتر) وتوفّر دوال قراءة/تنظيف/
+   تجميع/عدّ موحّدة مع Caching بسيط. أي جزء جديد في المشروع يجب أن
+   يقرأ من هنا فقط (Single Source of Truth) بدل تكرار حلقات الفلترة
+   والتجميع. الدوال القائمة تبقى تعمل كما هي؛ هذه الطبقة تغلّفها.
+   ════════════════════════════════════════════════════════════════ */
+const DataService = (function () {
+  const _cache = new Map();
+  const _key = (...a) => a.map((x) => JSON.stringify(x)).join("|");
+
+  // تنظيف قيمة نصية موحّد (null/undefined/NaN/#N/A/فراغات)
+  function cleanText(v, fallback = "") {
+    if (v == null) return fallback;
+    const s = String(v).replace(/\uFEFF/g, "").trim();
+    if (!s || s === "—" || s === "#N/A" || s === "NaT" || s === "null" || s === "undefined")
+      return fallback;
+    return s.replace(/\s+/g, " ");
+  }
+  // تحويل لرقم موحّد (يعيد null لو غير صالح)
+  function toNum(v) {
+    if (v == null || v === "" || v === "#N/A" || v === "NaT") return null;
+    const n = parseFloat(String(v).replace(/,/g, ""));
+    return isFinite(n) ? n : null;
+  }
+
+  return {
+    cleanText,
+    toNum,
+    invalidateCache() {
+      _cache.clear();
+    },
+    /** كل السجلّات الخام المُطبَّعة (للقراءة فقط منطقياً) */
+    all() {
+      return typeof RAW !== "undefined" && Array.isArray(RAW) ? RAW : [];
+    },
+    /** السجلّات بعد تطبيق الفلاتر الحالية — المصدر الافتراضي لكل عرض */
+    filtered() {
+      return typeof FILTERED !== "undefined" && Array.isArray(FILTERED) ? FILTERED : this.all();
+    },
+    /** قيمة حقل مُعرّف في COLS لسجل واحد (تعتمد أسماء الهيدرز فقط) */
+    field(row, fieldKey) {
+      return typeof getVal === "function" ? getVal(row, fieldKey) : row?.[fieldKey] ?? null;
+    },
+    /** عدّ حسب فئة، مرتّب تنازلياً (مع Cache) */
+    countBy(arr, key, n = Infinity) {
+      const k = _key("countBy", arr === this.filtered() ? "F" : "A", key, n);
+      if (_cache.has(k)) return _cache.get(k);
+      const map = {};
+      (arr || []).forEach((r) => {
+        const v = cleanText(r[key]);
+        if (!v) return;
+        map[v] = (map[v] || 0) + 1;
+      });
+      const out = Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n)
+        .map(([name, count]) => ({ name, count }));
+      _cache.set(k, out);
+      return out;
+    },
+    /** متوسط حقل رقمي */
+    avg(arr, key) {
+      const vals = (arr || []).map((r) => toNum(r[key])).filter((v) => v != null);
+      return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : null;
+    },
+    /** مجموع حقل رقمي */
+    sum(arr, key) {
+      return (arr || []).reduce((s, r) => s + (toNum(r[key]) || 0), 0);
+    },
+    /** أعلى/أدنى n حسب حقل رقمي */
+    topN(arr, key, n = 10, asc = false) {
+      const valid = (arr || []).filter((r) => toNum(r[key]) != null);
+      return [...valid]
+        .sort((a, b) => (asc ? toNum(a[key]) - toNum(b[key]) : toNum(b[key]) - toNum(a[key])))
+        .slice(0, n);
+    },
+    /** تجميع مجموع قيمة رقمية حسب فئة */
+    groupBySum(arr, groupKey, numKey, n = Infinity) {
+      const map = {};
+      (arr || []).forEach((r) => {
+        const g = cleanText(r[groupKey]);
+        const v = toNum(r[numKey]);
+        if (!g || v == null) return;
+        map[g] = (map[g] || 0) + v;
+      });
+      return Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n)
+        .map(([name, value]) => ({ name, value: +value.toFixed(2) }));
+    },
+  };
+})();
+window.DataService = DataService;
 const num = (v) => {
     if (null == v || "" === v || "#N/A" === v || "NaT" === v) return null;
     const n = parseFloat(String(v).replace(/,/g, ""));
@@ -303,6 +514,47 @@ function renderEmptyState(container, message = "لا توجد بيانات مت�
   </div>`;
 }
 
+/* ── حالات UX موحّدة (تحميل / خطأ / Skeleton) — طلب السادس عشر ── */
+function renderLoadingState(container, message = "جاري التحميل…") {
+  const el = typeof container === "string" ? document.getElementById(container) : container;
+  if (!el) return;
+  el.innerHTML = `<div class="chart-loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:var(--tx-muted);gap:10px">
+    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid rgba(8,145,178,.15);border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
+    <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
+  </div>`;
+}
+function renderErrorState(container, message = "تعذّر عرض البيانات") {
+  const el = typeof container === "string" ? document.getElementById(container) : container;
+  if (!el) return;
+  el.innerHTML = `<div class="chart-error-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:#DC2626;gap:8px">
+    <div style="font-size:28px;opacity:.6">⚠️</div>
+    <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
+  </div>`;
+}
+function renderSkeleton(container, lines = 4) {
+  const el = typeof container === "string" ? document.getElementById(container) : container;
+  if (!el) return;
+  let html = '<div class="ix-skeleton" style="display:flex;flex-direction:column;gap:10px;padding:12px">';
+  for (let i = 0; i < lines; i++) {
+    html += `<div style="height:14px;border-radius:6px;background:linear-gradient(90deg,rgba(168,195,214,.18) 25%,rgba(168,195,214,.34) 37%,rgba(168,195,214,.18) 63%);background-size:400% 100%;animation:ixshimmer 1.4s ease infinite;width:${90 - i * 8}%"></div>`;
+  }
+  html += "</div>";
+  el.innerHTML = html;
+}
+
+/* ── Memoization لحساب ثقيل (طلب السابع عشر) — مفتاح من الوسائط ── */
+function memoize(fn) {
+  const cache = new Map();
+  return function (...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) return cache.get(key);
+    const v = fn.apply(this, args);
+    cache.set(key, v);
+    return v;
+  };
+}
+window.IXStates = { renderEmptyState, renderLoadingState, renderErrorState, renderSkeleton };
+
 /* Callback آمن لمحاور Chart.js (ticks.callback) — يُستخدم في scales.x/y.ticks.callback
    لمنع ظهور undefined/null/NaN حتى لو وصلت القيمة الخام فاسدة لأي سبب وقت الرسم فعلياً.
    يعمل مع كلا نوعي المحاور: category (تمرّر index، نجيب label الحقيقي) وlinear (تمرّر القيمة مباشرة). */
@@ -311,7 +563,10 @@ function safeTickCallback(value, index, ticks) {
   const raw = hasLabelGetter ? this.getLabelForValue(value) : value;
   // لو الناتج رقم صالح (محور خطي)، نرجّعه كرقم بدل تحويله لنص "غير متوفر"
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  return sanitizeText(raw, "");
+  const clean = sanitizeText(raw, "");
+  // لف التسميات النصية الطويلة بدل قصها (يعتمد على الطبقة العامة ChartLabels)
+  if (window.ChartLabels && typeof clean === "string") return window.ChartLabels.wrapLabel(clean);
+  return clean;
 }
 
 function setDot(s) {
@@ -499,6 +754,7 @@ function applyFilters() {
         (!owner || r.ownership === owner) &&
         (!district || r.district === district) &&
         (!subStatus || r.subscriptionStatus === subStatus) &&
+        (!linkChecked.length || linkChecked.includes(r.linkType)) &&
         (!fcaMin || !(null == r.fca || r.fca < fcaMin)) &&
         !(
           search &&
@@ -511,6 +767,7 @@ function applyFilters() {
         ),
     );
 
+    DataService.invalidateCache();
     renderKPIs();
     renderTierStrip();
 
@@ -731,6 +988,8 @@ function showTab(name, el) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active")),
     document.getElementById("tab-" + name).classList.add("active"),
     el && el.classList.add("active"),
+    (window.__ACTIVE_TAB__ = name),
+    (window.__ACTIVE_TAB_LABEL__ = el ? (el.textContent || "").trim() : name),
     "overview" === name && renderOverviewCharts(),
     "fca" === name && renderFcaCharts(),
     "env" === name && renderEnvCharts(),
@@ -794,9 +1053,9 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
 }
 function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) {
   killChart(id);
-  const displayLabels = labels.map((l) =>
-      String(l ?? "").length > 28 ? String(l ?? "").slice(0, 28) + "…" : String(l ?? ""),
-    ),
+  // نحتفظ بالتسميات كاملة في data.labels (لا قص) — اللف يتم على المحور عبر
+  // الإضافة العامة ChartLabels، والـ Tooltip يقرأ النص الكامل تلقائياً.
+  const displayLabels = (fullLabels || labels).map((l) => String(l ?? "")),
     tooltipLabels = fullLabels || labels;
   CHARTS[id] = new Chart(document.getElementById(id), {
     type: "bar",
@@ -855,7 +1114,7 @@ function makeVBar(id, labels, datasets) {
     return;
   }
   const fullLabels = cleanLabels,
-    displayLabels = cleanLabels.map((l) => (l.length > 16 ? l.slice(0, 16) + "…" : l));
+    displayLabels = cleanLabels;
   CHARTS[id] = new Chart(document.getElementById(id), {
     type: "bar",
     data: { labels: displayLabels, datasets: cleanDatasets },
@@ -951,13 +1210,21 @@ function renderOverviewCharts() {
       },
     })));
   const sizeMap = {},
-    ownerMap = {};
+    ownerMap = {},
+    linkMap = {},
+    subMap = {};
   (D.forEach((r) => {
     r.schoolSize && (sizeMap[r.schoolSize] = (sizeMap[r.schoolSize] || 0) + 1);
     r.ownership  && (ownerMap[r.ownership]  = (ownerMap[r.ownership]  || 0) + 1);
+    r.linkType   && (linkMap[r.linkType]    = (linkMap[r.linkType]    || 0) + 1);
+    r.subscriptionStatus && (subMap[r.subscriptionStatus] = (subMap[r.subscriptionStatus] || 0) + 1);
   }),
     makeDoughnut("ch-size",  sizeMap,  { كبير: "#083D4F", متوسط: "#0891B2", صغير: "#059669" }),
-    makeDoughnut("ch-owner", ownerMap, { حكومي: "#083D4F", مستأجر: "#D97706" }));
+    makeDoughnut("ch-owner", ownerMap, { حكومي: "#083D4F", مستأجر: "#D97706" }),
+    // نوع الارتباط (مستقل/مشترك) — يعتمد على نوع_المبنى
+    makeDoughnut("ch-link", linkMap, { مستقل: "#0891B2", مشترك: "#7C3AED" }),
+    // حالة الاشتراك — يعتمد على حالة_الاشتراك
+    makeDoughnut("ch-sub-status", subMap, {}));
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📈  JS تبويب: تحليل FCA
@@ -2099,7 +2366,7 @@ function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
         (CHARTS[`ch-${tabId}-top`] = new Chart(document.getElementById(`ch-${tabId}-top`), {
           type: "bar",
           data: {
-            labels: top20.map((r) => (r.name.length > 30 ? r.name.slice(0, 30) + "…" : r.name)),
+            labels: top20.map((r) => r.name),
             datasets: [
               {
                 label: label,
@@ -2464,6 +2731,8 @@ function renderTable() {
             classrooms: num(b["عدد_الفصول"]),
             schoolSize: String(b["حجم_المدرسة"] ?? "").trim(),
             buildingSize: String(b["نوع_المبنى"] ?? b["حجم_المبنى"] ?? "").trim(),
+            // نوع الارتباط = نوع_المبنى (مصدر موحّد للهيدر، يصلح حقل linkType الذي كان فارغاً)
+            linkType: String(b["نوع_المبنى"] ?? "").trim(),
             lng: num(b["خط_الطول"]),
             lat: num(b["خط_العرض"]),
             fca: (() => {
@@ -2881,7 +3150,7 @@ function renderStudentsTab() {
         (CHARTS["ch-stud-top"] = new Chart(document.getElementById("ch-stud-top"), {
           type: "bar",
           data: {
-            labels: top20stud.map((r) => (r.name.length > 30 ? r.name.slice(0, 30) + "…" : r.name)),
+            labels: top20stud.map((r) => r.name),
             datasets: [
               {
                 label: "عدد الطلاب",
@@ -2915,7 +3184,7 @@ function renderStudentsTab() {
         (CHARTS["ch-age-top"] = new Chart(document.getElementById("ch-age-top"), {
           type: "bar",
           data: {
-            labels: top20age.map((r) => (r.name.length > 30 ? r.name.slice(0, 30) + "…" : r.name)),
+            labels: top20age.map((r) => r.name),
             datasets: [
               {
                 label: "عمر المبنى (سنة)",
@@ -3727,7 +3996,7 @@ function renderSpareTab() {
         (CHARTS["ch-spare-top-qty"] = new Chart(document.getElementById("ch-spare-top-qty"), {
           type: "bar",
           data: {
-            labels: top20qty.map((r) => (r.name.length > 30 ? r.name.slice(0, 30) + "…" : r.name)),
+            labels: top20qty.map((r) => r.name),
             datasets: [
               {
                 label: "الكمية",
@@ -3761,7 +4030,7 @@ function renderSpareTab() {
         (CHARTS["ch-spare-dist"] = new Chart(document.getElementById("ch-spare-dist"), {
           type: "bar",
           data: {
-            labels: distArr.map((d) => (d[0].length > 28 ? d[0].slice(0, 28) + "…" : d[0])),
+            labels: distArr.map((d) => d[0]),
             datasets: [
               {
                 label: "الكمية",
@@ -4069,7 +4338,7 @@ function renderAyenTab() {
         (CHARTS["ch-ayen-dist"] = new Chart(document.getElementById("ch-ayen-dist"), {
           type: "bar",
           data: {
-            labels: distArr.map((x) => (x.k.length > 28 ? x.k.slice(0, 28) + "…" : x.k)),
+            labels: distArr.map((x) => x.k),
             datasets: [
               {
                 label: "متوسط تقييم عاين",
@@ -7048,10 +7317,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
   }),
     (window.makeHBar = function (id, labels, values, colors, maxVal = null, fullLabels = null) {
       killChart(id);
-      const displayLabels = labels.map((l) => {
-          const s = String(l ?? "");
-          return s.length > 28 ? s.slice(0, 28) + "…" : s;
-        }),
+      const displayLabels = (fullLabels || labels).map((l) => String(l ?? "")),
         tooltipLabels = fullLabels || labels;
       CHARTS[id] = new Chart(document.getElementById(id), {
         type: "bar",
@@ -7120,7 +7386,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         return;
       }
       const fullLabels = cleanLabels,
-        displayLabels = cleanLabels.map((l) => (l.length > 16 ? l.slice(0, 16) + "…" : l));
+        displayLabels = cleanLabels;
       CHARTS[id] = new Chart(document.getElementById(id), {
         type: "bar",
         data: { labels: displayLabels, datasets: cleanDatasets },
@@ -9508,7 +9774,7 @@ function renderTajheezInventoryTab() {
       CHARTS["ch-taj-qism-need"] = new Chart(document.getElementById("ch-taj-qism-need"), {
         type: "bar",
         data: {
-          labels: qismEntries.map(([k]) => (k.length > 20 ? k.slice(0, 20) + "…" : k)),
+          labels: qismEntries.map(([k]) => k),
           datasets: [
             {
               label: "قيمة الاحتياج",
@@ -11419,6 +11685,141 @@ function renderTajheezAllTable() {
     };
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     🧠 طبقة الميتاداتا للهيدرز — يفهم بها المساعد مرادفات الحقول
+     (طلب التاسع عشر: فهم البيانات والهيدرز). يربط المصطلح الذي
+     يكتبه المستخدم بالحقل الفعلي في النموذج الموحّد RAW.
+     ════════════════════════════════════════════════════════════════ */
+  const FCB_FIELD_META = {
+    name:        { ar: "اسم المدرسة", header: "اسم_المدرسة", syn: ["اسم المدرسة", "المدرسة", "اسم المبنى", "المبنى"] },
+    sector:      { ar: "المحافظة", header: "المحافظة", syn: ["المحافظة", "محافظة", "القطاع"] },
+    city:        { ar: "المدينة", header: "المدينة_الرئيسية", syn: ["المدينة", "المنطقة", "مدينة"] },
+    district:    { ar: "الحي", header: "الحي", syn: ["الحي", "حي"] },
+    stage:       { ar: "المرحلة", header: "المرحلة", syn: ["المرحلة", "المرحلة الدراسية", "مرحلة"] },
+    gender:      { ar: "الجنس", header: "الجنس", syn: ["الجنس", "بنين", "بنات", "النوع"] },
+    ownership:   { ar: "الملكية", header: "حكومي_مستأجر", syn: ["حكومي", "مستأجر", "الملكية", "نوع الملكية"] },
+    schoolSize:  { ar: "حجم المدرسة", header: "حجم_المدرسة", syn: ["حجم المدرسة", "الحجم"] },
+    buildingSize:{ ar: "نوع المبنى", header: "نوع_المبنى", syn: ["نوع المبنى", "حجم المبنى"] },
+    linkType:    { ar: "نوع الارتباط", header: "نوع_المبنى", syn: ["نوع الارتباط", "مستقل", "مشترك", "الارتباط"] },
+    subscriptionStatus: { ar: "حالة الاشتراك", header: "حالة_الاشتراك", syn: ["حالة الاشتراك", "الاشتراك", "مشترك", "غير مشترك"] },
+    fca:         { ar: "قيمة FCA", header: "قيمة_FCA", syn: ["fca", "إف سي إيه", "الحالة الفنية", "قيمة fca", "تقييم المبنى"] },
+    envScore:    { ar: "درجة البيئة المدرسية", header: "درجة_البيئة_المدرسية", syn: ["البيئة", "البيئة المدرسية", "درجة البيئة"] },
+    ayenScore:   { ar: "تقييم عاين", header: "تقييم_عاين", syn: ["عاين", "تقييم عاين"] },
+    students:    { ar: "عدد الطلاب", header: "عدد_الطلاب", syn: ["الطلاب", "عدد الطلاب", "الطالبات"] },
+    buildingAge: { ar: "عمر المبنى", header: "عمر_المبني", syn: ["عمر المبنى", "العمر", "قدم المبنى"] },
+    classrooms:  { ar: "عدد الفصول", header: "عدد_الفصول", syn: ["الفصول", "عدد الفصول", "الفصول الدراسية"] },
+    acUnits:     { ar: "وحدات التكييف", header: "وحدات_التكييف", syn: ["التكييف", "المكيفات", "وحدات التكييف"] },
+    alerts:      { ar: "عدد البلاغات", header: "عدد_البلاغات", syn: ["البلاغات", "عدد البلاغات", "الأعطال"] },
+  };
+
+  // يحاول استنتاج الحقل المقصود من نص المستخدم (مرادفات)
+  function fcbResolveField(text) {
+    const t = String(text || "").toLowerCase();
+    for (const [key, m] of Object.entries(FCB_FIELD_META)) {
+      if (m.syn.some((s) => t.includes(String(s).toLowerCase()))) return key;
+    }
+    return null;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     🧭 سياق الداشبورد الحالي (التبويب + الفلاتر المطبّقة + التحديد)
+     (طلب: فهم حالة الداشبورد الحالية) — يُرسل للموديل ليجاوب على
+     البيانات المعروضة حالياً بعد الفلترة.
+     ════════════════════════════════════════════════════════════════ */
+  function fcbBuildDashboardContext() {
+    const g = (id) => document.getElementById(id)?.value || "";
+    const filters = {
+      المدينة: g("fCity"),
+      المحافظة: g("fSector"),
+      المرحلة: g("fStage"),
+      الجنس: g("fGender"),
+      حجم_المدرسة: g("fSize"),
+      الملكية: g("fOwner"),
+      الحي: g("fDistrict"),
+      حالة_الاشتراك: g("fSubStatus"),
+      أدنى_FCA: g("fFcaMin"),
+      بحث: (document.getElementById("fSearch")?.value || "").trim(),
+    };
+    const applied = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    const total = DataService.all().length;
+    const shown = DataService.filtered().length;
+    return {
+      التبويب_المفتوح: window.__ACTIVE_TAB_LABEL__ || window.__ACTIVE_TAB__ || "نظرة عامة",
+      الفلاتر_المطبقة: Object.keys(applied).length ? applied : "لا توجد فلاتر — كل البيانات معروضة",
+      عدد_السجلات_بعد_الفلترة: shown,
+      عدد_السجلات_الإجمالي: total,
+      ملاحظة: shown < total
+        ? "المستخدم يرى مجموعة مفلترة. أجب اعتماداً على هذه المجموعة المعروضة ما لم يطلب كامل البيانات صراحةً."
+        : "لا فلاتر مطبّقة — البيانات المعروضة = كامل قاعدة البيانات.",
+    };
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     ⚙️ محرك الاستعلامات الذكي (Smart Query Engine)
+     يحوّل أسئلة المستخدم إلى عمليات تحليلية على البيانات الفعلية
+     المعروضة (DataService.filtered) ويرجع نتيجة محسوبة + تفسير
+     (Explainability). يعمل قبل الموديل لتثبيت الأرقام ومنع التخمين.
+     ════════════════════════════════════════════════════════════════ */
+  function fcbSmartQuery(userText) {
+    const data = DataService.filtered();
+    if (!data.length) return null;
+    const t = String(userText || "");
+    const tl = t.toLowerCase();
+    const field = fcbResolveField(t);
+    const out = { عمليات: [] };
+
+    const wantsCount = /كم |عدد |how many|count/.test(tl);
+    const wantsAvg = /متوسط|معدل|average|avg/.test(tl);
+    const wantsTop = /أعلى|أكبر|أفضل|top|highest|max/.test(tl);
+    const wantsBottom = /أقل|أدنى|أسوأ|lowest|min|worst/.test(tl);
+    const wantsDist = /توزيع|distribution|حسب|per |by /.test(tl);
+
+    // عدّ إجمالي
+    if (wantsCount && !field) {
+      out.عمليات.push({ نوع: "عدّ", النتيجة: data.length, شرح: "إجمالي السجلات في العرض الحالي" });
+    }
+    // عدّ/توزيع حسب حقل فئوي
+    if ((wantsCount || wantsDist) && field && FCB_FIELD_META[field]) {
+      const isNumericField = ["fca", "envScore", "ayenScore", "students", "buildingAge", "classrooms", "acUnits", "alerts"].includes(field);
+      if (!isNumericField) {
+        const dist = DataService.countBy(data, field, 15);
+        if (dist.length) out.عمليات.push({ نوع: "توزيع", الحقل: FCB_FIELD_META[field].ar, النتيجة: dist });
+      }
+    }
+    // متوسط حقل رقمي
+    if (wantsAvg && field) {
+      const a = DataService.avg(data, field);
+      if (a != null) out.عمليات.push({ نوع: "متوسط", الحقل: FCB_FIELD_META[field].ar, النتيجة: a });
+    }
+    // أعلى/أقل حسب حقل رقمي
+    if ((wantsTop || wantsBottom) && field) {
+      const tn = DataService.topN(data, field, 10, wantsBottom);
+      if (tn.length)
+        out.عمليات.push({
+          نوع: wantsBottom ? "أدنى 10" : "أعلى 10",
+          الحقل: FCB_FIELD_META[field].ar,
+          النتيجة: tn.map((r) => ({ المدرسة: r.name, المحافظة: r.sector, القيمة: r[field] })),
+        });
+    }
+
+    if (!out.عمليات.length) return null;
+    out.الحقل_المُستنتَج = field ? FCB_FIELD_META[field].ar : null;
+    out.عدد_السجلات_المستخدمة = data.length;
+    return out;
+  }
+
+  /* اقتراح أسئلة متابعة ذكية حسب التبويب الحالي (طلب: اقتراح أسئلة) */
+  function fcbSuggestQuestions() {
+    const tab = window.__ACTIVE_TAB__ || "overview";
+    const base = {
+      overview: ["كم عدد المدارس حسب المحافظة؟", "ما توزيع حالة الاشتراك؟", "ما نسبة المباني المستقلة مقابل المشتركة؟"],
+      fca: ["ما متوسط قيمة FCA في العرض الحالي؟", "أعطني أسوأ 10 مدارس في FCA", "كم عدد المباني الحرجة؟"],
+      env: ["ما متوسط درجة البيئة المدرسية؟", "أسوأ 10 مدارس في البيئة", "قارن البيئة بين المحافظات"],
+      students: ["ما أكبر 10 مدارس بعدد الطلاب؟", "ما أقدم المباني؟", "متوسط عمر المبنى؟"],
+    };
+    return base[tab] || ["لخّص أهم المؤشرات في العرض الحالي", "ما أبرز الملاحظات من البيانات المفلترة؟"];
+  }
+
   async function fcbAskOpenAI(userText) {
     if (!AIService.hasKey()) {
       const err = new Error("NO_API_KEY");
@@ -11427,6 +11828,11 @@ function renderTajheezAllTable() {
     }
 
     const topics = fcbDetectTopics(userText);
+
+    // ── سياق الداشبورد الحالي + محرك الاستعلامات الذكي (المرحلة 4) ──
+    const dashContext = fcbBuildDashboardContext();
+    const smartResult = fcbSmartQuery(userText);
+    const suggestions = fcbSuggestQuestions();
 
     // ── الملخص الأساسي دايماً (خفيف) ──
     const base = fcbBuildDashboardSummary();
@@ -11543,6 +11949,31 @@ function renderTajheezAllTable() {
 - لو المستخدم سأل سؤالاً عاماً لا يخص اللوحة، جاوبه بشكل طبيعي.
 
 ══════════════════════════════════════════════════════
+سياق الداشبورد الحالي — أجب على المعروض حالياً
+══════════════════════════════════════════════════════
+المستخدم يرى الآن تبويباً محدداً وقد طبّق فلاتر. اعتمد على "نتائج_المحرك_التحليلي" و"سياق_الداشبورد" أدناه: إن وُجدت فلاتر مطبّقة، فإجابتك يجب أن تخص المجموعة المفلترة المعروضة، إلا إذا طلب المستخدم كامل قاعدة البيانات صراحةً.
+
+══════════════════════════════════════════════════════
+محرك الاستعلامات الذكي — الأرقام الموثوقة
+══════════════════════════════════════════════════════
+"نتائج_المحرك_التحليلي" أدناه محسوبة مباشرةً من البيانات الفعلية المعروضة (عدّ/متوسط/توزيع/أعلى/أدنى). إذا كان هناك ناتج فيها يطابق سؤال المستخدم، استخدمه حرفياً ولا تعِد حسابه ولا تخمّن رقماً مختلفاً.
+
+══════════════════════════════════════════════════════
+تفسير الإجابة (Explainability) — إلزامي عند تقديم أرقام
+══════════════════════════════════════════════════════
+بعد أي إجابة رقمية، أضف سطراً مختصراً يوضّح: عدد السجلات المستخدمة، والفلاتر المطبّقة (إن وُجدت)، والحقل/الحقول المعتمدة. مثال: "(محسوب من 312 سجلاً بعد فلتر المحافظة=مكة، حقل قيمة_FCA)".
+
+══════════════════════════════════════════════════════
+منع المعلومات غير الصحيحة
+══════════════════════════════════════════════════════
+إذا لم تكفِ البيانات للإجابة، قُل ذلك صراحةً ("البيانات الحالية لا تكفي للإجابة على هذا") ووجّه لتبويب أو فلتر مناسب — ولا تُنشئ أرقاماً أو أسماءً غير موجودة في البيانات المرفقة إطلاقاً.
+
+══════════════════════════════════════════════════════
+اقتراح أسئلة متابعة — إلزامي في نهاية كل رد
+══════════════════════════════════════════════════════
+اختم كل رد بسطر "💡 أسئلة مقترحة:" يتبعه 2-3 أسئلة قصيرة مرتبطة بالسؤال الحالي وبالتبويب المفتوح (استرشد بـ"أسئلة_مقترحة" أدناه أو اقترح أفضل منها).
+
+══════════════════════════════════════════════════════
 دليل التبويبات — أين تجد كل بيانات
 ══════════════════════════════════════════════════════
 • نظرة عامة              → عدد_المباني_الإجمالي، توزيع_المدن، توزيع_المراحل
@@ -11610,6 +12041,15 @@ function renderTajheezAllTable() {
 بيانات اللوحة الحالية (محدّثة لحظة هذا السؤال):
 ${JSON.stringify(base)}
 ${extraContext}
+
+سياق_الداشبورد:
+${JSON.stringify(dashContext)}
+
+نتائج_المحرك_التحليلي (محسوبة من البيانات المعروضة فعلياً):
+${smartResult ? JSON.stringify(smartResult) : "لا يوجد ناتج محرك مباشر لهذا السؤال — اعتمد على ملخص اللوحة."}
+
+أسئلة_مقترحة (للتبويب الحالي):
+${JSON.stringify(suggestions)}
 
 محرك الأولويات:
 ${JSON.stringify(priorityData)}`;

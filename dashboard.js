@@ -4993,6 +4993,11 @@ function renderSysMain() {
     schoolRows[id] ||
       (schoolRows[id] = {
         id: id,
+        // الرقم الوزاري: يجرب عدة أسماء ممكنة في ملف الأنظمة
+        minId: String(
+          r["رقم_وزاري"] ?? r["الرقم الوزاري"] ?? r["رقم_المدرسة_الوزاري"] ??
+          r["رقم وزاري"] ?? r["رقم المدرسة الوزاري"] ?? id ?? ""
+        ).replace(/\uFEFF/g, "").trim(),
         name: r["اسم المدرسة"],
         city: r["المدينة الرئيسية"],
         sector: r["المحافظة"],
@@ -5049,7 +5054,7 @@ function renderSysMain() {
           <option value="score_desc" ${(window._sysMainState?.sortBy || "score_desc") === "score_desc" ? "selected" : ""}>الأعلى درجة أولاً</option>
           <option value="score_asc"  ${window._sysMainState?.sortBy === "score_asc" ? "selected" : ""}>الأقل درجة أولاً</option>
         </select>
-      </div>\n    </div>\n\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:11px" id="sysm-table">\n        <thead>\n          <tr style="text-align:right">\n            <th style="white-space:nowrap">اسم المدرسة</th>\n            <th style="white-space:nowrap">المدينة</th>\n            <th style="white-space:nowrap">الدرجة الكلية</th>\n            <th style="white-space:nowrap">الفئة</th>\n            ${mainSystems
+      </div>\n    </div>\n\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:11px" id="sysm-table">\n        <thead>\n          <tr style="text-align:right">\n            <th style="white-space:nowrap;padding:9px 12px">اسم المدرسة</th>\n            <th style="white-space:nowrap;min-width:90px;color:#0891B2;padding:9px 8px">الرقم الوزاري</th>\n            <th style="white-space:nowrap">المدينة</th>\n            <th style="white-space:nowrap">الدرجة الكلية</th>\n            <th style="white-space:nowrap">الفئة</th>\n            ${mainSystems
         .filter((s) => "6" !== s)
         .map(
           (s) =>
@@ -5132,38 +5137,124 @@ function renderSysMain() {
     filterSysMainTable());
 }
 function fillSysMainTable(rows) {
-  const tbody = document.getElementById("sysm-tbody"),
-    systems = window._sysMainSystems || [];
-  tbody &&
-    (tbody.innerHTML = rows
+  try {
+    const tbody = document.getElementById("sysm-tbody"),
+      systems = window._sysMainSystems || [];
+    if (!tbody) return;
+
+    tbody.innerHTML = rows
       .map((r, i) => {
-        const scoreNum = parseFloat(r.score),
-          scoreClr = isNaN(scoreNum)
-            ? "#64748b"
-            : scoreNum >= 70
-              ? "#0891B2"
-              : scoreNum >= 50
-                ? "#059669"
-                : scoreNum >= 35
-                  ? "#D97706"
-                  : "#DC2626",
-          sysAvgCells = systems
-            .map((s) => {
-              const sg = r.systems[s];
-              if (!sg)
-                return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
-              const av = sg.sum / sg.cnt;
-              return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av >= 4 ? "#0891B2" : av >= 3 ? "#059669" : av >= 2 ? "#D97706" : "#DC2626"}">${av.toFixed(1)}</td>`;
-            })
-            .join(""),
-          dateStr = r.date
-            ? r.date instanceof Date
-              ? r.date.toLocaleDateString("en" === LANG ? "en-US" : "ar-SA")
-              : String(r.date).slice(0, 10)
-            : "—";
-        return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">\n      <td style="padding:9px 12px;font-weight:600">${esc(r.name || "")}${r.id || r.minId ? `<span style="font-size:9px;color:var(--tx-muted);margin-right:5px;font-weight:500">(${esc(r.id || r.minId || "")})</span>` : ""}${!r.id && !r.minId ? "" : ""}</td>\n      <td style="padding:9px 8px;white-space:nowrap">${esc(r.city || "")}</td>\n      <td style="padding:9px 8px;font-weight:800;color:${scoreClr};white-space:nowrap">${isNaN(scoreNum) ? "—" : scoreNum.toFixed(1) + "%"}</td>\n      <td style="padding:9px 8px">${sysBadge(r.tier)}</td>\n      ${sysAvgCells}\n      <td style="padding:9px 8px;white-space:nowrap;font-size:10px">${esc(r.eng || "")}</td>\n    </tr>`;
+        try {
+          const scoreNum = parseFloat(r.score),
+            scoreClr = isNaN(scoreNum)
+              ? "#64748b"
+              : scoreNum >= 70
+                ? "#0891B2"
+                : scoreNum >= 50
+                  ? "#059669"
+                  : scoreNum >= 35
+                    ? "#D97706"
+                    : "#DC2626",
+            sysAvgCells = systems
+              .map((s) => {
+                try {
+                  const sg = r.systems[s];
+                  if (!sg)
+                    return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
+                  const av = sg.sum / sg.cnt;
+                  return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av >= 4 ? "#0891B2" : av >= 3 ? "#059669" : av >= 2 ? "#D97706" : "#DC2626"}">${av.toFixed(1)}</td>`;
+                } catch (_) {
+                  return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
+                }
+              })
+              .join(""),
+            // الرقم الوزاري: من حقل minId المحفوظ في schoolRow
+            minIdDisplay = String(r.minId || r.id || "").trim();
+
+          // نحفظ الرقم الوزاري والاسم والمدينة كـ data attributes للربط لاحقاً
+          return `<tr
+            data-sysm-minid="${esc(minIdDisplay)}"
+            data-sysm-name="${esc(String(r.name || "").trim())}"
+            data-sysm-city="${esc(String(r.city || "").trim())}"
+            style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"};cursor:pointer"
+            title="انقر لعرض تفاصيل المدرسة">
+            <td style="padding:9px 12px;font-weight:600;white-space:normal;line-height:1.4">${esc(r.name || "")}</td>
+            <td style="padding:9px 8px;white-space:nowrap;font-size:11px;color:${minIdDisplay ? "#0891B2" : "var(--tx-muted)"};font-weight:${minIdDisplay ? "700" : "400"}">${minIdDisplay ? esc(minIdDisplay) : "—"}</td>
+            <td style="padding:9px 8px;white-space:nowrap">${esc(r.city || "")}</td>
+            <td style="padding:9px 8px;font-weight:800;color:${scoreClr};white-space:nowrap">${isNaN(scoreNum) ? "—" : scoreNum.toFixed(1) + "%"}</td>
+            <td style="padding:9px 8px">${sysBadge(r.tier)}</td>
+            ${sysAvgCells}
+            <td style="padding:9px 8px;white-space:nowrap;font-size:10px">${esc(r.eng || "")}</td>
+          </tr>`;
+        } catch (rowErr) {
+          console.warn("[sysMain] خطأ في بناء صف:", rowErr);
+          return "";
+        }
       })
-      .join(""));
+      .join("");
+
+    // ── ربط كل صف بـ openSchoolPanel بعد إضافته للـ DOM ──
+    // الأولوية: 1) رقم وزاري  2) اسم + مدينة  3) اسم فقط
+    requestAnimationFrame(function () {
+      try {
+        if (!tbody) return;
+        tbody.querySelectorAll("tr[data-sysm-name]").forEach(function (tr) {
+          if (tr.dataset.sysmHooked) return;
+          tr.dataset.sysmHooked = "1";
+          tr.addEventListener("click", function () {
+            try {
+              const minId = (tr.dataset.sysmMinid || "").trim();
+              const name  = (tr.dataset.sysmName  || "").trim();
+              const city  = (tr.dataset.sysmCity  || "").trim();
+              const raw   = Array.isArray(window.RAW) ? window.RAW : [];
+
+              // 1. الربط بالرقم الوزاري أولاً (الأدق)
+              let match = null;
+              if (minId) {
+                const normV = function (v) {
+                  return String(v || "").replace(/\uFEFF/g, "").trim().toUpperCase();
+                };
+                const normMinId = normV(minId);
+                match = raw.find(function (s) {
+                  return normV(s.minId) === normMinId || normV(s.schoolSeq) === normMinId;
+                });
+              }
+
+              // 2. الربط بالاسم + المدينة (لو مفيش رقم وزاري)
+              if (!match && name) {
+                const nameLow = name.toLowerCase();
+                const cityLow = city.toLowerCase();
+                if (city) {
+                  match = raw.find(function (s) {
+                    return String(s.name || "").toLowerCase() === nameLow &&
+                           String(s.city || "").toLowerCase() === cityLow;
+                  });
+                }
+                // 3. الاسم فقط كملاذ أخير
+                if (!match) {
+                  match = raw.find(function (s) {
+                    return String(s.name || "").toLowerCase() === nameLow;
+                  });
+                }
+              }
+
+              if (match && typeof window.openSchoolDetails === "function") {
+                window.openSchoolDetails(match);
+              } else if (!match && name) {
+                console.warn("[sysMain] لم يتم العثور على المدرسة للربط:", name, minId);
+              }
+            } catch (clickErr) {
+              console.warn("[sysMain] خطأ عند النقر على صف:", clickErr);
+            }
+          });
+        });
+      } catch (hookErr) {
+        console.warn("[sysMain] خطأ في ربط الصفوف:", hookErr);
+      }
+    });
+  } catch (err) {
+    console.warn("[fillSysMainTable] خطأ عام:", err);
+  }
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🔩  JS تبويب: الأنظمة التفصيلية
@@ -5455,6 +5546,13 @@ function getExportData() {
       ? all.filter(
           (r) =>
             String(r.name || "")
+              .toLowerCase()
+              .includes(q) ||
+            // 🔑 البحث بالرقم الوزاري
+            String(r.minId || "")
+              .toLowerCase()
+              .includes(q) ||
+            String(r.id || "")
               .toLowerCase()
               .includes(q) ||
             String(r.city || "")
@@ -6837,39 +6935,93 @@ function _sysNum(v, d = 1) {
   return Number.isFinite(n) ? n.toFixed(d) : "";
 }
 window.exportSysMainCSV = function () {
-  const isEn = "en" === LANG,
-    systems = (window._sysMainSystems || []).filter((s) => "6" !== s),
-    rows = (window._sysMainRows || []).filter((r) => {
-      const q = (document.getElementById("sysm-search")?.value || "").toLowerCase().trim();
-      return (
-        !q ||
-        String(r.name || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(r.city || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(r.eng || "")
-          .toLowerCase()
-          .includes(q)
+  try {
+    const isEn = "en" === LANG,
+      systems = (window._sysMainSystems || []).filter((s) => "6" !== s),
+      rows = (window._sysMainRows || []).filter((r) => {
+        const q = (document.getElementById("sysm-search")?.value || "").toLowerCase().trim();
+        return (
+          !q ||
+          String(r.name || "").toLowerCase().includes(q) ||
+          String(r.minId || "").toLowerCase().includes(q) ||
+          String(r.id || "").toLowerCase().includes(q) ||
+          String(r.city || "").toLowerCase().includes(q) ||
+          String(r.eng || "").toLowerCase().includes(q)
+        );
+      }),
+      headers = isEn
+        ? ["School Name", "Min. ID", "City", "Total Score", "Tier", ...systems, "Visit Date", "Engineer"]
+        : [
+            "اسم المدرسة",
+            "الرقم الوزاري",
+            "المدينة",
+            "الدرجة الكلية",
+            "الفئة",
+            ...systems,
+            "تاريخ الزيارة",
+            "المهندس",
+          ],
+      csv = [headers.map(_sysCsvCell).join(",")];
+    rows.forEach((r) => {
+      csv.push(
+        [
+          r.name || "",
+          r.minId || r.id || "",
+          r.city || "",
+          _sysNum(r.score, 1),
+          r.tier || "",
+          ...systems.map((s) => {
+            const sg = r.systems?.[s];
+            return sg ? +(sg.sum / sg.cnt).toFixed(1) : "";
+          }),
+          _sysDateVal(r.date),
+          r.eng || "",
+        ]
+          .map(_sysCsvCell)
+          .join(","),
       );
-    }),
-    headers = isEn
-      ? ["School Name", "City", "Total Score", "Tier", ...systems, "Visit Date", "Engineer"]
-      : [
-          "اسم المدرسة",
-          "المدينة",
-          "الدرجة الكلية",
-          "الفئة",
-          ...systems,
-          "تاريخ الزيارة",
-          "المهندس",
-        ],
-    csv = [headers.map(_sysCsvCell).join(",")];
-  rows.forEach((r) => {
-    csv.push(
-      [
+    });
+    _sysDownloadFile(
+      `sys_main_${_sysExportSafeName(isEn ? "data" : "الأنظمة_الرئيسية")}_${new Date().toISOString().slice(0, 10)}.csv`,
+      `\ufeff${csv.join("\r\n")}`,
+      "text/csv;charset=utf-8;",
+    );
+  } catch (err) {
+    console.warn("[exportSysMainCSV] خطأ:", err);
+  }
+};
+window.exportSysMainExcel = function () {
+  try {
+    const isEn = "en" === LANG,
+      systems = (window._sysMainSystems || []).filter((s) => "6" !== s),
+      rows = (window._sysMainRows || []).filter((r) => {
+        const q = (document.getElementById("sysm-search")?.value || "").toLowerCase().trim();
+        return (
+          !q ||
+          String(r.name || "").toLowerCase().includes(q) ||
+          String(r.minId || "").toLowerCase().includes(q) ||
+          String(r.id || "").toLowerCase().includes(q) ||
+          String(r.city || "").toLowerCase().includes(q) ||
+          String(r.eng || "").toLowerCase().includes(q)
+        );
+      }),
+      headers = isEn
+        ? ["School Name", "Min. ID", "City", "Total Score", "Tier", ...systems, "Visit Date", "Engineer"]
+        : [
+            "اسم المدرسة",
+            "الرقم الوزاري",
+            "المدينة",
+            "الدرجة الكلية",
+            "الفئة",
+            ...systems,
+            "تاريخ الزيارة",
+            "المهندس",
+          ];
+    const dataArr = [headers];
+    rows.forEach((r) => {
+      dataArr.push([
         r.name || "",
+        r.minId || r.id || "",
         r.city || "",
         _sysNum(r.score, 1),
         r.tier || "",
@@ -6879,68 +7031,18 @@ window.exportSysMainCSV = function () {
         }),
         _sysDateVal(r.date),
         r.eng || "",
-      ]
-        .map(_sysCsvCell)
-        .join(","),
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(dataArr);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isEn ? "Sys Main" : "الأنظمة الرئيسية");
+    XLSX.writeFile(
+      wb,
+      `sys_main_${_sysExportSafeName(isEn ? "data" : "الأنظمة_الرئيسية")}_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
-  });
-  _sysDownloadFile(
-    `sys_main_${_sysExportSafeName(isEn ? "data" : "الأنظمة_الرئيسية")}_${new Date().toISOString().slice(0, 10)}.csv`,
-    `\ufeff${csv.join("\r\n")}`,
-    "text/csv;charset=utf-8;",
-  );
-};
-window.exportSysMainExcel = function () {
-  const isEn = "en" === LANG,
-    systems = (window._sysMainSystems || []).filter((s) => "6" !== s),
-    rows = (window._sysMainRows || []).filter((r) => {
-      const q = (document.getElementById("sysm-search")?.value || "").toLowerCase().trim();
-      return (
-        !q ||
-        String(r.name || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(r.city || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(r.eng || "")
-          .toLowerCase()
-          .includes(q)
-      );
-    }),
-    headers = isEn
-      ? ["School Name", "City", "Total Score", "Tier", ...systems, "Visit Date", "Engineer"]
-      : [
-          "اسم المدرسة",
-          "المدينة",
-          "الدرجة الكلية",
-          "الفئة",
-          ...systems,
-          "تاريخ الزيارة",
-          "المهندس",
-        ];
-  const dataArr = [headers];
-  rows.forEach((r) => {
-    dataArr.push([
-      r.name || "",
-      r.city || "",
-      _sysNum(r.score, 1),
-      r.tier || "",
-      ...systems.map((s) => {
-        const sg = r.systems?.[s];
-        return sg ? +(sg.sum / sg.cnt).toFixed(1) : "";
-      }),
-      _sysDateVal(r.date),
-      r.eng || "",
-    ]);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(dataArr);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, isEn ? "Sys Main" : "الأنظمة الرئيسية");
-  XLSX.writeFile(
-    wb,
-    `sys_main_${_sysExportSafeName(isEn ? "data" : "الأنظمة_الرئيسية")}_${new Date().toISOString().slice(0, 10)}.xlsx`,
-  );
+  } catch (err) {
+    console.warn("[exportSysMainExcel] خطأ:", err);
+  }
 };
 window.exportSysDetailCSV = function () {
   const isEn = "en" === LANG,

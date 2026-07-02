@@ -2965,67 +2965,63 @@ tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
 
 
 /* ════════════════════════════════════════════════════════════════
-   theme-modern.css — طبقة التحديث البصري 2026 "Aurora Glass"
-   تُحمَّل بعد dashboard.css — تنسيق بصري فقط، لا تغيّر أي IDs أو منطق.
-   لغة التصميم: زجاجية ناعمة (glass) + تدرجات Teal→Indigo هادئة
-   + حواف كبيرة + ظلال متعددة الطبقات + حركة دقيقة عند التحويم.
+   طبقة التحديث البصري v3 — "Calm Slate"
+   ألوان هادئة مريحة للعين · تباين صحيح للجداول · حركة خفيفة جداً
+   (تنسيق بصري فقط — لا تغيّر أي IDs أو منطق)
    ════════════════════════════════════════════════════════════════ */
 
 :root {
-  --mx-teal: #0e9db8;
-  --mx-teal-2: #22c3dd;
-  --mx-indigo: #4f6df5;
-  --mx-navy: #072a3a;
-  --mx-grad: linear-gradient(135deg, var(--mx-teal) 0%, var(--mx-indigo) 100%);
-  --mx-grad-soft: linear-gradient(135deg, rgba(14,157,184,.10), rgba(79,109,245,.08));
-  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 22px; --r-2xl: 28px;
-  --sh-card: 0 1px 2px rgba(7,42,58,.05), 0 12px 32px -8px rgba(7,42,58,.10);
-  --sh-hover: 0 4px 12px rgba(14,157,184,.14), 0 20px 48px -12px rgba(7,42,58,.18);
+  --mx-teal: #3a8fa3;          /* Teal هادئ منخفض التشبع */
+  --mx-teal-2: #5fb0c2;
+  --mx-slate: #5f7d95;         /* أزرق رمادي هادئ */
+  --mx-navy: #12303f;
+  --mx-grad: linear-gradient(135deg, #3a8fa3, #4f7a9e);
+  --mx-grad-soft: linear-gradient(135deg, rgba(58,143,163,.07), rgba(95,125,149,.06));
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 20px; --r-2xl: 26px;
+  --sh-card: 0 1px 2px rgba(18,48,63,.04), 0 8px 22px -8px rgba(18,48,63,.07);
+  --sh-hover: 0 3px 8px rgba(58,143,163,.08), 0 14px 30px -12px rgba(18,48,63,.12);
   --mx-ease: cubic-bezier(.22,.8,.3,1);
 }
 
-/* خلفية الصفحة — أجواء Aurora هادئة */
+/* خلفية هادئة شبه محايدة — بدون تدرجات صارخة */
 body, html {
   background:
-    radial-gradient(1100px 550px at 88% -8%, rgba(34,195,221,.14), transparent 55%),
-    radial-gradient(900px 520px at -5% 12%, rgba(79,109,245,.10), transparent 50%),
-    radial-gradient(800px 480px at 50% 115%, rgba(14,157,184,.08), transparent 45%),
-    linear-gradient(180deg, #f6fafd 0%, #eef3f8 100%) !important;
+    radial-gradient(1000px 500px at 90% -10%, rgba(95,176,194,.06), transparent 55%),
+    radial-gradient(800px 450px at -5% 15%, rgba(95,125,149,.05), transparent 50%),
+    linear-gradient(180deg, #f8fafb 0%, #f1f4f7 100%) !important;
 }
 
-/* ─── الشريط العلوي: زجاجي داكن مع خط توهج ─── */
+/* ─── الشريط العلوي ─── */
 .topbar {
-  background: linear-gradient(120deg, rgba(6,32,44,.96), rgba(9,48,66,.94) 55%, rgba(17,38,84,.94)) !important;
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  border-bottom: 1px solid rgba(255,255,255,.08) !important;
-  box-shadow: 0 10px 34px -10px rgba(4,24,34,.55) !important;
+  background: linear-gradient(120deg, #102a37 0%, #133646 60%, #16394b 100%) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,.06) !important;
+  box-shadow: 0 8px 26px -10px rgba(10,30,42,.4) !important;
 }
 .topbar::after {
   content: ""; position: absolute; inset-inline: 0; bottom: -1px; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--mx-teal-2), var(--mx-indigo), transparent);
-  opacity: .8; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(95,176,194,.55), transparent);
+  pointer-events: none;
 }
 .tb-btn {
   border-radius: 999px !important;
-  border: 1px solid rgba(255,255,255,.16) !important;
-  background: rgba(255,255,255,.06) !important;
-  transition: all .25s var(--mx-ease) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  background: rgba(255,255,255,.05) !important;
+  transition: background .2s, border-color .2s !important;
 }
 .tb-btn:hover {
-  background: rgba(34,195,221,.18) !important;
-  border-color: rgba(34,195,221,.45) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px -4px rgba(34,195,221,.35);
+  background: rgba(95,176,194,.14) !important;
+  border-color: rgba(95,176,194,.4) !important;
 }
 .prog-fill { background: var(--mx-grad) !important; }
 
-/* ─── التبويبات: كبسولات زجاجية عائمة ─── */
+/* ─── التبويبات ─── */
 .tabs {
-  background: rgba(255,255,255,.72) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,.9) !important;
+  background: rgba(255,255,255,.85) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(224,233,239,.95) !important;
   border-radius: var(--r-xl) !important;
   box-shadow: var(--sh-card) !important;
   padding: 8px !important;
@@ -3033,148 +3029,399 @@ body, html {
 }
 .tab {
   border-radius: 999px !important;
-  transition: all .25s var(--mx-ease) !important;
+  transition: background .2s, color .2s !important;
   border: 1px solid transparent !important;
 }
-.tab:hover {
-  background: var(--mx-grad-soft) !important;
-  color: var(--mx-teal) !important;
-  transform: translateY(-1px);
-}
+.tab:hover { background: var(--mx-grad-soft) !important; color: var(--mx-teal) !important; }
 .tab.active {
   background: var(--mx-grad) !important;
   color: #fff !important;
-  box-shadow: 0 6px 18px -4px rgba(14,157,184,.45), inset 0 1px 0 rgba(255,255,255,.25) !important;
+  box-shadow: 0 4px 12px -4px rgba(58,143,163,.35) !important;
 }
 
-/* ─── البطاقات: زجاج أبيض بحافة مضيئة عند التحويم ─── */
+/* ─── البطاقات ─── */
 .card, .chart-box, .contract-card {
-  background: rgba(255,255,255,.88) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(215,231,239,.9) !important;
+  background: #ffffff !important;
+  border: 1px solid #e2eaf0 !important;
   border-radius: var(--r-xl) !important;
   box-shadow: var(--sh-card) !important;
-  transition: transform .3s var(--mx-ease), box-shadow .3s var(--mx-ease), border-color .3s !important;
+  transition: box-shadow .25s var(--mx-ease), border-color .25s !important;
 }
 .card:hover, .chart-box:hover {
-  transform: translateY(-3px);
   box-shadow: var(--sh-hover) !important;
-  border-color: rgba(34,195,221,.35) !important;
+  border-color: rgba(95,176,194,.4) !important;
 }
-.card-title {
-  font-weight: 800 !important;
-  letter-spacing: -.2px;
-}
+.card-title { font-weight: 800 !important; letter-spacing: -.2px; }
 .card-title::before {
-  content: ""; display: inline-block; width: 4px; height: 18px;
+  content: ""; display: inline-block; width: 4px; height: 16px;
   border-radius: 4px; background: var(--mx-grad);
-  margin-inline-start: 0; margin-inline-end: 10px; vertical-align: -3px;
+  margin-inline-end: 10px; vertical-align: -3px;
 }
 
-/* ─── بطاقات KPI: تدرج علوي + رقم متدرج + رفع عند التحويم ─── */
+/* ─── بطاقات KPI ─── */
 .kpi {
   position: relative;
   border-radius: var(--r-xl) !important;
-  background: rgba(255,255,255,.92) !important;
-  border: 1px solid rgba(215,231,239,.9) !important;
+  background: #ffffff !important;
+  border: 1px solid #e2eaf0 !important;
   box-shadow: var(--sh-card) !important;
   overflow: hidden;
-  transition: transform .3s var(--mx-ease), box-shadow .3s var(--mx-ease) !important;
+  transition: box-shadow .25s var(--mx-ease), transform .25s var(--mx-ease) !important;
 }
 .kpi::before {
-  content: ""; position: absolute; inset-inline: 0; top: 0; height: 4px;
-  background: var(--mx-grad); opacity: .9;
+  content: ""; position: absolute; inset-inline: 0; top: 0; height: 3px;
+  background: var(--mx-grad); opacity: .85;
 }
-.kpi::after {
-  content: ""; position: absolute; width: 130px; height: 130px;
-  inset-inline-end: -45px; top: -45px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(34,195,221,.14), transparent 70%);
-  pointer-events: none;
-}
-.kpi:hover { transform: translateY(-4px) scale(1.01); box-shadow: var(--sh-hover) !important; }
-.kpi-val {
-  background: linear-gradient(120deg, var(--mx-navy), var(--mx-teal)) ;
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 900 !important;
-  letter-spacing: -.5px;
-}
-.kpi.kc-red::before   { background: linear-gradient(135deg,#e0455c,#a82135); }
-.kpi.kc-red .kpi-val  { background: linear-gradient(120deg,#7a1626,#e0455c); -webkit-background-clip:text; background-clip:text; }
-.kpi.kc-amber::before { background: linear-gradient(135deg,#f5b04a,#d97706); }
-.kpi.kc-amber .kpi-val{ background: linear-gradient(120deg,#8a4b04,#f0a53c); -webkit-background-clip:text; background-clip:text; }
-.kpi.kc-green::before { background: linear-gradient(135deg,#2dd4a7,#059669); }
-.kpi.kc-green .kpi-val{ background: linear-gradient(120deg,#046148,#2dd4a7); -webkit-background-clip:text; background-clip:text; }
-.kpi.kc-navy::before  { background: linear-gradient(135deg,#0a5468,#072a3a); }
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--sh-hover) !important; }
+.kpi-val { color: var(--mx-navy) !important; font-weight: 900 !important; letter-spacing: -.4px; }
+.kpi.kc-red::before   { background: #c05a68; }
+.kpi.kc-red .kpi-val  { color: #9c3b49 !important; }
+.kpi.kc-amber::before { background: #d1975a; }
+.kpi.kc-amber .kpi-val{ color: #a4713a !important; }
+.kpi.kc-green::before { background: #4fa084; }
+.kpi.kc-green .kpi-val{ color: #2f7a60 !important; }
+.kpi.kc-navy::before  { background: #35586c; }
+.kpi.kc-blue .kpi-val { color: #2f6f84 !important; }
 
-/* ─── صف الفلاتر: شريط زجاجي واحد أنيق ─── */
+/* ─── صف الفلاتر ─── */
 .filters-row {
-  background: rgba(255,255,255,.78) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,.95) !important;
+  background: rgba(255,255,255,.9) !important;
+  border: 1px solid #e2eaf0 !important;
   border-radius: var(--r-xl) !important;
   box-shadow: var(--sh-card) !important;
 }
 .fsel, .finp {
   border-radius: 12px !important;
-  border: 1.5px solid var(--bd-light) !important;
+  border: 1.5px solid #dbe5ec !important;
   background: #fff !important;
   transition: border-color .2s, box-shadow .2s !important;
 }
-.fsel:hover, .finp:hover { border-color: rgba(34,195,221,.5) !important; }
+.fsel:hover, .finp:hover { border-color: rgba(95,176,194,.55) !important; }
 .fsel:focus, .finp:focus {
   border-color: var(--mx-teal) !important;
-  box-shadow: 0 0 0 4px rgba(14,157,184,.14) !important;
+  box-shadow: 0 0 0 3px rgba(58,143,163,.12) !important;
   outline: none !important;
 }
-.f-clear {
-  border-radius: 999px !important;
-  transition: all .25s var(--mx-ease) !important;
-}
-.f-clear:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -4px rgba(200,40,60,.4); }
+.f-clear { border-radius: 999px !important; }
 
-/* ─── الجداول: رؤوس متدرجة + صفوف تفاعلية ─── */
+/* ─── الجداول: رؤوس داكنة هادئة بنص أبيض واضح (تباين مضمون) ─── */
 .tbl-wrap { border-radius: var(--r-lg) !important; }
-table thead th {
-  background: linear-gradient(180deg,#f2f8fb,#e8f1f6) !important;
+thead th, table thead th {
+  background: linear-gradient(180deg, #23485a 0%, #1d3d4d 100%) !important;
+  color: rgba(255,255,255,.95) !important;
   font-weight: 800 !important;
-  border-bottom: 2px solid rgba(14,157,184,.25) !important;
+  border-bottom: 2px solid rgba(95,176,194,.35) !important;
 }
-table tbody tr { transition: background .18s, transform .18s; }
-table tbody tr:nth-child(even) { background: rgba(14,157,184,.03); }
-table tbody tr:hover {
-  background: linear-gradient(90deg, rgba(34,195,221,.08), rgba(79,109,245,.06)) !important;
-}
+table tbody tr { transition: background .15s; }
+table tbody tr:nth-child(even) td { background: #f7fafc; }
+table tbody tr:hover td { background: rgba(95,176,194,.08) !important; }
 
-/* ─── الأزرار والشارات ─── */
-.export-btn, .pag-btn, .map-ctrl-btn {
-  border-radius: 999px !important;
-  transition: all .22s var(--mx-ease) !important;
-}
-.export-btn:hover, .pag-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -6px rgba(7,42,58,.3); }
+/* ─── أزرار وشارات ─── */
+.export-btn, .pag-btn, .map-ctrl-btn { border-radius: 999px !important; transition: background .2s, box-shadow .2s !important; }
+.export-btn:hover, .pag-btn:hover { box-shadow: 0 4px 12px -6px rgba(18,48,63,.25); }
 .badge, .pill { border-radius: 999px !important; font-weight: 700 !important; }
 
-/* ─── سكرول بار حديث ─── */
+/* ─── سكرول بار ─── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(var(--mx-teal), var(--mx-indigo));
-  border-radius: 999px; border: 2px solid #eef3f8;
-}
+::-webkit-scrollbar-thumb { background: #b9ccd7; border-radius: 999px; border: 2px solid #f1f4f7; }
+::-webkit-scrollbar-thumb:hover { background: #9db6c4; }
 
-/* ─── دخول ناعم للبطاقات ─── */
-@keyframes mxFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-.panel.active .card, .panel.active .kpi, .kpi-grid .kpi {
-  animation: mxFadeUp .45s var(--mx-ease) both;
-}
-.kpi-grid .kpi:nth-child(2){animation-delay:.05s}
-.kpi-grid .kpi:nth-child(3){animation-delay:.10s}
-.kpi-grid .kpi:nth-child(4){animation-delay:.15s}
-.kpi-grid .kpi:nth-child(5){animation-delay:.20s}
-.kpi-grid .kpi:nth-child(6){animation-delay:.25s}
+/* ─── دخول ناعم وخفيف ─── */
+@keyframes mxFadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.panel.active .card, .kpi-grid .kpi { animation: mxFadeUp .35s var(--mx-ease) both; }
+.kpi-grid .kpi:nth-child(2){animation-delay:.04s}
+.kpi-grid .kpi:nth-child(3){animation-delay:.08s}
+.kpi-grid .kpi:nth-child(4){animation-delay:.12s}
+.kpi-grid .kpi:nth-child(5){animation-delay:.16s}
+.kpi-grid .kpi:nth-child(6){animation-delay:.20s}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Calm Slate — استكمال تحسين UI/UX
+   نوافذ منبثقة · قوائم منسدلة · حالات فارغة · تحميل · شرائح · استجابة
+   ════════════════════════════════════════════════════════════════ */
+
+/* النوافذ المنبثقة (KPI Modal + لوحة تفاصيل المدرسة) */
+.ix-kpi-overlay { background: rgba(14,32,42,.45) !important; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.ix-kpi-modal {
+  border-radius: 20px !important;
+  border: 1px solid #e2eaf0 !important;
+  box-shadow: 0 24px 64px -16px rgba(14,32,42,.35) !important;
+  overflow: hidden;
+  animation: mxModalIn .28s var(--mx-ease) both;
+}
+@keyframes mxModalIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.ix-kpi-modal-head { background: linear-gradient(120deg, #16394b, #1d4459) !important; }
+.ix-kpi-modal-close { border-radius: 999px !important; transition: background .2s; }
+.ix-kpi-modal-close:hover { background: rgba(255,255,255,.15) !important; }
+
+/* القوائم المنسدلة: سهم حديث موحّد */
+.fsel, select {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235f7d95' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: left 12px center !important;
+  padding-left: 30px !important;
+}
+
+/* حالات فارغة وتحميل — أهدأ وأوضح */
+.empty-state, .empty-msg {
+  border: 1.5px dashed #d5e0e8 !important;
+  border-radius: 16px !important;
+  background: #fafcfd !important;
+  color: var(--tx-muted) !important;
+}
+.loading-placeholder { border-radius: 16px !important; }
+@keyframes mxShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.loading-placeholder, .empty-state-icon {
+  background-image: linear-gradient(90deg, #f2f6f9 25%, #e9eff4 50%, #f2f6f9 75%);
+  background-size: 200% 100%;
+  animation: mxShimmer 1.6s linear infinite;
+}
+
+/* شرائح المستويات (tier strip) — ألوان أهدأ */
+.tier-seg { border-radius: 14px !important; transition: box-shadow .2s !important; }
+.tier-seg:hover { box-shadow: 0 6px 16px -8px rgba(18,48,63,.18); }
+
+/* التوست */
+.toast { border-radius: 14px !important; box-shadow: 0 10px 28px -10px rgba(14,32,42,.3) !important; backdrop-filter: blur(8px); }
+
+/* الصفوف القابلة للنقر */
+.school-row { border-radius: 12px !important; transition: background .15s, transform .15s !important; }
+.school-row:hover { background: rgba(95,176,194,.08) !important; }
+
+/* توحيد العناوين والمسافات */
+.card-title .sub { font-weight: 600; opacity: .75; }
+.g2, .g3, .g4 { gap: 14px !important; }
+.mb14 { margin-bottom: 14px !important; }
+
+/* استجابة أفضل للشاشات الصغيرة */
+@media (max-width: 900px) {
+  .g2, .g3, .g4 { grid-template-columns: 1fr !important; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .filters-row { position: static !important; }
+  .tabs { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; }
+}
+@media (max-width: 560px) {
+  .kpi-grid { grid-template-columns: 1fr !important; }
+  .kpi-val { font-size: 26px !important; }
+  .ix-kpi-modal { width: 96vw !important; max-height: 88vh !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   طبقة "Power BI Look" — ظلال وعمق بأسلوب Microsoft Fluent
+   نفس إحساس تقارير Power BI: خلفية رمادية فاتحة محايدة،
+   بطاقات بيضاء مرتفعة بظل Fluent مزدوج (حاد قريب + ناعم بعيد)،
+   ارتفاع أعلى عند التحويم، وفواصل رفيعة تحت عناوين البطاقات.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ظلال Fluent Depth المستخدمة في Power BI */
+  --pbi-d4:  0 1.6px 3.6px rgba(0,0,0,.132), 0 .3px .9px rgba(0,0,0,.108);
+  --pbi-d8:  0 3.2px 7.2px rgba(0,0,0,.132), 0 .6px 1.8px rgba(0,0,0,.108);
+  --pbi-d16: 0 6.4px 14.4px rgba(0,0,0,.132), 0 1.2px 3.6px rgba(0,0,0,.108);
+  --pbi-d64: 0 25.6px 57.6px rgba(0,0,0,.22), 0 4.8px 14.4px rgba(0,0,0,.18);
+}
+
+/* خلفية التقرير: رمادي Power BI المحايد */
+body, html {
+  background: #eaeef2 !important;
+}
+
+/* البطاقات = Visuals مرتفعة */
+.card, .chart-box, .contract-card, .kpi, .filters-row, .tabs {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,.045) !important;
+  box-shadow: var(--pbi-d4) !important;
+  border-radius: 12px !important;
+}
+.card:hover, .chart-box:hover, .kpi:hover {
+  box-shadow: var(--pbi-d16) !important;
+  border-color: rgba(0,0,0,.06) !important;
+  transform: translateY(-2px);
+}
+.chart-box { box-shadow: none !important; border: none !important; } /* لا ظل مزدوج داخل البطاقة */
+.chart-box:hover { box-shadow: none !important; transform: none; }
+
+/* عنوان البطاقة بأسلوب Visual Header في Power BI */
+.card-title {
+  font-size: 13px !important;
+  padding-bottom: 10px !important;
+  margin-bottom: 12px !important;
+  border-bottom: 1px solid #eef1f4 !important;
+}
+.card-title::before { height: 14px; }
+
+/* KPI Cards بإحساس بطاقات Power BI */
+.kpi { border-radius: 12px !important; }
+.kpi:hover { transform: translateY(-2px); }
+.kpi::before { height: 3px; }
+
+/* الشريط العلوي أعمق قليلاً */
+.topbar { box-shadow: var(--pbi-d8) !important; }
+
+/* التبويبات: شريط أدوات مرتفع */
+.tabs { box-shadow: var(--pbi-d4) !important; }
+.tab.active { box-shadow: var(--pbi-d8) !important; }
+
+/* الفلاتر: لوحة Filters مرتفعة */
+.filters-row { box-shadow: var(--pbi-d4) !important; }
+.fsel:focus, .finp:focus { box-shadow: var(--pbi-d4), 0 0 0 3px rgba(58,143,163,.14) !important; }
+
+/* الجداول داخل حاوية مرتفعة */
+.tbl-wrap { box-shadow: var(--pbi-d4) !important; border-radius: 10px !important; }
+
+/* النوافذ المنبثقة: أعلى مستوى عمق مثل Dialogs في Fluent */
+.ix-kpi-modal { box-shadow: var(--pbi-d64) !important; }
+
+/* التوست */
+.toast { box-shadow: var(--pbi-d16) !important; }
+
+/* أزرار التصدير والتحكم */
+.export-btn, .pag-btn, .map-ctrl-btn { box-shadow: var(--pbi-d4); }
+.export-btn:hover, .pag-btn:hover { box-shadow: var(--pbi-d8); transform: translateY(-1px); }
+
+/* ════════════════════════════════════════════════════════════════
+   لوحة معلومات المدرسة (Information Panel) — تحديث شامل
+   أسلوب Power BI / Fluent: رأس أنظف، بطاقات معلومات مرتّبة،
+   بطاقات درجات بارزة، عقود على شكل كروت، وتمرير أنيق.
+   ════════════════════════════════════════════════════════════════ */
+
+/* الحاوية والدخول */
+.ix-school-overlay { background: rgba(10,26,36,.45) !important; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.ix-school-panel {
+  width: min(620px, 96vw) !important;
+  background: #f6f8fa !important;
+  border-right: none !important;
+  box-shadow: var(--pbi-d64) !important;
+  transition: transform .32s cubic-bezier(.22,.8,.3,1) !important;
+}
+
+/* الرأس: تدرج هادئ + خط توهج سفلي + اسم أكبر */
+.ix-panel-head {
+  padding: 22px 26px 18px !important;
+  background: linear-gradient(130deg, #12303f 0%, #1b4356 55%, #235068 100%) !important;
+  position: relative;
+}
+.ix-panel-head::after {
+  content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(95,176,194,.7), transparent);
+}
+.ix-panel-school-name { font-size: 18px !important; letter-spacing: -.2px; }
+.ix-panel-badge {
+  background: rgba(255,255,255,.10) !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+  backdrop-filter: blur(4px);
+  padding: 4px 13px !important;
+}
+.ix-panel-close {
+  width: 34px !important; height: 34px !important;
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  transition: background .2s, transform .2s !important;
+}
+.ix-panel-close:hover { background: rgba(255,255,255,.25) !important; transform: rotate(90deg); }
+
+/* الجسم */
+.ix-panel-body { padding: 20px 22px 28px !important; }
+.ix-panel-body::-webkit-scrollbar { width: 8px; }
+.ix-panel-body::-webkit-scrollbar-thumb { background: #c3d2dc; border-radius: 999px; }
+
+/* عناوين الأقسام: شريط جانبي ملون بدل الخط الباهت */
+.ix-section-title {
+  font-size: 11px !important;
+  color: #35586c !important;
+  margin: 22px 0 10px !important;
+  padding: 0 0 0 0 !important;
+  border-bottom: none !important;
+}
+.ix-section-title::before {
+  content: ""; width: 4px; height: 14px; border-radius: 4px;
+  background: var(--mx-grad); display: inline-block;
+}
+
+/* بطاقات المعلومات: كروت بيضاء بظل Fluent وهوفر خفيف */
+.ix-info-item, .ix-info-item2 {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,.05) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pbi-d4) !important;
+  padding: 12px 14px !important;
+  transition: box-shadow .2s, transform .2s !important;
+}
+.ix-info-item:hover, .ix-info-item2:hover { box-shadow: var(--pbi-d8) !important; transform: translateY(-1px); }
+.ix-info-lbl, .ix-info-lbl2 { font-size: 10px !important; letter-spacing: .03em; text-transform: uppercase; }
+.ix-info-val, .ix-info-val2 { font-size: 14px !important; }
+
+/* بطاقات الدرجات (FCA / البيئة / عاين): بارزة بشريط لون علوي */
+.ix-score-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,.05) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--pbi-d4) !important;
+  position: relative; overflow: hidden;
+  transition: box-shadow .2s, transform .2s !important;
+}
+.ix-score-card::before {
+  content: ""; position: absolute; inset-inline: 0; top: 0; height: 3px;
+  background: var(--ix-sc-color, var(--mx-teal));
+}
+.ix-score-card:hover { box-shadow: var(--pbi-d16) !important; transform: translateY(-2px); }
+.ix-score-val { font-size: 22px !important; font-weight: 900 !important; color: var(--ix-sc-color, var(--mx-navy)) !important; letter-spacing: -.4px; }
+.ix-score-bar2 { height: 7px !important; border-radius: 999px !important; background: #edf2f6 !important; }
+.ix-score-fill2 { border-radius: 999px !important; background: var(--ix-sc-color, var(--mx-teal)) !important; }
+
+/* صفوف العقود: كروت واضحة */
+.ix-contract-row {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,.05) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--pbi-d4) !important;
+  padding: 12px 14px !important;
+  margin-bottom: 8px !important;
+  transition: box-shadow .2s !important;
+}
+.ix-contract-row:hover { box-shadow: var(--pbi-d8) !important; }
+.ix-contract-type { font-weight: 800 !important; color: #23485a !important; }
+.ix-contract-num {
+  display: inline-block; background: #eef4f8; color: #2f6f84;
+  border-radius: 8px; padding: 2px 10px; font-weight: 700; font-size: 11px; margin-top: 4px;
+}
+
+/* أزرار الأكشن أعلى اللوحة */
+.ix-action-row { gap: 8px !important; margin-bottom: 16px !important; }
+.ix-action-btn {
+  border-radius: 999px !important;
+  border: 1px solid #dbe5ec !important;
+  background: #ffffff !important;
+  box-shadow: var(--pbi-d4) !important;
+  font-weight: 700 !important;
+  transition: box-shadow .2s, transform .2s, background .2s !important;
+}
+.ix-action-btn:hover { box-shadow: var(--pbi-d8) !important; transform: translateY(-1px); }
+.ix-action-btn.ix-btn-primary {
+  background: var(--mx-grad) !important;
+  color: #fff !important; border: none !important;
+}
+.ix-btn-copied { background: #4fa084 !important; color: #fff !important; border: none !important; }
+
+/* الخريطة المصغرة داخل اللوحة */
+.ix-mini-map-wrap, .ix-mini-map {
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,.06) !important;
+  box-shadow: var(--pbi-d4) !important;
+}
+
+/* استجابة الموبايل */
+@media (max-width: 640px) {
+  .ix-school-panel { width: 100vw !important; }
+  .ix-info-grid, .ix-info-grid2 { grid-template-columns: 1fr 1fr !important; }
+  .ix-panel-body { padding: 16px 14px 24px !important; }
 }

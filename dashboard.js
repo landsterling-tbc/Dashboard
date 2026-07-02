@@ -13199,7 +13199,7 @@ ${JSON.stringify(priorityData)}`;
     TT.backgroundColor = "rgba(6, 30, 42, .94)";
     TT.titleColor = "#fff";
     TT.bodyColor = "rgba(255,255,255,.82)";
-    TT.borderColor = "rgba(34,195,221,.45)";
+    TT.borderColor = "rgba(95,176,194,.4)";
     TT.borderWidth = 1;
     TT.padding = 14;
     TT.cornerRadius = 14;
@@ -13212,7 +13212,7 @@ ${JSON.stringify(priorityData)}`;
 
     C.defaults.font.family = "'IBM Plex Sans Arabic', Tajawal, sans-serif";
     C.defaults.animation = C.defaults.animation || {};
-    C.defaults.animation.duration = 650;
+    C.defaults.animation.duration = 500;
     C.defaults.animation.easing = "easeOutQuart";
 
     // أعمدة بزوايا دائرية افتراضياً + شبكة أنعم
@@ -13223,7 +13223,7 @@ ${JSON.stringify(priorityData)}`;
     if (C.defaults.elements && C.defaults.elements.arc) {
       C.defaults.elements.arc.borderWidth = 2;
       C.defaults.elements.arc.borderColor = "#ffffff";
-      C.defaults.elements.arc.hoverOffset = 8;
+      C.defaults.elements.arc.hoverOffset = 5;
     }
     if (C.defaults.elements && C.defaults.elements.line) {
       C.defaults.elements.line.tension = 0.35;
@@ -13237,9 +13237,309 @@ ${JSON.stringify(priorityData)}`;
     }
     C.defaults.scale = C.defaults.scale || {};
     C.defaults.scale.grid = Object.assign({}, C.defaults.scale.grid, {
-      color: "rgba(14,157,184,.08)",
+      color: "rgba(95,125,149,.08)",
       drawTicks: false,
     });
     C.defaults.scale.border = Object.assign({}, C.defaults.scale.border, { display: false });
   });
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   تبسيط الرسوم المشتتة (Scatter Simplifier)
+   أي رسم من نوع scatter (آلاف النقاط المتراكمة) يتحول تلقائياً إلى
+   أعمدة "متوسط لكل شريحة": نقسم المحور الأفقي إلى شرائح 10%،
+   ونعرض متوسط القيمة وعدد المدارس في كل شريحة — أوضح وأسهل قراءة.
+   لا يغيّر البيانات الأصلية ولا أي منطق آخر.
+   ════════════════════════════════════════════════════════════════ */
+(function () {
+  function whenChartReady(fn) {
+    if (window.Chart) return fn();
+    var t = setInterval(function () {
+      if (window.Chart) { clearInterval(t); fn(); }
+    }, 100);
+  }
+
+  whenChartReady(function () {
+    var Orig = window.Chart;
+
+    function tierColor(avg) {
+      if (avg == null) return "rgba(150,165,175,.55)";
+      if (avg < 25) return "rgba(192,90,104,.75)";   // أحمر هادئ
+      if (avg < 50) return "rgba(209,151,90,.75)";   // كهرماني هادئ
+      if (avg < 75) return "rgba(79,160,132,.75)";   // أخضر هادئ
+      return "rgba(58,143,163,.78)";                 // Teal هادئ
+    }
+
+    function simplifyScatter(config) {
+      try {
+        var datasets = (config.data && config.data.datasets) || [];
+        var pts = [];
+        datasets.forEach(function (ds) {
+          (ds.data || []).forEach(function (p) {
+            if (p && p.x != null && p.y != null && isFinite(p.x) && isFinite(p.y)) pts.push(p);
+          });
+        });
+        if (pts.length < 30) return config; // القليل من النقاط مقروء كما هو
+
+        // نطاق المحور الأفقي وتقسيمه إلى 10 شرائح
+        var xs = pts.map(function (p) { return p.x; });
+        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        if (minX === maxX) return config;
+        var BINS = 10, step = (maxX - minX) / BINS;
+        var sums = new Array(BINS).fill(0), cnts = new Array(BINS).fill(0);
+        pts.forEach(function (p) {
+          var i = Math.min(BINS - 1, Math.floor((p.x - minX) / step));
+          sums[i] += p.y; cnts[i]++;
+        });
+
+        var labels = [], avgs = [], counts = [];
+        for (var i = 0; i < BINS; i++) {
+          var a = minX + i * step, b = a + step;
+          labels.push(Math.round(a) + "–" + Math.round(b));
+          avgs.push(cnts[i] ? +(sums[i] / cnts[i]).toFixed(1) : null);
+          counts.push(cnts[i]);
+        }
+
+        var opts = config.options || {};
+        var xTitle = opts.scales && opts.scales.x && opts.scales.x.title && opts.scales.x.title.text || "";
+        var yTitle = opts.scales && opts.scales.y && opts.scales.y.title && opts.scales.y.title.text || "المتوسط";
+
+        return {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: yTitle ? "متوسط " + yTitle : "المتوسط",
+              data: avgs,
+              backgroundColor: avgs.map(tierColor),
+              borderRadius: 8,
+              borderSkipped: false,
+              maxBarThickness: 54,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    return (xTitle ? xTitle + ": " : "الشريحة: ") + items[0].label;
+                  },
+                  label: function (ctx) {
+                    var i = ctx.dataIndex;
+                    return [
+                      (yTitle ? "متوسط " + yTitle : "المتوسط") + ": " + (avgs[i] == null ? "—" : avgs[i]),
+                      "عدد المدارس: " + counts[i].toLocaleString(),
+                    ];
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { title: { display: !!xTitle, text: xTitle }, grid: { display: false } },
+              y: { beginAtZero: true, title: { display: true, text: yTitle } },
+            },
+          },
+        };
+      } catch (_) {
+        return config;
+      }
+    }
+
+    function Patched(ctx, config) {
+      if (config && config.type === "scatter") config = simplifyScatter(config);
+      return new Orig(ctx, config);
+    }
+    Patched.prototype = Orig.prototype;
+    Object.setPrototypeOf(Patched, Orig);
+    for (var k in Orig) { try { Patched[k] = Orig[k]; } catch (_) {} }
+    window.Chart = Patched;
+  });
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   تبويب تحليل FCA — طبقة ذكية:
+   • أي رسم بلا بيانات (الحي/المرحلة/حجم المدرسة) تُخفى بطاقته بالكامل
+     بدل عرض "No Data".
+   • تُضاف بدائل مفيدة تعتمد فقط على البيانات المتوفرة فعلياً:
+     توزيع مستويات FCA، توزيع الدرجات، ومتوسط FCA حسب أي بُعد متاح
+     (الملكية، الجنس، المحافظة، نوع الارتباط، حالة الاشتراك).
+   لا تغيّر أي منطق أصلي — تعمل بعد الرسم الأصلي مباشرة.
+   ════════════════════════════════════════════════════════════════ */
+(function () {
+  var orig = null;
+  function hook() {
+    if (typeof window.renderFcaCharts !== "function") return setTimeout(hook, 300);
+    if (window.renderFcaCharts.__mxWrapped) return;
+    orig = window.renderFcaCharts;
+    var wrapped = function () {
+      orig.apply(this, arguments);
+      try { mxFcaFixup(); } catch (e) { console.warn("[mx-fca]", e); }
+    };
+    wrapped.__mxWrapped = true;
+    window.renderFcaCharts = wrapped;
+  }
+  hook();
+
+  function mean(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
+  function tCol(v) { try { return (window.tierColor && window.tierColor(v)) || "#5f7d95"; } catch (_) { return "#5f7d95"; } }
+  function kill(id) { try { window.killChart && window.killChart(id); } catch (_) {} try { if (window.CHARTS && window.CHARTS[id]) { window.CHARTS[id].destroy(); delete window.CHARTS[id]; } } catch (_) {} }
+
+  function groupAvg(D, key) {
+    var m = {};
+    D.forEach(function (r) {
+      var k = r[key], f = r.fca;
+      if (k == null || f == null) return;
+      k = String(k).trim();
+      if (!k || k === "—" || k === "#N/A") return;
+      (m[k] || (m[k] = [])).push(f);
+    });
+    return Object.keys(m).map(function (k) { return { k: k, a: mean(m[k]), n: m[k].length }; })
+      .sort(function (a, b) { return b.a - a.a; });
+  }
+
+  function setCardVisible(canvasId, visible) {
+    var el = document.getElementById(canvasId);
+    if (!el) return;
+    var card = el.closest(".card");
+    if (card) card.style.display = visible ? "" : "none";
+    // لو صف grid فرغ بالكامل نطويه
+    if (card && card.parentElement) {
+      var row = card.parentElement;
+      var anyVisible = Array.prototype.some.call(row.children, function (c) { return c.style.display !== "none"; });
+      if (row.classList.contains("g2") || row.classList.contains("g3")) row.style.display = anyVisible ? "" : "none";
+    }
+  }
+
+  function mxFcaFixup() {
+    var D = window.FILTERED || [];
+    var withF = D.filter(function (r) { return r.fca != null; });
+
+    // 1) إخفاء الرسوم الأصلية الفارغة
+    var distOK  = groupAvg(D, "district").length   >= 2;
+    var stageOK = groupAvg(D, "stage").length      >= 2;
+    var sizeOK  = groupAvg(D, "schoolSize").length >= 2;
+    setCardVisible("ch-fca-dist",  distOK);
+    setCardVisible("ch-fca-stage", stageOK);
+    setCardVisible("ch-fca-size",  sizeOK);
+
+    // 2) حاوية البدائل
+    var tab = document.getElementById("tab-fca");
+    if (!tab) return;
+    var box = document.getElementById("fca-extra");
+    if (!box) { box = document.createElement("div"); box.id = "fca-extra"; tab.appendChild(box); }
+    box.innerHTML = "";
+    if (!withF.length) return;
+
+    var cards = [];
+
+    // (أ) توزيع مستويات FCA — دائماً متاح
+    var tiers = [
+      { lbl: "حرج · 0–24%",     f: function (v) { return v < 25; },            c: "#c05a68" },
+      { lbl: "متوسط · 25–49%",  f: function (v) { return v >= 25 && v < 50; }, c: "#d1975a" },
+      { lbl: "جيد · 50–74%",    f: function (v) { return v >= 50 && v < 75; }, c: "#4fa084" },
+      { lbl: "جيد جداً · 75–100%", f: function (v) { return v >= 75; },        c: "#3a8fa3" },
+    ];
+    cards.push({
+      title: "توزيع مستويات FCA", sub: withF.length.toLocaleString() + " مدرسة", h: 280,
+      draw: function (id) {
+        kill(id);
+        window.CHARTS[id] = new Chart(document.getElementById(id), {
+          type: "doughnut",
+          data: {
+            labels: tiers.map(function (t) { return t.lbl; }),
+            datasets: [{
+              data: tiers.map(function (t) { return withF.filter(function (r) { return t.f(r.fca); }).length; }),
+              backgroundColor: tiers.map(function (t) { return t.c + "CC"; }),
+              borderColor: "#fff", borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, cutout: "62%",
+            plugins: { legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", padding: 14, font: { size: 11 } } } },
+          },
+        });
+      },
+    });
+
+    // (ب) توزيع درجات FCA — هستوجرام 10 شرائح
+    cards.push({
+      title: "توزيع درجات FCA", sub: "شرائح 10%", h: 280,
+      draw: function (id) {
+        kill(id);
+        var bins = new Array(10).fill(0);
+        withF.forEach(function (r) { bins[Math.min(9, Math.floor(r.fca / 10))]++; });
+        window.CHARTS[id] = new Chart(document.getElementById(id), {
+          type: "bar",
+          data: {
+            labels: bins.map(function (_, i) { return (10 * i) + "–" + (10 * i + 10) + "%"; }),
+            datasets: [{ label: "عدد المدارس", data: bins,
+              backgroundColor: bins.map(function (_, i) { return tCol(10 * i + 5) + "B3"; }),
+              borderRadius: 8, borderSkipped: false, maxBarThickness: 48 }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false } }, y: { beginAtZero: true, title: { display: true, text: "عدد المدارس" } } },
+          },
+        });
+      },
+    });
+
+    // (ج) متوسط FCA حسب أي بُعد متوفر فعلياً في البيانات
+    [
+      ["ownership", "متوسط FCA حسب الملكية"],
+      ["gender", "متوسط FCA حسب الجنس"],
+      ["sector", "متوسط FCA حسب المحافظة"],
+      ["linkType", "متوسط FCA حسب نوع الارتباط"],
+      ["subscriptionStatus", "متوسط FCA حسب حالة الاشتراك"],
+    ].forEach(function (dim) {
+      var g = groupAvg(D, dim[0]).slice(0, 15);
+      if (g.length < 2) return; // لا نعرض بُعداً بلا بيانات
+      cards.push({
+        title: dim[1], sub: g.length + (g.length > 2 ? " فئات" : " فئتان"), h: 280,
+        draw: function (id) {
+          kill(id);
+          window.CHARTS[id] = new Chart(document.getElementById(id), {
+            type: "bar",
+            data: {
+              labels: g.map(function (x) { return x.k; }),
+              datasets: [{ label: "متوسط FCA", data: g.map(function (x) { return +x.a.toFixed(1); }),
+                backgroundColor: g.map(function (x) { return tCol(x.a) + "B3"; }),
+                borderRadius: 8, borderSkipped: false, maxBarThickness: 52 }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function (c) { return ["متوسط FCA: " + c.formattedValue + "%", "عدد المدارس: " + g[c.dataIndex].n.toLocaleString()]; } } },
+              },
+              scales: { x: { grid: { display: false } }, y: { beginAtZero: true, max: 100, title: { display: true, text: "متوسط FCA (%)" } } },
+            },
+          });
+        },
+      });
+    });
+
+    // 3) بناء الشبكة ورسمها
+    var html = "";
+    for (var i = 0; i < cards.length; i += 2) {
+      html += '<div class="g2 mb14">';
+      [cards[i], cards[i + 1]].forEach(function (c, j) {
+        if (!c) return;
+        var id = "mx-fca-x" + (i + j);
+        c._id = id;
+        html += '<div class="card"><div class="card-title">' + c.title +
+          (c.sub ? ' <span class="sub">' + c.sub + "</span>" : "") +
+          '</div><div class="chart-box" style="height:' + c.h + 'px"><canvas id="' + id + '"></canvas></div></div>';
+      });
+      html += "</div>";
+    }
+    box.innerHTML = html;
+    requestAnimationFrame(function () {
+      cards.forEach(function (c) { try { c.draw(c._id); } catch (e) { console.warn("[mx-fca]", c.title, e); } });
+    });
+  }
 })();

@@ -236,8 +236,13 @@ const CFG = {
     // اتركه فارغاً لو البلاغات في نفس الـ GAS_URL كشيت منفصلة
     // أو ضع رابط CSV مباشر من Google Drive: ?export&format=csv
     BALAGH_SHEET_KEY: "balaghReports", // المفتاح في SHEET_NAMES
-    OPENAI_MODEL: "gpt-5.4-mini", // الموديل الافتراضي لو المستخدم لم يحدد موديل آخر في الإعدادات
+    OPENAI_MODEL: "gpt-4o-mini", // الموديل الافتراضي لو المستخدم لم يحدد موديل آخر في الإعدادات
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
+    // 🔒 رابط الوسيط (Proxy) على Deno Deploy — يحتفظ بمفتاح OpenAI بأمان
+    // في الباك إند بدل أن يدخله كل مستخدم بنفسه. عند تعبئة هذا الرابط،
+    // AIService.chat يرسل الطلبات هنا بدل OpenAI مباشرة، ولا حاجة لأي
+    // مفتاح داخل المتصفح إطلاقاً.
+    PROXY_URL: "https://stark-bongo-8712.landsterling-tbc.deno.net",
   },
   COLS = {
     minId: ["minId"],
@@ -2815,13 +2820,15 @@ function renderTable() {
         function normId(v) {
           return String(v ?? "").replace(/\uFEFF/g, "").trim().replace(/\.0+$/, "").toUpperCase();
         }
-        // نسخة بدون S- prefix
+        // نسخة بدون أي بادئة حروف (S- / M / S-M / أي حرفين أو حرف + شرطة) — يبقى الرقم الصافي فقط
+        // هذا يحل مشكلة أن نفس المدرسة قد تظهر بصيغ: 32427 / S-32427 / M32427 / S-M32427
         function normIdPlain(v) {
           const k = normId(v);
-          return k.startsWith("S-") ? k.slice(2) : k;
+          // نشيل أي بادئة غير رقمية بالكامل (S- / M / S-M ...) حتى يبقى الرقم الصافي فقط
+          return k.replace(/^[^0-9]+/, "");
         }
 
-        // بناء خريطتين: بالرقم كما هو + بدون S-
+        // بناء خريطتين: بالرقم كما هو + بدون البادئة (الرقم الصافي هو المفتاح الأساسي للربط)
         const alertsMap = {};
         const alertsMapPlain = {};
         balaghRaw.forEach((row) => {
@@ -2829,17 +2836,16 @@ function renderTable() {
           if (!sn) return;
           alertsMap[sn] = (alertsMap[sn] || 0) + 1;
           const plain = normIdPlain(row["رقم المدرسة"]);
-          if (plain !== sn) alertsMapPlain[plain] = (alertsMapPlain[plain] || 0) + 1;
+          if (plain) alertsMapPlain[plain] = (alertsMapPlain[plain] || 0) + 1;
         });
 
-        // تحديث حقل alerts في كل مدرسة في RAW — يجرب الأشكال المختلفة للرقم
+        // تحديث حقل alerts في كل مدرسة في RAW — نطابق أولاً بالرقم الصافي (بدون بادئة) ثم بالشكل الكامل
         let patched = 0;
         RAW.forEach((r) => {
           const id = normId(r.minId || r.schoolSeq);
           if (!id) { r.alerts = 0; return; }
           const idPlain = normIdPlain(r.minId || r.schoolSeq);
-          const count = alertsMap[id] ?? alertsMapPlain[idPlain] ??
-                        alertsMap["S-" + idPlain] ?? alertsMapPlain[id.replace(/^S-/i, "")] ?? null;
+          const count = alertsMapPlain[idPlain] ?? alertsMap[id] ?? null;
           r.alerts = count != null ? count : 0;
           if (count != null) patched++;
         });
@@ -6151,23 +6157,36 @@ function _sysExcelTableHTML(title, headers, rows) {
     return s;
   }
 
+  // ── الرقم الصافي بدون أي بادئة حروف (S- / M / S-M / أي حرف أو حرفين + شرطة اختيارية) ──
+  // نفس المدرسة قد تُكتب بصيغ مختلفة حسب مصدر الملف: 32427 / S-32427 / M32427 / S-M32427
+  // نعتمد الرقم الصافي كمفتاح الربط الأساسي حتى تُحتسب كل هذه الصيغ كمدرسة واحدة
+  function coreSchoolNo(v) {
+    const s = normSchoolNo(v).toUpperCase();
+    // نشيل أي بادئة غير رقمية بالكامل (حرف واحد أو أكثر + شرطات، مثل S- أو M أو S-M)
+    return s.replace(/^[^0-9]+/, "");
+  }
+
   // ── خريطة المدارس (من RAW: المباني) بالرقم الوزاري، لربط كل بلاغ بمدرسته ──
   function buildSchoolByMinIdMap() {
-    const map = {};
+    const map = {};       // مفاتيح كاملة كما هي (احتياطي)
+    const coreMap = {};   // مفاتيح بالرقم الصافي فقط — المصدر الأساسي للربط
     (Array.isArray(RAW) ? RAW : []).forEach((s) => {
       // نسجّل الرقم بأشكاله المختلفة لضمان أعلى نسبة ربط
       const keys = new Set();
       [s.minId, s.schoolSeq, s.mainMinId, s.buildingSeq].forEach(v => {
         const k = normSchoolNo(v);
         if (k) keys.add(k);
-        // بدون S- prefix (لو كان S-12345 نضيف 12345 أيضاً)
-        if (k && k.toUpperCase().startsWith("S-")) keys.add(k.slice(2));
-        // مع S- prefix (لو كان 12345 نضيف S-12345 أيضاً)
-        if (k && !k.toUpperCase().startsWith("S-") && /^\d/.test(k)) keys.add("S-" + k);
+        const core = coreSchoolNo(v);
+        if (core && !coreMap[core]) coreMap[core] = s;
       });
       keys.forEach(k => { if (!map[k]) map[k] = s; });
     });
-    return map;
+    // نعرض خريطة موحّدة: الأولوية للرقم الصافي (يغطي كل الصيغ)، ثم الشكل الكامل كاحتياط
+    return new Proxy({}, {
+      get(_, key) {
+        return coreMap[coreSchoolNo(key)] ?? map[String(key)] ?? undefined;
+      }
+    });
   }
 
   function normalizeRows() {
@@ -6182,6 +6201,12 @@ function _sysExcelTableHTML(title, headers, rows) {
         const creationDateObj = parseBalaghDate(created);
         const schoolNumber = norm(r["رقم المدرسة"]);
         const linkedSchool = schoolByMinId[normSchoolNo(schoolNumber)] || null;
+        // مفتاح موحّد لتجميع/عدّ البلاغات لكل مدرسة — يعتمد الرقم الوزاري المرتبط إن وُجد
+        // (نفس المدرسة بصيغ مختلفة: 32427 / S-32427 / M32427 / S-M32427 تُحسب كمدرسة واحدة)
+        // وإلا الرقم الصافي بعد إزالة أي بادئة، وإلا اسم المبنى كحل أخير
+        const schoolKey = linkedSchool
+          ? ("ID::" + linkedSchool.minId)
+          : (coreSchoolNo(schoolNumber) ? ("ID::" + coreSchoolNo(schoolNumber)) : ("NM::" + norm(r["اسم المبنى"])));
         // حالة SLA — نحسب "متأخر" من حالة SLA مباشرة
         const isOverdue = slaStatus === "تم اختراقه";
         return {
@@ -6195,6 +6220,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           slaStatus,
           status,
           schoolNumber,
+          schoolKey,
           schoolName:        norm(r["اسم المبنى"]),
           // ── ربط البلاغ بسجل المدرسة (من المباني) عبر الرقم الوزاري ──
           linkedMinId:       linkedSchool ? linkedSchool.minId       : "",
@@ -6231,8 +6257,12 @@ function _sysExcelTableHTML(title, headers, rows) {
     const location = ST.location || document.getElementById("balagh-location")?.value || "";
     const dateFrom = ST.dateFrom || document.getElementById("balagh-date-from")?.value || "";
     const dateTo = ST.dateTo || document.getElementById("balagh-date-to")?.value || "";
+    const schoolKeyFilter = ST.schoolKeyFilter || "";
 
     return all.filter((r) => {
+      // فلترة دقيقة بمدرسة محدّدة (من الضغط على اسم مدرسة في "أكثر المدارس تكراراً") —
+      // تعتمد المفتاح الموحّد بدل النص الحر حتى تشمل كل صيغ رقم المدرسة لنفس المدرسة
+      if (schoolKeyFilter && r.schoolKey !== schoolKeyFilter) return false;
       if (status && r.status !== status) return false;
       if (category && r.category !== category) return false;
       if (priority && r.priority !== priority) return false;
@@ -6438,17 +6468,17 @@ function _sysExcelTableHTML(title, headers, rows) {
 
     // أكثر المدارس تكراراً: نستخدم اسم المدرسة الموحّد من الربط (إن وُجد) بدل الاسم الخام،
     // لتفادي تكرار نفس المدرسة بأكثر من اسم/تهجئة في ملف البلاغات
-    // نعد بـ schoolNumber (الرقم الثابت) لتجنب تكرار نفس المدرسة بأسماء مختلفة
-    // ونبني خريطة: schoolNumber → displayName لعرض الاسم
+    // نعد بـ schoolKey (المفتاح الموحّد) لتجنب تكرار نفس المدرسة بصيغ رقم مختلفة (S-/M/S-M/بدون بادئة) أو أسماء مختلفة
+    // ونبني خريطة: schoolKey → displayName لعرض الاسم
     const schoolNumberNameMap = {};
     rows.forEach((r) => {
-      const sn = r.schoolNumber || "";
+      const sn = r.schoolKey || "";
       if (!sn) return;
       if (!schoolNumberNameMap[sn]) {
-        schoolNumberNameMap[sn] = r.isLinked ? r.linkedSchoolName : (r.schoolName || sn);
+        schoolNumberNameMap[sn] = r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || sn);
       }
     });
-    const schoolCounts = topCounts(rows, "schoolNumber", STATE.topSchoolN || 10);
+    const schoolCounts = topCounts(rows, "schoolKey", STATE.topSchoolN || 10);
     const categoryCounts = topCounts(rows, "category", 6);
     const priorityCounts = topCounts(rows, "priority", 6);
     const locationCounts = topCounts(rows, "location", 6);
@@ -6515,7 +6545,7 @@ function _sysExcelTableHTML(title, headers, rows) {
         <div class="fg">
           <div class="fg-lbl">بحث</div>
           <input class="finp" id="balagh-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}"
-            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;renderBalaghTab()">
+            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;renderBalaghTab()">
         </div>
         <div class="fg">
           <div class="fg-lbl">الحالة</div>
@@ -6601,7 +6631,7 @@ function _sysExcelTableHTML(title, headers, rows) {
             // نستخدم data-sn بدل onclick inline لتفادي كسر الـ JS لو كان sn يحتوي '
             const safeAttr = escText(sn);
             const safeName = escText(name);
-            return `<span data-balagh-filter="${safeAttr}" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${safeName}</span>`;
+            return `<span data-balagh-filter="${safeAttr}" data-balagh-label="${safeName}" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${safeName}</span>`;
           })}
         </div>
         <div class="card">
@@ -6676,7 +6706,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           <div class="fg" style="flex:1;min-width:220px">
             <div class="fg-lbl">بحث في التفاصيل</div>
             <input class="finp" id="balagh-table-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}" style="width:100%"
-              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-search');if(s)s.value=this.value;renderBalaghTab()">
+              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-search');if(s)s.value=this.value;renderBalaghTab()">
           </div>
           <div class="fg">
             <div class="fg-lbl">الترتيب</div>
@@ -6744,14 +6774,16 @@ function _sysExcelTableHTML(title, headers, rows) {
     // === ربط data-balagh-filter بالبحث (بديل onclick inline) ===
     el.querySelectorAll("[data-balagh-filter]").forEach((span) => {
       span.addEventListener("click", function () {
-        const sn = this.dataset.balaghFilter;
-        window.__BALAGH_STATE__.search = sn;
+        const key = this.dataset.balaghFilter;   // المفتاح الموحّد (schoolKey)
+        const label = this.dataset.balaghLabel || key; // الاسم المعروض فقط للعرض في مربع البحث
+        window.__BALAGH_STATE__.schoolKeyFilter = key;
+        window.__BALAGH_STATE__.search = "";
         window.__BALAGH_STATE__.page = 0;
         renderBalaghTab();
-        // مزامنة حقلَي البحث بعد إعادة الرسم
+        // مزامنة حقلَي البحث بعد إعادة الرسم (نعرض الاسم فقط، الفلترة الفعلية تتم بالمفتاح)
         ["balagh-search", "balagh-table-search"].forEach((id) => {
           const el2 = document.getElementById(id);
-          if (el2) el2.value = sn;
+          if (el2) el2.value = label;
         });
       });
     });
@@ -10358,8 +10390,9 @@ function renderTajheezAllTable() {
     getApiKey() {
       return (localStorage.getItem("fcb_openai_key") || "").trim();
     },
-    /** هل يوجد مفتاح صالح حالياً؟ */
+    /** هل يوجد مفتاح صالح حالياً؟ (دائماً "نعم" في وضع الوسيط) */
     hasKey() {
+      if (CFG.PROXY_URL && CFG.PROXY_URL.trim()) return true;
       return this.getApiKey().length > 0;
     },
     /** اسم الموديل: المحفوظ محلياً، وإلا الافتراضي من CFG */
@@ -10386,18 +10419,27 @@ function renderTajheezAllTable() {
      * مستقبلي يُستبدل هنا فقط.
      */
     async chat(messages) {
-      const apiKey = this.getApiKey();
-      if (!apiKey) {
+      // ── وضع الوسيط (Proxy): لا حاجة لمفتاح في المتصفح ──
+      // لو PROXY_URL معبأ، نرسل كل الطلبات له مباشرة (هو يحتفظ
+      // بمفتاح OpenAI بأمان في الباك إند). في هذا الوضع لا نستخدم
+      // مفتاح المستخدم المحلي إطلاقاً حتى لو كان مدخلاً من قبل.
+      const useProxy = !!(CFG.PROXY_URL && CFG.PROXY_URL.trim());
+      const apiKey = useProxy ? null : this.getApiKey();
+      if (!useProxy && !apiKey) {
         const err = new Error("NO_API_KEY");
         err.code = "NO_API_KEY";
         throw err;
       }
-      const resp = await fetch(CFG.OPENAI_API_URL, {
+      const url = useProxy ? CFG.PROXY_URL.trim() : CFG.OPENAI_API_URL;
+      // 💡 عند استخدام الوسيط: نرسل بصيغة text/plain بدل application/json
+      // حتى يتجنب المتصفح طلب Preflight (OPTIONS) الإضافي — هذا يخفّض
+      // عدد الطلبات المستهلكة من الحد الشهري إلى النصف تقريباً.
+      // الوسيط (main.ts) مصمم ليقبل الصيغتين، فلا حاجة لتغيير أي شيء هناك.
+      const headers = useProxy ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" };
+      if (!useProxy) headers.Authorization = "Bearer " + apiKey;
+      const resp = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + apiKey,
-        },
+        headers: headers,
         body: JSON.stringify({
           model: this.getModel(),
           messages: messages,

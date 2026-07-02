@@ -1323,15 +1323,18 @@
       <div class="fcb-settings-title">⚙️ إعدادات المساعد الذكي</div>
       <div class="fcb-head-close" onclick="fcbCloseSettings()" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);">✕</div>
     </div>
-    <label class="fcb-settings-lbl">مفتاح OpenAI API (مطلوب لتفعيل المساعد الذكي الكامل)</label>
-    <input type="password" id="fcbApiKeyInput" class="fcb-settings-input" placeholder="sk-...">
-    <label class="fcb-settings-lbl">اسم الموديل</label>
-    <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-5.4-mini">
-    <div class="fcb-settings-actions">
-      <button type="button" class="fcb-settings-save" onclick="fcbSaveSettings()">💾 حفظ</button>
-      <button type="button" class="fcb-settings-clear" onclick="fcbClearSettings()">🗑️ مسح المخزّن محلياً</button>
+    <div class="fcb-settings-note" style="margin:0 0 10px;">✅ المساعد الذكي مفعّل بالكامل عبر خادم آمن — لا حاجة لإدخال أي مفتاح API.</div>
+    <div id="fcbProxyOverride" style="display:none;">
+      <label class="fcb-settings-lbl">مفتاح OpenAI API (اختياري — للاستخدام الشخصي فقط)</label>
+      <input type="password" id="fcbApiKeyInput" class="fcb-settings-input" placeholder="sk-...">
+      <label class="fcb-settings-lbl">اسم الموديل</label>
+      <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-4o-mini">
+      <div class="fcb-settings-actions">
+        <button type="button" class="fcb-settings-save" onclick="fcbSaveSettings()">💾 حفظ</button>
+        <button type="button" class="fcb-settings-clear" onclick="fcbClearSettings()">🗑️ مسح المخزّن محلياً</button>
+      </div>
+      <div class="fcb-settings-note">المفتاح يُخزَّن في متصفحك فقط (localStorage) ولا يُرسل لأي مكان عدا OpenAI مباشرة.</div>
     </div>
-    <div class="fcb-settings-note">المفتاح يُخزَّن في متصفحك فقط (localStorage) ولا يُرسل لأي مكان عدا OpenAI مباشرة.</div>
   </div>
 
   <div class="fcb-body" id="fcbBody">

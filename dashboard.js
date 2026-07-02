@@ -3968,7 +3968,6 @@ function renderKpiTabGeneric_(opts) {
             ${months.map((m) => `<th style="min-width:78px">${esc(m)}</th>`).join("")}
             <th style="min-width:90px">المتوسط</th>
             <th style="min-width:90px">التغير</th>
-            <th style="min-width:110px">التصنيف</th>
           </tr></thead>
           <tbody>
             ${stats
@@ -3979,7 +3978,6 @@ function renderKpiTabGeneric_(opts) {
               ${r.values.map((v) => `<td style="font-weight:600">${v === null ? "—" : v.toFixed(2) + "%"}</td>`).join("")}
               <td style="font-weight:700">${pctText(r.avgVal)}</td>
               <td style="font-weight:700;color:${deltaColor(r.delta || 0)}">${r.delta === null ? "—" : `${deltaArrow(r.delta)} ${deltaText(r.delta)}`}</td>
-              <td>${r.tier ? `<span style="background:${tierBg(r.last)};color:${tierColor(r.last)};border:1px solid ${tierColor(r.last)}33;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">${TIER[r.tier]?.label || "—"}</span>` : "—"}</td>
             </tr>`,
               )
               .join("")}

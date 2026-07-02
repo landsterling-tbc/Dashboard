@@ -2962,3 +2962,219 @@ tbody tr:hover td { background: rgba(12, 127, 147, 0.06) !important; }
 /* ════ حالات UX الموحّدة: Spinner + Skeleton shimmer (المرحلة 5) ════ */
 @keyframes ixspin { to { transform: rotate(360deg); } }
 @keyframes ixshimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+
+/* ════════════════════════════════════════════════════════════════
+   theme-modern.css — طبقة التحديث البصري 2026 "Aurora Glass"
+   تُحمَّل بعد dashboard.css — تنسيق بصري فقط، لا تغيّر أي IDs أو منطق.
+   لغة التصميم: زجاجية ناعمة (glass) + تدرجات Teal→Indigo هادئة
+   + حواف كبيرة + ظلال متعددة الطبقات + حركة دقيقة عند التحويم.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  --mx-teal: #0e9db8;
+  --mx-teal-2: #22c3dd;
+  --mx-indigo: #4f6df5;
+  --mx-navy: #072a3a;
+  --mx-grad: linear-gradient(135deg, var(--mx-teal) 0%, var(--mx-indigo) 100%);
+  --mx-grad-soft: linear-gradient(135deg, rgba(14,157,184,.10), rgba(79,109,245,.08));
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 22px; --r-2xl: 28px;
+  --sh-card: 0 1px 2px rgba(7,42,58,.05), 0 12px 32px -8px rgba(7,42,58,.10);
+  --sh-hover: 0 4px 12px rgba(14,157,184,.14), 0 20px 48px -12px rgba(7,42,58,.18);
+  --mx-ease: cubic-bezier(.22,.8,.3,1);
+}
+
+/* خلفية الصفحة — أجواء Aurora هادئة */
+body, html {
+  background:
+    radial-gradient(1100px 550px at 88% -8%, rgba(34,195,221,.14), transparent 55%),
+    radial-gradient(900px 520px at -5% 12%, rgba(79,109,245,.10), transparent 50%),
+    radial-gradient(800px 480px at 50% 115%, rgba(14,157,184,.08), transparent 45%),
+    linear-gradient(180deg, #f6fafd 0%, #eef3f8 100%) !important;
+}
+
+/* ─── الشريط العلوي: زجاجي داكن مع خط توهج ─── */
+.topbar {
+  background: linear-gradient(120deg, rgba(6,32,44,.96), rgba(9,48,66,.94) 55%, rgba(17,38,84,.94)) !important;
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom: 1px solid rgba(255,255,255,.08) !important;
+  box-shadow: 0 10px 34px -10px rgba(4,24,34,.55) !important;
+}
+.topbar::after {
+  content: ""; position: absolute; inset-inline: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--mx-teal-2), var(--mx-indigo), transparent);
+  opacity: .8; pointer-events: none;
+}
+.tb-btn {
+  border-radius: 999px !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  background: rgba(255,255,255,.06) !important;
+  transition: all .25s var(--mx-ease) !important;
+}
+.tb-btn:hover {
+  background: rgba(34,195,221,.18) !important;
+  border-color: rgba(34,195,221,.45) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -4px rgba(34,195,221,.35);
+}
+.prog-fill { background: var(--mx-grad) !important; }
+
+/* ─── التبويبات: كبسولات زجاجية عائمة ─── */
+.tabs {
+  background: rgba(255,255,255,.72) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.9) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--sh-card) !important;
+  padding: 8px !important;
+  gap: 6px !important;
+}
+.tab {
+  border-radius: 999px !important;
+  transition: all .25s var(--mx-ease) !important;
+  border: 1px solid transparent !important;
+}
+.tab:hover {
+  background: var(--mx-grad-soft) !important;
+  color: var(--mx-teal) !important;
+  transform: translateY(-1px);
+}
+.tab.active {
+  background: var(--mx-grad) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 18px -4px rgba(14,157,184,.45), inset 0 1px 0 rgba(255,255,255,.25) !important;
+}
+
+/* ─── البطاقات: زجاج أبيض بحافة مضيئة عند التحويم ─── */
+.card, .chart-box, .contract-card {
+  background: rgba(255,255,255,.88) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(215,231,239,.9) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--sh-card) !important;
+  transition: transform .3s var(--mx-ease), box-shadow .3s var(--mx-ease), border-color .3s !important;
+}
+.card:hover, .chart-box:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sh-hover) !important;
+  border-color: rgba(34,195,221,.35) !important;
+}
+.card-title {
+  font-weight: 800 !important;
+  letter-spacing: -.2px;
+}
+.card-title::before {
+  content: ""; display: inline-block; width: 4px; height: 18px;
+  border-radius: 4px; background: var(--mx-grad);
+  margin-inline-start: 0; margin-inline-end: 10px; vertical-align: -3px;
+}
+
+/* ─── بطاقات KPI: تدرج علوي + رقم متدرج + رفع عند التحويم ─── */
+.kpi {
+  position: relative;
+  border-radius: var(--r-xl) !important;
+  background: rgba(255,255,255,.92) !important;
+  border: 1px solid rgba(215,231,239,.9) !important;
+  box-shadow: var(--sh-card) !important;
+  overflow: hidden;
+  transition: transform .3s var(--mx-ease), box-shadow .3s var(--mx-ease) !important;
+}
+.kpi::before {
+  content: ""; position: absolute; inset-inline: 0; top: 0; height: 4px;
+  background: var(--mx-grad); opacity: .9;
+}
+.kpi::after {
+  content: ""; position: absolute; width: 130px; height: 130px;
+  inset-inline-end: -45px; top: -45px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,195,221,.14), transparent 70%);
+  pointer-events: none;
+}
+.kpi:hover { transform: translateY(-4px) scale(1.01); box-shadow: var(--sh-hover) !important; }
+.kpi-val {
+  background: linear-gradient(120deg, var(--mx-navy), var(--mx-teal)) ;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900 !important;
+  letter-spacing: -.5px;
+}
+.kpi.kc-red::before   { background: linear-gradient(135deg,#e0455c,#a82135); }
+.kpi.kc-red .kpi-val  { background: linear-gradient(120deg,#7a1626,#e0455c); -webkit-background-clip:text; background-clip:text; }
+.kpi.kc-amber::before { background: linear-gradient(135deg,#f5b04a,#d97706); }
+.kpi.kc-amber .kpi-val{ background: linear-gradient(120deg,#8a4b04,#f0a53c); -webkit-background-clip:text; background-clip:text; }
+.kpi.kc-green::before { background: linear-gradient(135deg,#2dd4a7,#059669); }
+.kpi.kc-green .kpi-val{ background: linear-gradient(120deg,#046148,#2dd4a7); -webkit-background-clip:text; background-clip:text; }
+.kpi.kc-navy::before  { background: linear-gradient(135deg,#0a5468,#072a3a); }
+
+/* ─── صف الفلاتر: شريط زجاجي واحد أنيق ─── */
+.filters-row {
+  background: rgba(255,255,255,.78) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.95) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--sh-card) !important;
+}
+.fsel, .finp {
+  border-radius: 12px !important;
+  border: 1.5px solid var(--bd-light) !important;
+  background: #fff !important;
+  transition: border-color .2s, box-shadow .2s !important;
+}
+.fsel:hover, .finp:hover { border-color: rgba(34,195,221,.5) !important; }
+.fsel:focus, .finp:focus {
+  border-color: var(--mx-teal) !important;
+  box-shadow: 0 0 0 4px rgba(14,157,184,.14) !important;
+  outline: none !important;
+}
+.f-clear {
+  border-radius: 999px !important;
+  transition: all .25s var(--mx-ease) !important;
+}
+.f-clear:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -4px rgba(200,40,60,.4); }
+
+/* ─── الجداول: رؤوس متدرجة + صفوف تفاعلية ─── */
+.tbl-wrap { border-radius: var(--r-lg) !important; }
+table thead th {
+  background: linear-gradient(180deg,#f2f8fb,#e8f1f6) !important;
+  font-weight: 800 !important;
+  border-bottom: 2px solid rgba(14,157,184,.25) !important;
+}
+table tbody tr { transition: background .18s, transform .18s; }
+table tbody tr:nth-child(even) { background: rgba(14,157,184,.03); }
+table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(34,195,221,.08), rgba(79,109,245,.06)) !important;
+}
+
+/* ─── الأزرار والشارات ─── */
+.export-btn, .pag-btn, .map-ctrl-btn {
+  border-radius: 999px !important;
+  transition: all .22s var(--mx-ease) !important;
+}
+.export-btn:hover, .pag-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -6px rgba(7,42,58,.3); }
+.badge, .pill { border-radius: 999px !important; font-weight: 700 !important; }
+
+/* ─── سكرول بار حديث ─── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--mx-teal), var(--mx-indigo));
+  border-radius: 999px; border: 2px solid #eef3f8;
+}
+
+/* ─── دخول ناعم للبطاقات ─── */
+@keyframes mxFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.panel.active .card, .panel.active .kpi, .kpi-grid .kpi {
+  animation: mxFadeUp .45s var(--mx-ease) both;
+}
+.kpi-grid .kpi:nth-child(2){animation-delay:.05s}
+.kpi-grid .kpi:nth-child(3){animation-delay:.10s}
+.kpi-grid .kpi:nth-child(4){animation-delay:.15s}
+.kpi-grid .kpi:nth-child(5){animation-delay:.20s}
+.kpi-grid .kpi:nth-child(6){animation-delay:.25s}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

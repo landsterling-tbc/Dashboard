@@ -906,7 +906,7 @@ function renderKPIs() {
         : "",
     ),
     setText("k-students-max", studMax ? studMax.students.toLocaleString() : "—"),
-    setText("k-students-max-name", studMax ? studMax.name.slice(0, 28) : "—"));
+    setText("k-students-max-name", studMax ? studMax.name : "—"));
   const ageArr = D.filter((r) => null != r.buildingAge && r.buildingAge > 0),
     ageAvg = ageArr.length ? ageArr.reduce((s, r) => s + r.buildingAge, 0) / ageArr.length : null,
     ageOld = ageArr.filter((r) => r.buildingAge > 40).length,
@@ -1976,7 +1976,7 @@ function renderStageCompareTab() {
     CHARTS["ch-stage-compare-main"] = new Chart(document.getElementById("ch-stage-compare-main"),{
       type:"bar",
       data:{
-        labels: topRows.map(r=>r.school.length>18?r.school.slice(0,18)+"…":r.school),
+        labels: topRows.map(r=>r.school),
         datasets: allStages.map((s,i)=>{
           const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
           return { label:stageLabel(s), data:topRows.map(r=>r.stageData[s]?.avg!=null?+r.stageData[s].avg.toFixed(1):null),
@@ -2391,7 +2391,7 @@ function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
         (CHARTS[`ch-${tabId}-dist`] = new Chart(document.getElementById(`ch-${tabId}-dist`), {
           type: "bar",
           data: {
-            labels: distData.map((d) => (d.k.length > 18 ? d.k.slice(0, 18) + "…" : d.k)),
+            labels: distData.map((d) => d.k),
             datasets: [
               {
                 label: "المتوسط",
@@ -5596,7 +5596,7 @@ function renderSysDetail() {
     )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:rgba(8,145,178,.1);color:var(--teal);border:1px solid rgba(8,145,178,.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
     requestAnimationFrame(() => {
       const subLabels = subAvg.map((s) =>
-          s.name.length > 22 ? s.name.slice(0, 22) + "…" : s.name,
+          s.name,
         ),
         subVals = subAvg.map((s) => +s.avg.toFixed(2)),
         subColors = subVals.map((v) =>
@@ -7068,7 +7068,7 @@ function _sysExcelTableHTML(title, headers, rows) {
             data: {
               labels: last6Labels,
               datasets: catTotals.map((item, i) => ({
-                label: item.cat.length > 20 ? item.cat.slice(0, 20) + "…" : item.cat,
+                label: item.cat,
                 data: last6.map((k) => catMonthMap[item.cat]?.[k] || 0),
                 borderColor: catColors[i % catColors.length],
                 backgroundColor: catColors[i % catColors.length] + "22",
@@ -13120,4 +13120,126 @@ ${JSON.stringify(priorityData)}`;
   };
 
   console.log("[recruitment] تم تحميل الملف بنجاح. typeof renderRecruitmentTab =", typeof window.renderRecruitmentTab);
+})();
+
+
+/* ════════════════════════════════════════════════════════════════
+   theme-modern.js — طبقة تحديث الرسوم البيانية 2026
+   1) ضمان ظهور الاسم الكامل (بدون قصّ) في tooltip لكل التشارتات،
+      مع لفّ الاسم الطويل على عدة أسطر داخل الـ tooltip.
+   2) مظهر حديث افتراضي للرسوم: زوايا دائرية، شبكة أنعم،
+      tooltip زجاجي أكبر، حركة أنعم.
+   لا يغيّر أي بيانات أو منطق — يُحمَّل بعد dashboard.js.
+   ════════════════════════════════════════════════════════════════ */
+(function () {
+  function whenChartReady(fn) {
+    if (window.Chart) return fn();
+    var t = setInterval(function () {
+      if (window.Chart) { clearInterval(t); fn(); }
+    }, 100);
+  }
+
+  // لفّ نص طويل إلى أسطر (~34 حرفاً) بدل قصّه
+  function wrapText(s, max) {
+    s = String(s == null ? "" : s).trim();
+    max = max || 34;
+    if (s.length <= max) return [s];
+    var words = s.split(/\s+/), lines = [], cur = "";
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (!cur) cur = w;
+      else if ((cur + " " + w).length <= max) cur += " " + w;
+      else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  whenChartReady(function () {
+    var C = window.Chart;
+
+    /* ── 1) Tooltip: الاسم الكامل دائماً ── */
+    var TT = C.defaults.plugins.tooltip;
+    TT.callbacks = TT.callbacks || {};
+    var prevTitle = TT.callbacks.title;
+
+    TT.callbacks.title = function (items) {
+      if (!items || !items.length) return "";
+      var it = items[0], full = "";
+      // أولوية: التسميات الكاملة المسجّلة عبر ChartLabels (إن وُجدت)
+      try {
+        if (window.ChartLabels && typeof window.ChartLabels.full === "function") {
+          full = window.ChartLabels.full(it.chart, it.dataIndex) || "";
+        }
+      } catch (_) {}
+      if (!full || full === "—") {
+        // التسمية الأصلية من بيانات الرسم (قد تكون مصفوفة أسطر ملفوفة)
+        var raw = it.chart.data && it.chart.data.labels ? it.chart.data.labels[it.dataIndex] : it.label;
+        full = Array.isArray(raw) ? raw.join(" ") : String(raw == null ? (it.label || "") : raw);
+      }
+      if ((!full || full === "—") && typeof prevTitle === "function") {
+        var p = prevTitle.call(this, items);
+        full = Array.isArray(p) ? p.join(" ") : (p || "");
+      }
+      return wrapText(full, 36); // أسطر متعددة = لا قصّ أبداً
+    };
+
+    // اسم الـ dataset كاملاً أيضاً في سطر القيمة
+    var prevLabel = TT.callbacks.label;
+    TT.callbacks.label = function (ctx) {
+      var base = typeof prevLabel === "function" ? prevLabel.call(this, ctx) : null;
+      if (base != null) return base;
+      var ds = ctx.dataset && ctx.dataset.label ? String(ctx.dataset.label) : "";
+      var val = ctx.formattedValue != null ? ctx.formattedValue : "";
+      var line = ds ? ds + ": " + val : val;
+      return wrapText(line, 40);
+    };
+
+    /* ── 2) مظهر حديث افتراضي ── */
+    TT.backgroundColor = "rgba(6, 30, 42, .94)";
+    TT.titleColor = "#fff";
+    TT.bodyColor = "rgba(255,255,255,.82)";
+    TT.borderColor = "rgba(34,195,221,.45)";
+    TT.borderWidth = 1;
+    TT.padding = 14;
+    TT.cornerRadius = 14;
+    TT.caretSize = 6;
+    TT.boxPadding = 6;
+    TT.titleFont = { size: 12.5, weight: "800", family: "Tajawal, 'IBM Plex Sans Arabic', sans-serif" };
+    TT.bodyFont = { size: 11.5, family: "'IBM Plex Sans Arabic', Tajawal, sans-serif" };
+    TT.rtl = true;
+    TT.textDirection = "rtl";
+
+    C.defaults.font.family = "'IBM Plex Sans Arabic', Tajawal, sans-serif";
+    C.defaults.animation = C.defaults.animation || {};
+    C.defaults.animation.duration = 650;
+    C.defaults.animation.easing = "easeOutQuart";
+
+    // أعمدة بزوايا دائرية افتراضياً + شبكة أنعم
+    if (C.defaults.elements && C.defaults.elements.bar) {
+      C.defaults.elements.bar.borderRadius = 8;
+      C.defaults.elements.bar.borderSkipped = false;
+    }
+    if (C.defaults.elements && C.defaults.elements.arc) {
+      C.defaults.elements.arc.borderWidth = 2;
+      C.defaults.elements.arc.borderColor = "#ffffff";
+      C.defaults.elements.arc.hoverOffset = 8;
+    }
+    if (C.defaults.elements && C.defaults.elements.line) {
+      C.defaults.elements.line.tension = 0.35;
+      C.defaults.elements.line.borderWidth = 2.5;
+    }
+    if (C.defaults.elements && C.defaults.elements.point) {
+      C.defaults.elements.point.radius = 3;
+      C.defaults.elements.point.hoverRadius = 6;
+      C.defaults.elements.point.borderWidth = 2;
+      C.defaults.elements.point.backgroundColor = "#fff";
+    }
+    C.defaults.scale = C.defaults.scale || {};
+    C.defaults.scale.grid = Object.assign({}, C.defaults.scale.grid, {
+      color: "rgba(14,157,184,.08)",
+      drawTicks: false,
+    });
+    C.defaults.scale.border = Object.assign({}, C.defaults.scale.border, { display: false });
+  });
 })();

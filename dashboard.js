@@ -6468,7 +6468,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           <div class="kpi kc-amber">
             <div class="kpi-val" style="color:#D97706">${fmt(filteredTotal)}</div>
             <div class="kpi-lbl">إجمالي البلاغات</div>
-            <div class="kpi-sub">${total === filteredTotal ? "كل السجلات من ملف CSV" : `من إجمالي ${fmt(total)} سجل`}</div>
+            <div class="kpi-sub">${total === filteredTotal ? "" : `من إجمالي ${fmt(total)} سجل`}</div>
           </div>
           <div class="kpi kc-red">
             <div class="kpi-val" style="color:#991b1b">${fmt(openCount)}</div>
@@ -12685,7 +12685,7 @@ ${JSON.stringify(priorityData)}`;
         "</div>" +
         '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
         '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(filteredTotal) + '</div><div class="kpi-lbl">إجمالي البوابين</div><div class="kpi-sub">' +
-        (total === filteredTotal ? "كل السجلات من ملف CSV" : "من إجمالي " + fmt_(total) + " سجل") + "</div></div>" +
+        (total === filteredTotal ? "" : "من إجمالي " + fmt_(total) + " سجل") + "</div></div>" +
         '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
         '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(citiesList.length) + '</div><div class="kpi-lbl">عدد المدن</div><div class="kpi-sub">' +
         escText(citiesList.slice(0, 3).join("، ") + (citiesList.length > 3 ? "…" : "")) + "</div></div>" +

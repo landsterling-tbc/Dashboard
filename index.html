@@ -282,6 +282,7 @@
     <div class="tab" onclick="showTab('tajheez',this)">التجهيزات</div>
     <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
     <div class="tab" onclick="showTab('gatekeepers',this)">البوابين</div>
+    <div class="tab" onclick="showTab('recruitment',this)">👥 التوظيف</div>
     <div class="tab" onclick="showTab('contracts',this)">العقود</div>
     <div class="tab" onclick="showTab('all-contracts',this)">عقود عدا المجال</div>
     <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">المدفوعات</div>
@@ -804,6 +805,24 @@
     <div id="gatekeepers-content">
       <div class="card loading-placeholder">
         <div class="loading-placeholder-icon">🧍</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  👥  تبويب: التوظيف
+║  ID: tab-recruitment
+╠════════════════════════════════════════════════════════════════════╣
+║  المصدر: window.RAW_RECRUITMENT (key: recruitment في GAS)
+║  الرندر: renderRecruitmentTab() في dashboard.js
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-recruitment">
+    <div id="recruitment-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">👥</div>
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>

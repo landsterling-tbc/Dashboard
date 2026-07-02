@@ -1003,6 +1003,7 @@ function showTab(name, el) {
     "balagh" === name && renderBalaghTab(),
     "tajheez" === name && renderTajheezInventoryTab(),
     "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
+    "recruitment" === name && "function" === typeof renderRecruitmentTab && renderRecruitmentTab(),
 
     "khanadeq" === name && renderKhanadeqTab(),
     "elevators" === name && renderElevatorsTab(),
@@ -2611,6 +2612,7 @@ function renderTable() {
       (window.RAW_BALAGH           = []),   // يُحمَّل بشكل منفصل
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
       (window.RAW_GATEKEEPERS      = sa(d.gatekeepers)),
+      (window.RAW_RECRUITMENT      = sa(d.recruitment)),
       (window.RAW_PAYMENTS         = sa(d.payments)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
@@ -12544,4 +12546,385 @@ ${JSON.stringify(priorityData)}`;
     "[gatekeepers] تم تحميل الملف بنجاح. typeof renderGatekeepersTab =",
     typeof window.renderGatekeepersTab,
   );
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+   تبويب التوظيف
+   المصدر: window.RAW_RECRUITMENT (key: recruitment في GAS)
+   أعمدة الملف: Region, Zone, Job Title (English), Ops Proposed, Emp ID,
+                Emp Name, Source, Status, Func. Role, Contract Start,
+                Contract End, DOJ, Stop Date, TBC Joining Forms, REMARKS
+══════════════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var fmt_ = typeof fmt === "function" ? fmt : function (v) { return v == null ? "—" : Number(v).toLocaleString("en-US"); };
+  var esc_ = typeof esc === "function" ? esc : function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+    });
+  };
+
+  var STATUS_COLORS = { "Joined": "#059669", "Vacant": "#dc2626", "Will Joined": "#d97706" };
+  var STATUS_AR = { "Joined": "منضم", "Vacant": "شاغر", "Will Joined": "قيد الانضمام" };
+  var REGION_ICONS = { "Jeddah": "", "Makkah": "", "Madinah": "", "Taif": "", "WR": "" };
+
+  var STATE = (window.__RECRUIT_STATE__ = window.__RECRUIT_STATE__ || {
+    page: 0, size: 20, search: "", region: "", status: "", sort: "region",
+  });
+
+  function getRaw() {
+    return Array.isArray(window.RAW_RECRUITMENT) ? window.RAW_RECRUITMENT : [];
+  }
+
+  function norm(v) {
+    return String(v == null ? "" : v).replace(/\uFEFF/g, "").trim();
+  }
+
+  function normalizeRows() {
+    return getRaw().map(function (r) {
+      return {
+        region: norm(r["Region"]),
+        zone: norm(r["Zone"]).replace(/\r?\n+/g, " — "),
+        title: norm(r["Job Title (English)"]),
+        empId: norm(r["Emp ID"]),
+        empName: norm(r["Emp Name"]),
+        source: norm(r["Source"]),
+        status: norm(r["Status"]),
+        contractStart: norm(r["Contract Start"]),
+        contractEnd: norm(r["Contract End"]),
+        doj: norm(r["DOJ"]),
+        stopDate: norm(r["Stop Date"]),
+        remarks: norm(r["REMARKS"]),
+      };
+    });
+  }
+
+  function matchesSearch(r, q) {
+    if (!q) return true;
+    return (
+      r.empName.toLowerCase().indexOf(q) !== -1 ||
+      r.title.toLowerCase().indexOf(q) !== -1 ||
+      r.empId.toLowerCase().indexOf(q) !== -1 ||
+      r.zone.toLowerCase().indexOf(q) !== -1 ||
+      r.region.toLowerCase().indexOf(q) !== -1 ||
+      r.remarks.toLowerCase().indexOf(q) !== -1
+    );
+  }
+
+  // فلترة كاملة (تُستخدم للجدول والـ KPIs)
+  function filteredRows(all) {
+    var q = STATE.search.trim().toLowerCase();
+    return all.filter(function (r) {
+      if (STATE.region && r.region !== STATE.region) return false;
+      if (STATE.status && r.status !== STATE.status) return false;
+      return matchesSearch(r, q);
+    });
+  }
+
+  // فلترة باستثناء بُعد "المنطقة" — تُستخدم لرسم توزيع المناطق
+  function rowsExcludingRegion(all) {
+    var q = STATE.search.trim().toLowerCase();
+    return all.filter(function (r) {
+      if (STATE.status && r.status !== STATE.status) return false;
+      return matchesSearch(r, q);
+    });
+  }
+
+  // فلترة باستثناء بُعد "الحالة" — تُستخدم لرسم توزيع الحالات
+  function rowsExcludingStatus(all) {
+    var q = STATE.search.trim().toLowerCase();
+    return all.filter(function (r) {
+      if (STATE.region && r.region !== STATE.region) return false;
+      return matchesSearch(r, q);
+    });
+  }
+
+  var SORTERS = {
+    region: function (a, b) { return a.region.localeCompare(b.region, "en") || a.title.localeCompare(b.title, "en"); },
+    name: function (a, b) { return a.empName.localeCompare(b.empName, "en"); },
+    title: function (a, b) { return a.title.localeCompare(b.title, "en"); },
+    status: function (a, b) { return a.status.localeCompare(b.status, "en"); },
+  };
+
+  function sortRows(rows, sort) {
+    return rows.slice().sort(SORTERS[sort] || SORTERS.region);
+  }
+
+  function pctOf(n, total) {
+    if (!total) return "0%";
+    return ((n / total) * 100).toFixed(1) + "%";
+  }
+
+  function statusBadge(status) {
+    var color = STATUS_COLORS[status] || "#64748b";
+    var label = STATUS_AR[status] || status || "—";
+    return '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;background:' +
+      color + '1A;color:' + color + '">' + esc_(label) + "</span>";
+  }
+
+  function renderPager(total) {
+    var pages = Math.max(1, Math.ceil(total / STATE.size));
+    var current = Math.min(STATE.page, pages - 1);
+    STATE.page = current;
+    var start = current * STATE.size;
+    var end = Math.min(start + STATE.size, total);
+    var prevDisabled = current <= 0 ? "disabled" : "";
+    var nextDisabled = current >= pages - 1 ? "disabled" : "";
+    return (
+      '<div class="pag-bar">' +
+      '<div class="pag-info">عرض ' + fmt_(start + 1) + " - " + fmt_(end) + " من " + fmt_(total) + " سجل</div>" +
+      '<div class="pag-btns">' +
+      '<button class="pag-btn" ' + prevDisabled + ' onclick="window.__RECRUIT_STATE__.page=Math.max(0,window.__RECRUIT_STATE__.page-1);renderRecruitmentTab()">◀ السابق</button>' +
+      '<button class="pag-btn active">' + fmt_(current + 1) + " / " + fmt_(pages) + "</button>" +
+      '<button class="pag-btn" ' + nextDisabled + ' onclick="window.__RECRUIT_STATE__.page=Math.min(' + (pages - 1) + ',window.__RECRUIT_STATE__.page+1);renderRecruitmentTab()">التالي ▶</button>' +
+      "</div></div>"
+    );
+  }
+
+  function exportRecruitCSV(rows) {
+    var headers = ["المنطقة", "الموقع/العقد", "المسمى الوظيفي", "رقم الموظف", "اسم الموظف", "المصدر", "الحالة", "تاريخ الانضمام", "نهاية العقد", "ملاحظات"];
+    var csv = [headers.map(function (h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(",")];
+    rows.forEach(function (r) {
+      var vals = [r.region, r.zone, r.title, r.empId, r.empName, r.source, STATUS_AR[r.status] || r.status, r.doj, r.contractEnd, r.remarks].map(function (v) {
+        return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+      });
+      csv.push(vals.join(","));
+    });
+    var blob = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "التوظيف_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function showErrorState(el, message) {
+    el.innerHTML =
+      '<div class="card empty-state">' +
+      '<div class="empty-state-icon"></div>' +
+      '<div class="empty-state-title">تعذّر عرض بيانات التوظيف</div>' +
+      '<div class="empty-state-sub">' + esc_(message) + "</div></div>";
+  }
+
+  function selectRegion(region) {
+    window.__RECRUIT_STATE__.region = window.__RECRUIT_STATE__.region === region ? "" : region;
+    window.__RECRUIT_STATE__.page = 0;
+    renderRecruitmentTab();
+    var tbl = document.getElementById("recruit-table-anchor");
+    if (tbl) tbl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  window.__recruitSelectRegion = selectRegion;
+
+  window.renderRecruitmentTab = function renderRecruitmentTab() {
+    var el = document.getElementById("recruitment-content");
+    if (!el) return;
+
+    try {
+      var all = normalizeRows();
+
+      if (!all.length) {
+        el.innerHTML =
+          '<div class="card empty-state">' +
+          '<div class="empty-state-icon"></div>' +
+          '<div class="empty-state-title">لم يتم تحميل بيانات التوظيف بعد</div>' +
+          '<div class="empty-state-sub">تأكد من إضافة شيت "التوظيف" في GAS ومن إعادة تحميل البيانات</div>' +
+          "</div>";
+        return;
+      }
+
+      var rows = sortRows(filteredRows(all), STATE.sort);
+      var total = all.length;
+      var filteredTotal = rows.length;
+
+      // ── إحصاءات عامة ────────────────────────────────────────
+      var joinedAll = all.filter(function (r) { return r.status === "Joined"; }).length;
+      var vacantAll = all.filter(function (r) { return r.status === "Vacant"; }).length;
+      var willJoinAll = all.filter(function (r) { return r.status === "Will Joined"; }).length;
+
+      var regionsSet = {};
+      all.forEach(function (r) { if (r.region) regionsSet[r.region] = true; });
+      var regionsList = Object.keys(regionsSet);
+
+      // ── بطاقات المناطق (قابلة للنقر) ───────────────────────
+      var regionCards = regionsList
+        .map(function (rg) {
+          var rrows = all.filter(function (r) { return r.region === rg; });
+          var j = rrows.filter(function (r) { return r.status === "Joined"; }).length;
+          var v = rrows.filter(function (r) { return r.status === "Vacant"; }).length;
+          var w = rrows.filter(function (r) { return r.status === "Will Joined"; }).length;
+          var tt = rrows.length;
+          var isActive = STATE.region === rg;
+          var icon = REGION_ICONS[rg] || "";
+          return { rg: rg, tt: tt, j: j, v: v, w: w, isActive: isActive, icon: icon };
+        })
+        .sort(function (a, b) { return b.tt - a.tt; });
+
+      var maxRegionTotal = Math.max.apply(null, regionCards.map(function (c) { return c.tt; }).concat([1]));
+
+      var regionCardsHtml = regionCards
+        .map(function (c) {
+          return (
+            '<div class="card" style="cursor:pointer;padding:16px;border:2px solid ' +
+            (c.isActive ? "#0891B2" : "transparent") + ";background:" + (c.isActive ? "#ECFEFF" : "var(--card-bg,#fff)") +
+            ';transition:.15s" onclick="window.__recruitSelectRegion(\'' + c.rg.replace(/'/g, "\\'") + '\')">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+            '<div style="font-size:13px;font-weight:800;color:var(--tx-main)">' + esc_(c.rg) + "</div>" +
+            (c.isActive ? '<span style="font-size:10px;font-weight:800;color:#0891B2"> مُفعّل</span>' : "") +
+            "</div>" +
+            '<div style="font-size:28px;font-weight:900;color:#083D4F;font-variant-numeric:tabular-nums">' + fmt_(c.tt) + "</div>" +
+            '<div style="font-size:11px;color:var(--tx-muted);margin-bottom:8px">إجمالي الوظائف</div>' +
+            '<div class="mini-track" style="height:8px;border-radius:6px;overflow:hidden;display:flex">' +
+            '<div style="width:' + (c.tt ? (c.j / c.tt) * 100 : 0) + '%;background:#059669"></div>' +
+            '<div style="width:' + (c.tt ? (c.w / c.tt) * 100 : 0) + '%;background:#d97706"></div>' +
+            '<div style="width:' + (c.tt ? (c.v / c.tt) * 100 : 0) + '%;background:#dc2626"></div>' +
+            "</div>" +
+            '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10.5px;font-weight:700">' +
+            '<span style="color:#059669"> ' + fmt_(c.j) + "</span>" +
+            '<span style="color:#d97706">⏳ ' + fmt_(c.w) + "</span>" +
+            '<span style="color:#dc2626"> ' + fmt_(c.v) + "</span>" +
+            "</div>" +
+            '<div style="margin-top:10px;text-align:center;font-size:11px;font-weight:800;color:#0891B2;padding:6px;border-radius:8px;background:#ECFEFF"> اعرف الموظفين</div>' +
+            "</div>"
+          );
+        })
+        .join("");
+
+      // ── أعلى المسميات الوظيفية ضمن الفلاتر الحالية ─────────
+      var titleCounts = {};
+      rows.forEach(function (r) { var k = r.title || "غير محدد"; titleCounts[k] = (titleCounts[k] || 0) + 1; });
+      var topTitles = Object.entries(titleCounts).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10);
+
+      // ── جدول ─────────────────────────────────────────────
+      var list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
+      var regionOptions = regionsList.slice().sort(function (a, b) { return a.localeCompare(b, "en"); })
+        .map(function (v) { return '<option value="' + esc_(v) + '"' + (STATE.region === v ? " selected" : "") + ">" + esc_(v) + "</option>"; })
+        .join("");
+
+      var rowsHtml = list.length
+        ? list.map(function (r) {
+            return (
+              "<tr>" +
+              '<td style="font-weight:700">' + esc_(r.region || "—") + "</td>" +
+              '<td style="text-align:right;font-size:11.5px;color:var(--tx-muted)">' + esc_(r.zone || "—") + "</td>" +
+              '<td style="text-align:right;font-weight:700">' + esc_(r.title || "—") + "</td>" +
+              '<td style="text-align:right">' + esc_(r.empName || "—") + "</td>" +
+              "<td>" + statusBadge(r.status) + "</td>" +
+              "<td>" + esc_(r.source || "—") + "</td>" +
+              "</tr>"
+            );
+          }).join("")
+        : '<tr><td colspan="6"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>';
+
+      el.innerHTML =
+        '<div class="card mb14">' +
+        '<div class="card-title">' +
+        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"></span>' +
+        "<span>نظرة عامة على التوظيف</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
+        "</div>" +
+        '<div class="g4" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:0">' +
+        '<div class="kpi kc-navy"><div class="kpi-val">' + fmt_(total) + '</div><div class="kpi-lbl">إجمالي الوظائف</div><div class="kpi-sub">كل المناطق</div></div>' +
+        '<div class="kpi kc-green"><div class="kpi-val">' + fmt_(joinedAll) + '</div><div class="kpi-lbl">منضمّون</div><div class="kpi-sub">' + pctOf(joinedAll, total) + " من الإجمالي</div></div>" +
+        '<div class="kpi kc-amber"><div class="kpi-val">' + fmt_(willJoinAll) + '</div><div class="kpi-lbl">قيد الانضمام</div><div class="kpi-sub">' + pctOf(willJoinAll, total) + " من الإجمالي</div></div>" +
+        '<div class="kpi kc-red"><div class="kpi-val">' + fmt_(vacantAll) + '</div><div class="kpi-lbl">شواغر</div><div class="kpi-sub">' + pctOf(vacantAll, total) + " من الإجمالي</div></div>" +
+        '<div class="kpi kc-blue"><div class="kpi-val">' + fmt_(regionsList.length) + '</div><div class="kpi-lbl">عدد المناطق</div><div class="kpi-sub">' + esc_(regionsList.join("، ")) + "</div></div>" +
+        "</div></div>" +
+
+        '<div class="card mb14">' +
+        '<div class="card-title">' +
+        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"></span>' +
+        "<span>الموظفون حسب المنطقة</span>" +
+        '<span class="sub">اضغط على أي منطقة لعرض موظفيها</span>' +
+        "</div>" +
+        '<div class="g4" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:0">' + regionCardsHtml + "</div>" +
+        "</div>" +
+
+        '<div class="g2">' +
+        '<div class="card">' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#FEF3C7;color:#92400E"></span><span>توزيع الحالات الوظيفية</span></div>' +
+        '<div class="chart-box" style="height:270px"><canvas id="ch-recruit-status"></canvas></div>' +
+        "</div>" +
+        '<div class="card">' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#DBEAFE;color:#1D4ED8"></span><span>عدد الموظفين حسب المنطقة</span></div>' +
+        '<div class="chart-box" style="height:270px"><canvas id="ch-recruit-region"></canvas></div>' +
+        "</div>" +
+        "</div>" +
+
+        '<div class="card mb14">' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#EDE9FE;color:#6D28D9"></span><span>أكثر المسميات الوظيفية</span>' +
+        '<span class="sub">' + (STATE.region ? esc_(STATE.region) : "كل المناطق") + "</span></div>" +
+        '<div class="chart-box" style="height:' + Math.max(220, topTitles.length * 32) + 'px"><canvas id="ch-recruit-title"></canvas></div>' +
+        "</div>" +
+
+        '<div id="recruit-table-anchor"></div>' +
+        '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
+        '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
+        '<input class="finp" id="recruit-search" placeholder=" اسم الموظف أو المسمى الوظيفي أو الرقم..." value="' + esc_(STATE.search) + '" style="width:100%" ' +
+        'oninput="window.__RECRUIT_STATE__.search=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()"></div>' +
+        '<div class="fg"><div class="fg-lbl">المنطقة</div>' +
+        '<select class="fsel" id="recruit-region" onchange="window.__RECRUIT_STATE__.region=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()">' +
+        '<option value="">الكل</option>' + regionOptions + "</select></div>" +
+        '<div class="fg"><div class="fg-lbl">الحالة</div>' +
+        '<select class="fsel" id="recruit-status" onchange="window.__RECRUIT_STATE__.status=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()">' +
+        '<option value="">الكل</option>' +
+        '<option value="Joined"' + (STATE.status === "Joined" ? " selected" : "") + ">منضم</option>" +
+        '<option value="Vacant"' + (STATE.status === "Vacant" ? " selected" : "") + ">شاغر</option>" +
+        '<option value="Will Joined"' + (STATE.status === "Will Joined" ? " selected" : "") + ">قيد الانضمام</option>" +
+        "</select></div>" +
+        '<div class="fg"><div class="fg-lbl">الترتيب</div>' +
+        '<select class="fsel" id="recruit-sort" onchange="window.__RECRUIT_STATE__.sort=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()">' +
+        '<option value="region"' + (STATE.sort === "region" ? " selected" : "") + ">المنطقة</option>" +
+        '<option value="name"' + (STATE.sort === "name" ? " selected" : "") + ">اسم الموظف</option>" +
+        '<option value="title"' + (STATE.sort === "title" ? " selected" : "") + ">المسمى الوظيفي</option>" +
+        '<option value="status"' + (STATE.sort === "status" ? " selected" : "") + ">الحالة</option>" +
+        "</select></div>" +
+        '<button class="f-clear" onclick="window.__RECRUIT_STATE__={page:0,size:20,search:\'\',region:\'\',status:\'\',sort:\'region\'};renderRecruitmentTab()"> مسح الفلاتر</button>' +
+        '<button class="export-btn export-btn-csv" onclick="window.exportRecruitCSV_dispatch && window.exportRecruitCSV_dispatch()"> تصدير CSV</button>' +
+        "</div>" +
+
+        '<div class="card">' +
+        '<div class="card-title">' +
+        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"></span>' +
+        "<span>قائمة الموظفين" + (STATE.region ? " — " + esc_(STATE.region) : "") + "</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
+        '<div class="tbl-wrap"><table><thead><tr>' +
+        "<th>المنطقة</th><th style=\"text-align:right\">الموقع/العقد</th>" +
+        "<th style=\"text-align:right\">المسمى الوظيفي</th><th style=\"text-align:right\">اسم الموظف</th>" +
+        "<th>الحالة</th><th>المصدر</th>" +
+        "</tr></thead><tbody>" + rowsHtml + "</tbody></table></div>" +
+        renderPager(filteredTotal) +
+        "</div>";
+
+      window.exportRecruitCSV_dispatch = function () { exportRecruitCSV(rows); };
+
+      // ── الرسوم البيانية ────────────────────────────────────
+      if (typeof makeDoughnut === "function") {
+        var statusRows = rowsExcludingStatus(all);
+        var statusMap = {};
+        statusRows.forEach(function (r) { var k = STATUS_AR[r.status] || r.status || "غير محدد"; statusMap[k] = (statusMap[k] || 0) + 1; });
+        var statusColorMap = {};
+        Object.keys(STATUS_AR).forEach(function (k) { statusColorMap[STATUS_AR[k]] = STATUS_COLORS[k]; });
+        makeDoughnut("ch-recruit-status", statusMap, statusColorMap);
+      }
+
+      if (typeof makeHBar === "function") {
+        var regionRows = rowsExcludingRegion(all);
+        var regionMap = {};
+        regionRows.forEach(function (r) { var k = r.region || "غير محدد"; regionMap[k] = (regionMap[k] || 0) + 1; });
+        var regionEntries = Object.entries(regionMap).sort(function (a, b) { return b[1] - a[1]; });
+        var PAL = typeof PALETTE !== "undefined" ? PALETTE : ["#0891B2", "#059669", "#D97706", "#DC2626", "#7C3AED"];
+        var regionColors = regionEntries.map(function (_, i) { return PAL[i % PAL.length] + "DD"; });
+        makeHBar("ch-recruit-region", regionEntries.map(function (x) { return x[0]; }), regionEntries.map(function (x) { return x[1]; }), regionColors);
+
+        var titleColors = topTitles.map(function (_, i) { return PAL[i % PAL.length] + "DD"; });
+        makeHBar("ch-recruit-title", topTitles.map(function (x) { return x[0]; }), topTitles.map(function (x) { return x[1]; }), titleColors);
+      }
+    } catch (err) {
+      console.error("[recruitment] خطأ أثناء رسم تبويب التوظيف:", err);
+      showErrorState(el, "حدث خطأ غير متوقع: " + (err && err.message ? err.message : String(err)) + " — افتح Console (F12) للتفاصيل.");
+    }
+  };
+
+  console.log("[recruitment] تم تحميل الملف بنجاح. typeof renderRecruitmentTab =", typeof window.renderRecruitmentTab);
 })();

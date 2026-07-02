@@ -267,7 +267,7 @@
     <div class="tab active" id="tabbtn-overview" onclick="showTab('overview',this)">نظرة عامة</div>
     <div class="tab" onclick="showTab('fca',this)">تحليل FCA</div>
     <div class="tab" onclick="showTab('stage-compare',this)">مقارنة مراحل FCA</div>
-    <div class="tab" onclick="showTab('fca-ref',this)">📋 FCA المرجعي</div>
+    <div class="tab" onclick="showTab('fca-ref',this)">FCA المرجعي</div>
     <div class="tab" onclick="showTab('env',this)">البيئة المدرسية</div>
     <div class="tab" id="tabbtn-students" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
     <div class="tab" onclick="showTab('stages',this)">المرحلة الدراسية</div>
@@ -282,14 +282,15 @@
     <div class="tab" onclick="showTab('tajheez',this)">التجهيزات</div>
     <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
     <div class="tab" onclick="showTab('gatekeepers',this)">البوابين</div>
-    <div class="tab" onclick="showTab('recruitment',this)">👥 التوظيف</div>
+    <div class="tab" onclick="showTab('recruitment',this)">التوظيف</div>
     <div class="tab" onclick="showTab('contracts',this)">العقود</div>
     <div class="tab" onclick="showTab('all-contracts',this)">عقود عدا المجال</div>
     <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">المدفوعات</div>
     <div class="tab tab-premium" onclick="showTab('cost',this)">التكلفة</div>
     <div class="tab" onclick="showTab('map',this)">الخريطة</div>
     <div class="tab" onclick="showTab('table',this)">الجدول التفصيلي</div>
-    <div class="tab" onclick="showTab('mag-kpi',this)">📊 مؤشرات الأداء للمقاول</div>
+    <div class="tab" onclick="showTab('mag-kpi',this)">مؤشرات الأداء للمقاول</div>
+    <div class="tab" onclick="showTab('consultant-kpi',this)">مؤشرات أداء الاستشاري</div>
   </div>
 
 <!--
@@ -1138,6 +1139,26 @@
     <div id="mag-kpi-content">
       <div class="card loading-placeholder">
         <div class="loading-placeholder-icon">📊</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  تبويب: مؤشرات أداء الاستشاري
+║  ID: tab-consultant-kpi
+║
+║  📌 المصدر: شيت "مؤشرات_اداء_الاستشاري" في نفس ملف جوجل شيت،
+║     يُقرأ تلقائيًا عبر مفتاح consultantKpi في الـ Apps Script.
+║     نفس منطق تبويب "مؤشرات الأداء للمقاول" بالضبط (renderKpiTabGeneric_).
+║  ⚠️ هذا التبويب مستقل عن فلاتر الداشبورد العلوية (المنطقة/المرحلة...)
+╠════════════════════════════════════════════════════════════════════╣
+-->
+  <div class="panel" id="tab-consultant-kpi">
+    <div id="consultant-kpi-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">📈</div>
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>

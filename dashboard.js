@@ -1014,7 +1014,8 @@ function showTab(name, el) {
     "ayen" === name && renderAyenTab(),
     "table" === name && ((TBL.cur = 0), renderTable()),
     "ac-plan" === name && renderAcPlanTab(),
-    "mag-kpi" === name && renderMagKpiTab());
+    "mag-kpi" === name && renderMagKpiTab(),
+    "consultant-kpi" === name && renderConsultantKpiTab());
 
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
@@ -2611,6 +2612,8 @@ function renderTable() {
       (window.RAW_TAJHEEZ_INV      = sa(d.tajheezInventory)),
       (window.RAW_BALAGH           = []),   // يُحمَّل بشكل منفصل
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
+      (window.RAW_MAG_KPI          = sa(d.kpiContractor)),
+      (window.RAW_CONSULTANT_KPI   = sa(d.consultantKpi)),
       (window.RAW_GATEKEEPERS      = sa(d.gatekeepers)),
       (window.RAW_RECRUITMENT      = sa(d.recruitment)),
       (window.RAW_PAYMENTS         = sa(d.payments)),
@@ -3653,43 +3656,153 @@ function renderAcPlanTab() {
   });
 }
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  📊  JS تبويب: مؤشرات الأداء للمقاول (Regional KPI)
-   ║  (tab-mag-kpi) — الدوال الخاصة بهذا التبويب تبدأ هنا
+   ║  📊  JS تبويبات مؤشرات الأداء (المقاول + الاستشاري)
+   ║  (tab-mag-kpi / tab-consultant-kpi)
    ║
-   ║  📝 لتعديل الأرقام فقط عدّل المصفوفة MAG_KPI_DATA بالأسفل مباشرة.
-   ║     كل عنصر = منطقة واحدة:
-   ║       region   : اسم المنطقة (يظهر بالجدول والرسم)
-   ║       contract : رقم عقد المقاول (TBC) الخاص بالمنطقة
-   ║       values   : نسب الأداء الشهرية بالترتيب (يناير ← مايو) من 0 إلى 100
-   ║     لإضافة شهر فعلي جديد (بيانات حقيقية): أضف رقمًا لكل منطقة في
-   ║       values + اسم الشهر في MAG_KPI_MONTHS بنفس الترتيب
-   ║     لإضافة منطقة جديدة: أضف سطر
-   ║       { region: "...", contract: "...", values: [.., .., .., .., ..] }
+   ║  📝 البيانات الآن تُقرأ مباشرة من جوجل شيت (لا يوجد أرقام ثابتة
+   ║     بالكود). كل تبويب مصدره تبويب (sheet) مختلف داخل نفس الملف:
+   ║       - مؤشرات الأداء للمقاول    → window.RAW_MAG_KPI        (d.kpiContractor)
+   ║       - مؤشرات أداء الاستشاري    → window.RAW_CONSULTANT_KPI (d.consultantKpi)
+   ║     شكل الصف المتوقع في الشيت: عمود "المنطقة" + عمود لكل شهر
+   ║     بصيغة "اسم_الشهر سنة" مثل "يناير 2026" — القيمة كسر (0.85)
+   ║     أو نسبة (85) وبيتم التعامل مع الحالتين تلقائيًا.
+   ║     لإضافة شهر جديد أو منطقة جديدة: يكفي إضافته في الشيت نفسه،
+   ║     مفيش أي تعديل مطلوب في الكود.
    ║
-   ║  🔮 التوقع المستقبلي (الخط المنقّط في الرسم):
-   ║     عدد شهور التوقع يتحكم فيه متغيّر واحد فقط بالأسفل:
-   ║       MAG_KPI_FORECAST_MONTHS  ← غيّره لـ 3 أو 4 أو أي رقم تاني
-   ║     طريقة الحساب: انحدار خطي بسيط (Linear Trend) على بيانات كل
-   ║     منطقة الفعلية — مفيهوش أي تدخل يدوي، بيتحسب تلقائي في دالة
-   ║     linearForecast() تحت. القيمة محصورة بين 0% و100%.
-   ║     أسماء الشهور المستقبلية موجودة في MAG_KPI_FUTURE_MONTH_NAMES،
-   ║     لو محتاج تتوقع لفترة أطول من 7 شهور زوّد أسماء فيها.
+   ║  🔮 التوقع المستقبلي (الخط المنقّط في الرسم): انحدار خطي بسيط
+   ║     (Linear Trend) يُحسب تلقائيًا من بيانات كل منطقة الفعلية عبر
+   ║     دالة linearForecast() تحت. القيمة محصورة بين 0% و100%.
    ╚════════════════════════════════════════════════════════════╝ */
-const MAG_KPI_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو"];
-const MAG_KPI_DATA = [
-  { region: "مكة",     contract: "TBC005842", values: [85.34, 87.75, 87.27, 72.11, 71.98] },
-  { region: "المدينة", contract: "TBC005841", values: [89.70, 88.60, 88.28, 90.25, 88.48] },
-  { region: "جدة",     contract: "TBC005843", values: [85.02, 91.68, 92.00, 90.42, 91.21] },
-  { region: "الطائف",  contract: "TBC005789", values: [80.07, 80.04, 80.29, 83.75, 85.16] },
-];
 
-// ⚙️ عدد شهور التوقع القادمة في اللاين تشارت — غيّر الرقم ده بس
-const MAG_KPI_FORECAST_MONTHS = 4; // مثال: 3 لو عايز توقع 3 شهور بدل 4
-
-// أسماء الشهور المستقبلية المتاحة (تتقرأ بالترتيب حسب عدد شهور التوقع أعلاه)
-const MAG_KPI_FUTURE_MONTH_NAMES = [
-  "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+// خريطة أسماء الشهور العربية ← ترتيبها في السنة (لفرز الأعمدة زمنيًا)
+const KPI_MONTH_ORDER = {
+  "يناير": 1, "فبراير": 2, "مارس": 3, "أبريل": 4, "مايو": 5, "يونيو": 6,
+  "يوليو": 7, "أغسطس": 8, "سبتمبر": 9, "أكتوبر": 10, "نوفمبر": 11, "ديسمبر": 12,
+};
+// نفس الخريطة بس بالعكس: رقم الشهر (1-12) ← اسمه بالعربي
+const KPI_MONTH_NAME_BY_NUM = [
+  "", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
+const KPI_FORECAST_MONTHS = 4; // عدد شهور التوقع القادمة في اللاين تشارت
+
+// أعمدة محتملة لكل حقل — بيدور عليها بالاسم بغض النظر عن شكل الشيت
+const KPI_REGION_KEYS    = ["المنطقة", "Region", "region"];
+const KPI_MONTH_NUM_KEYS = ["الشهر", "Month", "month"];
+const KPI_YEAR_KEYS      = ["السنة", "Year", "year"];
+const KPI_VALUE_KEYS     = ["التقييم", "النسبة", "القيمة", "Value", "Rating", "Score"];
+const KPI_CONTRACT_KEYS  = ["رقم عقد المقاول", "رقم العقد", "العقد", "Contract No.", "Contract"];
+
+const toKpiPct_ = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  let n = typeof v === "number" ? v : parseFloat(String(v).replace(/[%,]/g, ""));
+  if (isNaN(n)) return null;
+  if (n <= 1) n *= 100; // كسر (0.85) → نسبة (85)
+  return +n.toFixed(2);
+};
+
+/* 🧮 يحوّل صفوف الشيت الخام (array of objects) إلى سلسلة بيانات جاهزة
+   للرسم والجدول: { months:[...labels], data:[{region, contract, values:[...]}] }
+   بيدعم شكلين للشيت:
+   1) الشكل الطولي (Long/Tidy) — الحالي المعتمد: صف لكل (منطقة + شهر)
+      أعمدة: المنطقة | الشهر (1-12) | السنة | التقييم
+      ★ ده الشكل الأنسب للإضافة المستمرة: كل تقييم جديد = صف جديد بالأسفل،
+      من غير ما تحتاج تعمل عمود جديد أو تلمس أي حاجة تانية بالشيت.
+   2) الشكل العريض (Wide) القديم — للتوافق فقط: عمود مستقل لكل شهر
+      بصيغة "اسم الشهر السنة" مثل "يناير 2026" */
+function buildKpiSeries_(rows) {
+  if (!Array.isArray(rows) || !rows.length) return { months: [], data: [] };
+
+  const sample = rows[0] || {};
+  const keys = Object.keys(sample);
+  const regionKey  = keys.find((k) => KPI_REGION_KEYS.includes(k)) || keys[0];
+  const monthNumKey = keys.find((k) => KPI_MONTH_NUM_KEYS.includes(k));
+  const yearKey     = keys.find((k) => KPI_YEAR_KEYS.includes(k));
+  const contractKey = keys.find((k) => KPI_CONTRACT_KEYS.includes(k)) || null;
+
+  // ── الشكل الطولي (Long/Tidy): فيه عمود شهر رقمي + عمود سنة ──
+  if (monthNumKey && yearKey) {
+    const valueKey =
+      keys.find((k) => KPI_VALUE_KEYS.includes(k)) ||
+      keys.find((k) => ![regionKey, monthNumKey, yearKey, contractKey].includes(k));
+    if (!valueKey) return { months: [], data: [] };
+
+    // كل (شهر، سنة) فريدة موجودة فعليًا في الصفوف — مرتبة زمنيًا
+    const colMap = new Map(); // sortKey -> {num, year, label}
+    rows.forEach((r) => {
+      const num = parseInt(r[monthNumKey], 10),
+        year = parseInt(r[yearKey], 10);
+      if (!num || num < 1 || num > 12 || !year) return;
+      const sortKey = year * 100 + num;
+      if (!colMap.has(sortKey)) {
+        colMap.set(sortKey, { num, year, label: `${KPI_MONTH_NAME_BY_NUM[num]} ${year}` });
+      }
+    });
+    const monthCols = [...colMap.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+    if (!monthCols.length) return { months: [], data: [] };
+    const colIndex = new Map(monthCols.map((c, i) => [c.num * 10000 + c.year, i]));
+
+    // تجميع القيم حسب المنطقة
+    const byRegion = new Map(); // region -> { contract, values[] }
+    rows.forEach((r) => {
+      const region = r[regionKey];
+      const num = parseInt(r[monthNumKey], 10),
+        year = parseInt(r[yearKey], 10);
+      if (!region || !num || !year) return;
+      const idx = colIndex.get(num * 10000 + year);
+      if (idx === undefined) return;
+      const key = String(region).trim();
+      if (!byRegion.has(key)) {
+        byRegion.set(key, {
+          region: key,
+          contract: contractKey ? String(r[contractKey] || "").trim() : "",
+          values: Array(monthCols.length).fill(null),
+        });
+      }
+      const entry = byRegion.get(key);
+      const pct = toKpiPct_(r[valueKey]);
+      if (pct !== null) entry.values[idx] = pct;
+      if (contractKey && r[contractKey] && !entry.contract) entry.contract = String(r[contractKey]).trim();
+    });
+
+    const data = [...byRegion.values()].filter((r) => r.values.some((v) => v !== null));
+    return { months: monthCols.map((c) => c.label), monthMeta: monthCols, data };
+  }
+
+  // ── الشكل العريض (Wide) — للتوافق مع نسخ شيتات قديمة ──
+  const monthCols = keys
+    .filter((k) => k !== regionKey && k !== contractKey)
+    .map((k) => {
+      const m = String(k).trim().match(/^([\u0600-\u06FF]+)\s*(\d{4})?$/);
+      if (!m || !(m[1] in KPI_MONTH_ORDER)) return null;
+      const year = m[2] ? parseInt(m[2], 10) : 2026;
+      return { key: k, name: m[1], year, num: KPI_MONTH_ORDER[m[1]], sortKey: year * 100 + KPI_MONTH_ORDER[m[1]] };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.sortKey - b.sortKey);
+
+  if (!monthCols.length) return { months: [], data: [] };
+
+  const data = rows
+    .map((r) => {
+      const region = r[regionKey];
+      if (!region) return null;
+      const values = monthCols.map((c) => toKpiPct_(r[c.key]));
+      if (!values.some((v) => v !== null)) return null;
+      return {
+        region: String(region).trim(),
+        contract: contractKey ? String(r[contractKey] || "").trim() : "",
+        values,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    months: monthCols.map((c) => `${c.name} ${c.year}`),
+    monthMeta: monthCols.map((c) => ({ num: c.num, year: c.year, label: `${c.name} ${c.year}` })),
+    data,
+  };
+}
 
 /* 🔮 انحدار خطي بسيط (Least-Squares Linear Regression) لتوقع قيم مستقبلية
    اعتمادًا على اتجاه البيانات الفعلية السابقة لكل منطقة.
@@ -3697,14 +3810,18 @@ const MAG_KPI_FUTURE_MONTH_NAMES = [
    nFuture : عدد النقاط المطلوب توقّعها بعد آخر قيمة فعلية
    يرجع مصفوفة بطول nFuture بقيم محصورة بين 0 و100 */
 function linearForecast(values, nFuture) {
+  // بيتجاهل القيم الفارغة (null) — بيتوقع بس بناءً على النقاط الفعلية المتاحة
+  const pts = values.map((v, i) => ({ x: i, y: v })).filter((p) => p.y !== null && p.y !== undefined);
+  if (pts.length < 2) return Array(nFuture).fill(null);
   const n = values.length,
-    xs = values.map((_, i) => i),
+    xs = pts.map((p) => p.x),
+    ys = pts.map((p) => p.y),
     xMean = avg(xs),
-    yMean = avg(values);
+    yMean = avg(ys);
   let num = 0,
     den = 0;
   xs.forEach((x, i) => {
-    num += (x - xMean) * (values[i] - yMean);
+    num += (x - xMean) * (ys[i] - yMean);
     den += (x - xMean) ** 2;
   });
   const slope = den === 0 ? 0 : num / den,
@@ -3718,97 +3835,136 @@ function linearForecast(values, nFuture) {
   return future;
 }
 
-function renderMagKpiTab() {
-  const el = document.getElementById("mag-kpi-content");
+/* 🧱 دالة عامة تبني تبويب مؤشر أداء كامل (بطاقات + رسم + تحليل + جدول)
+   انطلاقًا من صفوف شيت خام. تُستخدم من renderMagKpiTab() و renderConsultantKpiTab() */
+function renderKpiTabGeneric_(opts) {
+  const { containerId, chartId, rawRows, entityLabel, followUpLabel, emptyIcon } = opts;
+  const el = document.getElementById(containerId);
   if (!el) return;
-  const data = MAG_KPI_DATA,
-    months = MAG_KPI_MONTHS,
-    lastIdx = months.length - 1;
 
-  // إحصائيات لكل منطقة
+  const { months, monthMeta, data } = buildKpiSeries_(rawRows);
+
+  if (!months.length || !data.length) {
+    el.innerHTML = `<div class="card empty-state">
+      <div class="empty-state-icon">${emptyIcon || "📊"}</div>
+      <div class="empty-state-title">لا توجد بيانات متاحة حاليًا في هذا الشيت</div>
+    </div>`;
+    return;
+  }
+
+  const lastIdx = months.length - 1;
+  const hasContract = data.some((r) => r.contract);
+
+  const lastNonNull = (vals) => {
+    for (let i = vals.length - 1; i >= 0; i--) if (vals[i] !== null) return vals[i];
+    return null;
+  };
+  const firstNonNull = (vals) => {
+    for (let i = 0; i < vals.length; i++) if (vals[i] !== null) return vals[i];
+    return null;
+  };
+
+  // إحصائيات لكل منطقة (بتجاهل الشهور الفارغة)
   const stats = data.map((r) => {
-    const avgVal = avg(r.values),
-      first = r.values[0],
-      last = r.values[lastIdx],
-      delta = last - first;
-    return { ...r, avgVal, first, last, delta, tier: getTier(last) };
+    const known = r.values.filter((v) => v !== null);
+    const avgVal = known.length ? avg(known) : null;
+    const first = firstNonNull(r.values);
+    const last = lastNonNull(r.values);
+    const delta = first !== null && last !== null ? last - first : null;
+    return { ...r, avgVal, first, last, delta, tier: last !== null ? getTier(last) : null };
   });
 
-  // المتوسط العام لكل شهر (عبر كل المناطق)
-  const monthlyAvg = months.map((_, i) => avg(data.map((r) => r.values[i]))),
-    overallFirst = monthlyAvg[0],
-    overallLast = monthlyAvg[lastIdx],
-    overallDelta = overallLast - overallFirst;
+  // المتوسط العام لكل شهر (عبر كل المناطق التي عندها قيمة في هذا الشهر)
+  const monthlyAvg = months.map((_, i) => {
+    const known = data.map((r) => r.values[i]).filter((v) => v !== null);
+    return known.length ? avg(known) : null;
+  });
+  const overallFirst = firstNonNull(monthlyAvg),
+    overallLast = lastNonNull(monthlyAvg),
+    overallDelta = overallFirst !== null && overallLast !== null ? overallLast - overallFirst : null;
 
-  const sortedByLast = [...stats].sort((a, b) => b.last - a.last),
-    best = sortedByLast[0],
-    worst = sortedByLast[sortedByLast.length - 1],
-    sortedByDelta = [...stats].sort((a, b) => a.delta - b.delta),
-    mostDeclined = sortedByDelta[0],
-    mostImproved = sortedByDelta[sortedByDelta.length - 1];
+  const withLast = stats.filter((r) => r.last !== null);
+  const sortedByLast = [...withLast].sort((a, b) => b.last - a.last),
+    best = sortedByLast[0] || null,
+    worst = sortedByLast[sortedByLast.length - 1] || null;
+  const withDelta = stats.filter((r) => r.delta !== null);
+  const sortedByDelta = [...withDelta].sort((a, b) => a.delta - b.delta),
+    mostDeclined = sortedByDelta[0] || null,
+    mostImproved = sortedByDelta[sortedByDelta.length - 1] || null;
 
   const deltaColor = (d) => (d > 0 ? "#059669" : d < 0 ? "#DC2626" : "#64748B"),
     deltaArrow = (d) => (d > 0 ? "▲" : d < 0 ? "▼" : "—"),
-    deltaText = (d) => `${d > 0 ? "+" : ""}${d.toFixed(2)}`;
+    deltaText = (d) => (d === null ? "—" : `${d > 0 ? "+" : ""}${d.toFixed(2)}`),
+    pctText = (v) => (v === null ? "—" : v.toFixed(2) + "%");
 
-  // 🔮 حساب التوقع المستقبلي لكل منطقة (انظر إعداد MAG_KPI_FORECAST_MONTHS أعلى الملف)
-  const nFuture = MAG_KPI_FORECAST_MONTHS,
-    futureMonths = Array.from(
-      { length: nFuture },
-      (_, i) => MAG_KPI_FUTURE_MONTH_NAMES[i] || `شهر +${i + 1}`,
-    ),
+  // 🔮 حساب التوقع المستقبلي لكل منطقة
+  const nFuture = KPI_FORECAST_MONTHS,
+    lastMeta = monthMeta[lastIdx],
+    futureMonths = Array.from({ length: nFuture }, (_, i) => {
+      const totalNum = lastMeta.num + i + 1, // شهر مطلق متتالي بعد آخر شهر فعلي
+        num = ((totalNum - 1) % 12) + 1,
+        year = lastMeta.year + Math.floor((totalNum - 1) / 12);
+      return `${KPI_MONTH_NAME_BY_NUM[num]} ${year}`;
+    }),
     forecastByRegion = data.map((r) => linearForecast(r.values, nFuture));
+
+  const contractCol = hasContract ? `<th style="min-width:120px">رقم العقد</th>` : "";
+  const contractCell = (r) =>
+    hasContract
+      ? `<td style="font-family:monospace;font-size:11px;font-weight:700;color:#0891B2">${esc(r.contract || "—")}</td>`
+      : "";
+  const contractSuffix = (c) => (hasContract && c ? ` · عقد ${esc(c)}` : "");
 
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
       <div class="card" style="border-top:3px solid #0891B2">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط الأداء العام — ${esc(months[lastIdx])} 2026</div>
-        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${overallLast.toFixed(1)}%</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${data.length.toLocaleString()} مناطق</div>
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط الأداء العام — ${esc(months[lastIdx])}</div>
+        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${pctText(overallLast)}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${data.length.toLocaleString()} ${esc(entityLabel)}</div>
       </div>
-      <div class="card" style="border-top:3px solid ${deltaColor(overallDelta)}">
+      <div class="card" style="border-top:3px solid ${deltaColor(overallDelta || 0)}">
         <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">التغير منذ ${esc(months[0])}</div>
-        <div style="font-size:26px;font-weight:800;color:${deltaColor(overallDelta)};letter-spacing:-.02em">${deltaArrow(overallDelta)} ${deltaText(overallDelta)}</div>
+        <div style="font-size:26px;font-weight:800;color:${deltaColor(overallDelta || 0)};letter-spacing:-.02em">${overallDelta === null ? "—" : `${deltaArrow(overallDelta)} ${deltaText(overallDelta)}`}</div>
         <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">نقطة مئوية (متوسط عام)</div>
       </div>
       <div class="card" style="border-top:3px solid #059669">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أفضل منطقة أداءً</div>
-        <div style="font-size:20px;font-weight:800;color:#059669;letter-spacing:-.02em">${esc(best.region)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${best.last.toFixed(1)}% · عقد ${esc(best.contract)}</div>
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أفضل ${esc(entityLabel)} أداءً</div>
+        <div style="font-size:20px;font-weight:800;color:#059669;letter-spacing:-.02em">${best ? esc(best.region) : "—"}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${best ? pctText(best.last) + contractSuffix(best.contract) : "—"}</div>
       </div>
       <div class="card" style="border-top:3px solid #DC2626">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">تحتاج متابعة مع المقاول</div>
-        <div style="font-size:20px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${esc(mostDeclined.region)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${deltaText(mostDeclined.delta)} نقطة · عقد ${esc(mostDeclined.contract)}</div>
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${esc(followUpLabel)}</div>
+        <div style="font-size:20px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${mostDeclined ? esc(mostDeclined.region) : "—"}</div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${mostDeclined ? deltaText(mostDeclined.delta) + " نقطة" + contractSuffix(mostDeclined.contract) : "—"}</div>
       </div>
     </div>
 
     <div class="card mb14">
-      <div class="card-title">📈 تطور مؤشر الأداء الشهري حسب المنطقة <span class="sub">${esc(months[0])} – ${esc(months[lastIdx])} 2026 (فعلي) + توقع ${nFuture} شهور قادمة</span></div>
-      <div class="chart-box" style="height:380px"><canvas id="ch-mag-kpi-line"></canvas></div>
+      <div class="card-title">تطور مؤشر الأداء الشهري حسب المنطقة <span class="sub">${esc(months[0])} – ${esc(months[lastIdx])} (فعلي) + توقع ${nFuture} شهور قادمة</span></div>
+      <div class="chart-box" style="height:380px"><canvas id="${chartId}"></canvas></div>
       <div style="font-size:11px;color:var(--tx-muted);margin-top:10px;display:flex;align-items:center;gap:6px">
         <span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #64748B"></span>
-        الخط المنقّط = توقع تقديري بانحدار خطي بسيط من اتجاه البيانات الفعلية، وليس تأكيدًا — للمتابعة الفعلية مع المقاول
+        الخط المنقّط = توقع تقديري بانحدار خطي بسيط من اتجاه البيانات الفعلية، وليس تأكيدًا — للمتابعة الفعلية
       </div>
     </div>
 
     <div class="card mb14">
-      <div class="card-title">🔍 تحليل الأداء</div>
+      <div class="card-title">تحليل الأداء</div>
       <div style="font-size:13px;line-height:2;color:var(--tx-main)">
-        ${magKpiAnalysisHTML(stats, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta)}
+        ${kpiAnalysisHTML_(stats, months, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta, hasContract)}
       </div>
     </div>
 
     <div class="card">
       <div class="card-title" style="margin-bottom:14px">
-        تفصيل مؤشرات الأداء حسب المنطقة وعقد المقاول
-        <span class="sub">${data.length.toLocaleString()} مناطق</span>
+        تفصيل مؤشرات الأداء حسب المنطقة${hasContract ? " والعقد" : ""}
+        <span class="sub">${data.length.toLocaleString()} ${esc(entityLabel)}</span>
       </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
             <th style="text-align:right;padding-right:14px;min-width:100px">المنطقة</th>
-            <th style="min-width:120px">رقم عقد المقاول</th>
+            ${contractCol}
             ${months.map((m) => `<th style="min-width:78px">${esc(m)}</th>`).join("")}
             <th style="min-width:90px">المتوسط</th>
             <th style="min-width:90px">التغير</th>
@@ -3819,11 +3975,11 @@ function renderMagKpiTab() {
               .map(
                 (r) => `<tr>
               <td style="text-align:right;padding-right:14px;font-weight:700">${esc(r.region)}</td>
-              <td style="font-family:monospace;font-size:11px;font-weight:700;color:#0891B2">${esc(r.contract)}</td>
-              ${r.values.map((v) => `<td style="font-weight:600">${v.toFixed(2)}%</td>`).join("")}
-              <td style="font-weight:700">${r.avgVal.toFixed(2)}%</td>
-              <td style="font-weight:700;color:${deltaColor(r.delta)}">${deltaArrow(r.delta)} ${deltaText(r.delta)}</td>
-              <td><span style="background:${tierBg(r.last)};color:${tierColor(r.last)};border:1px solid ${tierColor(r.last)}33;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">${TIER[r.tier]?.label || "—"}</span></td>
+              ${contractCell(r)}
+              ${r.values.map((v) => `<td style="font-weight:600">${v === null ? "—" : v.toFixed(2) + "%"}</td>`).join("")}
+              <td style="font-weight:700">${pctText(r.avgVal)}</td>
+              <td style="font-weight:700;color:${deltaColor(r.delta || 0)}">${r.delta === null ? "—" : `${deltaArrow(r.delta)} ${deltaText(r.delta)}`}</td>
+              <td>${r.tier ? `<span style="background:${tierBg(r.last)};color:${tierColor(r.last)};border:1px solid ${tierColor(r.last)}33;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">${TIER[r.tier]?.label || "—"}</span>` : "—"}</td>
             </tr>`,
               )
               .join("")}
@@ -3833,13 +3989,14 @@ function renderMagKpiTab() {
     </div>`;
 
   requestAnimationFrame(() => {
-    killChart("ch-mag-kpi-line");
-    CHARTS["ch-mag-kpi-line"] = new Chart(document.getElementById("ch-mag-kpi-line"), {
+    killChart(chartId);
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    CHARTS[chartId] = new Chart(canvas, {
       type: "line",
       data: {
-        labels: [...months, ...futureMonths].map((m) => `${m} 2026`),
+        labels: [...months, ...futureMonths],
         datasets: [
-          // الخط الفعلي (متصل) — بيانات حقيقية فقط، فاضي (null) في شهور التوقع
           ...data.map((r, i) => ({
             label: r.region,
             data: [...r.values, ...Array(nFuture).fill(null)],
@@ -3850,14 +4007,13 @@ function renderMagKpiTab() {
             pointRadius: 4,
             pointHoverRadius: 6,
             pointBackgroundColor: PALETTE[i % PALETTE.length],
+            spanGaps: !0,
           })),
-          // خط التوقع (منقّط) — بيبدأ من آخر نقطة فعلية عشان يكمّل بصريًا
-          // وبيتحسب تلقائي من linearForecast() فوق — مفيش أرقام يدوية هنا
           ...data.map((r, i) => ({
             label: r.region + " (توقع)",
             data: [
               ...Array(months.length - 1).fill(null),
-              r.values[r.values.length - 1],
+              lastNonNull(r.values),
               ...forecastByRegion[i],
             ],
             borderColor: PALETTE[i % PALETTE.length],
@@ -3869,6 +4025,7 @@ function renderMagKpiTab() {
             pointStyle: "rectRot",
             pointHoverRadius: 5,
             pointBackgroundColor: PALETTE[i % PALETTE.length],
+            spanGaps: !0,
           })),
           {
             label: "المتوسط العام",
@@ -3879,6 +4036,7 @@ function renderMagKpiTab() {
             tension: 0.3,
             pointRadius: 0,
             fill: !1,
+            spanGaps: !0,
           },
         ],
       },
@@ -3892,7 +4050,6 @@ function renderMagKpiTab() {
               font: { size: 10 },
               boxWidth: 12,
               padding: 10,
-              // إخفاء مدخلات "(توقع)" من الليجند عشان مايتكررش اسم المنطقة مرتين
               filter: (item) => !String(item.text || "").includes("(توقع)"),
             },
           },
@@ -3911,40 +4068,70 @@ function renderMagKpiTab() {
   });
 }
 
-function magKpiAnalysisHTML(stats, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta) {
-  const m = MAG_KPI_MONTHS,
-    last = m.length - 1,
-    trendWord = overallDelta > 0.05 ? "تحسّناً" : overallDelta < -0.05 ? "تراجعاً" : "استقراراً نسبياً",
+function kpiAnalysisHTML_(stats, months, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta, hasContract) {
+  const last = months.length - 1,
+    trendWord = overallDelta === null ? null : overallDelta > 0.05 ? "تحسّناً" : overallDelta < -0.05 ? "تراجعاً" : "استقراراً نسبياً",
+    contractTxt = (c) => (hasContract && c ? ` (عقد ${esc(c)})` : ""),
     lines = [];
 
-  lines.push(
-    `سجّل متوسط مؤشر الأداء العام ${trendWord} خلال الفترة من ${esc(m[0])} إلى ${esc(m[last])} 2026، منتقلاً من ${monthlyAvg[0].toFixed(1)}% إلى ${monthlyAvg[last].toFixed(1)}% (${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(1)} نقطة مئوية).`,
-  );
-
-  lines.push(
-    `<strong>${esc(best.region)}</strong> تتصدّر المناطق بمتوسط أداء ${best.avgVal.toFixed(1)}% (عقد ${esc(best.contract)})، بينما تسجّل <strong>${esc(worst.region)}</strong> أدنى متوسط أداء بـ ${worst.avgVal.toFixed(1)}% (عقد ${esc(worst.contract)}).`,
-  );
-
-  if (mostDeclined.delta < -3) {
+  if (trendWord && monthlyAvg[0] !== null && monthlyAvg[last] !== null) {
     lines.push(
-      `⚠️ منطقة <strong>${esc(mostDeclined.region)}</strong> (عقد المقاول ${esc(mostDeclined.contract)}) سجّلت أكبر تراجع بمقدار ${Math.abs(mostDeclined.delta).toFixed(1)} نقطة بين ${esc(m[0])} (${mostDeclined.first.toFixed(1)}%) و${esc(m[last])} (${mostDeclined.last.toFixed(1)}%)، وتحتاج متابعة مباشرة مع المقاول لمعرفة الأسباب ووضع خطة تصحيحية.`,
+      `سجّل متوسط مؤشر الأداء العام ${trendWord} خلال الفترة من ${esc(months[0])} إلى ${esc(months[last])}، منتقلاً من ${monthlyAvg[0].toFixed(1)}% إلى ${monthlyAvg[last].toFixed(1)}% (${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(1)} نقطة مئوية).`,
     );
   }
 
-  if (mostImproved.delta > 3) {
+  if (best && worst) {
     lines.push(
-      `✅ منطقة <strong>${esc(mostImproved.region)}</strong> (عقد ${esc(mostImproved.contract)}) حقّقت أفضل تحسّن بمقدار +${mostImproved.delta.toFixed(1)} نقطة، ما يعكس التزاماً جيداً بمستوى الخدمة المتعاقد عليه.`,
+      `<strong>${esc(best.region)}</strong> تتصدّر المناطق بمتوسط أداء ${best.avgVal.toFixed(1)}%${contractTxt(best.contract)}، بينما تسجّل <strong>${esc(worst.region)}</strong> أدنى متوسط أداء بـ ${worst.avgVal.toFixed(1)}%${contractTxt(worst.contract)}.`,
     );
   }
 
-  const belowTarget = stats.filter((r) => r.last < 75);
-  lines.push(
-    belowTarget.length
-      ? `${belowTarget.length === 1 ? "منطقة واحدة" : belowTarget.length + " مناطق"} (${belowTarget.map((r) => esc(r.region)).join("، ")}) أقل من نسبة 75% المستهدفة (تصنيف "جيد جداً") في آخر شهر مرصود، وتحتاج خطة تحسين من المقاول المختص بكل عقد.`
-      : `جميع المناطق حافظت على أداء 75% فأعلى (تصنيف "جيد جداً") خلال آخر شهر مرصود.`,
-  );
+  if (mostDeclined && mostDeclined.delta < -3) {
+    lines.push(
+      `⚠️ منطقة <strong>${esc(mostDeclined.region)}</strong>${contractTxt(mostDeclined.contract)} سجّلت أكبر تراجع بمقدار ${Math.abs(mostDeclined.delta).toFixed(1)} نقطة، وتحتاج متابعة مباشرة لمعرفة الأسباب ووضع خطة تصحيحية.`,
+    );
+  }
 
-  return lines.map((t) => `<p style="margin:0 0 10px">${t}</p>`).join("");
+  if (mostImproved && mostImproved.delta > 3) {
+    lines.push(
+      `✅ منطقة <strong>${esc(mostImproved.region)}</strong>${contractTxt(mostImproved.contract)} حقّقت أفضل تحسّن بمقدار +${mostImproved.delta.toFixed(1)} نقطة، ما يعكس التزاماً جيداً بمستوى الخدمة المتعاقد عليه.`,
+    );
+  }
+
+  const belowTarget = stats.filter((r) => r.last !== null && r.last < 75);
+  if (belowTarget.length || stats.some((r) => r.last !== null)) {
+    lines.push(
+      belowTarget.length
+        ? `${belowTarget.length === 1 ? "منطقة واحدة" : belowTarget.length + " مناطق"} (${belowTarget.map((r) => esc(r.region)).join("، ")}) أقل من نسبة 75% المستهدفة (تصنيف "جيد جداً") في آخر شهر مرصود، وتحتاج خطة تحسين.`
+        : `جميع المناطق حافظت على أداء 75% فأعلى (تصنيف "جيد جداً") خلال آخر شهر مرصود.`,
+    );
+  }
+
+  return lines.length
+    ? lines.map((t) => `<p style="margin:0 0 10px">${t}</p>`).join("")
+    : `<p style="margin:0;color:var(--tx-muted)">لا تتوفر بيانات كافية بعد لبناء تحليل — أضف قيم الشهور في الشيت.</p>`;
+}
+
+function renderMagKpiTab() {
+  renderKpiTabGeneric_({
+    containerId: "mag-kpi-content",
+    chartId: "ch-mag-kpi-line",
+    rawRows: window.RAW_MAG_KPI || [],
+    entityLabel: "مناطق",
+    followUpLabel: "تحتاج متابعة مع المقاول",
+    emptyIcon: "📊",
+  });
+}
+
+function renderConsultantKpiTab() {
+  renderKpiTabGeneric_({
+    containerId: "consultant-kpi-content",
+    chartId: "ch-consultant-kpi-line",
+    rawRows: window.RAW_CONSULTANT_KPI || [],
+    entityLabel: "مناطق",
+    followUpLabel: "تحتاج متابعة مع الاستشاري",
+    emptyIcon: "📈",
+  });
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -10946,30 +11133,39 @@ function renderTajheezAllTable() {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 📊 تبويب مؤشرات الأداء للمقاول (MAG_KPI_DATA — بيانات ثابتة في الكود)
+    // 📊 مؤشرات الأداء (مقاول + استشاري) — تُقرأ من الشيت مباشرة
     // ════════════════════════════════════════════════════════════════
+    const summarizeKpi_ = (rawRows) => {
+      const { months, data } = buildKpiSeries_(rawRows || []);
+      if (!months.length || !data.length) return null;
+      const kpiRows = data.map((r) => {
+        const known = r.values.filter((v) => v !== null);
+        const avgVal = known.length ? +(known.reduce((a, b) => a + b, 0) / known.length).toFixed(2) : null;
+        const last = (() => { for (let i = r.values.length - 1; i >= 0; i--) if (r.values[i] !== null) return r.values[i]; return null; })();
+        const monthData = {};
+        months.forEach((m, i) => { if (r.values[i] != null) monthData[m] = r.values[i]; });
+        return { المنطقة: r.region, رقم_العقد: r.contract || undefined, متوسط_الأداء: avgVal, آخر_شهر: last, الأداء_الشهري: monthData };
+      });
+      const withAvg = kpiRows.filter((r) => r.متوسط_الأداء !== null);
+      const أقل_منطقة = withAvg.length ? withAvg.reduce((a, b) => (a.متوسط_الأداء < b.متوسط_الأداء ? a : b)) : null;
+      return {
+        الشهور_المتاحة: months,
+        تفاصيل_حسب_المنطقة: kpiRows,
+        أقل_منطقة_أداءً: أقل_منطقة?.المنطقة,
+        متوسط_الأداء_الكلي: withAvg.length ? +(withAvg.reduce((s, r) => s + r.متوسط_الأداء, 0) / withAvg.length).toFixed(2) : null,
+      };
+    };
     try {
-      if (typeof MAG_KPI_DATA !== "undefined" && Array.isArray(MAG_KPI_DATA) && MAG_KPI_DATA.length) {
-        const months = typeof MAG_KPI_MONTHS !== "undefined" ? MAG_KPI_MONTHS : [];
-        const kpiRows = MAG_KPI_DATA.map(r => {
-          const vals = r.values || [];
-          const avg  = vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : null;
-          const last = vals.length ? vals[vals.length-1] : null;
-          const monthData = {};
-          months.forEach((m,i) => { if (vals[i] != null) monthData[m] = vals[i]; });
-          return { المنطقة: r.region, رقم_العقد: r.contract, متوسط_الأداء: avg, آخر_شهر: last, الأداء_الشهري: monthData };
-        });
-        const أقل_منطقة = kpiRows.reduce((a,b)=>(a.متوسط_الأداء||100)<(b.متوسط_الأداء||100)?a:b, kpiRows[0]);
-        summary.مؤشرات_أداء_المقاول = {
-          مصدر: "تبويب مؤشرات الأداء — MAG_KPI_DATA",
-          الشهور_المتاحة: months,
-          تفاصيل_حسب_المنطقة: kpiRows,
-          أقل_منطقة_أداءً: أقل_منطقة?.المنطقة,
-          متوسط_الأداء_الكلي: kpiRows.length ? +(kpiRows.reduce((s,r)=>s+(r.متوسط_الأداء||0),0)/kpiRows.length).toFixed(2) : null,
-        };
-      }
+      const mag = summarizeKpi_(window.RAW_MAG_KPI);
+      if (mag) summary.مؤشرات_أداء_المقاول = { مصدر: "تبويب مؤشرات الأداء للمقاول — شيت مؤشرات_الأداء_للمقاول", ...mag };
     } catch (e) {
-      summary.مؤشرات_أداء_المقاول = { تنبيه: "تعذّر تلخيص مؤشرات الأداء: " + (e?.message || e) };
+      summary.مؤشرات_أداء_المقاول = { تنبيه: "تعذّر تلخيص مؤشرات أداء المقاول: " + (e?.message || e) };
+    }
+    try {
+      const con = summarizeKpi_(window.RAW_CONSULTANT_KPI);
+      if (con) summary.مؤشرات_أداء_الاستشاري = { مصدر: "تبويب مؤشرات أداء الاستشاري — شيت مؤشرات_اداء_الاستشاري", ...con };
+    } catch (e) {
+      summary.مؤشرات_أداء_الاستشاري = { تنبيه: "تعذّر تلخيص مؤشرات أداء الاستشاري: " + (e?.message || e) };
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -12683,10 +12879,10 @@ ${JSON.stringify(priorityData)}`;
   }
 
   function exportRecruitCSV(rows) {
-    var headers = ["المنطقة", "الموقع/العقد", "المسمى الوظيفي", "رقم الموظف", "اسم الموظف", "المصدر", "الحالة", "تاريخ الانضمام", "نهاية العقد", "ملاحظات"];
+    var headers = ["المنطقة", "الموقع/العقد", "المسمى الوظيفي", "رقم الموظف", "اسم الموظف", "الحالة", "تاريخ الانضمام", "نهاية العقد", "ملاحظات"];
     var csv = [headers.map(function (h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(",")];
     rows.forEach(function (r) {
-      var vals = [r.region, r.zone, r.title, r.empId, r.empName, r.source, STATUS_AR[r.status] || r.status, r.doj, r.contractEnd, r.remarks].map(function (v) {
+      var vals = [r.region, r.zone, r.title, r.empId, r.empName, STATUS_AR[r.status] || r.status, r.doj, r.contractEnd, r.remarks].map(function (v) {
         return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
       });
       csv.push(vals.join(","));
@@ -12810,11 +13006,10 @@ ${JSON.stringify(priorityData)}`;
               '<td style="text-align:right;font-weight:700">' + esc_(r.title || "—") + "</td>" +
               '<td style="text-align:right">' + esc_(r.empName || "—") + "</td>" +
               "<td>" + statusBadge(r.status) + "</td>" +
-              "<td>" + esc_(r.source || "—") + "</td>" +
               "</tr>"
             );
           }).join("")
-        : '<tr><td colspan="6"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>';
+        : '<tr><td colspan="5"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>';
 
       el.innerHTML =
         '<div class="card mb14">' +
@@ -12891,7 +13086,7 @@ ${JSON.stringify(priorityData)}`;
         '<div class="tbl-wrap"><table><thead><tr>' +
         "<th>المنطقة</th><th style=\"text-align:right\">الموقع/العقد</th>" +
         "<th style=\"text-align:right\">المسمى الوظيفي</th><th style=\"text-align:right\">اسم الموظف</th>" +
-        "<th>الحالة</th><th>المصدر</th>" +
+        "<th>الحالة</th>" +
         "</tr></thead><tbody>" + rowsHtml + "</tbody></table></div>" +
         renderPager(filteredTotal) +
         "</div>";

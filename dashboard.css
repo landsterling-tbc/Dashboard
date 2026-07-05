@@ -3425,3 +3425,6 @@ body, html {
   .ix-info-grid, .ix-info-grid2 { grid-template-columns: 1fr 1fr !important; }
   .ix-panel-body { padding: 16px 14px 24px !important; }
 }
+
+/* تولتيب أرقام المدفوعات — يُبنى بالكامل عبر JS (انظر dashboard.js) */
+.pay-tip { cursor: help; }

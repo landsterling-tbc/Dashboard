@@ -236,7 +236,7 @@ const CFG = {
     // اتركه فارغاً لو البلاغات في نفس الـ GAS_URL كشيت منفصلة
     // أو ضع رابط CSV مباشر من Google Drive: ?export&format=csv
     BALAGH_SHEET_KEY: "balaghReports", // المفتاح في SHEET_NAMES
-    OPENAI_MODEL: "gpt-4o-mini", // الموديل الافتراضي لو المستخدم لم يحدد موديل آخر في الإعدادات
+    OPENAI_MODEL: "gpt-5.4", // الموديل ثابت بالكود
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
     // 🔒 رابط الوسيط (Proxy) على Deno Deploy — يحتفظ بمفتاح OpenAI بأمان
     // في الباك إند بدل أن يدخله كل مستخدم بنفسه. عند تعبئة هذا الرابط،
@@ -2712,6 +2712,11 @@ function renderTable() {
       console.log("[FCA] latestFcaMap:", Object.keys(latestFcaMap).length, "مدرسة مقيّمة");
     })();
 
+    // 🔄 رقم إصدار البيانات — يزيد كل مرة تُعاد فيها بناء RAW من الشيت
+    // (يُستخدم في fcbBuildDashboardSummary لعمل كاش ذكي: نحسب الملخص
+    // الثقيل مرة واحدة فقط عند تحديث البيانات، مش مع كل رسالة شات).
+    window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1;
+
 
 
     (setProgress(75),
@@ -4867,6 +4872,24 @@ function renderAllContractsBody() {
     byContractor[ctr] = (byContractor[ctr] || 0) + 1;
   });
 
+  // تفصيل مالي كامل لكل مقاول: عدد العقود + القيم + المستخلصات + المستحق
+  const contractorFin = {};
+  data.forEach((r) => {
+    const ctr = acNormContractor(r["المقاول"]) || "غير محدد";
+    if (!contractorFin[ctr])
+      contractorFin[ctr] = { count: 0, base: 0, updated: 0, spent: 0, due: 0, lastInvoice: 0 };
+    const f = contractorFin[ctr];
+    f.count++;
+    f.base += num(r["قيمة العقد الأساسي"]) || 0;
+    f.updated += num(r["قيمة العقد المحدثة"]) || 0;
+    f.spent += num(r["تراكمي المستخلصات المصروفة"]) || 0;
+    f.due += num(r["القيمة المستحقة للمستخلصات حتى تاريخه"]) || 0;
+    f.lastInvoice += num(r["القيمة"]) || 0;
+  });
+  const contractorFinRows = Object.entries(contractorFin)
+    .map(([name, f]) => ({ name, ...f }))
+    .sort((a, b) => b.updated - a.updated);
+
   const regionColors = ["#0891B2", "#059669", "#D97706", "#7C3AED", "#DC2626", "#0E7490", "#DB2777", "#65A30D"];
   const regions = Object.keys(byRegion);
   const topContractors = Object.entries(byContractor)
@@ -4919,6 +4942,63 @@ function renderAllContractsBody() {
         <span class="sub">أعلى ${topContractors.length} مقاول</span>
       </div>
       <div class="chart-box" style="height:${Math.max(220, topContractors.length * 28)}px"><canvas id="ch-ac-contractor"></canvas></div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">💰 قيمة العقود (المحدثة) والمستخلصات المصروفة لكل مقاول
+        <span class="sub">أعلى ${Math.min(contractorFinRows.length, 15)} مقاول</span>
+      </div>
+      <div class="chart-box" style="height:${Math.max(260, Math.min(contractorFinRows.length, 15) * 32)}px"><canvas id="ch-ac-contractor-value"></canvas></div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">💰 القيم المالية لكل مقاول
+        <span class="sub">${contractorFinRows.length} مقاول</span>
+      </div>
+      <div style="overflow:auto;max-height:420px;border:1px solid var(--bd-light);border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead style="position:sticky;top:0;background:var(--bg-2);z-index:1">
+            <tr style="text-align:right">
+              <th style="padding:8px 10px">المقاول</th>
+              <th style="padding:8px 10px">عدد العقود</th>
+              <th style="padding:8px 10px">قيمة العقد الأساسي</th>
+              <th style="padding:8px 10px">قيمة العقد المحدثة</th>
+              <th style="padding:8px 10px">إجمالي المستخلصات المصروفة</th>
+              <th style="padding:8px 10px">القيمة المستحقة</th>
+              <th style="padding:8px 10px">آخر مستخلص</th>
+              <th style="padding:8px 10px">% الصرف من المحدثة</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${contractorFinRows
+              .map(
+                (c, i) => `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">
+                  <td style="padding:9px 10px;font-weight:700">${esc(c.name)}</td>
+                  <td style="padding:9px 10px;font-weight:700;color:#0891B2">${c.count}</td>
+                  <td style="padding:9px 10px">${fmt(c.base, 0)} ر.س</td>
+                  <td style="padding:9px 10px;font-weight:700;color:#7C3AED">${fmt(c.updated, 0)} ر.س</td>
+                  <td style="padding:9px 10px;color:#0E7490">${fmt(c.spent, 0)} ر.س</td>
+                  <td style="padding:9px 10px;font-weight:700;color:${c.due > 0 ? "#DC2626" : "var(--tx-muted)"}">${fmt(c.due, 0)} ر.س</td>
+                  <td style="padding:9px 10px">${fmt(c.lastInvoice, 0)} ر.س</td>
+                  <td style="padding:9px 10px">${c.updated ? Math.round((c.spent / c.updated) * 100) : 0}%</td>
+                </tr>`,
+              )
+              .join("")}
+          </tbody>
+          <tfoot>
+            <tr style="border-top:2px solid var(--bd-mid);font-weight:800;background:#fbfdfe;position:sticky;bottom:0">
+              <td style="padding:9px 10px">الإجمالي</td>
+              <td style="padding:9px 10px;color:#0891B2">${contractorFinRows.reduce((s, c) => s + c.count, 0)}</td>
+              <td style="padding:9px 10px">${fmt(contractorFinRows.reduce((s, c) => s + c.base, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#7C3AED">${fmt(contractorFinRows.reduce((s, c) => s + c.updated, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#0E7490">${fmt(contractorFinRows.reduce((s, c) => s + c.spent, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#DC2626">${fmt(contractorFinRows.reduce((s, c) => s + c.due, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px">${fmt(contractorFinRows.reduce((s, c) => s + c.lastInvoice, 0), 0)} ر.س</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
 
     <div class="card mb14">
@@ -5075,6 +5155,58 @@ function renderAllContractsBody() {
             plugins: { legend: { display: !1 } },
             scales: {
               x: { beginAtZero: !0, ticks: { stepSize: 1 } },
+              y: { ticks: { font: { size: 10 } } },
+            },
+          },
+        })));
+
+      const topValRows = contractorFinRows.slice(0, 15);
+      const valLabels = topValRows.map((c) => c.name);
+      (killChart("ch-ac-contractor-value"),
+        (CHARTS["ch-ac-contractor-value"] = new Chart(document.getElementById("ch-ac-contractor-value"), {
+          type: "bar",
+          data: {
+            labels: valLabels,
+            datasets: [
+              {
+                label: "قيمة العقد المحدثة",
+                data: topValRows.map((c) => c.updated),
+                backgroundColor: "#7C3AED99",
+                borderColor: "#7C3AED",
+                borderWidth: 1.5,
+                borderRadius: 4,
+              },
+              {
+                label: "المستخلصات المصروفة",
+                data: topValRows.map((c) => c.spent),
+                backgroundColor: "#0E749099",
+                borderColor: "#0E7490",
+                borderWidth: 1.5,
+                borderRadius: 4,
+              },
+              {
+                label: "القيمة المستحقة",
+                data: topValRows.map((c) => c.due),
+                backgroundColor: "#DC262699",
+                borderColor: "#DC2626",
+                borderWidth: 1.5,
+                borderRadius: 4,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            maintainAspectRatio: !1,
+            plugins: {
+              legend: { position: "top", labels: { font: { size: 11 } } },
+              tooltip: {
+                callbacks: {
+                  label: (c) => `${c.dataset.label}: ${Math.round(c.parsed.x).toLocaleString("en-US")} ر.س`,
+                },
+              },
+            },
+            scales: {
+              x: { beginAtZero: !0, ticks: { callback: (v) => Number(v).toLocaleString("en-US") } },
               y: { ticks: { font: { size: 10 } } },
             },
           },
@@ -7571,7 +7703,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         (Chart.defaults.scale.ticks.padding = 6),
         (Chart.defaults.scale.border = { dash: [3, 3] }),
         (Chart.defaults.scale.title = {
-          display: !0,
+          display: !1,
           color: "#6B8795",
           font: { size: 10, weight: "700" },
         })));
@@ -8875,10 +9007,18 @@ window.renderElevatorsTab = function () {
     });
     let base = 0, updated = 0, paid = 0, remaining = 0, kpi = 0, total = 0;
     dataRows.forEach(r => {
-      base      += payNum(r["Base Contract Value (SAR)"]  || r["Base_Contract_Value_SAR"]  || 0);
-      updated   += payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0);
-      paid      += payNum(r["Payment Released (SAR)"]     || r["Payment_Released_SAR"]     || 0);
-      remaining += payNum(r["Remaining (SAR)"]            || r["Remaining_SAR"]            || 0);
+      const rowBase    = payNum(r["Base Contract Value (SAR)"]    || r["Base_Contract_Value_SAR"]    || 0);
+      const rowUpdated = payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0);
+      const rowPaid    = payNum(r["Payment Released (SAR)"]       || r["Payment_Released_SAR"]       || 0);
+      // لو خانة "المتبقي" فاضية (عقد جديد لسه ما اتصرفش عليه)، احسبها تلقائياً
+      const remRaw = r["Remaining (SAR)"] ?? r["Remaining_SAR"];
+      const rowRemaining = (remRaw === null || remRaw === undefined || remRaw === "")
+        ? Math.max(rowUpdated - rowPaid, 0)
+        : payNum(remRaw);
+      base      += rowBase;
+      updated   += rowUpdated;
+      paid      += rowPaid;
+      remaining += rowRemaining;
       kpi       += payNum(r["KPI Deduction"]              || r["KPI_Deduction"]            || 0);
       total     += payNum(r["Total Deduction"]            || r["Total_Deduction"]          || 0);
     });
@@ -8887,6 +9027,39 @@ window.renderElevatorsTab = function () {
       paid, remaining, kpiDeduction: kpi, totalDeduction: total,
       pct: updated > 0 ? paid / updated : 0,
     };
+  }
+
+  let PAY_TIP_EL = null;
+  function payTipInit(scopeEl) {
+    if (!PAY_TIP_EL) {
+      PAY_TIP_EL = document.createElement("div");
+      PAY_TIP_EL.style.cssText =
+        "position:fixed;background:rgba(7,28,38,.96);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;padding:8px 14px;border-radius:10px;border:1px solid rgba(8,145,178,.35);box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;display:none;z-index:99999;direction:ltr";
+      document.body.appendChild(PAY_TIP_EL);
+    }
+    const root = scopeEl || document;
+    root.querySelectorAll(".pay-tip").forEach((el) => {
+      if (el.dataset.tipBound) return;
+      el.dataset.tipBound = "1";
+      el.addEventListener("mouseenter", () => {
+        PAY_TIP_EL.textContent = el.getAttribute("data-tip") || "";
+        PAY_TIP_EL.style.display = "block";
+      });
+      el.addEventListener("mousemove", (e) => {
+        const pad = 14;
+        let left = e.clientX + pad;
+        let top = e.clientY - 14;
+        const tw = PAY_TIP_EL.offsetWidth, th = PAY_TIP_EL.offsetHeight;
+        if (left + tw > window.innerWidth - 8) left = e.clientX - tw - pad;
+        if (top < 8) top = 8;
+        if (top + th > window.innerHeight - 8) top = window.innerHeight - th - 8;
+        PAY_TIP_EL.style.left = left + "px";
+        PAY_TIP_EL.style.top = top + "px";
+      });
+      el.addEventListener("mouseleave", () => {
+        PAY_TIP_EL.style.display = "none";
+      });
+    });
   }
 
   /* ══════════════════════════════════════
@@ -8940,19 +9113,19 @@ window.renderElevatorsTab = function () {
     <div class="kpi-grid" style="margin-bottom:18px">
       <div class="kpi kc-blue">
         <div class="kpi-icon">💰</div>
-        <div class="kpi-val" title="${payFmtFull(kpi.updatedContract)}">${payFmt(kpi.updatedContract)}</div>
+        <div class="kpi-val pay-tip" data-tip="${payFmtFull(kpi.updatedContract)} ريال">${payFmt(kpi.updatedContract)}</div>
         <div class="kpi-lbl">إجمالي قيمة العقود المحدثة</div>
         <div class="kpi-sub" style="font-size:10px;opacity:.7">القيمة الأصلية: ${payFmt(kpi.baseContract)}</div>
       </div>
       <div class="kpi kc-green">
         <div class="kpi-icon">✅</div>
-        <div class="kpi-val" title="${payFmtFull(kpi.paid)}">${payFmt(kpi.paid)}</div>
+        <div class="kpi-val pay-tip" data-tip="${payFmtFull(kpi.paid)} ريال">${payFmt(kpi.paid)}</div>
         <div class="kpi-lbl">المدفوعات المصروفة</div>
         <div class="kpi-sub">إجمالي ما تم صرفه</div>
       </div>
       <div class="kpi kc-amber">
         <div class="kpi-icon">⏳</div>
-        <div class="kpi-val" title="${payFmtFull(kpi.remaining)}">${payFmt(kpi.remaining)}</div>
+        <div class="kpi-val pay-tip" data-tip="${payFmtFull(kpi.remaining)} ريال">${payFmt(kpi.remaining)}</div>
         <div class="kpi-lbl">المتبقي</div>
         <div class="kpi-sub">المبلغ المتبقي غير المصروف</div>
       </div>
@@ -8971,7 +9144,7 @@ window.renderElevatorsTab = function () {
           <span style="font-size:22px">⚠️</span>
           <div>
             <div style="font-size:11px;color:var(--tx-muted);font-weight:700">خصومات KPI</div>
-            <div style="font-size:22px;font-weight:900;color:#D97706" title="${payFmtFull(kpi.kpiDeduction)}">${payFmt(kpi.kpiDeduction)}</div>
+            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#D97706" data-tip="${payFmtFull(kpi.kpiDeduction)} ريال">${payFmt(kpi.kpiDeduction)}</div>
           </div>
         </div>
         <div style="font-size:10px;color:var(--tx-muted)">خصومات مؤشرات الأداء</div>
@@ -8981,7 +9154,7 @@ window.renderElevatorsTab = function () {
           <span style="font-size:22px">🔻</span>
           <div>
             <div style="font-size:11px;color:var(--tx-muted);font-weight:700">إجمالي الخصومات</div>
-            <div style="font-size:22px;font-weight:900;color:#DC2626" title="${payFmtFull(kpi.totalDeduction)}">${payFmt(kpi.totalDeduction)}</div>
+            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#DC2626" data-tip="${payFmtFull(kpi.totalDeduction)} ريال">${payFmt(kpi.totalDeduction)}</div>
           </div>
         </div>
         <div style="font-size:10px;color:var(--tx-muted)">KPI + خصومات أخرى</div>
@@ -9028,6 +9201,9 @@ window.renderElevatorsTab = function () {
 
     // رسم الشارت
     renderContractsChart(dataRows);
+
+    // تفعيل التولتيب الأنيق لكل أرقام المدفوعات في هذا التبويب
+    payTipInit(el);
   }
 
   /* ══════════════════════════════════════
@@ -9045,7 +9221,10 @@ window.renderElevatorsTab = function () {
       const region     = r["Region"]       || r["المنطقة"]    || "—";
       const updated    = payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0);
       const paid       = payNum(r["Payment Released (SAR)"]       || r["Payment_Released_SAR"]       || 0);
-      const remaining  = payNum(r["Remaining (SAR)"]              || r["Remaining_SAR"]              || 0);
+      const remRaw     = r["Remaining (SAR)"] ?? r["Remaining_SAR"];
+      const remaining  = (remRaw === null || remRaw === undefined || remRaw === "")
+        ? Math.max(updated - paid, 0)
+        : payNum(remRaw);
       const kpiDed     = payNum(r["KPI Deduction"]                || r["KPI_Deduction"]              || 0);
       const pctRaw     = payNum(r["% Paid"]                       || r["Pct_Paid"]                   || 0);
       const pct        = pctRaw <= 1 ? pctRaw * 100 : pctRaw;
@@ -9067,10 +9246,10 @@ window.renderElevatorsTab = function () {
           <div style="height:100%;width:${Math.min(pct, 100).toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width .9s cubic-bezier(.22,.61,.36,1)"></div>
         </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
-          <div><span style="color:var(--tx-muted)">القيمة المحدثة: </span><strong style="color:var(--tx-main)" title="${payFmtFull(updated)}">${payFmt(updated)}</strong></div>
-          <div><span style="color:var(--tx-muted)">المدفوع: </span><strong style="color:#059669" title="${payFmtFull(paid)}">${payFmt(paid)}</strong></div>
-          <div><span style="color:var(--tx-muted)">المتبقي: </span><strong style="color:#D97706" title="${payFmtFull(remaining)}">${payFmt(remaining)}</strong></div>
-          ${kpiDed > 0 ? `<div><span style="color:var(--tx-muted)">خصم KPI: </span><strong style="color:#DC2626" title="${payFmtFull(kpiDed)}">${payFmt(kpiDed)}</strong></div>` : ""}
+          <div><span style="color:var(--tx-muted)">القيمة المحدثة: </span><strong class="pay-tip" style="color:var(--tx-main)" data-tip="${payFmtFull(updated)} ريال">${payFmt(updated)}</strong></div>
+          <div><span style="color:var(--tx-muted)">المدفوع: </span><strong class="pay-tip" style="color:#059669" data-tip="${payFmtFull(paid)} ريال">${payFmt(paid)}</strong></div>
+          <div><span style="color:var(--tx-muted)">المتبقي: </span><strong class="pay-tip" style="color:#D97706" data-tip="${payFmtFull(remaining)} ريال">${payFmt(remaining)}</strong></div>
+          ${kpiDed > 0 ? `<div><span style="color:var(--tx-muted)">خصم KPI: </span><strong class="pay-tip" style="color:#DC2626" data-tip="${payFmtFull(kpiDed)} ريال">${payFmt(kpiDed)}</strong></div>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -9087,7 +9266,12 @@ window.renderElevatorsTab = function () {
     const labels   = rows.map(r => r["Region"] || r["المنطقة"] || "—");
     const updated  = rows.map(r => payNum(r["Updated Contract Value (SAR)"] || r["Updated_Contract_Value_SAR"] || 0));
     const paid     = rows.map(r => payNum(r["Payment Released (SAR)"]       || r["Payment_Released_SAR"]       || 0));
-    const remaining= rows.map(r => payNum(r["Remaining (SAR)"]              || r["Remaining_SAR"]              || 0));
+    const remaining= rows.map((r, i) => {
+      const remRaw = r["Remaining (SAR)"] ?? r["Remaining_SAR"];
+      return (remRaw === null || remRaw === undefined || remRaw === "")
+        ? Math.max(updated[i] - paid[i], 0)
+        : payNum(remRaw);
+    });
 
     PAY_CHART = new Chart(canvas, {
       type: "bar",
@@ -10395,10 +10579,9 @@ function renderTajheezAllTable() {
       if (CFG.PROXY_URL && CFG.PROXY_URL.trim()) return true;
       return this.getApiKey().length > 0;
     },
-    /** اسم الموديل: المحفوظ محلياً، وإلا الافتراضي من CFG */
+    /** اسم الموديل: ثابت بالكود دايماً (CFG.OPENAI_MODEL)، بدون اعتماد على أي إعداد محلي */
     getModel() {
-      const local = (localStorage.getItem("fcb_openai_model") || "").trim();
-      return local || CFG.OPENAI_MODEL || "gpt-5.4-mini";
+      return CFG.OPENAI_MODEL || "gpt-5.4";
     },
     saveSettings(key, model) {
       if (key) localStorage.setItem("fcb_openai_key", key);
@@ -10541,7 +10724,21 @@ function renderTajheezAllTable() {
       .slice(0, n)
       .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
   }
+  // ⚡ كاش الملخص الثقيل — يُعاد حسابه فقط لما تتغيّر البيانات فعلياً
+  // (window.__DATA_REV__)، مش مع كل رسالة شات. ده أكبر مصدر بطء وتكلفة
+  // كان موجود: fcbBuildDashboardSummary كان بيعمل loop/sort كامل على
+  // كل السجلات مع كل سؤال حتى لو البيانات نفسها لم تتغيّر.
+  let __fcbSummaryCache = null;
+  let __fcbSummaryCacheRev = -1;
   function fcbBuildDashboardSummary() {
+    const rev = window.__DATA_REV__ || 0;
+    if (__fcbSummaryCache && __fcbSummaryCacheRev === rev) return __fcbSummaryCache;
+    const built = fcbBuildDashboardSummaryUncached_();
+    __fcbSummaryCache = built;
+    __fcbSummaryCacheRev = rev;
+    return built;
+  }
+  function fcbBuildDashboardSummaryUncached_() {
     const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
     const total = D.length;
     if (!total) {
@@ -10973,7 +11170,10 @@ function renderTajheezAllTable() {
         const pn = (v) => { const n = parseFloat(String(v||0).replace(/,/g,"")); return isNaN(n)?0:n; };
         const paid     = pn(totalRow?.["Payment Released (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Payment Released (SAR)"]||0),0);
         const updated  = pn(totalRow?.["Updated Contract Value (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Updated Contract Value (SAR)"]||0),0);
-        const remaining= pn(totalRow?.["Remaining (SAR)"] || 0) || payData.reduce((s,r)=>s+pn(r["Remaining (SAR)"]||0),0);
+        const remaining= pn(totalRow?.["Remaining (SAR)"] || 0) || payData.reduce((s,r)=>{
+          const remRaw = r["Remaining (SAR)"];
+          return s + ((remRaw === null || remRaw === undefined || remRaw === "") ? Math.max(pn(r["Updated Contract Value (SAR)"]) - pn(r["Payment Released (SAR)"]), 0) : pn(remRaw));
+        },0);
         const pct      = updated > 0 ? ((paid/updated)*100).toFixed(1) : "0";
         summary.المدفوعات = {
           عدد_العقود: payData.length,
@@ -11998,8 +12198,51 @@ function renderTajheezAllTable() {
   /* ════════════════════════════════════════════════════════════════
      💬 سجل المحادثة (للحفاظ على سياق الحوار مع OpenAI)
   ════════════════════════════════════════════════════════════════ */
-  const FCB_HISTORY = [];
+  const FCB_HISTORY_KEY = "fcb_chat_history_v1";
+  const FCB_MEMORY_KEY  = "fcb_memory_facts_v1";
   const FCB_HISTORY_MAX = 12; // آخر 12 رسالة (6 أسئلة + 6 ردود) كسياق
+  const FCB_MEMORY_MAX  = 30; // أقصى عدد حقائق محفوظة عن هذا المستخدم
+
+  // 🧠 "تعلّم" فعلي وبسيط عبر الجلسات: history + memory محفوظين في
+  // localStorage (متصفح المستخدم فقط، زي مفتاح OpenAI بالضبط — نفس
+  // مبدأ الخصوصية المستخدم في AIService). الفرق بين الاتنين:
+  //   • FCB_HISTORY: آخر رسائل المحادثة (سياق قريب المدى).
+  //   • FCB_MEMORY : حقائق/تفضيلات صريحة يطلب المستخدم تذكّرها
+  //     (مثلاً: "تذكر إني مهتم بمدارس جدة") — بتفضل متاحة للموديل
+  //     في كل محادثة جديدة حتى بعد إغلاق المتصفح.
+  function fcbLoadHistory() {
+    try { return JSON.parse(localStorage.getItem(FCB_HISTORY_KEY) || "[]"); }
+    catch (_) { return []; }
+  }
+  function fcbSaveHistory(h) {
+    try { localStorage.setItem(FCB_HISTORY_KEY, JSON.stringify(h.slice(-FCB_HISTORY_MAX))); }
+    catch (_) {}
+  }
+  function fcbLoadMemory() {
+    try { return JSON.parse(localStorage.getItem(FCB_MEMORY_KEY) || "[]"); }
+    catch (_) { return []; }
+  }
+  function fcbSaveMemory(facts) {
+    try { localStorage.setItem(FCB_MEMORY_KEY, JSON.stringify(facts.slice(-FCB_MEMORY_MAX))); }
+    catch (_) {}
+  }
+  /** يكتشف طلب حفظ صريح زي "تذكر إن..." أو "احفظ إن..." ويضيفه للذاكرة */
+  function fcbMaybeLearnFact(userText) {
+    const m = userText.match(/^(?:تذكر|احفظ|لاحظ)\s+(?:إن|ان|أن)?\s*(.+)/i);
+    if (!m || !m[1]) return null;
+    const fact = m[1].trim();
+    if (!fact) return null;
+    const facts = fcbLoadMemory();
+    facts.push({ fact, at: new Date().toISOString() });
+    fcbSaveMemory(facts);
+    return fact;
+  }
+  function fcbForgetAll() {
+    localStorage.removeItem(FCB_HISTORY_KEY);
+    localStorage.removeItem(FCB_MEMORY_KEY);
+  }
+
+  const FCB_HISTORY = fcbLoadHistory();
 
   /* ════════════════════════════════════════════════════════════════
      🤖 استدعاء OpenAI API مع تمرير ملخص بيانات الداشبورد كسياق
@@ -12392,7 +12635,17 @@ ${smartResult ? JSON.stringify(smartResult) : "لا يوجد ناتج محرك �
 ${JSON.stringify(suggestions)}
 
 محرك الأولويات:
-${JSON.stringify(priorityData)}`;
+${JSON.stringify(priorityData)}
+
+══════════════════════════════════════════════════════
+ذاكرة المستخدم — حقائق وتفضيلات طلب المستخدم تذكّرها سابقاً
+══════════════════════════════════════════════════════
+${(() => {
+  const facts = fcbLoadMemory();
+  if (!facts.length) return "لا توجد حقائق محفوظة بعد.";
+  return facts.map((f, i) => `${i + 1}. ${f.fact}`).join("\n");
+})()}
+راعِ هذه التفضيلات تلقائياً في ردودك (مثلاً مدينة أو مقاول يهتم به المستخدم دائماً) دون إعادة سؤاله عنها.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -12405,6 +12658,7 @@ ${JSON.stringify(priorityData)}`;
     FCB_HISTORY.push({ role: "user", content: userText });
     FCB_HISTORY.push({ role: "assistant", content: reply });
     while (FCB_HISTORY.length > FCB_HISTORY_MAX) FCB_HISTORY.shift();
+    fcbSaveHistory(FCB_HISTORY);
 
     return reply;
   }
@@ -12423,6 +12677,27 @@ ${JSON.stringify(priorityData)}`;
     inputEl.style.height = "auto";
     sendBtn.disabled = true;
     fcbShowTyping();
+
+    // 🧠 أمر مسح الذاكرة والمحادثة المحفوظة
+    if (/^(انسَ|انسى|امسح الذاكرة|امسح ذاكرتك)\s*(كل شيء|الكل)?\.?$/i.test(val.trim())) {
+      fcbForgetAll();
+      FCB_HISTORY.length = 0;
+      fcbHideTyping();
+      fcbAppendMsg("🗑️ تم مسح كل الذاكرة والمحادثات المحفوظة.", "bot");
+      sendBtn.disabled = false;
+      inputEl.focus();
+      return;
+    }
+
+    // 🧠 حفظ فوري لو المستخدم طلب صراحةً "تذكر/احفظ/لاحظ ..."
+    const learned = fcbMaybeLearnFact(val);
+    if (learned) {
+      fcbHideTyping();
+      fcbAppendMsg("✅ تم الحفظ في الذاكرة، هستخدمها في كل ردودي القادمة: \"" + learned + "\"", "bot");
+      sendBtn.disabled = false;
+      inputEl.focus();
+      return;
+    }
 
     try {
       if (!AIService.hasKey()) {
@@ -13585,3 +13860,384 @@ ${JSON.stringify(priorityData)}`;
     });
   }
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   إضافة زر تنزيل تلقائي لكل جدول في الصفحة (أي تبويب / أي جدول)
+   Universal auto "Download" button injector for every <table> on the page
+════════════════════════════════════════════════════════════════════ */
+(function () {
+  function tableToAOA(table) {
+    var aoa = [];
+    var rows = table.querySelectorAll("tr");
+    rows.forEach(function (tr) {
+      var style = window.getComputedStyle ? window.getComputedStyle(tr) : null;
+      if (style && style.display === "none") return;
+
+      var cells = tr.querySelectorAll("th,td");
+      if (!cells.length) return;
+      var rowArr = [];
+      cells.forEach(function (cell) {
+        var text = (cell.innerText || cell.textContent || "").replace(/\s+/g, " ").trim();
+        var span = parseInt(cell.getAttribute("colspan") || "1", 10);
+        rowArr.push(text);
+        for (var i = 1; i < span; i++) rowArr.push("");
+      });
+      aoa.push(rowArr);
+    });
+    return aoa;
+  }
+
+  function downloadTableAsCSV(table, filenameBase) {
+    try {
+      var aoa = tableToAOA(table);
+      var csv = aoa
+        .map(function (row) {
+          return row
+            .map(function (cell) {
+              var v = String(cell == null ? "" : cell).replace(/"/g, '""');
+              return '"' + v + '"';
+            })
+            .join(",");
+        })
+        .join("\r\n");
+      var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      var stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = (filenameBase || "جدول") + "_" + stamp + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn("[table-download] فشل تصدير CSV", e);
+    }
+  }
+
+  function downloadTableAsExcel(table, filenameBase) {
+    try {
+      var aoa = tableToAOA(table);
+      if (!aoa.length) {
+        if (typeof showToast === "function") showToast("لا توجد بيانات في الجدول للتنزيل", "warn");
+        return;
+      }
+      if (typeof XLSX === "undefined") {
+        downloadTableAsCSV(table, filenameBase);
+        return;
+      }
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "بيانات");
+      var stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, (filenameBase || "جدول") + "_" + stamp + ".xlsx");
+    } catch (e) {
+      console.warn("[table-download] فشل تصدير Excel، سيتم تجربة CSV", e);
+      downloadTableAsCSV(table, filenameBase);
+    }
+  }
+
+  function guessTableName(table) {
+    var el = table.closest(".card, .panel, .tbl-wrap");
+    var title =
+      (el && el.querySelector(".card-title")) ||
+      (table.closest(".panel") && table.closest(".panel").querySelector(".panel-title, h2, h3"));
+    var activePanel = document.querySelector(".panel.active, .panel[style*='display: block']");
+    var name = title ? title.textContent : activePanel && activePanel.id ? activePanel.id : "جدول";
+    return name.replace(/\s+/g, " ").trim().replace(/[\\/:*?"<>|]/g, "").slice(0, 60) || "جدول";
+  }
+
+  function addButtonToTable(table) {
+    if (table.dataset.dlBtnAdded) return;
+    if (!table.querySelector("tr")) return;
+
+    table.dataset.dlBtnAdded = "1";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "export-btn export-btn-excel tbl-auto-dl-btn";
+    btn.innerHTML = "⬇ <span data-ar=\"تنزيل البيانات\" data-en=\"Download data\">تنزيل البيانات</span>";
+    btn.style.marginBottom = "8px";
+    btn.style.display = "inline-flex";
+    btn.style.alignItems = "center";
+    btn.style.gap = "4px";
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      downloadTableAsExcel(table, guessTableName(table));
+    });
+
+    var bar = document.createElement("div");
+    bar.className = "tbl-auto-dl-bar";
+    bar.style.display = "flex";
+    bar.style.justifyContent = "flex-start";
+    bar.appendChild(btn);
+
+    var wrap = table.closest(".tbl-wrap");
+    if (wrap && wrap.parentElement) {
+      wrap.parentElement.insertBefore(bar, wrap);
+    } else if (table.parentElement) {
+      // مفيش .tbl-wrap (زي جداول الـ KPI modal) → نحط الزر قبل الجدول مباشرة
+      // جوه نفس أب الجدول، عشان يتنضف تلقائيًا لما المودال يتصفّر ويتبني من جديد
+      // (قبل كده كان بيطلع درجة لفوق زيادة ويحط الزر برّه المودال فيتكوم كل مرة تتفتح)
+      table.parentElement.insertBefore(bar, table);
+    }
+  }
+
+  function scanAllTables() {
+    document.querySelectorAll("table").forEach(function (t) {
+      addButtonToTable(t);
+    });
+  }
+
+  setInterval(scanAllTables, 1000);
+  document.addEventListener("DOMContentLoaded", scanAllTables);
+  window.addEventListener("load", scanAllTables);
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   تنزيل التبويب الحالي بالكامل (رسومات بيانية + جداول) كصورة أو PDF
+   Download the current active tab (charts + tables) as PNG or PDF
+════════════════════════════════════════════════════════════════════ */
+function downloadCurrentTab() {
+  var panel = document.querySelector(".panel.active");
+  if (!panel) {
+    if (typeof showToast === "function") showToast("تعذّر تحديد التبويب الحالي", "warn");
+    else alert("تعذّر تحديد التبويب الحالي");
+    return;
+  }
+
+  var btn = document.getElementById("btnDownloadTab");
+  var oldHtml = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = "⏳ <span>جاري التجهيز...</span>"; }
+
+  var titleEl    = document.getElementById("topTitle");
+  var tabTitleEl = panel.querySelector(".card-title, h2, h3");
+  var baseName   = ((tabTitleEl ? tabTitleEl.textContent : "") ||
+                    (titleEl    ? titleEl.textContent    : "") ||
+                    panel.id || "التبويب")
+                   .replace(/\s+/g, " ").trim()
+                   .replace(/[\\/:*?"<>|]/g, "").slice(0, 60) || "التبويب";
+  var stamp = new Date().toISOString().slice(0, 10);
+
+  function finish() {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+  }
+
+  // ── الطريقة: نفتح نافذة طباعة مخصصة ──
+  // المتصفح نفسه يرسم النص العربي بشكل صحيح تمامًا بدون أي مكتبة وسيطة.
+  // نحوّل كل chart canvas لصورة base64 أولًا عشان تظهر في النافذة الجديدة.
+
+  // 1. احتفظ بصور الـ charts
+  var chartImages = [];
+  panel.querySelectorAll("canvas").forEach(function (cv) {
+    try {
+      chartImages.push({
+        id:  cv.id || "",
+        src: (cv.width && cv.height) ? cv.toDataURL("image/png") : "",
+        w:   cv.offsetWidth,
+        h:   cv.offsetHeight,
+      });
+    } catch(e) { chartImages.push({ id: cv.id || "", src: "", w: cv.offsetWidth, h: cv.offsetHeight }); }
+  });
+
+  // 2. استخرج كل ملفات الـ CSS من الصفحة الحالية
+  var cssLinks = Array.from(document.querySelectorAll("link[rel=stylesheet]"))
+    .map(function(l){ return '<link rel="stylesheet" href="' + l.href + '">'; }).join("\n");
+  var cssStyles = Array.from(document.querySelectorAll("style"))
+    .map(function(s){ return "<style>" + s.textContent + "</style>"; }).join("\n");
+
+  // 3. انسخ HTML الـ panel مع استبدال كل canvas بـ <img>
+  var clone = panel.cloneNode(true);
+  clone.style.cssText = "display:block!important;position:static!important;max-height:none!important;overflow:visible!important;";
+  clone.querySelectorAll("*").forEach(function(el){
+    el.style.maxHeight = "none";
+    el.style.overflowY = "visible";
+  });
+
+  var cloneCanvases = Array.from(clone.querySelectorAll("canvas"));
+  cloneCanvases.forEach(function(cc, i) {
+    var info = chartImages[i];
+    if (!info) return;
+    var img = document.createElement("img");
+    img.src = info.src;
+    img.style.width  = info.w + "px";
+    img.style.height = info.h + "px";
+    img.style.display = "block";
+    img.className = cc.className;
+    cc.parentNode.replaceChild(img, cc);
+  });
+
+  var panelHTML = clone.outerHTML;
+  var googleFonts = '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">';
+
+  // 4. افتح نافذة طباعة
+  var pw = window.open("", "_blank", "width=1400,height=900");
+  if (!pw) {
+    if (typeof showToast === "function") showToast("يرجى السماح بفتح النوافذ المنبثقة ثم المحاولة مجددًا", "warn");
+    finish();
+    return;
+  }
+
+  pw.document.open();
+  pw.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${baseName}</title>
+${googleFonts}
+${cssLinks}
+${cssStyles}
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: #ffffff;
+    font-family: 'IBM Plex Sans Arabic', Tajawal, Arial, sans-serif;
+    direction: rtl;
+  }
+  canvas { display: none !important; }
+  .topbar, .filters-row, .prog-bar, #toast-area,
+  .tb-btn, #btnDownloadTab, #btnReload, #btnAuto, #btnPresentationMode,
+  .tbl-auto-dl-bar, .tbl-auto-dl-btn, .pag-bar { display: none !important; }
+  @media print {
+    body { padding: 0; }
+    @page { margin: 10mm; size: A3 landscape; }
+  }
+</style>
+</head>
+<body>
+${panelHTML}
+<script>
+  // انتظر تحميل الصور والخطوط ثم اطبع
+  window.addEventListener("load", function() {
+    var imgs = document.querySelectorAll("img");
+    var loaded = 0;
+    var total  = imgs.length;
+    function tryPrint() {
+      loaded++;
+      if (loaded >= total) {
+        setTimeout(function(){ window.print(); }, 400);
+      }
+    }
+    if (total === 0) { setTimeout(function(){ window.print(); }, 400); return; }
+    imgs.forEach(function(img){
+      if (img.complete) { tryPrint(); }
+      else { img.onload = tryPrint; img.onerror = tryPrint; }
+    });
+  });
+<\/script>
+</body>
+</html>`);
+  pw.document.close();
+  finish();
+}
+
+function askFormatAndSave(canvas, baseName, stamp, doneCb) {
+  // لو الصورة طويلة جدًا (أطول من ~1.8 ضعف عرضها بكذا مرة) نقسّمها لصفحات/صور
+  // بدل ما تتكدس في صورة واحدة يصعب قراءتها
+  var A4_RATIO = 297 / 210; // ارتفاع/عرض ورقة A4 بالبورتريه
+  var sliceRatio = A4_RATIO * 1.15; // هامش بسيط قبل ما نقرر إننا نقسّم
+  var totalRatio = canvas.height / canvas.width;
+  var pageCount = Math.max(1, Math.ceil(totalRatio / sliceRatio));
+
+  function sliceCanvas(count) {
+    var slices = [];
+    var sliceH = Math.ceil(canvas.height / count);
+    for (var i = 0; i < count; i++) {
+      var y = i * sliceH;
+      var h = Math.min(sliceH, canvas.height - y);
+      if (h <= 0) break;
+      var sc = document.createElement("canvas");
+      sc.width = canvas.width;
+      sc.height = h;
+      var ctx = sc.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, sc.width, sc.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      slices.push(sc);
+    }
+    return slices;
+  }
+
+  // نافذة اختيار بسيطة: صورة PNG أو ملف PDF
+  var overlay = document.createElement("div");
+  overlay.style.cssText =
+    "position:fixed;inset:0;background:rgba(8,20,28,.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif";
+
+  var box = document.createElement("div");
+  box.style.cssText =
+    "background:#fff;border-radius:16px;padding:22px 24px;min-width:280px;max-width:90vw;box-shadow:0 20px 50px rgba(0,0,0,.25);text-align:center";
+  var splitNote =
+    pageCount > 1
+      ? '<div style="font-size:11px;color:#0891B2;margin-bottom:10px">📄 المحتوى طويل، هيتقسّم تلقائيًا إلى ' + pageCount + " أجزاء/صفحات</div>"
+      : "";
+  box.innerHTML =
+    '<div style="font-size:14px;font-weight:800;color:#0f2a37;margin-bottom:14px">اختر صيغة التنزيل</div>' +
+    splitNote +
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">' +
+    '<button id="dlAsPng" class="export-btn export-btn-excel">🖼️ صورة PNG</button>' +
+    '<button id="dlAsPdf" class="export-btn export-btn-csv">📄 ملف PDF</button>' +
+    "</div>" +
+    '<button id="dlCancel" style="background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;text-decoration:underline">إلغاء</button>';
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  function cleanup() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (doneCb) doneCb();
+  }
+
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) cleanup();
+  });
+  document.getElementById("dlCancel").addEventListener("click", cleanup);
+
+  document.getElementById("dlAsPng").addEventListener("click", function () {
+    var slices = pageCount > 1 ? sliceCanvas(pageCount) : [canvas];
+    slices.forEach(function (sc, idx) {
+      var link = document.createElement("a");
+      link.download = baseName + "_" + stamp + (slices.length > 1 ? "_جزء" + (idx + 1) : "") + ".png";
+      link.href = sc.toDataURL("image/png");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+    cleanup();
+  });
+
+  document.getElementById("dlAsPdf").addEventListener("click", function () {
+    try {
+      var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+      if (!jsPDFCtor) {
+        if (typeof showToast === "function") showToast("مكتبة PDF غير متاحة", "error");
+        cleanup();
+        return;
+      }
+      var pxToMm = 0.264583; // تحويل بكسل إلى ملم عند 96dpi تقريباً (مع مراعاة scale الكانفاس)
+      var slices = pageCount > 1 ? sliceCanvas(pageCount) : [canvas];
+      var pdf = null;
+
+      slices.forEach(function (sc, idx) {
+        var imgData = sc.toDataURL("image/png");
+        var imgWmm = sc.width * pxToMm;
+        var imgHmm = sc.height * pxToMm;
+        var orientation = imgWmm > imgHmm ? "l" : "p";
+        if (idx === 0) {
+          pdf = new jsPDFCtor({ orientation: orientation, unit: "mm", format: [imgWmm, imgHmm] });
+        } else {
+          pdf.addPage([imgWmm, imgHmm], orientation);
+        }
+        pdf.addImage(imgData, "PNG", 0, 0, imgWmm, imgHmm);
+      });
+
+      pdf.save(baseName + "_" + stamp + ".pdf");
+    } catch (e) {
+      console.warn("[downloadCurrentTab] فشل إنشاء PDF", e);
+      if (typeof showToast === "function") showToast("تعذّر إنشاء PDF", "error");
+    }
+    cleanup();
+  });
+}

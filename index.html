@@ -42,6 +42,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 
@@ -83,6 +85,7 @@
     <span id="lastTime" style="font-size:10px;color:rgba(255,255,255,.35);font-weight:500"></span>
     <button class="tb-btn" id="btnReload" onclick="loadData()">↻ <span data-ar="تحديث" data-en="Refresh">تحديث</span></button>
     <button class="tb-btn" id="btnAuto"   onclick="toggleAuto()">◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">تلقائي</span></button>
+    <button class="tb-btn" id="btnDownloadTab" onclick="downloadCurrentTab()">⬇ <span data-ar="تنزيل التبويب" data-en="Download Tab">تنزيل التبويب</span></button>
     <button class="tb-btn" id="btnPresentationMode" onclick="togglePresentationMode()" title="Presentation Mode" aria-pressed="true" style="padding:4px 8px;min-width:30px;opacity:.12;font-size:10px;line-height:1">◌</button>
   </div>
 </div>

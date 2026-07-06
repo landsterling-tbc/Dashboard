@@ -7,24 +7,22 @@
 ║   2. 📈  تحليل FCA                      (tab-fca)
 ║   3. 🌿  البيئة المدرسية                (tab-env)
 ║   4. 🎓  المرحلة الدراسية            (tab-stages)
-║   5. 📋  العقود                         (tab-contracts)
-║   6. 📌  عقود غير المجال                (tab-all-contracts)
-║   7. 📢  البلاغات                       (tab-balagh)
-║   8. 🏗️  التجهيزات                      (tab-tajheez)
-║   9. ⚙️  الأنظمة الرئيسية               (tab-sys-main)
-║  10. 🔩  الأنظمة التفصيلية              (tab-sys-detail)
-║  11. 🔧  الصيانة الوقائية               (tab-seyana)
-║  12. 🌊  خنادق الصرف                    (tab-khanadeq)
-║  13. 🛗  المصاعد                        (tab-elevators)
-║  14. 💰  التكلفة                        (tab-cost)
-║  15. 🗺️  الخريطة                        (tab-map)
-║  16. 👨‍🎓  الطلاب وعمر المبنى             (tab-students)
-║  17. 🔩  قطع الغيار                     (tab-spare)
-║  18. 🔍  تقييم عاين                     (tab-ayen)
-║  19. 💳  المدفوعات والعقود              (tab-payments)
-║  20. 📅  الجدول التفصيلي                (tab-table)
-║  21. ❄️  خطة استبدال المكيفات           (tab-ac-plan)
-║  22. 📊  مؤشرات الأداء للمقاول          (tab-mag-kpi)
+║   5. 📌  عقود غير المجال                (tab-all-contracts)
+║   6. 📢  البلاغات                       (tab-balagh)
+║   7. 🏗️  التجهيزات                      (tab-tajheez)
+║   8. ⚙️  الأنظمة الرئيسية               (tab-sys-main)
+║   9. 🔩  الأنظمة التفصيلية              (tab-sys-detail)
+║  10. 🌊  خنادق الصرف                    (tab-khanadeq)
+║  11. 🛗  المصاعد                        (tab-elevators)
+║  12. 💰  التكلفة                        (tab-cost)
+║  13. 🗺️  الخريطة                        (tab-map)
+║  14. 👨‍🎓  الطلاب وعمر المبنى             (tab-students)
+║  15. 🔩  قطع الغيار                     (tab-spare)
+║  16. 🔍  تقييم عاين                     (tab-ayen)
+║  17. 💳  المدفوعات والعقود              (tab-payments)
+║  18. 📅  الجدول التفصيلي                (tab-table)
+║  19. ❄️  خطة استبدال المكيفات           (tab-ac-plan)
+║  20. 📊  مؤشرات الأداء للمقاول          (tab-mag-kpi)
 ╠════════════════════════════════════════════════════════════════════╣
 ║  📁 هيكل الملف:
 ║     • الـ HTML لكل تبويب: مُعلَّم بـ ╔═══╗ قبل كل <div class="panel">
@@ -281,12 +279,10 @@
     <div class="tab" onclick="showTab('khanadeq',this)">خنادق الصرف</div>
     <div class="tab" onclick="showTab('ac-plan',this)">خطة استبدال المكيفات</div>
     <div class="tab" onclick="showTab('balagh',this)">البلاغات</div>
-    <div class="tab" id="tabbtn-seyana" onclick="showTab('seyana',this)">الصيانة الوقائية</div>
     <div class="tab" onclick="showTab('tajheez',this)">التجهيزات</div>
     <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
     <div class="tab" onclick="showTab('gatekeepers',this)">البوابين</div>
     <div class="tab" onclick="showTab('recruitment',this)">التوظيف</div>
-    <div class="tab" onclick="showTab('contracts',this)">العقود</div>
     <div class="tab" onclick="showTab('all-contracts',this)">عقود عدا المجال</div>
     <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">المدفوعات</div>
     <div class="tab tab-premium" onclick="showTab('cost',this)">التكلفة</div>
@@ -493,7 +489,7 @@
           <div class="fg-lbl">بحث بالاسم أو الرقم الوزاري</div>
           <input class="finp" id="stageCompareSearch" type="text"
             placeholder="اكتب اسم المدرسة أو الرقم الوزاري..."
-            oninput="renderStageCompareTab()" />
+            oninput="smartSearchRerender(this, renderStageCompareTab)" />
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
@@ -606,7 +602,7 @@
           <div class="fg-lbl">بحث</div>
           <input class="finp" id="fcaRefSearch" type="text"
             placeholder="🔍 اسم المدرسة أو الرقم الوزاري..."
-            oninput="renderFcaRefTab()" />
+            oninput="smartSearchRerender(this, renderFcaRefTab)" />
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
@@ -685,43 +681,6 @@
   </div>
 
 </div>
-
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  📋  تبويب رقم 5: العقود
-║  ID: tab-contracts
-╠════════════════════════════════════════════════════════════════════╣
-║  HTML الخاص بهذا التبويب ↓
-║
-║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
-║        في قسم <div class="tabs"> (حوالي السطر 649)
-║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
-║        في مكانٍ مناسب بعد هذا القسم
-║     3. أضف دالة renderNewTab() في قسم الـ JS المناسب
-║     4. أضف "NEW_ID"===name && renderNewTab() في دالتَي showTab() و applyFilters()
-╚════════════════════════════════════════════════════════════════════╝
--->
-  <div class="panel" id="tab-contracts">
-    <div class="g3 mb14" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-      <div class="card">
-        <div class="card-title">مقاولو الصيانة</div>
-        <div class="chart-box" style="height:380px"><canvas id="ch-cont-maint"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">مقاولو التكييف</div>
-        <div class="chart-box" style="height:380px"><canvas id="ch-cont-ac"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">مقاولو النظافة</div>
-        <div class="chart-box" style="height:380px"><canvas id="ch-cont-clean"></canvas></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">انتهاء العقود</div>
-      <div class="contracts-grid" id="contracts-expiry"></div>
-    </div>
-  </div>
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
@@ -870,26 +829,6 @@
 -->
   <div class="panel" id="tab-sys-detail">
     <div id="sys-detail-content"><div class="card loading-placeholder"><div class="loading-placeholder-icon">🔩</div><div class="loading-placeholder-text">جاري التحميل…</div></div></div>
-  </div>
-
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  🔧  تبويب رقم 12: الصيانة الوقائية
-║  ID: tab-seyana
-╠════════════════════════════════════════════════════════════════════╣
-║  HTML الخاص بهذا التبويب ↓
-║
-║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
-║        في قسم <div class="tabs"> (حوالي السطر 649)
-║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
-║        في مكانٍ مناسب بعد هذا القسم
-║     3. أضف دالة renderNewTab() في قسم الـ JS المناسب
-║     4. أضف "NEW_ID"===name && renderNewTab() في دالتَي showTab() و applyFilters()
-╚════════════════════════════════════════════════════════════════════╝
--->
-  <div class="panel" id="tab-seyana">
-    <div id="seyana-content"></div>
   </div>
 
 <!--
@@ -1196,7 +1135,7 @@
           <div style="position:relative">
             <input class="finp" id="tbl-search"
               placeholder="🔍 بحث بالاسم أو الرقم الوزاري..."
-              oninput="TBL.cur=0;renderTable()"
+              oninput="TBL.cur=0;smartSearchRerender(this, renderTable)"
               style="min-width:240px;padding-right:14px">
           </div>
           <select class="fsel" id="tbl-sort" onchange="renderTable()" style="font-size:11px">
@@ -1287,12 +1226,17 @@
 
 <div class="fcb-fab" id="fcbFab" onclick="fcbToggle()">
   <span class="fcb-fab-icon" aria-hidden="true">
-    <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
-      <path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-      <path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/>
-      <rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/>
-      <rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/>
-      <rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/>
+    <svg class="fcb-robot-svg" viewBox="0 0 24 24" width="36" height="36" fill="none">
+      <g class="fcb-robot-antenna">
+        <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
+        <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+      </g>
+      <rect x="4" y="5.5" width="16" height="13.6" rx="4.8" stroke="#fff" stroke-width="1.9"/>
+      <rect x="1.3" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
+      <rect x="19.9" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
+      <circle class="fcb-robot-eye" cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
+      <circle class="fcb-robot-eye" cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
+      <path d="M7.9 16.1c1.8 1.7 6.4 1.7 8.2 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
     </svg>
   </span>
   <span class="fcb-fab-close" aria-hidden="true">
@@ -1305,12 +1249,17 @@
 <div class="fcb-panel" id="fcbPanel">
   <div class="fcb-head">
     <div class="fcb-avatar">
-      <svg viewBox="0 0 24 24" width="21" height="21" fill="none">
-        <path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
-        <path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/>
-        <rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/>
-        <rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/>
-        <rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/>
+      <svg class="fcb-robot-svg" viewBox="0 0 24 24" width="25" height="25" fill="none">
+        <g class="fcb-robot-antenna">
+          <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
+          <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+        </g>
+        <rect x="4" y="5.5" width="16" height="13.6" rx="4.8" stroke="#fff" stroke-width="1.9"/>
+        <rect x="1.3" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
+        <rect x="19.9" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
+        <circle class="fcb-robot-eye" cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
+        <circle class="fcb-robot-eye" cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
+        <path d="M7.9 16.1c1.8 1.7 6.4 1.7 8.2 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
       </svg>
     </div>
     <div class="fcb-head-text">
@@ -1345,7 +1294,7 @@
       <div class="fcb-row bot">
         <div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>
         <div class="fcb-col">
-          <div class="fcb-bubble">مرحباً 👋 — أنا مساعد إدارة المرافق الذكي. اسألني عن FCA، الصيانة، العقود، الأصول، أو أي شيء يخص مرافق مدارسك.</div>
+          <div class="fcb-bubble">مرحباً 👋 — أنا مساعد إدارة المرافق الذكي. اسألني عن FCA، العقود، البلاغات، الأصول، أو أي شيء يخص المرافق.</div>
           <div class="fcb-time">10:24 ص</div>
         </div>
       </div>
@@ -1617,9 +1566,15 @@
       }
       .ix-school-clickable:hover { color: var(--teal); text-decoration-color: var(--teal); }
 
-      /* ── Search Suggestions ── */
+      /* ── Search Suggestions ──
+         ملاحظة: position:fixed بدل absolute، مع z-index عالٍ جداً (أعلى من
+         .topbar وأي كارت/جدول) — لأن الاقتراحات كانت تظهر خلف الكروت
+         بسبب overflow:hidden أو stacking context مختلف في بعض الأباء.
+         الإحداثيات (top/left/width) تُحسب وتُحدَّث ديناميكيًا عبر JS
+         بناءً على موضع حقل البحث الفعلي على الشاشة، فتبقى ملتصقة به دائمًا
+         بغض النظر عن مكانه في الصفحة أو تمرير الصفحة (scroll). */
       .ix-search-suggestions {
-        position: absolute; top: 100%; right: 0; left: 0; z-index: 500;
+        position: fixed; z-index: 99999;
         background: var(--bg-3); border: 1px solid var(--bd-mid);
         border-radius: 12px; box-shadow: var(--sh-soft);
         max-height: 260px; overflow-y: auto;
@@ -1632,7 +1587,7 @@
         border-bottom: 1px solid var(--bd-light); transition: background .13s;
       }
       .ix-suggestion-item:last-child { border-bottom: none; }
-      .ix-suggestion-item:hover { background: var(--bg-2); }
+      .ix-suggestion-item:hover, .ix-suggestion-item:focus { background: var(--bg-2); outline: none; }
       .ix-sug-name { font-size: 12px; font-weight: 700; color: var(--tx-main); }
       .ix-sug-meta { font-size: 10px; color: var(--tx-muted); margin-top: 2px; }
       .ix-sug-mark { background: rgba(8,145,178,.15); color: var(--teal-3); border-radius: 2px; }
@@ -1862,25 +1817,75 @@
     const tierLabel = v => v == null ? "—" : v < 25 ? "حرج" : v < 50 ? "متوسط" : v < 75 ? "جيد" : "جيد جداً";
     const tierIcon  = v => v == null ? "⚪" : v < 25 ? "🔴" : v < 50 ? "🟡" : v < 75 ? "🟢" : "🔵";
 
+    // ── عمر المبنى لون (لازم قبل استخدامه في statsItemsHTML) ──
+    const ageColor = r.buildingAge != null
+      ? (r.buildingAge >= 40 ? "color:#DC2626;font-weight:800"
+        : r.buildingAge >= 25 ? "color:#D97706;font-weight:800"
+        : "color:#059669;font-weight:800")
+      : "";
+
+    // scoreCard: يرجع "" (بدون كارت) لو القيمة غير متوفرة، بدل عرض كارت فاضٍ بـ "—"
     const scoreCard = (label, v) => {
+      if (v == null || isNaN(v)) return "";
       const c = fcaColor(v);
       return `<div class="ix-score-card" style="--ix-sc-color:${c}">
         <div class="ix-score-lbl">${label}</div>
-        <div class="ix-score-val">${v != null ? v.toFixed(1) + "%" : "—"}</div>
-        ${v != null ? `<div class="ix-score-tier">${tierIcon(v)} ${tierLabel(v)}</div>
-        <div class="ix-score-bar2"><div class="ix-score-fill2" style="width:${Math.min(v,100)}%"></div></div>` : ""}
+        <div class="ix-score-val">${v.toFixed(1)}%</div>
+        <div class="ix-score-tier">${tierIcon(v)} ${tierLabel(v)}</div>
+        <div class="ix-score-bar2"><div class="ix-score-fill2" style="width:${Math.min(v,100)}%"></div></div>
       </div>`;
     };
 
-    const infoItem = (lbl, val, extra="") =>
-      `<div class="ix-info-item2${extra}">
+    // infoItem: يرجع "" (بدون كارت) لو القيمة فاضية/غير متوفرة، بدل عرض كارت فاضٍ بـ "—"
+    // val ممكن يكون نص عادي أو HTML جاهز (زي span ملوّن) — لو val فاضي/null نتجاهل الكارت بالكامل
+    const infoItem = (lbl, val, extra="") => {
+      if (val == null || val === "" || val === "—") return "";
+      return `<div class="ix-info-item2${extra}">
          <div class="ix-info-lbl2">${lbl}</div>
          <div class="ix-info-val2">${val}</div>
        </div>`;
+    };
 
+    // ── بناء أقسام العرض كمتغيرات — كل قسم يختفي بالكامل (عنوانه + محتواه) لو مفيش أي عنصر فيه ──
     const fca  = r.fca       ?? null;
     const env  = r.envScore  ?? null;
     const ayen = r.ayenScore ?? null;
+
+    const infoItemsHTML = [
+      infoItem("الرقم الوزاري",              r.minId ? `<span style="font-family:monospace;font-size:14px;font-weight:800">${esc(r.minId)}</span>` : ""),
+      infoItem("رقم التسلسل",               (r.schoolSeq||r.buildingSeq) ? `<span style="font-family:monospace;font-size:12px">${esc(r.schoolSeq||r.buildingSeq)}</span>` : ""),
+      infoItem("المدينة / المنطقة",          r.city ? esc(r.city) : ""),
+      infoItem("المحافظة",                   r.sector ? esc(r.sector) : ""),
+      infoItem("الحي",                       r.district ? esc(r.district) : ""),
+      infoItem("الملكية",                    r.ownership ? esc(r.ownership) : ""),
+      infoItem("حالة الاشتراك",              r.subscriptionStatus ? esc(r.subscriptionStatus) : ""),
+      infoItem("نوع الارتباط",               r.linkType ? esc(r.linkType) : ""),
+    ].filter(Boolean).join("");
+    const infoSectionHTML = infoItemsHTML
+      ? `<div class="ix-section-title">🏫 معلومات المدرسة</div><div class="ix-info-grid2">${infoItemsHTML}</div>`
+      : "";
+
+    const statsItemsHTML = [
+      infoItem("عدد الطلاب",
+        r.students != null ? `<span style="color:#059669;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : ""),
+      infoItem("عدد الفصول",
+        r.classrooms != null ? `<span style="font-weight:800">${r.classrooms}</span>` : ""),
+      infoItem("حجم المدرسة",  r.schoolSize ? esc(r.schoolSize) : ""),
+      infoItem("عمر المبنى",
+        r.buildingAge != null ? `<span style="${ageColor};font-size:15px">${r.buildingAge} سنة</span>` : ""),
+    ].filter(Boolean).join("");
+    const statsSectionHTML = statsItemsHTML
+      ? `<div class="ix-section-title">📊 الإحصائيات</div><div class="ix-info-grid2">${statsItemsHTML}</div>`
+      : "";
+
+    const scoreCardsHTML = [
+      scoreCard("تقييم FCA", fca),
+      scoreCard("البيئة المدرسية", env),
+      scoreCard("تقييم عاين", ayen),
+    ].filter(Boolean).join("");
+    const scoresSectionHTML = scoreCardsHTML
+      ? `<div class="ix-section-title">🎯 التقييمات</div><div class="ix-info-grid2">${scoreCardsHTML}</div>`
+      : "";
 
     // ── إحداثيات ──
     const hasCoords = r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1;
@@ -1908,13 +1913,69 @@
       contractRow("❄️","عقد التكييف", r.contractAC,   r.contrAC,   r.projAC,   r.expAC),
       contractRow("🧹","عقد النظافة", r.contractClean, r.contrClean, r.projClean, r.expClean),
     ].filter(Boolean).join("");
-
-    // ── عمر المبنى لون ──
-    const ageColor = r.buildingAge != null
-      ? (r.buildingAge >= 40 ? "color:#DC2626;font-weight:800"
-        : r.buildingAge >= 25 ? "color:#D97706;font-weight:800"
-        : "color:#059669;font-weight:800")
+    const contractsSectionHTML = contractsHTML
+      ? `<div class="ix-section-title">📋 العقود</div>${contractsHTML}`
       : "";
+
+    const notesSectionHTML = r.notes
+      ? `<div class="ix-section-title">📝 ملاحظات</div>
+        <div class="ix-info-item2 ix-full2" style="margin-bottom:12px">
+          <div class="ix-info-val2" style="font-size:12px;line-height:1.7;font-weight:500">${esc(r.notes)}</div>
+        </div>`
+      : "";
+
+    // ── الأنظمة الرئيسية (متوسط كل قسم رئيسي من شيت المدارس_والأنظمة) ──
+    // الربط: 1) بالرقم الوزاري (minId/schoolSeq) أولاً — الأدق
+    //        2) بالاسم + المدينة كملاذ احتياطي لو الرقم غير متوفر بشيت الأنظمة
+    const sysMainHTML = (function () {
+      const allSys = Array.isArray(window.RAW_ALL_SYSTEMS) ? window.RAW_ALL_SYSTEMS : [];
+      if (!allSys.length) return "";
+
+      const normV = v => String(v || "").replace(/\uFEFF/g, "").trim().toUpperCase();
+      const targetId   = normV(r.minId || r.schoolSeq || r.buildingSeq || "");
+      const targetName = String(r.name || r.buildingName || "").trim().toLowerCase();
+      const targetCity = String(r.city || r.sector || "").trim().toLowerCase();
+
+      let rows = targetId
+        ? allSys.filter(row => normV(row["رقم المدرسة"]) === targetId)
+        : [];
+      if (!rows.length && targetName) {
+        rows = allSys.filter(row =>
+          String(row["اسم المدرسة"] || "").trim().toLowerCase() === targetName &&
+          (!targetCity || String(row["المدينة الرئيسية"] || "").trim().toLowerCase() === targetCity)
+        );
+      }
+      if (!rows.length) return "";
+
+      const HIDDEN = (typeof HIDDEN_SYSTEMS !== "undefined") ? HIDDEN_SYSTEMS : [];
+      const sumMap = {}, cntMap = {};
+      rows.forEach(row => {
+        const sec = row["القسم الرئيسي"];
+        const v = parseFloat(row["التقييم (1–5)"]);
+        if (!sec || isNaN(v) || v <= 0 || HIDDEN.includes(sec)) return;
+        sumMap[sec] = (sumMap[sec] || 0) + v;
+        cntMap[sec] = (cntMap[sec] || 0) + 1;
+      });
+      const sections = Object.keys(sumMap);
+      if (!sections.length) return "";
+
+      const catFromAvg = v => v >= 4.5 ? "جيد جداً" : v >= 3.5 ? "جيد" : v >= 2.5 ? "متوسط" : "حرج";
+      const cards = sections
+        .map(sec => ({ sec, avg: sumMap[sec] / cntMap[sec] }))
+        .sort((a, b) => a.avg - b.avg)
+        .map(({ sec, avg }) => `
+          <div class="ix-info-item2">
+            <div class="ix-info-lbl2">${esc(sec)}</div>
+            <div class="ix-info-val2" style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              ${typeof sysScoreDot === "function" ? sysScoreDot(avg) : avg.toFixed(1)}
+              ${typeof sysBadge === "function" ? sysBadge(catFromAvg(avg)) : ""}
+            </div>
+          </div>`)
+        .join("");
+
+      return `<div class="ix-section-title">⚙️ الأنظمة الرئيسية</div>
+        <div class="ix-info-grid2">${cards}</div>`;
+    })();
 
     bodyEl.innerHTML = `
 
@@ -1954,45 +2015,21 @@
       }
 
       <!-- ── معلومات المدرسة ── -->
-      <div class="ix-section-title">🏫 معلومات المدرسة</div>
-      <div class="ix-info-grid2">
-        ${infoItem("الرقم الوزاري",              `<span style="font-family:monospace;font-size:14px;font-weight:800">${esc(r.minId)||"—"}</span>`)}
-        ${infoItem("رقم التسلسل",               `<span style="font-family:monospace;font-size:12px">${esc(r.schoolSeq||r.buildingSeq)||"—"}</span>`)}
-        ${infoItem("المدينة / المنطقة",          esc(r.city)||"—")}
-        ${infoItem("المحافظة",                   esc(r.sector)||"—")}
-        ${infoItem("الحي",                       esc(r.district)||"—")}
-        ${infoItem("الملكية",                    esc(r.ownership)||"—")}
-        ${infoItem("حالة الاشتراك",              esc(r.subscriptionStatus)||"—")}
-        ${infoItem("نوع الارتباط",               esc(r.linkType)||"—")}
-      </div>
+      ${infoSectionHTML}
 
       <!-- ── الإحصائيات ── -->
-      <div class="ix-section-title">📊 الإحصائيات</div>
-      <div class="ix-info-grid2">
-        ${infoItem("عدد الطلاب",
-          r.students != null ? `<span style="color:#059669;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : "—")}
-        ${infoItem("عدد الفصول",
-          r.classrooms != null ? `<span style="font-weight:800">${r.classrooms}</span>` : "—")}
-        ${infoItem("حجم المدرسة",  esc(r.schoolSize)||"—")}
-        ${infoItem("عمر المبنى",
-          r.buildingAge != null ? `<span style="${ageColor};font-size:15px">${r.buildingAge} سنة</span>` : "—")}
-      </div>
+      ${statsSectionHTML}
 
       <!-- ── التقييمات ── -->
-      <div class="ix-section-title">🎯 التقييمات</div>
-      <div class="ix-info-grid2">
-        ${scoreCard("تقييم FCA", fca)}
-        ${scoreCard("البيئة المدرسية", env)}
-        ${scoreCard("تقييم عاين", ayen)}
-      </div>
+      ${scoresSectionHTML}
+
+      <!-- ── الأنظمة الرئيسية ── -->
+      ${sysMainHTML}
 
       <!-- ── العقود ── -->
-      ${contractsHTML ? `<div class="ix-section-title">📋 العقود</div>${contractsHTML}` : ""}
+      ${contractsSectionHTML}
 
-      ${r.notes ? `<div class="ix-section-title">📝 ملاحظات</div>
-        <div class="ix-info-item2 ix-full2" style="margin-bottom:12px">
-          <div class="ix-info-val2" style="font-size:12px;line-height:1.7;font-weight:500">${esc(r.notes)}</div>
-        </div>` : ""}
+      ${notesSectionHTML}
     `;
 
     // ── تشغيل الخريطة الصغيرة بعد render ──
@@ -2314,16 +2351,27 @@
   }
 
   function setupSmartSearch(input) {
-    // حاوية الاقتراحات
-    const wrap = input.parentElement;
-    if (!wrap) return;
-    const origPosition = getComputedStyle(wrap).position;
-    if (origPosition === "static") wrap.style.position = "relative";
+    // حماية: لو الدالة اتنادت قبل كده على نفس الحقل، امسح العنصر القديم
+    // أولاً بدل ما نضيف نسخة مكررة (مثلاً لو حصلت إعادة تحميل للبيانات)
+    const existingOld = document.getElementById("ix-search-suggestions");
+    if (existingOld) existingOld.remove();
 
+    // حاوية الاقتراحات — تُلحق بـ body مباشرة (مش داخل .fg) حتى لا تتأثر
+    // بأي overflow:hidden أو stacking context لعناصر آباء الحقل.
     const suggestions = document.createElement("div");
     suggestions.id = "ix-search-suggestions";
     suggestions.className = "ix-search-suggestions";
-    wrap.appendChild(suggestions);
+    document.body.appendChild(suggestions);
+
+    // يحسب موضع/عرض حقل البحث الفعلي على الشاشة ويحدّث بيه الاقتراحات
+    // (fixed positioning يعتمد على viewport، فلازم نحسبه من جديد كل مرة
+    // تُفتح فيها القائمة، وأيضاً عند التمرير أو تغيير حجم النافذة).
+    function positionSuggestions() {
+      const rect = input.getBoundingClientRect();
+      suggestions.style.top = (rect.bottom + 4) + "px";
+      suggestions.style.left = rect.left + "px";
+      suggestions.style.width = rect.width + "px";
+    }
 
     let debounceTimer;
 
@@ -2344,9 +2392,17 @@
     });
 
     document.addEventListener("click", function (e) {
-      if (!wrap.contains(e.target)) {
+      if (e.target !== input && !suggestions.contains(e.target)) {
         suggestions.classList.remove("ix-open");
       }
+    });
+
+    // إبقاء القائمة ملتصقة بالحقل دائمًا أثناء التمرير أو تغيير حجم النافذة
+    window.addEventListener("scroll", function () {
+      if (suggestions.classList.contains("ix-open")) positionSuggestions();
+    }, true);
+    window.addEventListener("resize", function () {
+      if (suggestions.classList.contains("ix-open")) positionSuggestions();
     });
 
     function showSuggestions(query) {
@@ -2399,6 +2455,7 @@
         openSchoolPanel(window.__IXSearchMatches[idx]);
       };
 
+      positionSuggestions();
       suggestions.classList.add("ix-open");
     }
   }

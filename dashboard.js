@@ -163,9 +163,7 @@ function applyPresentationModeUI() {
   const on = !!window.__PRESENTATION_MODE__;
   const idsToHide = [
     "tabbtn-students",
-    "tabbtn-seyana",
     "tab-students",
-    "tab-seyana",
     "kpi-students-total",
     "kpi-students-max",
     "kpi-age-avg",
@@ -598,6 +596,53 @@ function clearToast() {
 function debounceFilter() {
   (clearTimeout(_filterTimer), (_filterTimer = setTimeout(applyFilters, 300)));
 }
+
+/* ════════════════════════════════════════════════════════════════
+   🔍 smartSearchRerender — حل عام لمشكلة "حقل البحث يفقد التركيز
+   (focus) ويتعلّق" في أي تبويب بيعيد بناء innerHTML بالكامل عند الكتابة.
+   ----------------------------------------------------------------
+   المشكلة: بعض التبويبات (البلاغات، التجهيزات، البوابين، التوظيف)
+   تستدعي renderXxxTab() مباشرة من oninput بدون أي تأخير (debounce)،
+   والدالة تلك تعيد بناء كل الـ HTML — بما فيه حقل البحث نفسه — في كل
+   ضغطة حرف. النتيجة: تعليق ملحوظ + فقدان التركيز من الحقل بعد كل حرف
+   (يضطر المستخدم يدوس على الحقل تاني بعد كل حرف يكتبه).
+   الحل: تأخير التنفيذ الفعلي (debounce بسيط) + بعد إعادة البناء،
+   نعيد فوراً التركيز لنفس id الحقل ونعيد موضع المؤشر (cursor) بالضبط
+   كما كان، حتى لا يشعر المستخدم بأي انقطاع أثناء الكتابة المتواصلة.
+   ----------------------------------------------------------------
+   الاستخدام:
+     input.addEventListener("input", function(){
+       smartSearchRerender(this, renderXxxTab, 250);
+     });
+   أو من inline: oninput="smartSearchRerender(this, renderXxxTab)"
+   ════════════════════════════════════════════════════════════════ */
+const _smartSearchTimers = new WeakMap();
+function smartSearchRerender(inputEl, renderFn, delay = 250) {
+  if (!inputEl || typeof renderFn !== "function") return;
+  const prevTimer = _smartSearchTimers.get(inputEl);
+  if (prevTimer) clearTimeout(prevTimer);
+
+  const fieldId = inputEl.id;
+  const selStart = inputEl.selectionStart;
+  const selEnd = inputEl.selectionEnd;
+
+  const timer = setTimeout(() => {
+    renderFn();
+    // إعادة التركيز وموضع المؤشر لنفس الحقل بعد إعادة البناء —
+    // لازم نبحث عنه بالـ id لأن العنصر القديم استُبدل بعنصر DOM جديد
+    if (fieldId) {
+      const freshEl = document.getElementById(fieldId);
+      if (freshEl) {
+        freshEl.focus();
+        try { freshEl.setSelectionRange(selStart, selEnd); } catch (_) {}
+      }
+    }
+  }, delay);
+
+  _smartSearchTimers.set(inputEl, timer);
+}
+window.smartSearchRerender = smartSearchRerender;
+
 function updateDistrictBySector() {
   const city = document.getElementById("fCity").value;
   const sector = document.getElementById("fSector").value;
@@ -791,7 +836,6 @@ function applyFilters() {
     if (activeId === "tab-stages") safeRun(renderStageCharts, "stages");
     if (activeId === "tab-stage-compare") safeRun(renderStageCompareTab, "stage-compare");
     if (activeId === "tab-fca-ref") safeRun(renderFcaRefTab, "fca-ref");
-    if (activeId === "tab-contracts") safeRun(renderContractCharts, "contracts");
     if (activeId === "tab-all-contracts") safeRun(renderAllContracts, "all-contracts");
     if (activeId === "tab-sys-main") safeRun(renderSysMain, "sys-main");
     if (activeId === "tab-sys-detail") safeRun(renderSysDetail, "sys-detail");
@@ -799,18 +843,6 @@ function applyFilters() {
     if (activeId === "tab-tajheez") safeRun(renderTajheezInventoryTab, "tajheez");
     if (activeId === "tab-gatekeepers" && typeof renderGatekeepersTab === "function")
       safeRun(renderGatekeepersTab, "gatekeepers");
-    if (activeId === "tab-seyana") {
-      const _el = document.getElementById("seyana-content");
-      if (_el) _el.innerHTML = `
-        <div class="card" style="text-align:center;padding:48px 24px">
-          <div style="font-size:48px;margin-bottom:12px">🔧</div>
-          <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">الصيانة الوقائية</div>
-          <div style="font-size:13px;color:var(--tx-sec);max-width:480px;margin:0 auto;line-height:1.8">
-            لا توجد بيانات لهذا التبويب حالياً.<br>
-            للاطلاع على بلاغات الصيانة الفعلية راجع تبويب <strong>البلاغات</strong>.
-          </div>
-        </div>`;
-    }
     if (activeId === "tab-khanadeq") safeRun(renderKhanadeqTab, "khanadeq");
     if (activeId === "tab-map") safeRun(renderMap, "map");
     if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
@@ -1001,7 +1033,6 @@ function showTab(name, el) {
     "stages" === name && renderStageCharts(),
     "stage-compare" === name && renderStageCompareTab(),
     "fca-ref" === name && renderFcaRefTab(),
-    "contracts" === name && renderContractCharts(),
     "all-contracts" === name && renderAllContracts(),
     "sys-main" === name && renderSysMain(),
     "sys-detail" === name && renderSysDetail(),
@@ -2312,24 +2343,6 @@ function renderStageCompareTab() {
 })();
 
 
-
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  📋  JS تبويب: العقود
-   ║  (tab-contracts) — الدوال الخاصة بهذا التبويب تبدأ هنا
-   ╚════════════════════════════════════════════════════════════╝ */
-function renderContractCharts() {
-  const el = document.getElementById("contracts-content");
-  if (!el) return;
-  el.innerHTML = `
-    <div class="card" style="text-align:center;padding:48px 24px">
-      <div style="font-size:48px;margin-bottom:12px">📋</div>
-      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:8px">بيانات العقود</div>
-      <div style="font-size:13px;color:var(--tx-sec);max-width:420px;margin:0 auto;line-height:1.7">
-        بيانات مقاولي الصيانة والتكييف والنظافة موجودة في تبويب
-        <strong>عقود عدا المجال</strong> مع كامل التفاصيل المالية وحالة المستخلصات.
-      </div>
-    </div>`;
-}
 
 function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
   const el = document.getElementById(tabId + "-content");
@@ -4801,7 +4814,7 @@ function renderAllContracts() {
       </select>
       <input id="ac-search" type="text" placeholder="بحث في كل الأعمدة…"
         value="${esc(window._acState.search)}"
-        oninput="window._acState.search=this.value;renderAllContractsBody()"
+        oninput="window._acState.search=this.value;smartSearchRerender(this, renderAllContractsBody)"
         style="flex:1;min-width:200px;padding:8px 14px;border:1px solid var(--bd-light);border-radius:10px;
         font-family:inherit;font-size:12px;direction:rtl">
       ${
@@ -6677,7 +6690,7 @@ function _sysExcelTableHTML(title, headers, rows) {
         <div class="fg">
           <div class="fg-lbl">بحث</div>
           <input class="finp" id="balagh-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}"
-            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;renderBalaghTab()">
+            oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;smartSearchRerender(this, renderBalaghTab)">
         </div>
         <div class="fg">
           <div class="fg-lbl">الحالة</div>
@@ -6838,7 +6851,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           <div class="fg" style="flex:1;min-width:220px">
             <div class="fg-lbl">بحث في التفاصيل</div>
             <input class="finp" id="balagh-table-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}" style="width:100%"
-              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-search');if(s)s.value=this.value;renderBalaghTab()">
+              oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-search');if(s)s.value=this.value;smartSearchRerender(this, renderBalaghTab)">
           </div>
           <div class="fg">
             <div class="fg-lbl">الترتيب</div>
@@ -10042,7 +10055,7 @@ function renderTajheezInventoryTab() {
     </div>
     <div class="fg">
       <div class="fg-lbl">اسم الصنف</div>
-      <input class="finp" id="taj-f-sanf" type="text" placeholder="بحث…" value="${esc(fS)}" oninput="renderTajheezInventoryTab()">
+      <input class="finp" id="taj-f-sanf" type="text" placeholder="بحث…" value="${esc(fS)}" oninput="smartSearchRerender(this, renderTajheezInventoryTab)">
     </div>
     <div class="fg">
       <div class="fg-lbl">المدينة</div>
@@ -10789,7 +10802,7 @@ function renderTajheezAllTable() {
 
 
       العقود: {
-        ملاحظة: "بيانات مقاولي الصيانة/التكييف/النظافة تأتي من تبويب عقود_FM — راجع قسم عقود_FM في الملخص",
+        ملاحظة: "عقود المجال (الصيانة/التكييف/النظافة) بتفاصيلها المالية موجودة الآن ضمن قسم المدفوعات أدناه، وعقود غير المجال (FM) في قسم عقود_FM.",
       },
 
       تقييم_عاين: {
@@ -11578,11 +11591,11 @@ function renderTajheezAllTable() {
      لو ما فيه مفتاح API أو فشل الاتصال بـ OpenAI
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
-    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، الصيانة الوقائية والتصحيحية، إدارة العقود والأصول، التجهيزات المدرسية، والبوابين وأنظمة المباني. اسألني عن أي قسم في اللوحة 📊" },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• العقود — حالة ومدد التعاقدات\n• عقود غير المجال — عقود FM\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، إدارة العقود والأصول، التجهيزات المدرسية، والبوابين وأنظمة المباني. اسألني عن أي قسم في اللوحة 📊" },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• عقود عدا المجال — عقود FM\n• المدفوعات — قيمة العقود والمدفوع والمتبقي (عقود المجال)\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
     { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nيقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
     { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nتشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
-    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب العقود يعرض كل التعاقدات مع حالتها ومدتها، وتبويب عقود غير المجال يعرض عقود FM." },
+    { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب عقود عدا المجال يعرض عقود FM (مقاولون خارج نطاق المجال)، وتبويب المدفوعات يعرض عقود المجال بقيمتها والمدفوع والمتبقي." },
     { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة والبلاغات 🔧\n\nبلاغات الصيانة والأعطال موجودة في تبويب البلاغات مع كامل التفاصيل (الحالة، الأولوية، SLA، الفئة)." },
     { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي — الفرق السالب يعني عجزاً يحتاج ميزانية." },
     { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\n• التكييف: العمر الافتراضي 10-15 سنة — يحتاج صيانة وقائية دورية.\n• الكهرباء: فحص دوري سنوي كحد أدنى.\n• السباكة: مراقبة الصرف وضغط المياه بشكل منتظم.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
@@ -12338,6 +12351,105 @@ function renderTajheezAllTable() {
   }
 
   /* ════════════════════════════════════════════════════════════════
+     🧮 محرك الحساب الحر (Free Calculation Engine)
+     ----------------------------------------------------------------
+     المشكلة اللي بيحلّها: fcbSmartQuery القديم بيتعرّف بس على أنماط
+     أسئلة محددة سلفاً (متوسط/عدّ/توزيع/أعلى/أدنى) عبر regex. أي صياغة
+     مختلفة شوية (زي "اقسم عدد كذا على كذا" أو "احسب نسبة X من Y" أو
+     "اضرب متوسط الطلاب في عدد المدارس الحرجة") كانت بتفلت من الأنماط
+     المعروفة، فيرجع المساعد رد عام بدون رقم دقيق.
+
+     الحل: بدل ما نحاول نتوقع كل صياغة ممكنة بـ regex (مستحيل عملياً)،
+     نديله لـ GPT نفسه — اللي بالفعل بيفهم أي صياغة طبيعية — عبر تعليمة
+     في الـ system prompt: "لو احتجت حساباً دقيقاً، اطلبه بصيغة ```calc```
+     بدل ما تحسبه بنفسك (لأنك قد تخطئ في الحساب الذهني)". بعدين محرك
+     JS هنا بيقرأ الطلب، ينفّذ العملية فعلياً على أرقام حقيقية بدقة
+     كاملة (بدون أي تقريب أو تخمين من الموديل)، ويرجّع الناتج لـ GPT في
+     رسالة تانية ليصيغ الرد النهائي بلغة طبيعية بناءً على رقم مضمون.
+
+     الصيغة المتوقعة من GPT (داخل ```calc ... ```):
+     {
+       "عمليات": [
+         { "نوع": "قسمة",    "أ": 27, "ب": 1497 },
+         { "نوع": "نسبة_مئوية", "جزء": 27, "كل": 1497 },
+         { "نوع": "ضرب",     "أ": 450, "ب": 1497 },
+         { "نوع": "جمع",     "قيم": [10, 20, 30] },
+         { "نوع": "طرح",     "أ": 100, "ب": 40 },
+         { "نوع": "متوسط",   "قيم": [10, 20, 30] },
+         { "نوع": "فرق_نسبة_مئوية", "قديم": 80, "جديد": 95 }
+       ]
+     }
+     كل عملية لازم تحتوي أرقاماً صريحة (المفروض GPT ياخدها من البيانات
+     المرفقة في الـ context، مش يخترعها). المحرك هنا لا يقرأ من قاعدة
+     البيانات مباشرة — فقط ينفّذ حساباً رياضياً صرفاً على الأرقام التي
+     يرسلها GPT، فهو مضمون الدقة 100% لأنه عمليات جبرية بسيطة.
+     ════════════════════════════════════════════════════════════════ */
+  function fcbRunCalcOp(op) {
+    const num_ = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+    const type = String(op?.نوع || op?.type || "").trim();
+    try {
+      switch (type) {
+        case "جمع": case "sum": {
+          const vals = (op.قيم || op.values || []).map(num_).filter((v) => v != null);
+          return { ...op, النتيجة: +vals.reduce((a, b) => a + b, 0).toFixed(4) };
+        }
+        case "طرح": case "subtract": {
+          const a = num_(op.أ ?? op.a), b = num_(op.ب ?? op.b);
+          if (a == null || b == null) return { ...op, خطأ: "أرقام غير صالحة" };
+          return { ...op, النتيجة: +(a - b).toFixed(4) };
+        }
+        case "ضرب": case "multiply": {
+          const a = num_(op.أ ?? op.a), b = num_(op.ب ?? op.b);
+          if (a == null || b == null) return { ...op, خطأ: "أرقام غير صالحة" };
+          return { ...op, النتيجة: +(a * b).toFixed(4) };
+        }
+        case "قسمة": case "divide": {
+          const a = num_(op.أ ?? op.a), b = num_(op.ب ?? op.b);
+          if (a == null || b == null) return { ...op, خطأ: "أرقام غير صالحة" };
+          if (b === 0) return { ...op, خطأ: "قسمة على صفر" };
+          return { ...op, النتيجة: +(a / b).toFixed(4) };
+        }
+        case "نسبة_مئوية": case "percentage": {
+          const part = num_(op.جزء ?? op.part), whole = num_(op.كل ?? op.whole);
+          if (part == null || whole == null) return { ...op, خطأ: "أرقام غير صالحة" };
+          if (whole === 0) return { ...op, خطأ: "قسمة على صفر" };
+          return { ...op, النتيجة: +((part / whole) * 100).toFixed(2), وحدة: "%" };
+        }
+        case "فرق_نسبة_مئوية": case "percent_change": {
+          const oldV = num_(op.قديم ?? op.old), newV = num_(op.جديد ?? op.new);
+          if (oldV == null || newV == null) return { ...op, خطأ: "أرقام غير صالحة" };
+          if (oldV === 0) return { ...op, خطأ: "القيمة القديمة صفر" };
+          return { ...op, النتيجة: +(((newV - oldV) / oldV) * 100).toFixed(2), وحدة: "%" };
+        }
+        case "متوسط": case "average": {
+          const vals = (op.قيم || op.values || []).map(num_).filter((v) => v != null);
+          if (!vals.length) return { ...op, خطأ: "لا توجد قيم" };
+          return { ...op, النتيجة: +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(4) };
+        }
+        default:
+          return { ...op, خطأ: "نوع عملية غير معروف: " + type };
+      }
+    } catch (e) {
+      return { ...op, خطأ: "فشل التنفيذ: " + e.message };
+    }
+  }
+
+  /** يبحث في نص رد GPT عن بلوك ```calc ... ``` وينفّذ العمليات المطلوبة */
+  function fcbExtractAndRunCalc(replyText) {
+    const m = String(replyText || "").match(/```calc\s*([\s\S]*?)```/);
+    if (!m) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(m[1].trim());
+    } catch (e) {
+      return { خطأ_تحليل: "تعذّر قراءة صيغة الحساب المطلوبة: " + e.message };
+    }
+    const ops = Array.isArray(parsed?.عمليات) ? parsed.عمليات : Array.isArray(parsed) ? parsed : [parsed];
+    return { عمليات_محسوبة: ops.map(fcbRunCalcOp) };
+  }
+
+
+  /* ════════════════════════════════════════════════════════════════
      ⚙️ محرك الاستعلامات الذكي (Smart Query Engine)
      يحوّل أسئلة المستخدم إلى عمليات تحليلية على البيانات الفعلية
      المعروضة (DataService.filtered) ويرجع نتيجة محسوبة + تفسير
@@ -12552,6 +12664,20 @@ function renderTajheezAllTable() {
 إذا لم تكفِ البيانات للإجابة، قُل ذلك صراحةً ("البيانات الحالية لا تكفي للإجابة على هذا") ووجّه لتبويب أو فلتر مناسب — ولا تُنشئ أرقاماً أو أسماءً غير موجودة في البيانات المرفقة إطلاقاً.
 
 ══════════════════════════════════════════════════════
+محرك الحساب الحر — لأي عملية حسابية يطلبها المستخدم
+══════════════════════════════════════════════════════
+مهم جداً: أنت قد تخطئ في الحساب الذهني (خصوصاً القسمة والنسب المئوية). لذلك ممنوع عليك حساب أي عملية رياضية بنفسك مباشرة في الرد. بدل ذلك، اطلب الحساب من المحرك بصيغة calc (بلوك كود بثلاث علامات backtick متبوعة بكلمة calc) وسيرسل لك الناتج الدقيق في رسالة تالية لتصيغ الرد النهائي بناءً عليه.
+
+الصيغة (استخدم فقط أرقاماً موجودة فعلياً في البيانات المرفقة أعلاه — لا تخترع رقماً):
+\`\`\`calc
+{"عمليات": [{"نوع": "قسمة", "أ": 27, "ب": 1497}]}
+\`\`\`
+الأنواع المتاحة: جمع (قيم:[...])، طرح (أ,ب)، ضرب (أ,ب)، قسمة (أ,ب)، نسبة_مئوية (جزء,كل)، فرق_نسبة_مئوية (قديم,جديد)، متوسط (قيم:[...]).
+يمكنك طلب أكثر من عملية في نفس البلوك دفعة واحدة.
+هذا ينطبق على أي طلب حسابي مهما كانت صياغته: اقسم، احسب نسبة، كم يمثل X من Y، اضرب، الفرق بين، بالمية... إلخ — طالما يحتاج عملية حسابية دقيقة على أرقام، استخدم صيغة calc ولا تحسبها ذهنياً.
+لا تستخدم صيغة calc للأسئلة التي أجوبتها جاهزة بالفعل في "نتائج_المحرك_التحليلي" أو الملخص أدناه (عدّ/توزيع/متوسط/أعلى/أدنى) — استخدمها فقط لعمليات حسابية إضافية (قسمة/ضرب/نسب/فروق) غير موجودة كناتج جاهز.
+
+══════════════════════════════════════════════════════
 اقتراح أسئلة متابعة — إلزامي في نهاية كل رد
 ══════════════════════════════════════════════════════
 اختم كل رد بسطر "💡 أسئلة مقترحة:" يتبعه 2-3 أسئلة قصيرة مرتبطة بالسؤال الحالي وبالتبويب المفتوح (استرشد بـ"أسئلة_مقترحة" أدناه أو اقترح أفضل منها).
@@ -12566,11 +12692,9 @@ function renderTajheezAllTable() {
 • البيئة المدرسية         → البيئة_المدرسية: متوسط، أسوأ/أفضل مدارس
 • الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي: أقدم مباني، أكبر مدارس، توزيع أعمار
 • المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب)
-• العقود (المجال)         → العقود: مقاولو الصيانة/التكييف/النظافة
 • عقود عدا المجال        → عقود_FM: إجمالي، مالي، منتهية، مستحقة، توزيع حسب مقاول/منطقة
 • الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات حسب النظام
 • الأنظمة التفصيلية      → الأنظمة_الرئيسية_والتفصيلية (نفس المصدر، تفصيل أعمق)
-• الصيانة الوقائية        → لا توجد بيانات حالياً — التبويب موجود في الواجهة لكن بدون شيت أو ملف بيانات
 • التجهيزات              → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام، مدن
 • البوابين               → البوابين: إحصائيات + توزيع (القايمة الكاملة تُحقن تلقائياً لو السؤال عن بواب)
 • قطع الغيار             → قطع_الغيار: إجمالي، أعلى أصناف قيمة
@@ -12653,7 +12777,24 @@ ${(() => {
       { role: "user", content: userText },
     ];
 
-    const reply = await AIService.chat(messages);
+    let reply = await AIService.chat(messages);
+
+    // ── لو GPT طلب حساباً عبر ```calc```، ننفّذه فعلياً ونرجّع الناتج
+    //    له في دورة ثانية ليصيغ الرد النهائي بناءً على رقم دقيق مضمون ──
+    const calcRequest = fcbExtractAndRunCalc(reply);
+    if (calcRequest) {
+      const calcMessages = [
+        ...messages,
+        { role: "assistant", content: reply },
+        {
+          role: "user",
+          content:
+            "نتيجة الحساب الفعلي من المحرك (استخدمها حرفياً في ردك النهائي، ولا تعرض بلوك ```calc``` للمستخدم، فقط اكتب الجواب بلغة طبيعية وواضحة):\n" +
+            JSON.stringify(calcRequest),
+        },
+      ];
+      reply = await AIService.chat(calcMessages);
+    }
 
     FCB_HISTORY.push({ role: "user", content: userText });
     FCB_HISTORY.push({ role: "assistant", content: reply });
@@ -13012,7 +13153,7 @@ ${(() => {
         '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
         '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
         '<input class="finp" id="gate-search" placeholder="🔍 اسم البواب أو المدرسة أو الجوال أو الهوية..." value="' + escText(STATE.search) + '" style="width:100%" ' +
-        'oninput="window.__GATE_STATE__.search=this.value;window.__GATE_STATE__.page=0;renderGatekeepersTab()"></div>' +
+        'oninput="window.__GATE_STATE__.search=this.value;window.__GATE_STATE__.page=0;smartSearchRerender(this, renderGatekeepersTab)"></div>' +
         '<div class="fg"><div class="fg-lbl">المدينة</div>' +
         '<select class="fsel" id="gate-city" onchange="window.__GATE_STATE__.city=this.value;window.__GATE_STATE__.page=0;renderGatekeepersTab()">' +
         '<option value="">الكل</option>' + cityOptions + "</select></div>" +
@@ -13371,7 +13512,7 @@ ${(() => {
         '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
         '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
         '<input class="finp" id="recruit-search" placeholder=" اسم الموظف أو المسمى الوظيفي أو الرقم..." value="' + esc_(STATE.search) + '" style="width:100%" ' +
-        'oninput="window.__RECRUIT_STATE__.search=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()"></div>' +
+        'oninput="window.__RECRUIT_STATE__.search=this.value;window.__RECRUIT_STATE__.page=0;smartSearchRerender(this, renderRecruitmentTab)"></div>' +
         '<div class="fg"><div class="fg-lbl">المنطقة</div>' +
         '<select class="fsel" id="recruit-region" onchange="window.__RECRUIT_STATE__.region=this.value;window.__RECRUIT_STATE__.page=0;renderRecruitmentTab()">' +
         '<option value="">الكل</option>' + regionOptions + "</select></div>" +

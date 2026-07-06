@@ -14410,9 +14410,9 @@ window.addEventListener('load', function(){
   scene.add(new THREE.HemisphereLight(0xf2fbff, 0xa9c6d4, 0.7));
   const sun = new THREE.DirectionalLight(0xffffff, 0.55);
   sun.position.set(3, 6, 5); scene.add(sun);
-  const rimL = new THREE.DirectionalLight(0x22d3ee, 0.3);
+  const rimL = new THREE.DirectionalLight(0x14a0ba, 0.3);
   rimL.position.set(-4, 3, -3); scene.add(rimL);
-  const glowLight = new THREE.PointLight(0x22d3ee, 0.9, 6);   /* يشتد في حالة الاستماع */
+  const glowLight = new THREE.PointLight(0x14a0ba, 0.9, 6);   /* يشتد في حالة الاستماع */
   glowLight.position.set(0, 1.8, 1.4); scene.add(glowLight);
 
   /* ── خامات Ink & Brass ── */
@@ -14423,7 +14423,7 @@ window.addEventListener('load', function(){
     visor : new THREE.MeshStandardMaterial({ color:0x061e2a, roughness:.12, metalness:.65 }),
     brass : new THREE.MeshStandardMaterial({ color:0xb08a4e, roughness:.28, metalness:.75 }),
     brass2: new THREE.MeshStandardMaterial({ color:0xd4af6a, emissive:0x4a3410, emissiveIntensity:.25, roughness:.25, metalness:.8 }),
-    glow  : new THREE.MeshStandardMaterial({ color:0x34e3ff, emissive:0x22d3ee, emissiveIntensity:2.4, roughness:.25 })
+    glow  : new THREE.MeshStandardMaterial({ color:0x2fb0c9, emissive:0x0c7f93, emissiveIntensity:2.4, roughness:.25 })
   };
 
   function capsule(r, len, mat){

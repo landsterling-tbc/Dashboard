@@ -14382,3 +14382,2260 @@ function askFormatAndSave(canvas, baseName, stamp, doneCb) {
     cleanup();
   });
 }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   منقول من index.html — منطق المساعد ثلاثي الأبعاد (Three.js)
+   Moved from inline <script> #1 in index.html
+   ══════════════════════════════════════════════════════════════════ */
+/* ═══════════ المساعد التنفيذي ثلاثي الأبعاد — حالات: idle / near / listening / thinking / speaking ═══════════ */
+window.addEventListener('load', function(){
+  if (typeof THREE === 'undefined') return;
+
+  const holder = document.getElementById('fmbotWalker');
+  const bubble = document.getElementById('fmbotBubble');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const W = holder.clientWidth, H = holder.clientHeight;
+  const renderer = new THREE.WebGLRenderer({ alpha:true, antialias:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(W, H);
+  holder.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, W/H, 0.1, 100);
+  camera.position.set(0, 2.3, 8.6);
+  camera.lookAt(0, 1.6, 0);
+
+  scene.add(new THREE.HemisphereLight(0xf2fbff, 0xa9c6d4, 0.7));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.55);
+  sun.position.set(3, 6, 5); scene.add(sun);
+  const rimL = new THREE.DirectionalLight(0x22d3ee, 0.3);
+  rimL.position.set(-4, 3, -3); scene.add(rimL);
+  const glowLight = new THREE.PointLight(0x22d3ee, 0.9, 6);   /* يشتد في حالة الاستماع */
+  glowLight.position.set(0, 1.8, 1.4); scene.add(glowLight);
+
+  /* ── خامات Ink & Brass ── */
+  const M = {
+    shell : new THREE.MeshStandardMaterial({ color:0x5b6b74, roughness:.35, metalness:.18 }),
+    shell2: new THREE.MeshStandardMaterial({ color:0x445159, roughness:.4,  metalness:.16 }),
+    joint : new THREE.MeshStandardMaterial({ color:0x0a5468, roughness:.4,  metalness:.45 }),
+    visor : new THREE.MeshStandardMaterial({ color:0x061e2a, roughness:.12, metalness:.65 }),
+    brass : new THREE.MeshStandardMaterial({ color:0xb08a4e, roughness:.28, metalness:.75 }),
+    brass2: new THREE.MeshStandardMaterial({ color:0xd4af6a, emissive:0x4a3410, emissiveIntensity:.25, roughness:.25, metalness:.8 }),
+    glow  : new THREE.MeshStandardMaterial({ color:0x34e3ff, emissive:0x22d3ee, emissiveIntensity:2.4, roughness:.25 })
+  };
+
+  function capsule(r, len, mat){
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 20), mat));
+    const s1 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s1.position.y =  len/2;
+    const s2 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s2.position.y = -len/2;
+    g.add(s1, s2);
+    return g;
+  }
+
+  /* ── بناء المساعد (واقف بثبات — لا مشي) ── */
+  const robot = new THREE.Group(); scene.add(robot);
+  const torso = new THREE.Group(); robot.add(torso);        /* تنفّس */
+  const headG = new THREE.Group(); headG.position.y = 2.42; torso.add(headG);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.62, 30, 24), M.shell);
+  skull.scale.set(1.06, 0.92, 0.98); headG.add(skull);
+  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.52, 30, 24, 0, Math.PI*2, 0, Math.PI*0.62), M.visor);
+  visor.scale.set(1.02, 0.88, 0.9); visor.position.set(0, -0.02, 0.17); headG.add(visor);
+
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), M.glow.clone());
+  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), eyeL.material);
+  eyeL.position.set(-0.21, 0.03, 0.62);
+  eyeR.position.set( 0.21, 0.03, 0.62);
+  headG.add(eyeL, eyeR);
+
+  const mouthG = new THREE.Group(); mouthG.position.set(0, -0.2, 0.6); headG.add(mouthG);
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 20, Math.PI*0.85), M.glow);
+  mouth.rotation.z = Math.PI + Math.PI*0.075; mouthG.add(mouth);
+
+  const antRod = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.34, 10), M.brass);
+  antRod.position.y = 0.72;
+  const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), M.glow.clone());
+  antTip.position.y = 0.92;
+  headG.add(antRod, antTip);
+
+  const earL = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 20), M.shell2);
+  earL.rotation.z = Math.PI/2; earL.position.set(-0.63, 0, 0);
+  const earR = earL.clone(); earR.position.x = 0.63;
+  const ringL = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 22), M.brass);
+  ringL.rotation.y = Math.PI/2; ringL.position.set(-0.69, 0, 0);
+  const ringR = ringL.clone(); ringR.position.x = 0.69;
+  headG.add(earL, earR, ringL, ringR);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.22, 14), M.joint);
+  neck.position.y = 1.98; torso.add(neck);
+  const chest = capsule(0.56, 0.62, M.shell); chest.position.y = 1.45; chest.scale.set(1,1,0.82); torso.add(chest);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.44, 24, 18), M.shell2);
+  belly.scale.set(1, 0.72, 0.6); belly.position.set(0, 1.42, 0.22); torso.add(belly);
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.07, 18), M.glow.clone());
+  core.rotation.x = Math.PI/2; core.position.set(0, 1.52, 0.47); torso.add(core);
+  const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.032, 10, 28), M.brass2);
+  coreRing.position.copy(core.position); torso.add(coreRing);
+
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.42, 22, 16), M.shell2);
+  pelvis.scale.set(1.05, 0.6, 0.8); pelvis.position.y = 0.98; robot.add(pelvis);
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 10, 30), M.brass);
+  belt.rotation.x = Math.PI/2; belt.position.y = 1.06; robot.add(belt);
+
+  /* أذرع هادئة بجانب الجسم */
+  function arm(side){
+    const sh = new THREE.Group(); sh.position.set(side*0.68, 1.72, 0);
+    sh.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), M.joint));
+    const up = capsule(0.115, 0.34, M.shell); up.position.y = -0.26; sh.add(up);
+    const el = new THREE.Group(); el.position.y = -0.5;
+    el.add(new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 10), M.joint));
+    const fo = capsule(0.1, 0.3, M.shell2); fo.position.y = -0.23; el.add(fo);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), M.joint);
+    hand.position.y = -0.46; el.add(hand);
+    el.rotation.x = -0.12; sh.rotation.z = side*-0.06;
+    sh.add(el); torso.add(sh);
+    return sh;
+  }
+  arm(-1); arm(1);
+
+  /* قاعدة عائمة بدل الأرجل — طابع Vision Pro (يطفو فوق المنصة الزجاجية) */
+  const hover1 = new THREE.Mesh(new THREE.SphereGeometry(0.34, 22, 16), M.shell);
+  hover1.scale.set(1, 0.5, 1); hover1.position.y = 0.62; robot.add(hover1);
+  const hoverRing = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 10, 30), M.brass2);
+  hoverRing.rotation.x = Math.PI/2; hoverRing.position.y = 0.6; robot.add(hoverRing);
+  const thruster = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.14, 16), M.glow.clone());
+  thruster.material.transparent = true;
+  thruster.position.y = 0.42; robot.add(thruster);
+
+  /* ── جسيمات التفكير المدارية حول الرأس ── */
+  const orbit = new THREE.Group(); orbit.position.y = 2.42; robot.add(orbit);
+  const orbiters = [];
+  for (let i = 0; i < 6; i++){
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), M.glow.clone());
+    p.material.transparent = true; p.material.opacity = 0;
+    p.material.color.set(0xffd27a); p.material.emissive.set(0xd4af6a); p.material.emissiveIntensity = 1.4;
+    orbit.add(p);
+    orbiters.push({ m:p, a:(i/6)*Math.PI*2, r:0.95 + (i%2)*0.12, tilt:(i%3)*0.35 });
+  }
+
+  robot.position.y = -0.35;
+
+  /* ═══════════ الحالات — تُقرأ من DOM دون تعديل أي منطق ═══════════ */
+  const S = { NEAR:false, LISTEN:false, THINK:false, SPEAK:0 };
+  const mouse = { x:0, y:0, active:false };
+
+  document.addEventListener('mousemove', e=>{
+    const r = holder.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    const d = Math.hypot(e.clientX - cx, e.clientY - cy);
+    S.NEAR = d < 240;
+    holder.classList.toggle('near', S.NEAR);
+    mouse.x = Math.max(-1, Math.min(1, (e.clientX - cx)/240));
+    mouse.y = Math.max(-1, Math.min(1, (e.clientY - cy)/240));
+    mouse.active = true;
+  }, { passive:true });
+
+  /* الاستماع: تركيز/كتابة في حقل الشات */
+  function hookInput(){
+    const inp = document.getElementById('fcbInput');
+    if (!inp) return setTimeout(hookInput, 800);
+    inp.addEventListener('focus', ()=>{ S.LISTEN = true;  holder.classList.add('listening'); });
+    inp.addEventListener('blur',  ()=>{ S.LISTEN = false; holder.classList.remove('listening'); });
+  }
+  hookInput();
+
+  /* التفكير + التحدث: مراقبة رسائل الشات */
+  function hookMessages(){
+    const box = document.getElementById('fcbMessages');
+    if (!box) return setTimeout(hookMessages, 800);
+    new MutationObserver(()=>{
+      const thinking = !!box.querySelector('.fcb-typing');
+      if (thinking && !S.THINK){ S.THINK = true; holder.classList.add('thinking'); }
+      if (!thinking && S.THINK){ S.THINK = false; S.SPEAK = 2.6; holder.classList.remove('thinking'); }  /* وصل الرد → تحدث */
+    }).observe(box, { childList:true, subtree:true });
+  }
+  hookMessages();
+
+  const panelOpen = () => {
+    const p = document.getElementById('fcbPanel');
+    return p && p.classList.contains('open');
+  };
+
+  /* ═══════════ حلقة الرسم ═══════════ */
+  const lerp = (a,b,t)=> a+(b-a)*t;
+  let blink = 0, nextBlink = 3 + Math.random()*4;
+  let headYawT = 0, headPitchT = 0, wanderT = 0;
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t  = clock.elapsedTime;
+    const e6 = Math.min(1, dt*6), e4 = Math.min(1, dt*4);
+
+    if (!reduced){
+      /* ── تنفّس 1→1.03 + طفو ±4px (≈0.11 وحدة) ── */
+      const br = 1 + Math.sin(t*1.4)*0.015 + 0.015;
+      torso.scale.set(br, br, br);
+      robot.position.y = -0.35 + Math.sin(t*0.9)*0.11;
+
+      /* ── حركة الرأس ── */
+      if (S.LISTEN || S.THINK){
+        headYawT = 0; headPitchT = S.THINK ? -0.05 : 0;      /* مواجهة للأمام */
+      } else if (S.NEAR && mouse.active){
+        headYawT = mouse.x * 0.32;                            /* تتبّع المؤشر */
+        headPitchT = mouse.y * 0.2;
+      } else {
+        wanderT -= dt;                                        /* تجوّل خامل ±2° */
+        if (wanderT <= 0){
+          headYawT = (Math.random()-0.5)*0.07;
+          headPitchT = (Math.random()-0.5)*0.05;
+          wanderT = 2.5 + Math.random()*3;
+        }
+      }
+      headG.rotation.y = lerp(headG.rotation.y, headYawT, e4);
+      headG.rotation.x = lerp(headG.rotation.x, headPitchT, e4);
+
+      /* إيماءة رأس أثناء التحدث */
+      if (S.SPEAK > 0) headG.rotation.x += Math.sin(t*7)*0.03;
+
+      /* ── العيون: تتبع + توسّع عند الاستماع ── */
+      const eyeScale = S.LISTEN ? 1.22 : (S.NEAR ? 1.08 : 1);
+      const ex = (S.NEAR && !S.LISTEN) ? mouse.x*0.05 : 0;
+      const ey = (S.NEAR && !S.LISTEN) ? -mouse.y*0.035 : 0;
+      [eyeL, eyeR].forEach((eye,i)=>{
+        eye.position.x = lerp(eye.position.x, (i? .21 : -.21) + ex, e6);
+        eye.position.y = lerp(eye.position.y, 0.03 + ey, e6);
+        const s = lerp(eye.scale.x, eyeScale, e6);
+        eye.scale.set(s, blink>0 ? Math.max(0.08, Math.abs(blink/0.07-1)) : s, s);
+      });
+
+      /* الرمش كل 4-8 ثوانٍ */
+      nextBlink -= dt;
+      if (nextBlink <= 0 && !S.LISTEN){ blink = 0.14; nextBlink = 4 + Math.random()*4; }
+      if (blink > 0) blink -= dt;
+
+      /* ── الابتسامة: أعرض قليلاً عند الاقتراب ── */
+      const smile = S.NEAR ? 1.25 : 1;
+      mouthG.scale.x = lerp(mouthG.scale.x, smile, e4);
+      /* حركة فم بسيطة أثناء التحدث */
+      if (S.SPEAK > 0){
+        S.SPEAK -= dt;
+        mouthG.scale.y = 1 + Math.abs(Math.sin(t*9))*0.5;
+      } else {
+        mouthG.scale.y = lerp(mouthG.scale.y, 1, e6);
+      }
+
+      /* ── توهج الاستماع (مع خفض الإضاءة وقت التفكير عشان لون الجسم يفضل ظاهر) ── */
+      const glowTarget = S.LISTEN ? 1.9 : (S.THINK ? 0.35 : 0.7);
+      glowLight.intensity = lerp(glowLight.intensity, glowTarget, e4);
+      eyeL.material.emissiveIntensity = lerp(eyeL.material.emissiveIntensity, S.LISTEN ? 2 : 1.3, e4);
+
+      /* ── جسيمات التفكير المدارية ── */
+      orbiters.forEach((o,i)=>{
+        o.a += dt * (1.6 + i*0.12);
+        o.m.position.set(
+          Math.cos(o.a)*o.r,
+          Math.sin(o.a*1.3)*0.22 + Math.sin(o.tilt)*0.18,
+          Math.sin(o.a)*o.r*0.7
+        );
+        o.m.material.opacity = lerp(o.m.material.opacity, S.THINK ? 0.9 : 0, e4);
+        o.m.material.emissiveIntensity = 1.2 + Math.sin(t*5+i)*0.4;
+      });
+      /* نبض الهوائي أسرع أثناء التفكير */
+      antTip.material.emissiveIntensity = (S.THINK ? 1.3 : 0.85) + Math.sin(t*(S.THINK?9:4))*0.3;
+      core.material.emissiveIntensity = 1.1 + Math.sin(t*3)*0.25;
+      thruster.material.emissiveIntensity = 1 + Math.sin(t*6)*0.35;
+      thruster.material.opacity = 0.9;
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  /* ── Minimal hint bubble — appears every 8-10s, disappears after first user message ── */
+  let hintDisabled = false;
+  let hintTimer = null;
+
+  function showBubble(){
+    if (hintDisabled || panelOpen()) return;
+    bubble.classList.add('show');
+    setTimeout(()=> bubble.classList.remove('show'), 3400);
+  }
+
+  function scheduleNextHint(){
+    if (hintDisabled) return;
+    const delay = 8000 + Math.random() * 2000;
+    hintTimer = setTimeout(()=>{
+      showBubble();
+      scheduleNextHint();
+    }, delay);
+  }
+
+  /* Disable hints permanently after user sends first message */
+  function disableHintPermanently(){
+    hintDisabled = true;
+    clearTimeout(hintTimer);
+    bubble.classList.remove('show');
+  }
+
+  /* Watch for first user message in the chat */
+  (function watchFirstMessage(){
+    const box = document.getElementById('fcbMessages');
+    if (!box){ setTimeout(watchFirstMessage, 800); return; }
+    const obs = new MutationObserver(()=>{
+      if (box.querySelector('.fcb-row.user')){
+        disableHintPermanently();
+        obs.disconnect();
+      }
+    });
+    obs.observe(box, { childList:true, subtree:true });
+  })();
+
+  /* Also disable on wallet click (they opened the chat) */
+  holder.addEventListener('click', ()=>{
+    bubble.classList.remove('show');
+    if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
+  });
+
+  /* Manage walker position relative to panel */
+  function syncWalkerPos(){
+    if (panelOpen()){
+      holder.classList.add('over-panel');
+      holder.classList.remove('panel-closed');
+    } else {
+      holder.classList.remove('over-panel');
+      holder.classList.add('panel-closed');
+    }
+  }
+  setInterval(syncWalkerPos, 300);
+
+  setTimeout(()=>{ showBubble(); scheduleNextHint(); }, 2000);
+});
+
+
+/* ══════════════════════════════════════════════════════════════════
+   منقول من index.html — سكربت #2 (منطق الشات بوت الأساسي)
+   Moved from inline <script> #2 in index.html
+   ══════════════════════════════════════════════════════════════════ */
+/* ============================================================
+   dashboard-interactive.js
+   طبقة التفاعل الكاملة — Drill Down + School Details + KPI Click + Smart Search
+   تُضاف فوق dashboard.js دون تعديل أي كود موجود.
+   ============================================================ */
+
+/* ============================================================
+   dashboard-interactive.js
+   طبقة التفاعل الكاملة — Drill Down + School Details + KPI Click + Smart Search
+   تُضاف فوق dashboard.js دون تعديل أي كود موجود.
+   ============================================================ */
+
+(function () {
+  "use strict";
+
+  /* ── Helper: دائماً يقرأ FILTERED الحالية من الـ scope الصحيح ── */
+  function getFiltered() {
+    // FILTERED معرّف في scope خارجي في dashboard.js — نقرأه مباشرة
+    try { if (typeof FILTERED !== "undefined" && FILTERED.length) return FILTERED; } catch(e) {}
+    try { if (getFiltered() && getFiltered().length) return getFiltered(); } catch(e) {}
+    try { if (typeof RAW !== "undefined" && RAW.length) return RAW; } catch(e) {}
+    return getRaw();
+  }
+  function getRaw() {
+    try { if (typeof RAW !== "undefined" && RAW.length) return RAW; } catch(e) {}
+    return getRaw();
+  }
+
+  /* ──────────────────────────────────────────────
+     0. انتظر تحميل DOM + البيانات
+  ────────────────────────────────────────────── */
+  document.addEventListener("DOMContentLoaded", function () {
+    injectStyles();
+    injectSchoolPanel();
+    injectKpiModal();
+    patchSearchForDrillDown();
+    hookKpiCards();
+    hookTierStrip();
+
+    // نراقب تغييرات البيانات لتفعيل الـ hooks على العناصر الجديدة
+    observeDataUpdates();
+  });
+
+  /* ──────────────────────────────────────────────
+     1. حقن CSS الطبقة التفاعلية
+  ────────────────────────────────────────────── */
+  function injectStyles() {
+    const style = document.createElement("style");
+    style.id = "interactive-layer-styles";
+    style.textContent = `
+      /* ── حالة الفلتر النشطة ── */
+      .ix-filter-bar {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding: 8px 16px; margin: 0 0 12px;
+        background: linear-gradient(135deg, rgba(8,145,178,.08), rgba(8,145,178,.04));
+        border: 1px solid rgba(8,145,178,.2);
+        border-radius: 12px; font-size: 12px; font-weight: 700;
+        color: var(--teal-3); animation: ixFadeIn .25s ease;
+      }
+      .ix-filter-bar .ix-filter-label { color: var(--tx-muted); font-weight: 500; }
+      .ix-filter-bar .ix-filter-tag {
+        padding: 3px 12px; background: var(--teal); color: #fff;
+        border-radius: 20px; font-size: 11px; font-weight: 700;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .ix-clear-btn {
+        margin-right: auto; padding: 5px 14px; font-size: 11px; font-weight: 700;
+        background: #fff; color: var(--teal-3); border: 1.5px solid var(--bd-mid);
+        border-radius: 20px; cursor: pointer; transition: all .18s;
+        display: inline-flex; align-items: center; gap: 5px;
+      }
+      .ix-clear-btn:hover { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+      /* ── بطاقات KPI قابلة للنقر ── */
+      .kpi[data-ix-kpi] {
+        cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s;
+        position: relative;
+      }
+      .kpi[data-ix-kpi]::after {
+        content: "🔍"; position: absolute; top: 8px; left: 10px;
+        font-size: 11px; opacity: 0; transition: opacity .2s;
+      }
+      .kpi[data-ix-kpi]:hover { transform: translateY(-3px); box-shadow: var(--sh-hover); }
+      .kpi[data-ix-kpi]:hover::after { opacity: .7; }
+      .kpi[data-ix-kpi]:active { transform: translateY(-1px); }
+
+      /* ── Tier Strip قابل للنقر ── */
+      .tier-seg[data-ix-tier] {
+        cursor: pointer; transition: transform .18s, box-shadow .18s, opacity .18s;
+      }
+      .tier-seg[data-ix-tier]:hover { transform: scale(1.03); box-shadow: 0 6px 18px rgba(0,0,0,.1); }
+      .tier-seg[data-ix-tier].ix-active { outline: 2.5px solid currentColor; outline-offset: 2px; }
+
+      /* ── اسم المدرسة في الجداول ── */
+      .ix-school-link {
+        cursor: pointer; color: var(--teal-3); font-weight: 700;
+        text-decoration: underline; text-decoration-color: transparent;
+        transition: color .16s, text-decoration-color .16s;
+        display: inline-flex; align-items: center; gap: 4px;
+      }
+      .ix-school-link:hover {
+        color: var(--teal); text-decoration-color: var(--teal);
+      }
+      .ix-school-link::after { content: " ↗"; font-size: 10px; opacity: 0; transition: opacity .16s; }
+      .ix-school-link:hover::after { opacity: 1; }
+
+      /* ── School Detail Side Panel ── */
+      .ix-school-overlay {
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(6,20,28,.45); backdrop-filter: blur(4px);
+        opacity: 0; transition: opacity .28s ease;
+        display: none;
+      }
+      .ix-school-overlay.ix-open { display: block; opacity: 1; }
+
+      .ix-school-panel {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 9001;
+        width: min(580px, 94vw);
+        background: var(--bg-3);
+        box-shadow: 4px 0 40px rgba(6,20,28,.18), 12px 0 64px rgba(8,145,178,.08);
+        display: flex; flex-direction: column;
+        transform: translateX(-100%); transition: transform .3s cubic-bezier(.22,.6,.34,1);
+        border-right: 2px solid var(--bd-light);
+        overflow: hidden;
+      }
+      .ix-school-panel.ix-open { transform: translateX(0); }
+
+      .ix-panel-head {
+        padding: 20px 24px 16px;
+        background: linear-gradient(135deg, #071C28 0%, #0A3043 100%);
+        color: #fff; flex-shrink: 0;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .ix-panel-close {
+        position: absolute; top: 16px; left: 18px;
+        width: 32px; height: 32px; border-radius: 50%;
+        background: rgba(255,255,255,.1); border: none; color: #fff;
+        font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background .18s;
+      }
+      .ix-panel-close:hover { background: rgba(255,255,255,.22); }
+      .ix-panel-school-name {
+        font-size: 17px; font-weight: 800; line-height: 1.4;
+        max-width: calc(100% - 50px); color: #fff;
+      }
+      .ix-panel-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+      .ix-panel-badge {
+        padding: 3px 12px; border-radius: 20px; font-size: 10px; font-weight: 700;
+        background: rgba(255,255,255,.12); color: rgba(255,255,255,.9);
+        border: 1px solid rgba(255,255,255,.15);
+      }
+      .ix-panel-body {
+        flex: 1; overflow-y: auto; padding: 20px 24px;
+        scroll-padding-top: 12px;
+      }
+
+      .ix-section-title {
+        font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--tx-muted); margin: 20px 0 10px;
+        padding-bottom: 6px; border-bottom: 1px solid var(--bd-light);
+        display: flex; align-items: center; gap: 6px;
+      }
+      .ix-section-title:first-child { margin-top: 0; }
+
+      .ix-info-grid {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 10px; margin-bottom: 4px;
+      }
+      .ix-info-item {
+        background: var(--bg-2); border-radius: 10px; padding: 11px 14px;
+        border: 1px solid var(--bd-light);
+      }
+      .ix-info-lbl { font-size: 10px; color: var(--tx-muted); font-weight: 600; margin-bottom: 4px; }
+      .ix-info-val { font-size: 14px; font-weight: 700; color: var(--tx-main); }
+      .ix-info-item.ix-full { grid-column: 1 / -1; }
+
+      .ix-score-bar {
+        height: 8px; border-radius: 4px; background: var(--bd-light); overflow: hidden;
+        margin-top: 6px;
+      }
+      .ix-score-fill {
+        height: 100%; border-radius: 4px;
+        transition: width .6s cubic-bezier(.22,.6,.34,1);
+      }
+
+      .ix-contract-row {
+        background: var(--bg-2); border: 1px solid var(--bd-light);
+        border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+        display: flex; flex-direction: column; gap: 5px;
+      }
+      .ix-contract-type {
+        font-size: 10px; font-weight: 800; text-transform: uppercase;
+        letter-spacing: .04em; color: var(--tx-muted);
+      }
+      .ix-contract-num { font-size: 13px; font-weight: 700; color: var(--teal-3); font-family: monospace; }
+      .ix-contract-contractor { font-size: 12px; color: var(--tx-sec); }
+
+      /* ── KPI Drill Modal ── */
+      .ix-kpi-overlay {
+        position: fixed; inset: 0; z-index: 8500;
+        background: rgba(6,20,28,.5); backdrop-filter: blur(5px);
+        display: none; align-items: center; justify-content: center;
+        animation: ixFadeIn .22s ease;
+      }
+      .ix-kpi-overlay.ix-open { display: flex; }
+
+      .ix-kpi-modal {
+        background: var(--bg-3); border-radius: 20px;
+        box-shadow: 0 24px 64px rgba(6,20,28,.24), 0 6px 24px rgba(8,145,178,.1);
+        width: min(780px, 95vw); max-height: 85vh;
+        display: flex; flex-direction: column; overflow: hidden;
+        animation: ixSlideUp .26s cubic-bezier(.22,.6,.34,1);
+      }
+      .ix-kpi-modal-head {
+        padding: 20px 24px 16px;
+        background: linear-gradient(135deg, #071C28 0%, #0A3043 100%);
+        color: #fff; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px;
+      }
+      .ix-kpi-modal-title { font-size: 16px; font-weight: 800; }
+      .ix-kpi-modal-sub { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 3px; }
+      .ix-kpi-modal-close {
+        width: 34px; height: 34px; border-radius: 50%;
+        background: rgba(255,255,255,.1); border: none; color: #fff;
+        font-size: 16px; cursor: pointer; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        transition: background .18s;
+      }
+      .ix-kpi-modal-close:hover { background: rgba(255,255,255,.22); }
+      .ix-kpi-modal-body {
+        flex: 1; overflow-y: auto; padding: 16px 20px;
+      }
+
+      .ix-kpi-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .ix-kpi-table th {
+        text-align: right; padding: 10px 12px; font-size: 10px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: .04em; color: var(--tx-muted);
+        background: var(--bg-2); border-bottom: 2px solid var(--bd-light);
+        position: sticky; top: 0; z-index: 1;
+      }
+      .ix-kpi-table td {
+        padding: 10px 12px; border-bottom: 1px solid var(--bd-light);
+        vertical-align: middle;
+      }
+      .ix-kpi-table tr:hover td { background: var(--bg-2); }
+      .ix-kpi-table tr:last-child td { border-bottom: none; }
+      .ix-school-clickable {
+        color: var(--teal-3); font-weight: 700; cursor: pointer;
+        text-decoration: underline; text-decoration-color: transparent;
+        transition: all .15s;
+      }
+      .ix-school-clickable:hover { color: var(--teal); text-decoration-color: var(--teal); }
+
+      /* ── Search Suggestions ──
+         ملاحظة: position:fixed بدل absolute، مع z-index عالٍ جداً (أعلى من
+         .topbar وأي كارت/جدول) — لأن الاقتراحات كانت تظهر خلف الكروت
+         بسبب overflow:hidden أو stacking context مختلف في بعض الأباء.
+         الإحداثيات (top/left/width) تُحسب وتُحدَّث ديناميكيًا عبر JS
+         بناءً على موضع حقل البحث الفعلي على الشاشة، فتبقى ملتصقة به دائمًا
+         بغض النظر عن مكانه في الصفحة أو تمرير الصفحة (scroll). */
+      .ix-search-suggestions {
+        position: fixed; z-index: 99999;
+        background: var(--bg-3); border: 1px solid var(--bd-mid);
+        border-radius: 12px; box-shadow: var(--sh-soft);
+        max-height: 260px; overflow-y: auto;
+        margin-top: 4px; display: none;
+        animation: ixFadeIn .18s ease;
+      }
+      .ix-search-suggestions.ix-open { display: block; }
+      .ix-suggestion-item {
+        padding: 10px 14px; cursor: pointer; display: flex; flex-direction: column;
+        border-bottom: 1px solid var(--bd-light); transition: background .13s;
+      }
+      .ix-suggestion-item:last-child { border-bottom: none; }
+      .ix-suggestion-item:hover, .ix-suggestion-item:focus { background: var(--bg-2); outline: none; }
+      .ix-sug-name { font-size: 12px; font-weight: 700; color: var(--tx-main); }
+      .ix-sug-meta { font-size: 10px; color: var(--tx-muted); margin-top: 2px; }
+      .ix-sug-mark { background: rgba(8,145,178,.15); color: var(--teal-3); border-radius: 2px; }
+
+      /* ── Loading Spinner ── */
+      .ix-spinner {
+        width: 20px; height: 20px; border: 2.5px solid rgba(8,145,178,.2);
+        border-top-color: var(--teal); border-radius: 50%;
+        animation: ixSpin .7s linear infinite; flex-shrink: 0;
+      }
+
+      /* ── Animations ── */
+      @keyframes ixFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes ixSlideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes ixSpin { to { transform: rotate(360deg); } }
+
+      /* ── Active filter indicator on chart bars/segments ── */
+      .ix-chart-filter-active {
+        outline: 2px solid var(--teal); outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      /* ── hover pointer for school rows in lists ── */
+      .school-row[data-school-idx] { cursor: pointer; }
+      .school-row[data-school-idx]:hover { background: var(--bg-2) !important; }
+
+      /* ── Mini Map in school panel ── */
+      .ix-mini-map-wrap {
+        border-radius: 14px; overflow: hidden;
+        border: 1px solid var(--bd-mid);
+        margin-bottom: 14px;
+        position: relative;
+        box-shadow: 0 2px 12px rgba(6,20,28,.12);
+      }
+      .ix-mini-map {
+        width: 100%; height: 200px;
+        display: block;
+      }
+      .ix-mini-map-no-coords {
+        height: 54px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--bg-2); border-radius: 12px;
+        font-size: 11px; color: var(--tx-muted);
+        border: 1px dashed var(--bd-mid);
+        gap: 8px;
+      }
+
+      /* ── Action Buttons Row ── */
+      .ix-action-row {
+        display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+      }
+      .ix-action-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px; border-radius: 10px; font-size: 11px; font-weight: 700;
+        border: 1px solid var(--bd-mid); background: var(--bg-2);
+        color: var(--tx-sec); cursor: pointer; text-decoration: none;
+        transition: all .18s; white-space: nowrap;
+      }
+      .ix-action-btn:hover { background: var(--bg-3); border-color: var(--teal); color: var(--teal); transform: translateY(-1px); }
+      .ix-action-btn.ix-btn-primary {
+        background: linear-gradient(135deg,#0c7a8a,#0891B2);
+        border-color: #0891B2; color: #fff;
+      }
+      .ix-action-btn.ix-btn-primary:hover { background: linear-gradient(135deg,#0891B2,#06b6d4); color: #fff; }
+      .ix-action-btn.ix-btn-copied { background:#059669!important; border-color:#059669!important; color:#fff!important; }
+
+      /* ── Score cards enhancement ── */
+      .ix-score-card {
+        background: var(--bg-2); border-radius: 12px; padding: 13px 16px;
+        border: 1px solid var(--bd-light); position: relative; overflow: hidden;
+      }
+      .ix-score-card::before {
+        content: ''; position: absolute; top: 0; right: 0;
+        width: 4px; height: 100%; border-radius: 0 12px 12px 0;
+        background: var(--ix-sc-color, #94a3b8);
+      }
+      .ix-score-lbl { font-size: 10px; color: var(--tx-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+      .ix-score-val { font-size: 22px; font-weight: 900; letter-spacing: -.02em; color: var(--ix-sc-color, var(--tx-main)); }
+      .ix-score-tier { font-size: 10px; font-weight: 700; margin-top: 2px; color: var(--ix-sc-color, var(--tx-muted)); }
+      .ix-score-bar2 { height: 6px; border-radius: 3px; background: var(--bd-light); overflow: hidden; margin-top: 8px; }
+      .ix-score-fill2 { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.22,.6,.34,1); background: var(--ix-sc-color, #94a3b8); }
+
+      /* ── Info grid enhanced ── */
+      .ix-info-grid2 {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 8px; margin-bottom: 4px;
+      }
+      .ix-info-item2 {
+        background: var(--bg-2); border-radius: 10px; padding: 10px 13px;
+        border: 1px solid var(--bd-light);
+      }
+      .ix-info-item2.ix-full2 { grid-column: 1 / -1; }
+      .ix-info-lbl2 { font-size: 10px; color: var(--tx-muted); font-weight: 600; margin-bottom: 3px; }
+      .ix-info-val2 { font-size: 13px; font-weight: 700; color: var(--tx-main); }
+
+      /* ── Leaflet popup override inside mini-map ── */
+      .ix-mini-map-wrap .leaflet-popup-content-wrapper { border-radius: 10px; font-family: Tajawal, sans-serif; }
+      .ix-mini-map-wrap .leaflet-popup-content { font-size: 12px; font-weight: 700; direction: rtl; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /* ──────────────────────────────────────────────
+     2. حقن HTML لـ School Detail Panel
+  ────────────────────────────────────────────── */
+  function injectSchoolPanel() {
+    const overlay = document.createElement("div");
+    overlay.id = "ix-school-overlay";
+    overlay.className = "ix-school-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.addEventListener("click", closeSchoolPanel);
+
+    const panel = document.createElement("div");
+    panel.id = "ix-school-panel";
+    panel.className = "ix-school-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.innerHTML = `
+      <div class="ix-panel-head" id="ix-panel-head">
+        <button class="ix-panel-close" id="ix-panel-close" onclick="window.__IXCloseSchool()">✕</button>
+        <div class="ix-panel-school-name" id="ix-school-name-title">—</div>
+        <div class="ix-panel-badges" id="ix-panel-badges"></div>
+      </div>
+      <div class="ix-panel-body" id="ix-panel-body">
+        <div style="display:flex;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--tx-muted)">
+          <div class="ix-spinner"></div>
+          <span style="font-size:13px">جاري تحميل البيانات...</span>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(panel);
+
+    // Close on Escape
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        if (document.getElementById("ix-school-overlay").classList.contains("ix-open")) {
+          closeSchoolPanel();
+        }
+        if (document.getElementById("ix-kpi-overlay")?.classList.contains("ix-open")) {
+          closeKpiModal();
+        }
+      }
+    });
+  }
+
+  /* ──────────────────────────────────────────────
+     3. حقن HTML لـ KPI Drill Modal
+  ────────────────────────────────────────────── */
+  function injectKpiModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "ix-kpi-overlay";
+    overlay.className = "ix-kpi-overlay";
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) closeKpiModal();
+    });
+
+    overlay.innerHTML = `
+      <div class="ix-kpi-modal" id="ix-kpi-modal">
+        <div class="ix-kpi-modal-head">
+          <div>
+            <div class="ix-kpi-modal-title" id="ix-kpi-modal-title">—</div>
+            <div class="ix-kpi-modal-sub" id="ix-kpi-modal-sub"></div>
+          </div>
+          <button class="ix-kpi-modal-close" onclick="window.__IXCloseKpi()">✕</button>
+        </div>
+        <div class="ix-kpi-modal-body" id="ix-kpi-modal-body">
+          <div style="display:flex;align-items:center;justify-content:center;height:120px;gap:12px;color:var(--tx-muted)">
+            <div class="ix-spinner"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+  }
+
+  /* ──────────────────────────────────────────────
+     4. دوال فتح / إغلاق School Panel
+  ────────────────────────────────────────────── */
+  function openSchoolPanel(schoolRow) {
+    const overlay = document.getElementById("ix-school-overlay");
+    const panel = document.getElementById("ix-school-panel");
+
+    overlay.classList.add("ix-open");
+    overlay.setAttribute("aria-hidden", "false");
+    panel.classList.add("ix-open");
+    document.body.style.overflow = "hidden";
+
+    renderSchoolDetails(schoolRow);
+  }
+
+  function closeSchoolPanel() {
+    const overlay = document.getElementById("ix-school-overlay");
+    const panel = document.getElementById("ix-school-panel");
+    overlay.classList.remove("ix-open");
+    panel.classList.remove("ix-open");
+    document.body.style.overflow = "";
+    setTimeout(() => {
+      overlay.setAttribute("aria-hidden", "true");
+    }, 300);
+  }
+
+  window.__IXCloseSchool = closeSchoolPanel;
+
+  function renderSchoolDetails(r) {
+    const nameEl   = document.getElementById("ix-school-name-title");
+    const badgesEl = document.getElementById("ix-panel-badges");
+    const bodyEl   = document.getElementById("ix-panel-body");
+
+    // ── اسم المدرسة ──
+    nameEl.textContent = safeStr(r.name || r.buildingName) || "—";
+
+    // ── شارات المرحلة / الجنس / الرقم الوزاري ──
+    const badges = [];
+    if (r.stage)  badges.push(safeStr(r.stage));
+    if (r.gender) badges.push(safeStr(r.gender.trim()));
+    if (r.minId)  badges.push("🔢 " + safeStr(r.minId));
+    badgesEl.innerHTML = badges.map(b => `<span class="ix-panel-badge">${esc(b)}</span>`).join("");
+
+    // ── مساعدات التقييم ──
+    const fcaColor  = v => v == null ? "#94a3b8" : v < 25 ? "#DC2626" : v < 50 ? "#D97706" : v < 75 ? "#059669" : "#0891B2";
+    const tierLabel = v => v == null ? "—" : v < 25 ? "حرج" : v < 50 ? "متوسط" : v < 75 ? "جيد" : "جيد جداً";
+    const tierIcon  = v => v == null ? "⚪" : v < 25 ? "🔴" : v < 50 ? "🟡" : v < 75 ? "🟢" : "🔵";
+
+    // ── عمر المبنى لون (لازم قبل استخدامه في statsItemsHTML) ──
+    const ageColor = r.buildingAge != null
+      ? (r.buildingAge >= 40 ? "color:#DC2626;font-weight:800"
+        : r.buildingAge >= 25 ? "color:#D97706;font-weight:800"
+        : "color:#059669;font-weight:800")
+      : "";
+
+    // scoreCard: يرجع "" (بدون كارت) لو القيمة غير متوفرة، بدل عرض كارت فاضٍ بـ "—"
+    const scoreCard = (label, v) => {
+      if (v == null || isNaN(v)) return "";
+      const c = fcaColor(v);
+      return `<div class="ix-score-card" style="--ix-sc-color:${c}">
+        <div class="ix-score-lbl">${label}</div>
+        <div class="ix-score-val">${v.toFixed(1)}%</div>
+        <div class="ix-score-tier">${tierIcon(v)} ${tierLabel(v)}</div>
+        <div class="ix-score-bar2"><div class="ix-score-fill2" style="width:${Math.min(v,100)}%"></div></div>
+      </div>`;
+    };
+
+    // infoItem: يرجع "" (بدون كارت) لو القيمة فاضية/غير متوفرة، بدل عرض كارت فاضٍ بـ "—"
+    // val ممكن يكون نص عادي أو HTML جاهز (زي span ملوّن) — لو val فاضي/null نتجاهل الكارت بالكامل
+    const infoItem = (lbl, val, extra="") => {
+      if (val == null || val === "" || val === "—") return "";
+      return `<div class="ix-info-item2${extra}">
+         <div class="ix-info-lbl2">${lbl}</div>
+         <div class="ix-info-val2">${val}</div>
+       </div>`;
+    };
+
+    // ── بناء أقسام العرض كمتغيرات — كل قسم يختفي بالكامل (عنوانه + محتواه) لو مفيش أي عنصر فيه ──
+    const fca  = r.fca       ?? null;
+    const env  = r.envScore  ?? null;
+    const ayen = r.ayenScore ?? null;
+
+    const infoItemsHTML = [
+      infoItem("الرقم الوزاري",              r.minId ? `<span style="font-family:monospace;font-size:14px;font-weight:800">${esc(r.minId)}</span>` : ""),
+      infoItem("رقم التسلسل",               (r.schoolSeq||r.buildingSeq) ? `<span style="font-family:monospace;font-size:12px">${esc(r.schoolSeq||r.buildingSeq)}</span>` : ""),
+      infoItem("المدينة / المنطقة",          r.city ? esc(r.city) : ""),
+      infoItem("المحافظة",                   r.sector ? esc(r.sector) : ""),
+      infoItem("الحي",                       r.district ? esc(r.district) : ""),
+      infoItem("الملكية",                    r.ownership ? esc(r.ownership) : ""),
+      infoItem("حالة الاشتراك",              r.subscriptionStatus ? esc(r.subscriptionStatus) : ""),
+      infoItem("نوع الارتباط",               r.linkType ? esc(r.linkType) : ""),
+    ].filter(Boolean).join("");
+    const infoSectionHTML = infoItemsHTML
+      ? `<div class="ix-section-title">🏫 معلومات المدرسة</div><div class="ix-info-grid2">${infoItemsHTML}</div>`
+      : "";
+
+    const statsItemsHTML = [
+      infoItem("عدد الطلاب",
+        r.students != null ? `<span style="color:#059669;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : ""),
+      infoItem("عدد الفصول",
+        r.classrooms != null ? `<span style="font-weight:800">${r.classrooms}</span>` : ""),
+      infoItem("حجم المدرسة",  r.schoolSize ? esc(r.schoolSize) : ""),
+      infoItem("عمر المبنى",
+        r.buildingAge != null ? `<span style="${ageColor};font-size:15px">${r.buildingAge} سنة</span>` : ""),
+    ].filter(Boolean).join("");
+    const statsSectionHTML = statsItemsHTML
+      ? `<div class="ix-section-title">📊 الإحصائيات</div><div class="ix-info-grid2">${statsItemsHTML}</div>`
+      : "";
+
+    const scoreCardsHTML = [
+      scoreCard("تقييم FCA", fca),
+      scoreCard("البيئة المدرسية", env),
+      scoreCard("تقييم عاين", ayen),
+    ].filter(Boolean).join("");
+    const scoresSectionHTML = scoreCardsHTML
+      ? `<div class="ix-section-title">🎯 التقييمات</div><div class="ix-info-grid2">${scoreCardsHTML}</div>`
+      : "";
+
+    // ── إحداثيات ──
+    const hasCoords = r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1;
+    const mapId = "ix-sp-map-" + Math.random().toString(36).slice(2,8);
+    const schoolName = esc(r.name || r.buildingName || "");
+    const cityName   = esc(r.city || r.sector || "");
+
+    // Google Maps URL: بالإحداثيات لو موجودة، وإلا بالاسم والمدينة
+    const gmapsUrl = hasCoords
+      ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`
+      : `https://www.google.com/maps/search/${encodeURIComponent((r.name||r.buildingName||"") + " " + (r.city||r.sector||"") + " السعودية")}`;
+
+    // ── قسم العقود ──
+    const contractRow = (icon, label, num, contractor, project, status) => !num ? "" : `
+      <div class="ix-contract-row">
+        <div class="ix-contract-type">${icon} ${label}</div>
+        <div class="ix-contract-num">${esc(num)}</div>
+        ${contractor ? `<div class="ix-contract-contractor">المقاول: ${esc(contractor)}</div>` : ""}
+        ${project    ? `<div class="ix-contract-contractor" style="font-size:10px;color:var(--tx-muted)">مشروع: ${esc(project)}</div>` : ""}
+        ${status     ? `<div class="ix-contract-contractor" style="font-size:10px;color:var(--tx-muted)">الحالة: ${esc(status)}</div>` : ""}
+      </div>`;
+
+    const contractsHTML = [
+      contractRow("🔧","عقد الصيانة", r.contractMaint, r.contrMaint, r.projMaint, r.expMaint),
+      contractRow("❄️","عقد التكييف", r.contractAC,   r.contrAC,   r.projAC,   r.expAC),
+      contractRow("🧹","عقد النظافة", r.contractClean, r.contrClean, r.projClean, r.expClean),
+    ].filter(Boolean).join("");
+    const contractsSectionHTML = contractsHTML
+      ? `<div class="ix-section-title">📋 العقود</div>${contractsHTML}`
+      : "";
+
+    const notesSectionHTML = r.notes
+      ? `<div class="ix-section-title">📝 ملاحظات</div>
+        <div class="ix-info-item2 ix-full2" style="margin-bottom:12px">
+          <div class="ix-info-val2" style="font-size:12px;line-height:1.7;font-weight:500">${esc(r.notes)}</div>
+        </div>`
+      : "";
+
+    // ── الأنظمة الرئيسية (متوسط كل قسم رئيسي من شيت المدارس_والأنظمة) ──
+    // الربط: 1) بالرقم الوزاري (minId/schoolSeq) أولاً — الأدق
+    //        2) بالاسم + المدينة كملاذ احتياطي لو الرقم غير متوفر بشيت الأنظمة
+    const sysMainHTML = (function () {
+      const allSys = Array.isArray(window.RAW_ALL_SYSTEMS) ? window.RAW_ALL_SYSTEMS : [];
+      if (!allSys.length) return "";
+
+      const normV = v => String(v || "").replace(/\uFEFF/g, "").trim().toUpperCase();
+      const targetId   = normV(r.minId || r.schoolSeq || r.buildingSeq || "");
+      const targetName = String(r.name || r.buildingName || "").trim().toLowerCase();
+      const targetCity = String(r.city || r.sector || "").trim().toLowerCase();
+
+      let rows = targetId
+        ? allSys.filter(row => normV(row["رقم المدرسة"]) === targetId)
+        : [];
+      if (!rows.length && targetName) {
+        rows = allSys.filter(row =>
+          String(row["اسم المدرسة"] || "").trim().toLowerCase() === targetName &&
+          (!targetCity || String(row["المدينة الرئيسية"] || "").trim().toLowerCase() === targetCity)
+        );
+      }
+      if (!rows.length) return "";
+
+      const HIDDEN = (typeof HIDDEN_SYSTEMS !== "undefined") ? HIDDEN_SYSTEMS : [];
+      const sumMap = {}, cntMap = {};
+      rows.forEach(row => {
+        const sec = row["القسم الرئيسي"];
+        const v = parseFloat(row["التقييم (1–5)"]);
+        if (!sec || isNaN(v) || v <= 0 || HIDDEN.includes(sec)) return;
+        sumMap[sec] = (sumMap[sec] || 0) + v;
+        cntMap[sec] = (cntMap[sec] || 0) + 1;
+      });
+      const sections = Object.keys(sumMap);
+      if (!sections.length) return "";
+
+      const catFromAvg = v => v >= 4.5 ? "جيد جداً" : v >= 3.5 ? "جيد" : v >= 2.5 ? "متوسط" : "حرج";
+      const cards = sections
+        .map(sec => ({ sec, avg: sumMap[sec] / cntMap[sec] }))
+        .sort((a, b) => a.avg - b.avg)
+        .map(({ sec, avg }) => `
+          <div class="ix-info-item2">
+            <div class="ix-info-lbl2">${esc(sec)}</div>
+            <div class="ix-info-val2" style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              ${typeof sysScoreDot === "function" ? sysScoreDot(avg) : avg.toFixed(1)}
+              ${typeof sysBadge === "function" ? sysBadge(catFromAvg(avg)) : ""}
+            </div>
+          </div>`)
+        .join("");
+
+      return `<div class="ix-section-title">⚙️ الأنظمة الرئيسية</div>
+        <div class="ix-info-grid2">${cards}</div>`;
+    })();
+
+    bodyEl.innerHTML = `
+
+      <!-- ── أزرار الأكشن ── -->
+      <div class="ix-action-row">
+        <a class="ix-action-btn ix-btn-primary" href="${gmapsUrl}" target="_blank" rel="noopener">
+          🗺️ افتح في الخريطة
+        </a>
+        <button class="ix-action-btn" id="ix-copy-btn" onclick="
+          const txt = '${schoolName} - ${cityName}';
+          navigator.clipboard.writeText(txt).then(()=>{
+            const b=document.getElementById('ix-copy-btn');
+            b.textContent='✓ تم النسخ';
+            b.classList.add('ix-btn-copied');
+            setTimeout(()=>{b.textContent='📋 نسخ الاسم';b.classList.remove('ix-btn-copied');},2000);
+          });
+        ">📋 نسخ الاسم</button>
+        <button class="ix-action-btn" id="ix-share-btn" onclick="
+          const url = window.location.href.split('?')[0]+'?school='+encodeURIComponent('${schoolName}');
+          navigator.clipboard.writeText(url).then(()=>{
+            const b=document.getElementById('ix-share-btn');
+            b.textContent='✓ تم النسخ';
+            b.classList.add('ix-btn-copied');
+            setTimeout(()=>{b.textContent='🔗 نسخ رابط';b.classList.remove('ix-btn-copied');},2000);
+          }).catch(()=>{});
+        ">🔗 نسخ رابط</button>
+      </div>
+
+      <!-- ── الخريطة الصغيرة ── -->
+      <div class="ix-section-title">🗺️ الموقع على الخريطة</div>
+      ${hasCoords
+        ? `<div class="ix-mini-map-wrap"><div id="${mapId}" class="ix-mini-map"></div></div>`
+        : `<div class="ix-mini-map-no-coords">
+             <span style="font-size:18px">📍</span>
+             <span>لا تتوفر إحداثيات — <a href="${gmapsUrl}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline">ابحث في Google Maps</a></span>
+           </div>`
+      }
+
+      <!-- ── معلومات المدرسة ── -->
+      ${infoSectionHTML}
+
+      <!-- ── الإحصائيات ── -->
+      ${statsSectionHTML}
+
+      <!-- ── التقييمات ── -->
+      ${scoresSectionHTML}
+
+      <!-- ── الأنظمة الرئيسية ── -->
+      ${sysMainHTML}
+
+      <!-- ── العقود ── -->
+      ${contractsSectionHTML}
+
+      ${notesSectionHTML}
+    `;
+
+    // ── تشغيل الخريطة الصغيرة بعد render ──
+    if (hasCoords) {
+      requestAnimationFrame(function() {
+        try {
+          const mapEl = document.getElementById(mapId);
+          if (!mapEl || !window.L) return;
+          // تأكد إن الـ container ظاهر
+          setTimeout(function() {
+            const miniMap = L.map(mapId, {
+              zoomControl: true,
+              attributionControl: false,
+              scrollWheelZoom: false,
+              doubleClickZoom: true,
+              dragging: true
+            }).setView([r.lat, r.lng], 15);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+              maxZoom: 19
+            }).addTo(miniMap);
+
+            // Marker مع popup باسم المدرسة
+            const marker = L.circleMarker([r.lat, r.lng], {
+              radius: 10,
+              fillColor: "#0891B2",
+              color: "#fff",
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 0.92
+            }).addTo(miniMap);
+
+            marker.bindPopup(
+              `<div style="font-family:Tajawal,sans-serif;font-weight:700;font-size:12px;direction:rtl;text-align:right">
+                📍 ${safeStr(r.name||r.buildingName)}<br>
+                <span style="font-weight:400;color:#64748b">${safeStr(r.district||"")}${r.district&&r.city?" · ":""}${safeStr(r.city||"")}</span>
+              </div>`,
+              { direction: "right" }
+            ).openPopup();
+
+            // فتح Google Maps بكليك على الخريطة
+            miniMap.on("click", function() {
+              window.open(gmapsUrl, "_blank", "noopener");
+            });
+
+            // اعمل invalidateSize عشان الـ Leaflet يعرف حجم الـ container صح
+            setTimeout(function() { miniMap.invalidateSize(); }, 120);
+          }, 60);
+        } catch(e) { console.warn("[MiniMap]", e); }
+      });
+    }
+  }
+
+  /* ──────────────────────────────────────────────
+     5. KPI Modal
+  ────────────────────────────────────────────── */
+  // دالة مساعدة لبناء جدول KPI (تُستخدم من openKpiModal وبحث الـ modal)
+  // بناء جدول KPI — يحدّث tbody فقط دون المساس بشريط البحث
+  function _buildKpiTable(bodyEl, filteredRows, allRows, columns) {
+    const fcaColor = (v) => (v == null ? "#ccc" : v <= 24.99 ? "#DC2626" : v <= 49.99 ? "#D97706" : v <= 74.99 ? "#059669" : "#0891B2");
+    const headerRow = columns.map(c => `<th>${esc(c.label)}</th>`).join("");
+
+    // كل صف يحمل index المدرسة في allRows مباشرة (مش indexOf لأنه قد يرجع -1 بعد فلتر)
+    const dataRows = filteredRows.map((r) => {
+      const globalIdx = allRows.indexOf(r);
+      const cells = columns.map(c => {
+        if (c.key === "name") {
+          return `<td><span class="ix-school-clickable" data-ix-row-idx="${globalIdx}" style="cursor:pointer;color:var(--teal);text-decoration:underline;text-underline-offset:2px">${esc(r.name)}</span></td>`;
+        }
+        if (c.key === "fca") return `<td style="color:${fcaColor(r.fca)};font-weight:700">${r.fca != null ? r.fca.toFixed(1) + "%" : "—"}</td>`;
+        if (c.key === "envScore") return `<td style="color:${fcaColor(r.envScore)};font-weight:700">${r.envScore != null ? r.envScore.toFixed(1) + "%" : "—"}</td>`;
+        if (c.key === "ayenScore") return `<td style="color:${fcaColor(r.ayenScore)};font-weight:700">${r.ayenScore != null ? r.ayenScore.toFixed(1) + "%" : "—"}</td>`;
+        if (c.key === "alerts") return `<td style="color:${(r.alerts||0)>0?'#DC2626':'#059669'};font-weight:700">${r.alerts ?? "—"}</td>`;
+        return `<td>${esc(r[c.key]) || "—"}</td>`;
+      }).join("");
+      return `<tr>${cells}</tr>`;
+    }).join("");
+
+    // إن وُجد جدول → حدّث tbody فقط (يحافظ على شريط البحث)
+    const existingTable = bodyEl.querySelector("#ix-kpi-table-inner");
+    if (existingTable) {
+      existingTable.querySelector("tbody").innerHTML = dataRows;
+    } else {
+      // أول مرة: أنشئ الجدول كاملاً
+      const tbl = document.createElement("table");
+      tbl.className = "ix-kpi-table";
+      tbl.id = "ix-kpi-table-inner";
+      tbl.innerHTML = `<thead><tr>${headerRow}</tr></thead><tbody>${dataRows}</tbody>`;
+      bodyEl.appendChild(tbl);
+    }
+
+    // ربط click لكل اسم مدرسة
+    bodyEl.querySelectorAll(".ix-school-clickable[data-ix-row-idx]").forEach(el => {
+      el.onclick = function () {
+        const idx = parseInt(this.getAttribute("data-ix-row-idx"));
+        const row = (idx >= 0 && allRows[idx]) ? allRows[idx] : null;
+        if (row) {
+          closeKpiModal();
+          setTimeout(() => openSchoolPanel(row), 100);
+        }
+      };
+    });
+  }
+
+  function openKpiModal(title, subtitle, rows, columns) {
+    const overlay = document.getElementById("ix-kpi-overlay");
+    const titleEl = document.getElementById("ix-kpi-modal-title");
+    const subEl   = document.getElementById("ix-kpi-modal-sub");
+    const bodyEl  = document.getElementById("ix-kpi-modal-body");
+
+    titleEl.textContent = title;
+    overlay.classList.add("ix-open");
+
+    // حفظ البيانات عالمياً قبل أي شيء
+    window.__IXKpiRows = rows || [];
+    window.__IXKpiCols = columns;
+
+    if (!rows || !rows.length) {
+      subEl.textContent = subtitle || "";
+      bodyEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:13px">لا توجد مدارس تنطبق عليها هذه المعايير</div>`;
+      return;
+    }
+
+    subEl.textContent = rows.length + " مدرسة";
+
+    // أنشئ شريط البحث + حاوية الجدول مرة واحدة
+    bodyEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <input id="ix-kpi-search-input" type="text" class="finp"
+          placeholder="🔍 بحث بالاسم أو الرقم الوزاري أو الحي..."
+          style="flex:1;min-width:200px">
+      </div>`;
+
+    // ربط البحث بحدث input (بدون oninput inline عشان يشتغل صح)
+    const searchInp = bodyEl.querySelector("#ix-kpi-search-input");
+    searchInp.addEventListener("input", function() {
+      const q = this.value.trim().toLowerCase();
+      const filtered = q
+        ? window.__IXKpiRows.filter(r =>
+            (r.name || "").toLowerCase().includes(q) ||
+            String(r.minId || "").toLowerCase().includes(q) ||
+            (r.district || "").toLowerCase().includes(q) ||
+            (r.sector || "").toLowerCase().includes(q)
+          )
+        : window.__IXKpiRows;
+      document.getElementById("ix-kpi-modal-sub").textContent =
+        filtered.length + " من " + window.__IXKpiRows.length + " مدرسة";
+      _buildKpiTable(bodyEl, filtered, window.__IXKpiRows, window.__IXKpiCols);
+    });
+
+    _buildKpiTable(bodyEl, rows, rows, columns);
+  }
+
+  function closeKpiModal() {
+    document.getElementById("ix-kpi-overlay")?.classList.remove("ix-open");
+  }
+
+  window.__IXCloseKpi = closeKpiModal;
+
+  /* ──────────────────────────────────────────────
+     6. ربط بطاقات KPI
+  ────────────────────────────────────────────── */
+  function hookKpiCards() {
+    const defs = [
+      {
+        id: "k-total",
+        container: ".kpi.kc-blue",
+        attr: "total",
+        title: "إجمالي المدارس",
+        filterFn: () => getFiltered(),
+        columns: [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "stage", label: "المرحلة" },
+          { key: "fca", label: "FCA" },
+        ],
+      },
+      {
+        id: "k-low-fca",
+        container: ".kpi.kc-red",
+        attr: "low-fca",
+        title: "مدارس FCA أقل من 50%",
+        filterFn: () => (getFiltered()).filter(r => r.fca != null && r.fca < 50).sort((a, b) => a.fca - b.fca),
+        columns: [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "district", label: "الحي" },
+          { key: "stage", label: "المرحلة" },
+          { key: "fca", label: "تقييم FCA" },
+        ],
+      },
+      {
+        id: "k-alerts-total",
+        container: null,
+        attr: "alerts",
+        title: "المدارس التي لها بلاغات",
+        filterFn: () => (getFiltered()).filter(r => r.alerts > 0).sort((a, b) => b.alerts - a.alerts),
+        columns: [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "alerts", label: "عدد البلاغات" },
+          { key: "fca", label: "FCA" },
+        ],
+      },
+      {
+        id: "k-govt",
+        container: ".kpi.kc-navy",
+        attr: "govt",
+        title: "المدارس الحكومية",
+        filterFn: () => (getFiltered()).filter(r => (r.ownership || "").includes("حكومي")),
+        columns: [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "stage", label: "المرحلة" },
+          { key: "fca", label: "FCA" },
+        ],
+      },
+    ];
+
+    defs.forEach(def => {
+      const el = document.getElementById(def.id);
+      if (!el) return;
+      const card = el.closest(".kpi");
+      if (!card) return;
+
+      card.setAttribute("data-ix-kpi", def.attr);
+      card.style.cursor = "pointer";
+      card.title = "انقر لعرض التفاصيل";
+
+      card.addEventListener("click", function () {
+        const rows = def.filterFn();
+        openKpiModal(def.title, rows.length + " مدرسة", rows, def.columns);
+      });
+    });
+
+    // Also hook KPI for FCA avg: shows distribution
+    const fcaAvgCard = document.getElementById("k-fca-avg")?.closest(".kpi");
+    if (fcaAvgCard) {
+      fcaAvgCard.setAttribute("data-ix-kpi", "fca-avg");
+      fcaAvgCard.style.cursor = "pointer";
+      fcaAvgCard.title = "انقر لعرض قائمة المدارس حسب FCA";
+      fcaAvgCard.addEventListener("click", function () {
+        const rows = (getFiltered()).filter(r => r.fca != null).sort((a, b) => a.fca - b.fca);
+        openKpiModal("قائمة المدارس مرتبة حسب FCA", rows.length + " مدرسة مقيّمة", rows, [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "stage", label: "المرحلة" },
+          { key: "fca", label: "تقييم FCA" },
+        ]);
+      });
+    }
+
+    const envAvgCard = document.getElementById("k-env-avg")?.closest(".kpi");
+    if (envAvgCard) {
+      envAvgCard.setAttribute("data-ix-kpi", "env-avg");
+      envAvgCard.style.cursor = "pointer";
+      envAvgCard.title = "انقر لعرض قائمة المدارس حسب البيئة المدرسية";
+      envAvgCard.addEventListener("click", function () {
+        const rows = (getFiltered()).filter(r => r.envScore != null).sort((a, b) => a.envScore - b.envScore);
+        openKpiModal("قائمة المدارس مرتبة حسب البيئة المدرسية", rows.length + " مدرسة مقيّمة", rows, [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "stage", label: "المرحلة" },
+          { key: "envScore", label: "تقييم البيئة" },
+        ]);
+      });
+    }
+  }
+
+  /* ──────────────────────────────────────────────
+     7. Tier Strip Drill Down
+  ────────────────────────────────────────────── */
+  function hookTierStrip() {
+    const strip = document.getElementById("tier-strip");
+    if (!strip) return;
+
+    const tierDefs = [
+      { id: "t-crit",  min: 0,  max: 24.99,  label: "مدارس FCA حرج (0–24%)",     color: "#DC2626" },
+      { id: "t-fair",  min: 25, max: 49.99,  label: "مدارس FCA متوسط (25–49%)",  color: "#D97706" },
+      { id: "t-good",  min: 50, max: 74.99,  label: "مدارس FCA جيد (50–74%)",   color: "#059669" },
+      { id: "t-vgood", min: 75, max: 100,    label: "مدارس FCA جيد جداً (75–100%)", color: "#0891B2" },
+    ];
+
+    tierDefs.forEach(td => {
+      const el = document.getElementById(td.id);
+      if (!el) return;
+      const seg = el.closest(".tier-seg");
+      if (!seg) return;
+
+      seg.setAttribute("data-ix-tier", td.id);
+      seg.style.cursor = "pointer";
+      seg.title = "انقر لعرض هذه المدارس";
+
+      seg.addEventListener("click", function () {
+        const rows = (getFiltered()).filter(r => r.fca != null && r.fca >= td.min && r.fca <= td.max).sort((a, b) => a.fca - b.fca);
+        openKpiModal(td.label, rows.length + " مدرسة", rows, [
+          { key: "name", label: "اسم المدرسة" },
+          { key: "sector", label: "المحافظة" },
+          { key: "district", label: "الحي" },
+          { key: "stage", label: "المرحلة" },
+          { key: "fca", label: "تقييم FCA" },
+          { key: "envScore", label: "البيئة" },
+        ]);
+      });
+    });
+  }
+
+  /* ──────────────────────────────────────────────
+     8. البحث الذكي مع اقتراحات
+  ────────────────────────────────────────────── */
+  function patchSearchForDrillDown() {
+    // نراقب DOM لنجد حقل البحث بعد تحميله
+    const checkSearch = setInterval(() => {
+      const searchInput = document.getElementById("fSearch");
+      if (!searchInput) return;
+      clearInterval(checkSearch);
+      setupSmartSearch(searchInput);
+    }, 200);
+  }
+
+  function setupSmartSearch(input) {
+    // حماية: لو الدالة اتنادت قبل كده على نفس الحقل، امسح العنصر القديم
+    // أولاً بدل ما نضيف نسخة مكررة (مثلاً لو حصلت إعادة تحميل للبيانات)
+    const existingOld = document.getElementById("ix-search-suggestions");
+    if (existingOld) existingOld.remove();
+
+    // حاوية الاقتراحات — تُلحق بـ body مباشرة (مش داخل .fg) حتى لا تتأثر
+    // بأي overflow:hidden أو stacking context لعناصر آباء الحقل.
+    const suggestions = document.createElement("div");
+    suggestions.id = "ix-search-suggestions";
+    suggestions.className = "ix-search-suggestions";
+    document.body.appendChild(suggestions);
+
+    // يحسب موضع/عرض حقل البحث الفعلي على الشاشة ويحدّث بيه الاقتراحات
+    // (fixed positioning يعتمد على viewport، فلازم نحسبه من جديد كل مرة
+    // تُفتح فيها القائمة، وأيضاً عند التمرير أو تغيير حجم النافذة).
+    function positionSuggestions() {
+      const rect = input.getBoundingClientRect();
+      suggestions.style.top = (rect.bottom + 4) + "px";
+      suggestions.style.left = rect.left + "px";
+      suggestions.style.width = rect.width + "px";
+    }
+
+    let debounceTimer;
+
+    input.addEventListener("input", function () {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => showSuggestions(this.value), 200);
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const first = suggestions.querySelector(".ix-suggestion-item");
+        first && first.focus();
+      }
+      if (e.key === "Escape") {
+        suggestions.classList.remove("ix-open");
+      }
+    });
+
+    document.addEventListener("click", function (e) {
+      if (e.target !== input && !suggestions.contains(e.target)) {
+        suggestions.classList.remove("ix-open");
+      }
+    });
+
+    // إبقاء القائمة ملتصقة بالحقل دائمًا أثناء التمرير أو تغيير حجم النافذة
+    window.addEventListener("scroll", function () {
+      if (suggestions.classList.contains("ix-open")) positionSuggestions();
+    }, true);
+    window.addEventListener("resize", function () {
+      if (suggestions.classList.contains("ix-open")) positionSuggestions();
+    });
+
+    function showSuggestions(query) {
+      const q = query.trim().toLowerCase();
+      if (!q || q.length < 2) {
+        suggestions.classList.remove("ix-open");
+        return;
+      }
+
+      const raw = getRaw();
+      const matches = raw.filter(r =>
+        (r.name || "").toLowerCase().includes(q) ||
+        String(r.minId || "").toLowerCase().includes(q) ||
+        (r.district || "").toLowerCase().includes(q)
+      ).slice(0, 10);
+
+      if (!matches.length) {
+        suggestions.classList.remove("ix-open");
+        return;
+      }
+
+      // إذا نتيجة واحدة، افتح التفاصيل مباشرة
+      if (matches.length === 1) {
+        suggestions.classList.remove("ix-open");
+        openSchoolPanel(matches[0]);
+        return;
+      }
+
+      suggestions.innerHTML = matches.map((m, i) => {
+        const highlight = (str) => {
+          if (!str) return "—";
+          const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+          return esc(str).replace(re, '<mark class="ix-sug-mark">$1</mark>');
+        };
+        return `
+          <div class="ix-suggestion-item" tabindex="0" data-sug-idx="${i}"
+            role="option"
+            onkeydown="if(event.key==='Enter')this.click()"
+            onclick="window.__IXSugClick(${i})">
+            <div class="ix-sug-name">${highlight(m.name)}</div>
+            <div class="ix-sug-meta">${esc(m.city || "")} · ${esc(m.sector || "")} · ${esc(m.stage || "")} ${m.minId ? "· رقم: " + esc(String(m.minId)) : ""}</div>
+          </div>`;
+      }).join("") + (raw.filter(r => (r.name || "").toLowerCase().includes(q)).length > 10
+        ? `<div style="padding:8px 14px;font-size:10px;color:var(--tx-muted);text-align:center">وغيرها... دقّق البحث لنتائج أفضل</div>`
+        : "");
+
+      window.__IXSearchMatches = matches;
+      window.__IXSugClick = function (idx) {
+        suggestions.classList.remove("ix-open");
+        openSchoolPanel(window.__IXSearchMatches[idx]);
+      };
+
+      positionSuggestions();
+      suggestions.classList.add("ix-open");
+    }
+  }
+
+  /* ──────────────────────────────────────────────
+     9. مراقبة تغيير البيانات لتفعيل روابط المدارس
+  ────────────────────────────────────────────── */
+  function observeDataUpdates() {
+    // نراقب تغيير جدول المدارس الرئيسي
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) return;
+          // الجدول الرئيسي
+          if (node.tagName === "TR" || node.tagName === "TBODY") {
+            hookSchoolNamesInElement(node.closest("tbody") || node);
+          }
+          // school-row lists (top/bottom lists in charts)
+          if (node.classList && (node.classList.contains("school-row") || node.querySelector && node.querySelector(".school-row"))) {
+            hookSchoolRowsInElement(node);
+          }
+        });
+      });
+    });
+
+    // راقب tbody الجدول الرئيسي
+    const tbody = document.getElementById("tbl-body");
+    if (tbody) observer.observe(tbody, { childList: true, subtree: true });
+
+    // راقب المناطق التي تظهر فيها قوائم المدارس
+    const panels = document.querySelectorAll(".panel");
+    panels.forEach(p => {
+      observer.observe(p, { childList: true, subtree: true });
+    });
+
+    // Patch renderTable مباشرة بعد أول تحميل للبيانات
+    patchRenderTable();
+  }
+
+  /* ──────────────────────────────────────────────
+     10. تعديل renderTable لتحويل أسماء المدارس لروابط
+  ────────────────────────────────────────────── */
+  function patchRenderTable() {
+    // ننتظر وجود FILTERED ثم نطبّق
+    const origRenderTable = window.renderTable;
+    if (!origRenderTable) {
+      setTimeout(patchRenderTable, 500);
+      return;
+    }
+
+    window.renderTable = function () {
+      origRenderTable.apply(this, arguments);
+      // بعد render، حوّل أسماء المدارس لروابط
+      requestAnimationFrame(() => hookSchoolNamesInElement(document.getElementById("tbl-body")));
+    };
+  }
+
+  function hookSchoolNamesInElement(container) {
+    if (!container) return;
+    // دايماً نجيب البيانات من FILTERED لأنه يحتوي fca/envScore/ayenScore المحسوبة
+    const filtered = getFiltered();
+
+    container.querySelectorAll("tr").forEach((tr, i) => {
+      const firstTd = tr.cells[0];
+      if (!firstTd) return;
+      if (firstTd.querySelector(".ix-school-link")) return;
+
+      const nameDiv = firstTd.querySelector("div");
+      if (!nameDiv) return;
+      const name = nameDiv.textContent.trim();
+      if (!name || name === "—") return;
+
+      let rowData = null;
+
+      // 1. data-row-idx الأدق (index مباشر في filtered)
+      const rowIdx = tr.dataset && tr.dataset.rowIdx;
+      if (rowIdx !== undefined && rowIdx !== "") {
+        const candidate = filtered[parseInt(rowIdx, 10)];
+        if (candidate && candidate.name === name) rowData = candidate;
+      }
+
+      // 2. data-min-id (بحث بالرقم الوزاري في filtered)
+      if (!rowData && tr.dataset && tr.dataset.minId) {
+        rowData = filtered.find(r => r.minId === tr.dataset.minId);
+      }
+
+      // 3. بحث بالاسم في filtered
+      if (!rowData) rowData = filtered.find(r => r.name === name);
+
+      if (!rowData) return;
+
+      nameDiv.innerHTML = "";
+      const link = document.createElement("span");
+      link.className = "ix-school-link";
+      link.textContent = name;
+      link.title = "انقر لعرض تفاصيل المدرسة";
+      link.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openSchoolPanel(rowData);
+      });
+      nameDiv.appendChild(link);
+    });
+  }
+
+  function hookSchoolRowsInElement(container) {
+    if (!container) return;
+    // نجيب من filtered دايماً عشان يكون فيه fca/envScore/ayenScore
+    const rows = getFiltered();
+
+    container.querySelectorAll(".school-row").forEach(el => {
+      if (el.dataset.ixHooked) return;
+      el.dataset.ixHooked = "1";
+
+      const nameEl = el.querySelector("div[style*='font-weight:700']") || el.querySelector("div:first-child");
+      if (!nameEl) return;
+      const name = nameEl.textContent.trim();
+      if (!name || name === "—") return;
+
+      // بحث بالاسم في filtered
+      let schoolRow = rows.find(r => r.name === name);
+      if (!schoolRow) return;
+
+      el.style.cursor = "pointer";
+      el.title = "انقر لعرض تفاصيل المدرسة";
+      el.addEventListener("click", function () {
+        // نجدد البحث وقت الضغط عشان البيانات تكون محدثة
+        const current = getFiltered().find(r => r.name === name) || schoolRow;
+        openSchoolPanel(current);
+      });
+    });
+  }
+
+  /* ──────────────────────────────────────────────
+     11. تفعيل على البيانات بعد تحميلها من الـ API
+  ────────────────────────────────────────────── */
+  // نراقب تغيير RAW ليُفعَّل الـ hooks
+  (function watchRAW() {
+    let lastLen = 0;
+    setInterval(function () {
+      const raw = window.RAW;
+      if (!raw || !raw.length) return;
+      if (raw.length === lastLen) return;
+      lastLen = raw.length;
+
+      // بعد تحميل البيانات، قم بتطبيق جميع الـ hooks
+      setTimeout(function () {
+        hookKpiCards();
+        hookTierStrip();
+        patchSearchForDrillDown();
+      }, 600);
+    }, 1000);
+  })();
+
+  /* ──────────────────────────────────────────────
+     12. توجيه عام: اجعل الرسوم البيانية تفتح KPI modal عند النقر
+  ────────────────────────────────────────────── */
+  // نضيف onClick على CHARTS بعد إنشائها
+  (function patchCharts() {
+    const origMakeHBar = window.makeHBar;
+    if (!origMakeHBar) {
+      setTimeout(patchCharts, 500);
+      return;
+    }
+
+    window.makeHBar = function (id, labels, values, colors, maxVal, fullLabels) {
+      origMakeHBar.apply(this, arguments);
+      const chart = window.CHARTS && window.CHARTS[id];
+      if (!chart) return;
+
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+
+      // أضف onClick للرسم
+      canvas.addEventListener("click", function (e) {
+        const active = chart.getElementsAtEventForMode(e, "nearest", { intersect: true }, true);
+        if (!active.length) return;
+        const idx = active[0].index;
+        const label = (fullLabels || labels)[idx];
+        if (!label) return;
+
+        // ابحث عن المدرسة بالاسم
+        const raw = getFiltered();
+        const schoolMatch = raw.find(r => r.name === label);
+        if (schoolMatch) {
+          openSchoolPanel(schoolMatch);
+        } else {
+          // قد يكون الـ label اسم حي أو مرحلة، نعرض القائمة
+          const byDistrict = raw.filter(r => r.district === label);
+          const byStage = raw.filter(r => r.stage === label);
+          const byCity = raw.filter(r => r.city === label);
+          const matched = byDistrict.length ? byDistrict : byStage.length ? byStage : byCity;
+
+          if (matched.length) {
+            openKpiModal("مدارس: " + label, matched.length + " مدرسة", matched, [
+              { key: "name", label: "اسم المدرسة" },
+              { key: "sector", label: "المحافظة" },
+              { key: "stage", label: "المرحلة" },
+              { key: "fca", label: "FCA" },
+            ]);
+          }
+        }
+      });
+
+      // Hover cursor
+      canvas.addEventListener("mousemove", function (e) {
+        const active = chart.getElementsAtEventForMode(e, "nearest", { intersect: true }, true);
+        canvas.style.cursor = active.length ? "pointer" : "default";
+      });
+    };
+
+    // Also patch makeDoughnut
+    const origMakeDoughnut = window.makeDoughnut;
+    if (origMakeDoughnut) {
+      window.makeDoughnut = function (id, dataMap, colorMap) {
+        origMakeDoughnut.apply(this, arguments);
+        const chart = window.CHARTS && window.CHARTS[id];
+        if (!chart) return;
+
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+
+        canvas.addEventListener("click", function (e) {
+          const active = chart.getElementsAtEventForMode(e, "nearest", { intersect: true }, true);
+          if (!active.length) return;
+          const idx = active[0].index;
+          const label = chart.data.labels[idx];
+          if (!label) return;
+
+          const raw = getFiltered();
+          const matched = raw.filter(r =>
+            r.ownership === label || r.schoolSize === label || r.linkType === label || r.subscriptionStatus === label
+          );
+
+          if (matched.length) {
+            openKpiModal("مدارس: " + label, matched.length + " مدرسة", matched, [
+              { key: "name", label: "اسم المدرسة" },
+              { key: "sector", label: "المحافظة" },
+              { key: "stage", label: "المرحلة" },
+              { key: "fca", label: "FCA" },
+            ]);
+          }
+        });
+
+        canvas.addEventListener("mousemove", function (e) {
+          const active = chart.getElementsAtEventForMode(e, "nearest", { intersect: true }, true);
+          canvas.style.cursor = active.length ? "pointer" : "default";
+        });
+      };
+    }
+  })();
+
+  /* ──────────────────────────────────────────────
+     Helpers
+  ────────────────────────────────────────────── */
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[m]);
+  }
+
+  function safeStr(v) {
+    if (v == null) return "";
+    return String(v).replace(/\s+/g, " ").trim();
+  }
+
+  // Public API للوصول من الكونسول
+  window.openSchoolDetails = openSchoolPanel;
+  window.openSchoolByName = function (name) {
+    const row = (getRaw()).find(r => r.name === name);
+    if (row) openSchoolPanel(row);
+    else console.warn("[IX] لم يتم العثور على:", name);
+  };
+
+})();
+
+
+
+/* ══════════════════════════════════════════════════════════════════
+   منقول من index.html — سكربت #3
+   Moved from inline <script> #3 in index.html
+   ══════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════════
+   🧠 PREMIUM AI INTELLIGENCE LAYER — Dashboard-Aware Semantic Assistant
+   يُحقن بعد كل الطبقات الأخرى ليُعدِّل نظام الشات الموجود في dashboard.js
+   دون تعديل أي وظيفة قائمة — يُضيف فقط:
+   1. System prompt شامل يغطي كل تبويبات الداشبورد
+   2. Semantic intent mapping للأسئلة بالعربي والإنجليزي
+   3. Data snapshot builder لتزويد الـ AI ببيانات البلاغات والـ KPIs
+   4. Tab navigation: يوجّه المستخدم للتبويب الصحيح برابط ضمن الرد
+══════════════════════════════════════════════════════════════════════════════ */
+window.addEventListener('load', function () {
+
+  /* ─────────────────────────────────────────────
+     1. فهرس التبويبات الكامل مع المرادفات
+  ───────────────────────────────────────────── */
+  const TAB_INDEX = [
+    {
+      id: 'overview', label: 'نظرة عامة',
+      keywords: ['نظرة عامة','overview','عام','ملخص','summary','إجمالي','total','لوحة رئيسية','dashboard','رئيسي','main'],
+      charts: ['توزيع درجات FCA','توزيع درجات البيئة المدرسية','حجم المدرسة','حكومي/مستأجر','نوع الارتباط','حالة الاشتراك'],
+      kpis: ['إجمالي المدارس','حكومية','متوسط FCA','متوسط البيئة المدرسية','FCA أقل من 50%']
+    },
+    {
+      id: 'fca', label: 'تحليل FCA',
+      keywords: ['fca','تحليل fca','facility condition','تقييم المنشأة','حالة المبنى','درجة fca','fca score','تقييم fca','fca analysis','فسيزبيلتي','نسبة fca','توزيع fca'],
+      charts: ['FCA حسب المدرسة','FCA حسب الحي','FCA حسب المدينة','توزيع FCA'],
+      kpis: ['متوسط FCA','أعلى FCA','أدنى FCA','مدارس تحت 50%']
+    },
+    {
+      id: 'stage-compare', label: 'مقارنة مراحل FCA',
+      keywords: ['مقارنة مراحل','مقارنة fca','stage compare','fca مراحل','مراحل fca','مقارنة التقييمات','تطور fca','timeline fca'],
+      charts: ['متوسط FCA لكل مرحلة','تطور متوسط FCA عبر الشهور','FCA حسب المنطقة الرئيسية','تغطية البيانات حسب المرحلة'],
+      kpis: []
+    },
+    {
+      id: 'fca-ref', label: 'FCA المرجعي',
+      keywords: ['fca مرجعي','fca reference','مرجعي','آخر تقييم','latest fca','أحدث fca','baseline fca','fca baseline','ref fca'],
+      charts: ['آخر تقييم FCA لكل مدرسة'],
+      kpis: ['عدد المدارس المقيّمة','متوسط FCA المرجعي']
+    },
+    {
+      id: 'env', label: 'البيئة المدرسية',
+      keywords: ['بيئة مدرسية','school environment','بيئة','environment','نظافة','cleanliness','سلامة','safety','مرافق عامة','نتيجة البيئة','env score','درجة البيئة','بيئة التعلم'],
+      charts: ['توزيع درجات البيئة','FCA مقابل البيئة المدرسية','البيئة حسب المنطقة'],
+      kpis: ['متوسط البيئة المدرسية','أعلى بيئة','أدنى بيئة']
+    },
+    {
+      id: 'students', label: 'الطلاب وعمر المبنى',
+      keywords: ['طلاب','students','عمر المبنى','building age','أعمار المباني','عمر','age','مبانٍ قديمة','old buildings','مبانٍ حديثة','new buildings','عدد الطلاب','تعداد طلاب','عمر البناء','سنة بناء'],
+      charts: ['توزيع عمر المبنى','عدد الطلاب حسب المدرسة','FCA مقابل عمر المبنى'],
+      kpis: ['إجمالي الطلاب','أكبر مدرسة طلاباً','متوسط عمر المبنى','مبانٍ >40 سنة','مبانٍ <10 سنوات']
+    },
+    {
+      id: 'stages', label: 'المرحلة الدراسية',
+      keywords: ['مرحلة دراسية','stage','مرحلة','ابتدائي','primary','متوسط','intermediate','ثانوي','secondary','جنس','gender','بنين','boys','بنات','girls','فصول','classrooms','تكييف','ac units'],
+      charts: ['توزيع المدارس حسب المرحلة','توزيع حسب الجنس والمرحلة','مقارنة FCA بنين/بنات','توزيع عدد الفصول','توزيع وحدات التكييف'],
+      kpis: []
+    },
+    {
+      id: 'ayen', label: 'تقييم عاين',
+      keywords: ['عاين','ayen','ayın','تقييم عاين','ayen score','درجة عاين','فحص عاين','نتيجة عاين','ayen evaluation','عاين تقييم'],
+      charts: ['درجات عاين حسب المدرسة','توزيع درجات عاين'],
+      kpis: ['متوسط درجة عاين','أعلى درجة عاين','أدنى درجة عاين']
+    },
+    {
+      id: 'sys-main', label: 'الأنظمة الرئيسية',
+      keywords: ['أنظمة رئيسية','main systems','أنظمة','systems','كهرباء','electricity','سباكة','plumbing','صرف صحي','sewage','تكييف أنظمة','hvac','إنارة','lighting','جدران','walls','أسقف','ceilings','أبواب','doors','نوافذ','windows','حريق','fire','أمن','security','نظام رئيسي','system rating'],
+      charts: ['تقييم الأنظمة الرئيسية حسب القسم','مقارنة الأنظمة'],
+      kpis: ['أعلى نظام','أدنى نظام','متوسط تقييم الأنظمة']
+    },
+    {
+      id: 'sys-detail', label: 'الأنظمة التفصيلية',
+      keywords: ['أنظمة تفصيلية','detailed systems','تفصيلي','detail','تفاصيل الأنظمة','system detail','تقييم تفصيلي','نظام تفصيلي'],
+      charts: ['تقييم الأنظمة التفصيلية','مقارنة تفصيلية'],
+      kpis: []
+    },
+    {
+      id: 'elevators', label: 'المصاعد',
+      keywords: ['مصاعد','elevator','elevators','مصعد','lift','lifts','عدد المصاعد','صيانة مصاعد','elevator maintenance','مصعد معطل','broken elevator','مصاعد تعمل'],
+      charts: ['توزيع المصاعد حسب المدرسة','حالة المصاعد'],
+      kpis: ['إجمالي المصاعد','مصاعد تعمل','مصاعد معطلة']
+    },
+    {
+      id: 'khanadeq', label: 'خنادق الصرف',
+      keywords: ['خنادق','خنادق الصرف','drainage','drainage trenches','صرف','صرف صحي خنادق','trench','trenches','drainage system','مصارف','مجاري','خندق'],
+      charts: ['توزيع خنادق الصرف','حالة الخنادق'],
+      kpis: ['إجمالي الخنادق','خنادق تحتاج صيانة']
+    },
+    {
+      id: 'ac-plan', label: 'خطة استبدال المكيفات',
+      keywords: ['مكيفات','ac','air conditioning','تكييف','خطة استبدال','replacement plan','ac replacement','مكيف','استبدال مكيفات','ac plan','تبديل مكيفات','خطة تكييف','cooling','تبريد'],
+      charts: ['خطة استبدال المكيفات حسب السنة','توزيع المكيفات'],
+      kpis: ['إجمالي وحدات المكيفات','مكيفات مجدولة للاستبدال']
+    },
+    {
+      id: 'balagh', label: 'البلاغات',
+      keywords: ['بلاغات','بلاغ','complaint','complaints','ticket','tickets','issue','issues','شكوى','شكاوى','طلب صيانة','work order','أعطال','fault','عطل','بلاغ مفتوح','open ticket','بلاغ مغلق','closed ticket','بلاغات مفتوحة','بلاغات مغلقة','أولوية','priority','طوارئ','emergency','حالة بلاغ','ticket status','maintenance request','service request','خدمة عملاء'],
+      charts: ['البلاغات حسب الحالة','البلاغات حسب الأولوية','البلاغات حسب المدينة','البلاغات حسب المقاول','البلاغات حسب المدرسة','تطور البلاغات عبر الزمن'],
+      kpis: ['إجمالي البلاغات','بلاغات مفتوحة','بلاغات مغلقة','بلاغات عاجلة','متوسط وقت الإغلاق']
+    },
+    {
+      id: 'tajheez', label: 'التجهيزات',
+      keywords: ['تجهيزات','equipment','tajheez','أثاث','furniture','تجهيز مدرسة','school equipment','موارد','resources','تجهيزات مدرسية','أجهزة','devices','لوحات','boards','مختبرات','labs'],
+      charts: ['توزيع التجهيزات','التجهيزات حسب النوع'],
+      kpis: ['إجمالي التجهيزات','تجهيزات مكتملة','تجهيزات ناقصة']
+    },
+    {
+      id: 'spare', label: 'قطع الغيار',
+      keywords: ['قطع غيار','spare parts','قطع','parts','مخزون','inventory','stock','قطعة غيار','spare','مستودع','warehouse','مواد صيانة','maintenance materials'],
+      charts: ['قطع الغيار حسب النوع','مستوى المخزون'],
+      kpis: ['إجمالي قطع الغيار','قطع ناقصة','قطع كافية']
+    },
+    {
+      id: 'gatekeepers', label: 'البوابين',
+      keywords: ['بوابين','gatekeepers','بواب','gatekeeper','حراس','guards','أمن مدارس','school security','حارس','security guard','حراسة'],
+      charts: ['توزيع البوابين حسب المدرسة','تغطية البوابين'],
+      kpis: ['إجمالي البوابين','مدارس بدون بواب']
+    },
+    {
+      id: 'recruitment', label: 'التوظيف',
+      keywords: ['توظيف','recruitment','موظفين','employees','staff','كوادر','human resources','hr','موارد بشرية','وظائف','jobs','عمالة','workforce','فنيين','technicians','عمال'],
+      charts: ['توزيع الموظفين حسب الفئة','التوظيف حسب المنطقة'],
+      kpis: ['إجمالي الموظفين','وظائف شاغرة','نسبة التغطية']
+    },
+    {
+      id: 'all-contracts', label: 'عقود عدا المجال',
+      keywords: ['عقود عدا المجال','عقود خارجية','other contracts','all contracts','عقود أخرى','عقد','contracts','نظافة','cleaning contract','صيانة','maintenance contract','حراسة','تشغيل','operations','عقد تشغيل'],
+      charts: ['قائمة العقود','توزيع العقود حسب النوع'],
+      kpis: ['إجمالي العقود','عقود نشطة','عقود منتهية']
+    },
+    {
+      id: 'payments', label: 'المدفوعات',
+      keywords: ['مدفوعات','payments','دفعات','payment','فواتير','invoices','invoice','صرف','disbursement','دفع','نسبة الصرف','payment ratio','مالية','financial','مستخلص','مستخلصات','claims','استحقاقات'],
+      charts: ['المدفوعات حسب المقاول','تطور المدفوعات','نسبة الصرف'],
+      kpis: ['إجمالي المدفوعات','نسبة الصرف','مدفوعات معلقة']
+    },
+    {
+      id: 'cost', label: 'التكلفة',
+      keywords: ['تكلفة','cost','تكاليف','costs','ميزانية','budget','مصاريف','expenses','إنفاق','spending','قيمة عقود','contract value','قيمة','value','مالي','financial data','تكلفة مدرسة','cost per school','تكلفة للطالب','cost per student'],
+      charts: ['التكلفة الإجمالية','التكلفة حسب المنطقة','تكلفة الطالب الواحد','توزيع الميزانية'],
+      kpis: ['إجمالي التكلفة','متوسط التكلفة للمدرسة','متوسط التكلفة للطالب']
+    },
+    {
+      id: 'map', label: 'الخريطة',
+      keywords: ['خريطة','map','خرائط','maps','موقع','location','إحداثيات','coordinates','توزيع جغرافي','geographic','موقع المدرسة','school location','gis','جغرافيا'],
+      charts: ['خريطة المدارس التفاعلية'],
+      kpis: []
+    },
+    {
+      id: 'table', label: 'الجدول التفصيلي',
+      keywords: ['جدول','table','جدول تفصيلي','detailed table','قائمة مدارس','school list','بيانات مدارس','data table','تصدير','export','excel','إكسل','كل المدارس','all schools','قاعدة بيانات','database'],
+      charts: ['جدول البيانات الكامل'],
+      kpis: []
+    },
+    {
+      id: 'mag-kpi', label: 'مؤشرات الأداء للمقاول',
+      keywords: ['مؤشرات مقاول','contractor kpi','kpi مقاول','أداء مقاول','contractor performance','مقاول','contractor','مقاولين','contractors','تقييم مقاول','contractor rating','أداء','performance','mag kpi','مؤشرات الأداء مقاول'],
+      charts: ['مؤشرات أداء المقاول','مقارنة المقاولين'],
+      kpis: ['أعلى مقاول أداءً','أدنى مقاول أداءً','متوسط الأداء']
+    },
+    {
+      id: 'consultant-kpi', label: 'مؤشرات أداء الاستشاري',
+      keywords: ['مؤشرات استشاري','consultant kpi','kpi استشاري','أداء استشاري','consultant performance','استشاري','consultant','استشاريين','consultants','تقييم استشاري','مؤشرات الأداء استشاري'],
+      charts: ['مؤشرات أداء الاستشاري','مقارنة الاستشاريين'],
+      kpis: ['أعلى استشاري أداءً','أدنى استشاري أداءً']
+    }
+  ];
+
+  /* ─────────────────────────────────────────────
+     2. Semantic intent matcher
+     يبحث عن التبويب الأنسب بناءً على الكلمات المفتاحية
+  ───────────────────────────────────────────── */
+  function detectTabIntent(text) {
+    if (!text) return null;
+    const q = text.toLowerCase().replace(/[؟?!،,]/g, ' ');
+    let best = null, bestScore = 0;
+    for (const tab of TAB_INDEX) {
+      let score = 0;
+      for (const kw of tab.keywords) {
+        if (q.includes(kw.toLowerCase())) {
+          score += kw.length; // أطول مطابقة → أعلى نقطة
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = tab; }
+    }
+    return bestScore > 0 ? best : null;
+  }
+
+  /* ─────────────────────────────────────────────
+     3. Live data snapshot — يُبني عند كل سؤال
+  ───────────────────────────────────────────── */
+  function buildDataSnapshot() {
+    const snap = {};
+
+    // ── بيانات المدارس الرئيسية ──
+    try {
+      const raw = (typeof FILTERED !== 'undefined' && FILTERED && FILTERED.length) ? FILTERED
+                : (typeof RAW !== 'undefined' ? RAW : []);
+      if (raw && raw.length) {
+        snap.totalSchools = raw.length;
+        const withFca = raw.filter(r => r.fca != null);
+        if (withFca.length) {
+          snap.avgFca = (withFca.reduce((s,r)=>s+r.fca,0)/withFca.length).toFixed(1);
+          snap.minFca = Math.min(...withFca.map(r=>r.fca)).toFixed(1);
+          snap.maxFca = Math.max(...withFca.map(r=>r.fca)).toFixed(1);
+          snap.fcaBelow50 = withFca.filter(r=>r.fca<50).length;
+        }
+        const cities = [...new Set(raw.map(r=>r.city).filter(Boolean))];
+        snap.cities = cities.slice(0,20).join('، ');
+        snap.cityCount = cities.length;
+      }
+    } catch(e){}
+
+    // ── بيانات البلاغات ── (يُصلح مشكلة عدم قراءتها)
+    try {
+      const balaghData = window.RAW_BALAGH || window.BALAGH_DATA || window.balaghRows || [];
+      if (balaghData.length) {
+        snap.totalBalagh = balaghData.length;
+        const open = balaghData.filter(b =>
+          ['مفتوح','open','قيد التنفيذ','in progress','جديد','new','معلق','pending'].some(s =>
+            String(b['الحالة']||b['status']||b['Status']||'').toLowerCase().includes(s)
+          )
+        ).length;
+        const closed = balaghData.filter(b =>
+          ['مغلق','closed','منتهي','completed','مكتمل','done'].some(s =>
+            String(b['الحالة']||b['status']||b['Status']||'').toLowerCase().includes(s)
+          )
+        ).length;
+        snap.openBalagh = open;
+        snap.closedBalagh = closed;
+        snap.balaghAvailable = true;
+
+        // أولويات
+        const urgent = balaghData.filter(b =>
+          ['عاجل','urgent','طارئ','emergency','حرج','critical'].some(s =>
+            String(b['الأولوية']||b['priority']||b['Priority']||'').toLowerCase().includes(s)
+          )
+        ).length;
+        snap.urgentBalagh = urgent;
+
+        // حسب المدينة
+        const byCity = {};
+        balaghData.forEach(b => {
+          const c = b['المدينة']||b['city']||b['City']||'';
+          if (c) byCity[c] = (byCity[c]||0)+1;
+        });
+        const topCities = Object.entries(byCity).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        snap.balaghByCity = topCities.map(([c,n])=>`${c}(${n})`).join('، ');
+      }
+    } catch(e){}
+
+    // ── بيانات التكلفة ──
+    try {
+      const costEl = document.getElementById('k-total-cost') || document.getElementById('cost-total');
+      if (costEl) snap.totalCost = costEl.textContent.trim();
+    } catch(e){}
+
+    // ── الكي بي أي الرئيسية من الصفحة ──
+    try {
+      const kpiIds = {
+        totalSchools: 'k-total',
+        avgFca: 'k-fca-avg',
+        avgEnv: 'k-env-avg',
+        lowFca: 'k-low-fca',
+        totalStudents: 'k-students-total'
+      };
+      for (const [key, id] of Object.entries(kpiIds)) {
+        const el = document.getElementById(id);
+        if (el && el.textContent.trim() !== '—') snap['kpi_'+key] = el.textContent.trim();
+      }
+    } catch(e){}
+
+    return snap;
+  }
+
+  /* ─────────────────────────────────────────────
+     4. بناء الـ system prompt الشامل
+  ───────────────────────────────────────────── */
+  function buildSystemPrompt(snap) {
+    const tabList = TAB_INDEX.map(t =>
+      `• ${t.label} (${t.id}): ${t.charts.slice(0,3).join(' | ')} — KPIs: ${t.kpis.slice(0,3).join(', ')||'راجع التبويب'}`
+    ).join('\n');
+
+    const dataCtx = Object.keys(snap).length > 0 ? `
+بيانات الداشبورد الحالية (snapshot):
+- إجمالي المدارس: ${snap.totalSchools || snap['kpi_totalSchools'] || 'غير متوفر'}
+- متوسط FCA: ${snap.avgFca || snap['kpi_avgFca'] || 'غير متوفر'}%
+- أدنى FCA: ${snap.minFca || 'غير متوفر'}% | أعلى FCA: ${snap.maxFca || 'غير متوفر'}%
+- مدارس FCA أقل من 50%: ${snap.fcaBelow50 || snap['kpi_lowFca'] || 'غير متوفر'}
+- إجمالي الطلاب: ${snap['kpi_totalStudents'] || 'غير متوفر'}
+- متوسط البيئة المدرسية: ${snap['kpi_avgEnv'] || 'غير متوفر'}
+- المناطق/المدن: ${snap.cities || 'غير متوفر'} (${snap.cityCount || '?'} منطقة)
+${snap.balaghAvailable ? `- البلاغات: إجمالي ${snap.totalBalagh} | مفتوحة ${snap.openBalagh} | مغلقة ${snap.closedBalagh} | عاجلة ${snap.urgentBalagh}
+- أكثر المدن بلاغاً: ${snap.balaghByCity}` : '- بيانات البلاغات: متاحة في تبويب البلاغات'}
+` : '';
+
+    return `أنت مساعد ذكاء اصطناعي متخصص في إدارة المرافق التعليمية، مدمج داخل لوحة بيانات شاملة تُدار من قِبل شركة Land Sterling و TBC.
+
+هويتك ومهمتك:
+- خبير محلل بيانات مرافق تعليمية متخصص في المملكة العربية السعودية
+- تعرف كل تبويبات اللوحة وبياناتها ومؤشراتها ورسومها البيانية بشكل كامل
+- تجيب بالعربية دائماً ما لم يسأل المستخدم بالإنجليزية
+- ردودك دقيقة ومختصرة ومفيدة، مع أرقام واضحة عند توفرها
+- تقدّم توصيات وتحليلات استراتيجية عند الطلب
+
+تبويبات اللوحة الكاملة (${TAB_INDEX.length} تبويب):
+${tabList}
+
+قواعد الفهم الدلالي:
+- "بلاغ/بلاغات/شكوى/شكاوى/ticket/complaint/issue/work order" → تبويب البلاغات
+- "تكلفة/تكاليف/ميزانية/cost/budget/إنفاق" → تبويب التكلفة
+- "مكيفات/تكييف/ac/air conditioning/استبدال مكيفات" → تبويب خطة استبدال المكيفات
+- "مقاول/مقاولين/contractor/performance مقاول" → تبويب مؤشرات الأداء للمقاول
+- "استشاري/consultant" → تبويب مؤشرات أداء الاستشاري
+- "FCA/فسيزبيلتي/حالة المبنى/تقييم" → تبويبات FCA حسب السياق
+- "خريطة/map/موقع/location" → تبويب الخريطة
+- "مدفوعات/دفعات/payment/مستخلص" → تبويب المدفوعات
+- "مصاعد/elevator/مصعد" → تبويب المصاعد
+- "عمر المبنى/طلاب/students/age" → تبويب الطلاب وعمر المبنى
+- "توظيف/موظفين/staff/hr" → تبويب التوظيف
+- "بوابين/gatekeeper/حراسة" → تبويب البوابين
+- "قطع غيار/spare parts/مخزون" → تبويب قطع الغيار
+- "خنادق/drainage/صرف" → تبويب خنادق الصرف
+
+${dataCtx}
+
+عند الإجابة:
+1. استخدم الأرقام من الـ snapshot عند توفرها
+2. أشر للتبويب المناسب بقولك "يمكنك الاطلاع على تفاصيل أكثر في تبويب [اسم التبويب]"
+3. لو السؤال عن بيانات دقيقة غير متوفرة في الـ snapshot، قل أنها متاحة في التبويب المحدد
+4. قدّم مقارنات وتحليلات عند الطلاع (بين مدن، مقاولين، مراحل دراسية...)
+5. اقترح توصيات عملية بناءً على البيانات عند الحاجة
+6. لا تتجاوز 4-5 أسطر في الرد العادي ما لم يُطلب منك تفصيل أكثر`;
+  }
+
+  /* ─────────────────────────────────────────────
+     5. تعديل نظام الشات — حقن system prompt ديناميكي
+     يعمل بعد تحميل dashboard.js
+  ───────────────────────────────────────────── */
+  function patchChatSystem() {
+    // dashboard.js يُعرِّف fcbBuildMessages أو يبني messages array مباشرة
+    // نُعدِّل window.fcbGetSystemPrompt لو موجود، وإلا نُنشئه
+    const origGet = window.fcbGetSystemPrompt;
+    window.fcbGetSystemPrompt = function() {
+      const snap = buildDataSnapshot();
+      return buildSystemPrompt(snap);
+    };
+
+    // patch fcbBuildMessages لو موجود
+    if (typeof window.fcbBuildMessages === 'function') {
+      const orig = window.fcbBuildMessages;
+      window.fcbBuildMessages = function(history) {
+        const msgs = orig.call(this, history);
+        // استبدل system message الأولى
+        if (msgs[0] && msgs[0].role === 'system') {
+          msgs[0].content = window.fcbGetSystemPrompt();
+        }
+        return msgs;
+      };
+    }
+
+    // كذلك patch fcbSend لو كان يستخدم systemPrompt مباشرة
+    const origSend = window.fcbSend;
+    if (typeof origSend === 'function') {
+      window.fcbSend = async function() {
+        // حدِّث الـ system prompt قبل كل إرسال
+        window.__FCB_SYSTEM_PROMPT = window.fcbGetSystemPrompt();
+        return origSend.apply(this, arguments);
+      };
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     6. تحسين الـ welcome message في الشات
+  ───────────────────────────────────────────── */
+  function upgradeWelcomeMessage() {
+    const msgBox = document.getElementById('fcbMessages');
+    if (!msgBox) return;
+    const firstBubble = msgBox.querySelector('.fcb-bubble');
+    if (firstBubble) {
+      firstBubble.innerHTML = `مرحباً 👋 أنا <strong>مساعد إدارة المرافق الذكي</strong> المتخصص في تحليل بيانات المرافق ....`;
+    }
+  }
+
+  /* ─────────────────────────────────────────────
+     7. Tab navigation helper — يضيف زر تنقل في الردود
+  ───────────────────────────────────────────── */
+  window.__FCB_TAB_INDEX = TAB_INDEX;
+  window.__FCB_DETECT_TAB = detectTabIntent;
+  window.__FCB_BUILD_SNAPSHOT = buildDataSnapshot;
+  window.__FCB_BUILD_SYSTEM = buildSystemPrompt;
+
+  /* ─────────────────────────────────────────────
+     8. تطبيق كل التحسينات بعد تحميل dashboard.js
+  ───────────────────────────────────────────── */
+  // dashboard.js مؤجّل defer — ننتظره بـ polling
+  let attempts = 0;
+  const waitForDashboard = setInterval(function() {
+    attempts++;
+    if (typeof window.fcbSend === 'function' || typeof window.fcbToggle === 'function') {
+      clearInterval(waitForDashboard);
+      patchChatSystem();
+      upgradeWelcomeMessage();
+    }
+    if (attempts > 60) clearInterval(waitForDashboard); // max 6s
+  }, 100);
+
+});
+
+
+/* ══════════════════════════════════════════════════════════════════
+   منقول من index.html — سكربت #4 (تخصيص لوحة الشات + موقع الروبوت)
+   Moved from inline <script> #4 in index.html
+   ══════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   🎨 PREMIUM PANEL LAYOUT — Walker position sync with panel open/close state
+   Adds CSS overrides to position robot head overlapping panel top edge
+══════════════════════════════════════════════════════════════════════════ */
+(function() {
+  // Inject dynamic positioning CSS
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Panel refinements */
+    .fcb-panel {
+      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px rgba(8,145,178,.06) !important;
+    }
+    .fcb-panel.open {
+      /* Panel is open — no special override needed, walker JS handles position */
+    }
+
+    /* Tighten panel header */
+    .fcb-head {
+      padding: 12px 16px 10px !important;
+      border-bottom: 1px solid rgba(255,255,255,.08) !important;
+    }
+
+    /* Improve message bubbles */
+    .fcb-bubble {
+      font-size: 13px !important;
+      line-height: 1.65 !important;
+      padding: 10px 14px !important;
+    }
+
+
+    /* Slightly tighter body padding */
+    .fcb-body {
+      padding: 12px 14px !important;
+    }
+
+    /* Input area refinements */
+    .fcb-foot {
+      padding: 10px 12px !important;
+      border-top: 1px solid rgba(255,255,255,.08) !important;
+    }
+    .fcb-input {
+      font-size: 13px !important;
+    }
+
+    /* Thinking indicator size */
+    .fcb-typing span {
+      width: 7px !important;
+      height: 7px !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Walker position controller
+  window.addEventListener('load', function() {
+    const walker = document.getElementById('fmbotWalker');
+    const panel  = document.getElementById('fcbPanel');
+    if (!walker || !panel) return;
+
+    function updateWalkerPos() {
+      const isOpen = panel.classList.contains('open');
+      if (isOpen) {
+        // Panel open: walker stands fully on top of the panel's top edge
+        // Panel: bottom=22px, height=540px → panel top = 22+540 = 562px from bottom
+        // Walker feet rest right on that edge (small 8px grounding overlap only)
+        walker.style.bottom = '554px';
+        walker.style.left   = '138px'; // horizontally centered over panel (panel left=24, width=355 → center=201; walker width=130 → left=201-65=136)
+        walker.style.zIndex = '1220';
+      } else {
+        // Panel closed: walker bottom-left corner
+        walker.style.bottom = '14px';
+        walker.style.left   = '20px';
+        walker.style.zIndex = '1210';
+      }
+    }
+
+    // Observe panel class changes
+    new MutationObserver(updateWalkerPos).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    updateWalkerPos();
+  });
+})();

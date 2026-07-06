@@ -1224,17 +1224,17 @@
 ╚════════════════════════════════════════════════════════════════════╝
 -->
 
-<!-- ═══════════════ 🤖 الروبوت المتجول v3 — مساعد إدارة المرافق الذكي ═══════════════
-     إصلاح جذري: كانت أنيميشن CSS (transform:rotate) تمسح خاصية transform="translate(..)"
-     الخاصة بموضع الطرف في الـSVG، فتقفز الأذرع والأرجل إلى (0,0) وتختفي.
-     الحل: كل طرف داخل مجموعتين — الخارجية للموضع (translate ثابت لا يُلمس)
-     والداخلية للدوران فقط (هي التي تتحرك بالـCSS). -->
+<!-- ═══════════════ 🤖 الروبوت المتجول v4 — مساعد إدارة المرافق الذكي ═══════════════
+     • مشية طبيعية: دورة مشي متزنة (الركبة تنثني أثناء أرجحة الرجل للأمام فقط،
+       وتفرد عند الوقوف عليها) + الجسم ينط نطّتين خفيفتين لكل دورة + ميل خفيف للأمام
+     • جسم مُعاد تصميمه: رقبة، خوذة بڤايزر لامع، صدر كبسولي، أكتاف، أحذية
+     • بنية المفاصل: مجموعة خارجية للموضع (ثابتة) + داخلية للدوران فقط -->
 <style>
 .fcb-fab{display:none!important}
 
 #fmbotWalker{
   position:fixed; bottom:0; left:24px;
-  width:76px; height:110px; z-index:1200;
+  width:78px; height:116px; z-index:1200;
   cursor:pointer; will-change:transform;
   filter:drop-shadow(0 5px 12px rgba(8,145,178,.3));
   transition:filter .25s;
@@ -1244,46 +1244,72 @@
 #fmbotWalker .fw-flip{transform-origin:50% 50%;transition:transform .28s}
 #fmbotWalker.face-right .fw-flip{transform:scaleX(-1)}
 
-/* ── الجذع: تنفّس واقفاً، تمايل ماشياً ── */
-.fw-torso{animation:fwBreathe 3.2s ease-in-out infinite}
-#fmbotWalker.walking .fw-torso{animation:fwSway .56s ease-in-out infinite}
-@keyframes fwBreathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
-@keyframes fwSway{0%,100%{transform:translateY(-1px)}25%,75%{transform:translateY(-3px)}50%{transform:translateY(-1px)}}
+/* ═══ دورة المشي = .64s (خطوتان). كل الأنيميشن مقفولة على نفس المدة ═══ */
 
-/* ── الأطراف: المجموعة الداخلية فقط هي التي تدور ── */
-.fw-rot{transform-origin:0 0}   /* نقطة المفصل عند (0,0) داخل المجموعة */
+/* الجذع: واقفاً يتنفس — ماشياً يميل للأمام قليلاً وينط نطّتين خفيفتين لكل دورة */
+.fw-torso{transform-origin:39px 84px;animation:fwBreathe 3.4s ease-in-out infinite}
+#fmbotWalker.walking .fw-torso{animation:fwGait .64s ease-in-out infinite}
+@keyframes fwBreathe{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-2px) rotate(0)}}
+@keyframes fwGait{
+  0%,50%,100%{transform:translateY(0) rotate(4deg)}
+  25%,75%   {transform:translateY(-3.5px) rotate(4deg)}
+}
 
-#fmbotWalker.walking .fw-hip-l .fw-rot.hip{animation:fwHip .56s linear infinite}
-#fmbotWalker.walking .fw-hip-r .fw-rot.hip{animation:fwHip .56s linear infinite;animation-delay:-.28s}
-#fmbotWalker.walking .fw-hip-l .fw-rot.knee{animation:fwKnee .56s linear infinite}
-#fmbotWalker.walking .fw-hip-r .fw-rot.knee{animation:fwKnee .56s linear infinite;animation-delay:-.28s}
-@keyframes fwHip{0%{transform:rotate(22deg)}50%{transform:rotate(-20deg)}100%{transform:rotate(22deg)}}
-@keyframes fwKnee{0%{transform:rotate(3deg)}30%{transform:rotate(45deg)}60%{transform:rotate(6deg)}100%{transform:rotate(3deg)}}
+.fw-rot{transform-origin:0 0}
 
-.fw-arm-l .fw-rot{animation:fwArmIdle 3.2s ease-in-out infinite}
-.fw-arm-r .fw-rot{animation:fwArmIdle 3.2s ease-in-out infinite reverse}
-#fmbotWalker.walking .fw-arm-l .fw-rot{animation:fwArm .56s ease-in-out infinite;animation-delay:-.28s}
-#fmbotWalker.walking .fw-arm-r .fw-rot{animation:fwArm .56s ease-in-out infinite}
-@keyframes fwArmIdle{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(7deg)}}
-@keyframes fwArm{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
+/* الورك: أرجحة ناعمة متماثلة. الرجل الثانية بإزاحة نصف دورة بالضبط */
+#fmbotWalker.walking .fw-hip-l .fw-rot.hip{animation:fwHip .64s cubic-bezier(.45,.05,.55,.95) infinite}
+#fmbotWalker.walking .fw-hip-r .fw-rot.hip{animation:fwHip .64s cubic-bezier(.45,.05,.55,.95) infinite;animation-delay:-.32s}
+@keyframes fwHip{
+  0%  {transform:rotate(26deg)}   /* الرجل في أقصى الأمام */
+  50% {transform:rotate(-24deg)}  /* أقصى الخلف (دفع) */
+  100%{transform:rotate(26deg)}
+}
 
-/* ── الرمش (جفون) ── */
+/* الركبة: مفرودة أثناء الوقوف على الرجل (0-50%) وتنثني فقط أثناء
+   أرجحتها للأمام (55-85%) ثم تفرد قبل ملامسة الأرض — هذا سر المشية الطبيعية */
+#fmbotWalker.walking .fw-hip-l .fw-rot.knee{animation:fwKnee .64s linear infinite}
+#fmbotWalker.walking .fw-hip-r .fw-rot.knee{animation:fwKnee .64s linear infinite;animation-delay:-.32s}
+@keyframes fwKnee{
+  0%  {transform:rotate(4deg)}
+  45% {transform:rotate(8deg)}
+  55% {transform:rotate(38deg)}
+  72% {transform:rotate(58deg)}
+  90% {transform:rotate(12deg)}
+  100%{transform:rotate(4deg)}
+}
+
+/* الذراعان: عكس الرجلين تماماً وبنفس منحنى الحركة */
+.fw-arm-l .fw-rot{animation:fwArmIdle 3.4s ease-in-out infinite}
+.fw-arm-r .fw-rot{animation:fwArmIdle 3.4s ease-in-out infinite reverse}
+#fmbotWalker.walking .fw-arm-l .fw-rot{animation:fwArm .64s cubic-bezier(.45,.05,.55,.95) infinite;animation-delay:-.32s}
+#fmbotWalker.walking .fw-arm-r .fw-rot{animation:fwArm .64s cubic-bezier(.45,.05,.55,.95) infinite}
+@keyframes fwArmIdle{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(6deg)}}
+@keyframes fwArm{0%{transform:rotate(24deg)}50%{transform:rotate(-24deg)}100%{transform:rotate(24deg)}}
+/* الكوع ينثني قليلاً أثناء المشي */
+#fmbotWalker.walking .fw-arm-l .fw-rot .fw-elbow{animation:fwElbow .64s ease-in-out infinite;animation-delay:-.32s}
+#fmbotWalker.walking .fw-arm-r .fw-rot .fw-elbow{animation:fwElbow .64s ease-in-out infinite}
+.fw-elbow{transform-origin:0 0}
+@keyframes fwElbow{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-2deg)}}
+
+/* الرمش */
 .fw-lids rect{transform-box:fill-box;transform-origin:center top;transform:scaleY(0);animation:fwBlink 4.4s ease-in-out infinite}
 @keyframes fwBlink{0%,91%,100%{transform:scaleY(0)}94%,96%{transform:scaleY(1)}}
 .fw-ant{animation:fwPulse 1.5s ease-in-out infinite}
 .fw-chest{animation:fwPulse 1.9s ease-in-out infinite}
 @keyframes fwPulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-.fw-shadow{transform-box:fill-box;transform-origin:center;animation:fwSh 3.2s ease-in-out infinite}
-#fmbotWalker.walking .fw-shadow{animation:fwSh .56s ease-in-out infinite}
+/* الظل: ينكمش مرتين لكل دورة (مع النطّتين) */
+.fw-shadow{transform-box:fill-box;transform-origin:center;animation:fwShIdle 3.4s ease-in-out infinite}
+#fmbotWalker.walking .fw-shadow{animation:fwSh .32s ease-in-out infinite}
+@keyframes fwShIdle{0%,100%{transform:scaleX(1);opacity:.18}50%{transform:scaleX(.92);opacity:.14}}
 @keyframes fwSh{0%,100%{transform:scaleX(1);opacity:.18}50%{transform:scaleX(.85);opacity:.12}}
 
 #fmbotWalker.clicked{animation:fwJump .5s cubic-bezier(.34,1.56,.64,1)}
 @keyframes fwJump{0%{margin-bottom:0}35%{margin-bottom:16px}65%{margin-bottom:6px}100%{margin-bottom:0}}
 
-/* ── فقاعة التلميح (يسار الشاشة → ذيلها يسار) ── */
 #fmbotBubble{
-  position:absolute; bottom:116px; left:-4px;
+  position:absolute; bottom:122px; left:-4px;
   background:linear-gradient(120deg,#083d4f,#0e7490);
   color:#e6f7fc; font-size:12px; font-weight:700;
   font-family:'Tajawal','IBM Plex Sans Arabic',sans-serif;
@@ -1298,8 +1324,8 @@
 
 @media (prefers-reduced-motion:reduce){#fmbotWalker,#fmbotWalker *{animation:none!important}}
 @media (max-width:640px){
-  #fmbotWalker{width:60px;height:88px;left:12px}
-  #fmbotBubble{bottom:92px;font-size:11px}
+  #fmbotWalker{width:62px;height:92px;left:12px}
+  #fmbotBubble{bottom:96px;font-size:11px}
 }
 </style>
 
@@ -1307,43 +1333,52 @@
 
 <div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
   <div id="fmbotBubble">أنا مساعد إدارة المرافق الذكي 🤖</div>
-  <!-- viewBox 76×110 — الأرض عند y=108 -->
-  <svg viewBox="0 0 76 110" xmlns="http://www.w3.org/2000/svg" fill="none">
-    <ellipse class="fw-shadow" cx="38" cy="106.5" rx="22" ry="3" fill="#083d4f" opacity=".18"/>
+  <!-- viewBox 78×116 — الأرض عند y=114 -->
+  <svg viewBox="0 0 78 116" xmlns="http://www.w3.org/2000/svg" fill="none">
+    <defs>
+      <linearGradient id="fwBodyG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e3f5fd"/>
+      </linearGradient>
+      <linearGradient id="fwVisorG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0d4a61"/><stop offset="1" stop-color="#072b3a"/>
+      </linearGradient>
+      <linearGradient id="fwLimbG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#eef9fe"/><stop offset="1" stop-color="#cfeefb"/>
+      </linearGradient>
+    </defs>
+
+    <ellipse class="fw-shadow" cx="39" cy="112.5" rx="21" ry="3" fill="#083d4f" opacity=".18"/>
     <g class="fw-flip">
 
-      <!-- ══ الرِجلان — خلف الجسم. البنية:
-           <g translate=موضع الورك> ← ثابت، لا يُحرَّك أبداً
-             <g class=fw-rot hip>  ← يدور حول (0,0) = الورك
-               فخذ
-               <g translate=موضع الركبة> ← ثابت
-                 <g class=fw-rot knee> ساق + قدم </g>
-               </g>
-             </g>
-           </g> ══ -->
+      <!-- ══ الرِجلان (خلف الجسم) ══ -->
       <g class="fw-hip-l">
-        <g transform="translate(31,78)">
+        <g transform="translate(32,84)">
           <g class="fw-rot hip">
-            <rect x="-5" y="-2" width="10" height="16" rx="5" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
-            <g transform="translate(0,12)">
+            <rect x="-5" y="-3" width="10" height="16" rx="5" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
+            <circle cx="0" cy="11" r="3" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1"/>
+            <g transform="translate(0,11)">
               <g class="fw-rot knee">
-                <rect x="-4.5" y="0" width="9" height="13" rx="4.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-                <path d="M-7 11 h11 a4 4 0 0 1 4 4 q0 1.6 -1.6 1.6 h-13.5 q-1.5 0 -1.5 -1.5 v-1.6 a2.5 2.5 0 0 1 1.6 -2.5z" fill="#0e7490"/>
-                <rect x="-8.6" y="14.7" width="17" height="2" rx="1" fill="#083d4f"/>
+                <rect x="-4.2" y="0" width="8.4" height="13" rx="4.2" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
+                <!-- حذاء -->
+                <path d="M-6.5 10.5 h10.5 a5 5 0 0 1 5 5 q0 1.7 -1.7 1.7 h-13.3 q-1.6 0 -1.6 -1.6 v-2.4 a2.7 2.7 0 0 1 1.1 -2.7z" fill="#0e7490"/>
+                <path d="M-6.5 12 h8" stroke="#22d3ee" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
+                <rect x="-8.2" y="15.4" width="17.8" height="2.2" rx="1.1" fill="#083d4f"/>
               </g>
             </g>
           </g>
         </g>
       </g>
       <g class="fw-hip-r">
-        <g transform="translate(45,78)">
+        <g transform="translate(46,84)">
           <g class="fw-rot hip">
-            <rect x="-5" y="-2" width="10" height="16" rx="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.2"/>
-            <g transform="translate(0,12)">
+            <rect x="-5" y="-3" width="10" height="16" rx="5" fill="#b7e4f7" stroke="#5fc4ef" stroke-width="1.2"/>
+            <circle cx="0" cy="11" r="3" fill="#8fd4f2" stroke="#5fc4ef" stroke-width="1"/>
+            <g transform="translate(0,11)">
               <g class="fw-rot knee">
-                <rect x="-4.5" y="0" width="9" height="13" rx="4.5" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
-                <path d="M-7 11 h11 a4 4 0 0 1 4 4 q0 1.6 -1.6 1.6 h-13.5 q-1.5 0 -1.5 -1.5 v-1.6 a2.5 2.5 0 0 1 1.6 -2.5z" fill="#0891b2"/>
-                <rect x="-8.6" y="14.7" width="17" height="2" rx="1" fill="#083d4f"/>
+                <rect x="-4.2" y="0" width="8.4" height="13" rx="4.2" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
+                <path d="M-6.5 10.5 h10.5 a5 5 0 0 1 5 5 q0 1.7 -1.7 1.7 h-13.3 q-1.6 0 -1.6 -1.6 v-2.4 a2.7 2.7 0 0 1 1.1 -2.7z" fill="#0891b2"/>
+                <path d="M-6.5 12 h8" stroke="#67e8f9" stroke-width="1.1" stroke-linecap="round" opacity=".7"/>
+                <rect x="-8.2" y="15.4" width="17.8" height="2.2" rx="1.1" fill="#083d4f"/>
               </g>
             </g>
           </g>
@@ -1352,65 +1387,92 @@
 
       <!-- ══ الجذع + الرأس + الذراعان ══ -->
       <g class="fw-torso">
-        <!-- الذراعان: نفس بنية المجموعتين -->
+        <!-- الذراعان: عضد + ساعد (كوع) + كف -->
         <g class="fw-arm-l">
-          <g transform="translate(11,50)">
+          <g transform="translate(13,54)">
             <g class="fw-rot">
-              <rect x="-5.5" y="-3" width="11" height="25" rx="5.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-              <circle cx="0" cy="22" r="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+              <circle cx="0" cy="0" r="4.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/><!-- كتف -->
+              <rect x="-4.5" y="-2" width="9" height="15" rx="4.5" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
+              <g transform="translate(0,12)">
+                <g class="fw-elbow">
+                  <rect x="-4" y="0" width="8" height="12" rx="4" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
+                  <circle cx="0" cy="13" r="4.6" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/><!-- كف -->
+                </g>
+              </g>
             </g>
           </g>
         </g>
         <g class="fw-arm-r">
-          <g transform="translate(65,50)">
+          <g transform="translate(65,54)">
             <g class="fw-rot">
-              <rect x="-5.5" y="-3" width="11" height="25" rx="5.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
-              <circle cx="0" cy="22" r="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+              <circle cx="0" cy="0" r="4.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+              <rect x="-4.5" y="-2" width="9" height="15" rx="4.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+              <g transform="translate(0,12)">
+                <g class="fw-elbow">
+                  <rect x="-4" y="0" width="8" height="12" rx="4" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+                  <circle cx="0" cy="13" r="4.6" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+                </g>
+              </g>
             </g>
           </g>
         </g>
 
-        <!-- الجسم — يغطي الوركين -->
-        <rect x="15" y="44" width="46" height="41" rx="14" fill="#f4fbfe" stroke="#5fc4ef" stroke-width="1.7"/>
-        <rect x="20" y="49" width="36" height="29" rx="10" fill="#e0f4fc"/>
-        <circle class="fw-chest" cx="38" cy="63" r="6" fill="#0891b2"/>
-        <circle cx="38" cy="63" r="3" fill="#fff" opacity=".85"/>
-        <rect x="28" y="72" width="20" height="2.8" rx="1.4" fill="#5fc4ef" opacity=".55"/>
+        <!-- الصدر: كبسولة بأكتاف — يغطي الوركين -->
+        <path d="M18 60
+                 q0 -10 10 -11 h22 q10 1 10 11
+                 v22 q0 10 -10 10 h-22 q-10 0 -10 -10 z"
+              fill="url(#fwBodyG)" stroke="#5fc4ef" stroke-width="1.7"/>
+        <rect x="23" y="55" width="32" height="26" rx="9" fill="#e0f4fc"/>
+        <circle class="fw-chest" cx="39" cy="66" r="5.6" fill="#0891b2"/>
+        <circle cx="39" cy="66" r="2.8" fill="#fff" opacity=".85"/>
+        <rect x="30" y="75" width="18" height="2.6" rx="1.3" fill="#5fc4ef" opacity=".6"/>
+        <rect x="18" y="86" width="42" height="4" rx="2" fill="#0891b2" opacity=".12"/>
+        <!-- لمعة على الصدر -->
+        <path d="M22 56 q1 -5 6 -6" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".8"/>
 
-        <!-- الرأس -->
-        <rect x="16" y="11" width="44" height="35" rx="14" fill="#fbfeff" stroke="#5fc4ef" stroke-width="1.7"/>
-        <rect x="22" y="16" width="32" height="25" rx="9.5" fill="#083d4f"/>
-        <circle cx="31.5" cy="27.5" r="4.4" fill="#22d3ee"/>
-        <circle cx="30.4" cy="26.3" r="1.3" fill="#fff" opacity=".8"/>
-        <circle cx="44.5" cy="27.5" r="4.4" fill="#22d3ee"/>
-        <circle cx="43.4" cy="26.3" r="1.3" fill="#fff" opacity=".8"/>
+        <!-- الرقبة -->
+        <rect x="34" y="43" width="10" height="8" rx="3.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.2"/>
+
+        <!-- الرأس: خوذة + ڤايزر لامع -->
+        <rect x="17" y="10" width="44" height="36" rx="15" fill="url(#fwBodyG)" stroke="#5fc4ef" stroke-width="1.7"/>
+        <rect x="23" y="16" width="32" height="24" rx="10" fill="url(#fwVisorG)"/>
+        <!-- لمعة الڤايزر -->
+        <path d="M26 20 q6 -3.5 14 -3" stroke="#3aa5c9" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        <path d="M20 14 q4 -3.5 9 -3.8" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+        <!-- العينان -->
+        <circle cx="32" cy="28" r="4.3" fill="#22d3ee"/>
+        <circle cx="30.9" cy="26.8" r="1.3" fill="#fff" opacity=".85"/>
+        <circle cx="46" cy="28" r="4.3" fill="#22d3ee"/>
+        <circle cx="44.9" cy="26.8" r="1.3" fill="#fff" opacity=".85"/>
         <g class="fw-lids">
-          <rect x="26.5" y="22.5" width="10" height="10" rx="5" fill="#083d4f"/>
-          <rect x="39.5" y="22.5" width="10" height="10" rx="5" fill="#083d4f"/>
+          <rect x="27" y="23" width="10" height="10" rx="5" fill="url(#fwVisorG)"/>
+          <rect x="41" y="23" width="10" height="10" rx="5" fill="url(#fwVisorG)"/>
         </g>
-        <path d="M33.5 35 Q38 38 42.5 35" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"/>
-        <line x1="38" y1="2.5" x2="38" y2="11" stroke="#5fc4ef" stroke-width="1.8" stroke-linecap="round"/>
-        <circle class="fw-ant" cx="38" cy="3" r="3.2" fill="#22d3ee"/>
-        <rect x="12" y="22" width="7" height="13" rx="3.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
-        <rect x="57" y="22" width="7" height="13" rx="3.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
+        <path d="M34 35 Q39 38 44 35" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- الهوائي -->
+        <line x1="39" y1="2.5" x2="39" y2="10" stroke="#5fc4ef" stroke-width="1.8" stroke-linecap="round"/>
+        <circle class="fw-ant" cx="39" cy="3" r="3.2" fill="#22d3ee"/>
+        <!-- الأذنان -->
+        <rect x="13" y="21" width="7" height="14" rx="3.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+        <circle cx="16.5" cy="28" r="1.6" fill="#0891b2" opacity=".5"/>
+        <rect x="58" y="21" width="7" height="14" rx="3.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+        <circle cx="61.5" cy="28" r="1.6" fill="#0891b2" opacity=".5"/>
       </g>
     </g>
   </svg>
 </div>
 
 <script>
-/* ═══ دورية قصيرة على يسار الشاشة: خطوتان-ثلاث (≈110px) يميناً ثم عودة ═══ */
+/* ═══ دورية قصيرة على يسار الشاشة: خطوتان-ثلاث (≈110px) ثم عودة ═══
+   السرعة مضبوطة على إيقاع الأرجل: خطوة كل .32s × طول خطوة ≈ 17px */
 (function(){
   const w = document.getElementById('fmbotWalker');
   const bubble = document.getElementById('fmbotBubble');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const PATROL = 110;
-  const SPEED  = 0.7;
-  let x = 0;                 /* 0 = نقطة البداية (يسار) ، PATROL = أقصى اليمين */
-  let dir = 1;               /* 1 → يتحرك يميناً */
-  let state = 'stand';
-  let hoverPause = false;
+  const PATROL = 105;
+  const SPEED  = 0.88;   /* ≈53px/ثانية = متزامن مع إيقاع الخطوات فلا يبدو منزلقاً */
+  let x = 0, dir = 1, state = 'stand', hoverPause = false;
 
   const panelOpen = () => {
     const p = document.getElementById('fcbPanel');

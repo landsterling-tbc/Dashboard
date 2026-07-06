@@ -1224,92 +1224,21 @@
 ╚════════════════════════════════════════════════════════════════════╝
 -->
 
-<!-- ═══════════════ 🤖 الروبوت المتجول v4 — مساعد إدارة المرافق الذكي ═══════════════
-     • مشية طبيعية: دورة مشي متزنة (الركبة تنثني أثناء أرجحة الرجل للأمام فقط،
-       وتفرد عند الوقوف عليها) + الجسم ينط نطّتين خفيفتين لكل دورة + ميل خفيف للأمام
-     • جسم مُعاد تصميمه: رقبة، خوذة بڤايزر لامع، صدر كبسولي، أكتاف، أحذية
-     • بنية المفاصل: مجموعة خارجية للموضع (ثابتة) + داخلية للدوران فقط -->
+<!-- ═══════════════ 🤖 الروبوت المتجول v5 — ثلاثي الأبعاد (Three.js WebGL) ═══════════════
+     روبوت 3D حقيقي مبني بـ Three.js: رأس وڤايزر وعيون متوهجة وجسم وأذرع بأكواع
+     وأرجل بركب وأحذية — يمشي دورة مشي طبيعية، يستدير بجسمه كاملاً 180° عند تغيير
+     الاتجاه، يرمش، يتنفس واقفاً، وله ظل أرضي. دورية قصيرة (خطوتان-ثلاث) يميناً وعودة.
+     عند الضغط: يقفز ويفتح نافذة الشات fcbPanel الموجودة. -->
 <style>
 .fcb-fab{display:none!important}
-
 #fmbotWalker{
-  position:fixed; bottom:0; left:24px;
-  width:78px; height:116px; z-index:1200;
+  position:fixed; bottom:0; left:12px;
+  width:150px; height:185px; z-index:1200;
   cursor:pointer; will-change:transform;
-  filter:drop-shadow(0 5px 12px rgba(8,145,178,.3));
-  transition:filter .25s;
 }
-#fmbotWalker:hover{filter:drop-shadow(0 7px 18px rgba(8,145,178,.5))}
-#fmbotWalker svg{width:100%;height:100%;overflow:visible;display:block}
-#fmbotWalker .fw-flip{transform-origin:50% 50%;transition:transform .28s}
-#fmbotWalker.face-right .fw-flip{transform:scaleX(-1)}
-
-/* ═══ دورة المشي = .64s (خطوتان). كل الأنيميشن مقفولة على نفس المدة ═══ */
-
-/* الجذع: واقفاً يتنفس — ماشياً يميل للأمام قليلاً وينط نطّتين خفيفتين لكل دورة */
-.fw-torso{transform-origin:39px 84px;animation:fwBreathe 3.4s ease-in-out infinite}
-#fmbotWalker.walking .fw-torso{animation:fwGait .64s ease-in-out infinite}
-@keyframes fwBreathe{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-2px) rotate(0)}}
-@keyframes fwGait{
-  0%,50%,100%{transform:translateY(0) rotate(4deg)}
-  25%,75%   {transform:translateY(-3.5px) rotate(4deg)}
-}
-
-.fw-rot{transform-origin:0 0}
-
-/* الورك: أرجحة ناعمة متماثلة. الرجل الثانية بإزاحة نصف دورة بالضبط */
-#fmbotWalker.walking .fw-hip-l .fw-rot.hip{animation:fwHip .64s cubic-bezier(.45,.05,.55,.95) infinite}
-#fmbotWalker.walking .fw-hip-r .fw-rot.hip{animation:fwHip .64s cubic-bezier(.45,.05,.55,.95) infinite;animation-delay:-.32s}
-@keyframes fwHip{
-  0%  {transform:rotate(26deg)}   /* الرجل في أقصى الأمام */
-  50% {transform:rotate(-24deg)}  /* أقصى الخلف (دفع) */
-  100%{transform:rotate(26deg)}
-}
-
-/* الركبة: مفرودة أثناء الوقوف على الرجل (0-50%) وتنثني فقط أثناء
-   أرجحتها للأمام (55-85%) ثم تفرد قبل ملامسة الأرض — هذا سر المشية الطبيعية */
-#fmbotWalker.walking .fw-hip-l .fw-rot.knee{animation:fwKnee .64s linear infinite}
-#fmbotWalker.walking .fw-hip-r .fw-rot.knee{animation:fwKnee .64s linear infinite;animation-delay:-.32s}
-@keyframes fwKnee{
-  0%  {transform:rotate(4deg)}
-  45% {transform:rotate(8deg)}
-  55% {transform:rotate(38deg)}
-  72% {transform:rotate(58deg)}
-  90% {transform:rotate(12deg)}
-  100%{transform:rotate(4deg)}
-}
-
-/* الذراعان: عكس الرجلين تماماً وبنفس منحنى الحركة */
-.fw-arm-l .fw-rot{animation:fwArmIdle 3.4s ease-in-out infinite}
-.fw-arm-r .fw-rot{animation:fwArmIdle 3.4s ease-in-out infinite reverse}
-#fmbotWalker.walking .fw-arm-l .fw-rot{animation:fwArm .64s cubic-bezier(.45,.05,.55,.95) infinite;animation-delay:-.32s}
-#fmbotWalker.walking .fw-arm-r .fw-rot{animation:fwArm .64s cubic-bezier(.45,.05,.55,.95) infinite}
-@keyframes fwArmIdle{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(6deg)}}
-@keyframes fwArm{0%{transform:rotate(24deg)}50%{transform:rotate(-24deg)}100%{transform:rotate(24deg)}}
-/* الكوع ينثني قليلاً أثناء المشي */
-#fmbotWalker.walking .fw-arm-l .fw-rot .fw-elbow{animation:fwElbow .64s ease-in-out infinite;animation-delay:-.32s}
-#fmbotWalker.walking .fw-arm-r .fw-rot .fw-elbow{animation:fwElbow .64s ease-in-out infinite}
-.fw-elbow{transform-origin:0 0}
-@keyframes fwElbow{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-2deg)}}
-
-/* الرمش */
-.fw-lids rect{transform-box:fill-box;transform-origin:center top;transform:scaleY(0);animation:fwBlink 4.4s ease-in-out infinite}
-@keyframes fwBlink{0%,91%,100%{transform:scaleY(0)}94%,96%{transform:scaleY(1)}}
-.fw-ant{animation:fwPulse 1.5s ease-in-out infinite}
-.fw-chest{animation:fwPulse 1.9s ease-in-out infinite}
-@keyframes fwPulse{0%,100%{opacity:1}50%{opacity:.35}}
-
-/* الظل: ينكمش مرتين لكل دورة (مع النطّتين) */
-.fw-shadow{transform-box:fill-box;transform-origin:center;animation:fwShIdle 3.4s ease-in-out infinite}
-#fmbotWalker.walking .fw-shadow{animation:fwSh .32s ease-in-out infinite}
-@keyframes fwShIdle{0%,100%{transform:scaleX(1);opacity:.18}50%{transform:scaleX(.92);opacity:.14}}
-@keyframes fwSh{0%,100%{transform:scaleX(1);opacity:.18}50%{transform:scaleX(.85);opacity:.12}}
-
-#fmbotWalker.clicked{animation:fwJump .5s cubic-bezier(.34,1.56,.64,1)}
-@keyframes fwJump{0%{margin-bottom:0}35%{margin-bottom:16px}65%{margin-bottom:6px}100%{margin-bottom:0}}
-
+#fmbotWalker canvas{display:block;width:100%!important;height:100%!important}
 #fmbotBubble{
-  position:absolute; bottom:122px; left:-4px;
+  position:absolute; bottom:178px; left:10px;
   background:linear-gradient(120deg,#083d4f,#0e7490);
   color:#e6f7fc; font-size:12px; font-weight:700;
   font-family:'Tajawal','IBM Plex Sans Arabic',sans-serif;
@@ -1321,11 +1250,9 @@
 }
 #fmbotBubble.show{opacity:1;transform:translateY(0) scale(1)}
 #fmbotBubble::after{content:'';position:absolute;bottom:-8px;left:18px;border:8px solid transparent;border-top-color:#083d4f;border-bottom:0}
-
-@media (prefers-reduced-motion:reduce){#fmbotWalker,#fmbotWalker *{animation:none!important}}
 @media (max-width:640px){
-  #fmbotWalker{width:62px;height:92px;left:12px}
-  #fmbotBubble{bottom:96px;font-size:11px}
+  #fmbotWalker{width:110px;height:140px;left:8px}
+  #fmbotBubble{bottom:134px;font-size:11px}
 }
 </style>
 
@@ -1333,146 +1260,218 @@
 
 <div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
   <div id="fmbotBubble">أنا مساعد إدارة المرافق الذكي 🤖</div>
-  <!-- viewBox 78×116 — الأرض عند y=114 -->
-  <svg viewBox="0 0 78 116" xmlns="http://www.w3.org/2000/svg" fill="none">
-    <defs>
-      <linearGradient id="fwBodyG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e3f5fd"/>
-      </linearGradient>
-      <linearGradient id="fwVisorG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#0d4a61"/><stop offset="1" stop-color="#072b3a"/>
-      </linearGradient>
-      <linearGradient id="fwLimbG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#eef9fe"/><stop offset="1" stop-color="#cfeefb"/>
-      </linearGradient>
-    </defs>
-
-    <ellipse class="fw-shadow" cx="39" cy="112.5" rx="21" ry="3" fill="#083d4f" opacity=".18"/>
-    <g class="fw-flip">
-
-      <!-- ══ الرِجلان (خلف الجسم) ══ -->
-      <g class="fw-hip-l">
-        <g transform="translate(32,84)">
-          <g class="fw-rot hip">
-            <rect x="-5" y="-3" width="10" height="16" rx="5" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
-            <circle cx="0" cy="11" r="3" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1"/>
-            <g transform="translate(0,11)">
-              <g class="fw-rot knee">
-                <rect x="-4.2" y="0" width="8.4" height="13" rx="4.2" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
-                <!-- حذاء -->
-                <path d="M-6.5 10.5 h10.5 a5 5 0 0 1 5 5 q0 1.7 -1.7 1.7 h-13.3 q-1.6 0 -1.6 -1.6 v-2.4 a2.7 2.7 0 0 1 1.1 -2.7z" fill="#0e7490"/>
-                <path d="M-6.5 12 h8" stroke="#22d3ee" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
-                <rect x="-8.2" y="15.4" width="17.8" height="2.2" rx="1.1" fill="#083d4f"/>
-              </g>
-            </g>
-          </g>
-        </g>
-      </g>
-      <g class="fw-hip-r">
-        <g transform="translate(46,84)">
-          <g class="fw-rot hip">
-            <rect x="-5" y="-3" width="10" height="16" rx="5" fill="#b7e4f7" stroke="#5fc4ef" stroke-width="1.2"/>
-            <circle cx="0" cy="11" r="3" fill="#8fd4f2" stroke="#5fc4ef" stroke-width="1"/>
-            <g transform="translate(0,11)">
-              <g class="fw-rot knee">
-                <rect x="-4.2" y="0" width="8.4" height="13" rx="4.2" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
-                <path d="M-6.5 10.5 h10.5 a5 5 0 0 1 5 5 q0 1.7 -1.7 1.7 h-13.3 q-1.6 0 -1.6 -1.6 v-2.4 a2.7 2.7 0 0 1 1.1 -2.7z" fill="#0891b2"/>
-                <path d="M-6.5 12 h8" stroke="#67e8f9" stroke-width="1.1" stroke-linecap="round" opacity=".7"/>
-                <rect x="-8.2" y="15.4" width="17.8" height="2.2" rx="1.1" fill="#083d4f"/>
-              </g>
-            </g>
-          </g>
-        </g>
-      </g>
-
-      <!-- ══ الجذع + الرأس + الذراعان ══ -->
-      <g class="fw-torso">
-        <!-- الذراعان: عضد + ساعد (كوع) + كف -->
-        <g class="fw-arm-l">
-          <g transform="translate(13,54)">
-            <g class="fw-rot">
-              <circle cx="0" cy="0" r="4.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/><!-- كتف -->
-              <rect x="-4.5" y="-2" width="9" height="15" rx="4.5" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
-              <g transform="translate(0,12)">
-                <g class="fw-elbow">
-                  <rect x="-4" y="0" width="8" height="12" rx="4" fill="url(#fwLimbG)" stroke="#5fc4ef" stroke-width="1.2"/>
-                  <circle cx="0" cy="13" r="4.6" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/><!-- كف -->
-                </g>
-              </g>
-            </g>
-          </g>
-        </g>
-        <g class="fw-arm-r">
-          <g transform="translate(65,54)">
-            <g class="fw-rot">
-              <circle cx="0" cy="0" r="4.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
-              <rect x="-4.5" y="-2" width="9" height="15" rx="4.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-              <g transform="translate(0,12)">
-                <g class="fw-elbow">
-                  <rect x="-4" y="0" width="8" height="12" rx="4" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-                  <circle cx="0" cy="13" r="4.6" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
-                </g>
-              </g>
-            </g>
-          </g>
-        </g>
-
-        <!-- الصدر: كبسولة بأكتاف — يغطي الوركين -->
-        <path d="M18 60
-                 q0 -10 10 -11 h22 q10 1 10 11
-                 v22 q0 10 -10 10 h-22 q-10 0 -10 -10 z"
-              fill="url(#fwBodyG)" stroke="#5fc4ef" stroke-width="1.7"/>
-        <rect x="23" y="55" width="32" height="26" rx="9" fill="#e0f4fc"/>
-        <circle class="fw-chest" cx="39" cy="66" r="5.6" fill="#0891b2"/>
-        <circle cx="39" cy="66" r="2.8" fill="#fff" opacity=".85"/>
-        <rect x="30" y="75" width="18" height="2.6" rx="1.3" fill="#5fc4ef" opacity=".6"/>
-        <rect x="18" y="86" width="42" height="4" rx="2" fill="#0891b2" opacity=".12"/>
-        <!-- لمعة على الصدر -->
-        <path d="M22 56 q1 -5 6 -6" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".8"/>
-
-        <!-- الرقبة -->
-        <rect x="34" y="43" width="10" height="8" rx="3.5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.2"/>
-
-        <!-- الرأس: خوذة + ڤايزر لامع -->
-        <rect x="17" y="10" width="44" height="36" rx="15" fill="url(#fwBodyG)" stroke="#5fc4ef" stroke-width="1.7"/>
-        <rect x="23" y="16" width="32" height="24" rx="10" fill="url(#fwVisorG)"/>
-        <!-- لمعة الڤايزر -->
-        <path d="M26 20 q6 -3.5 14 -3" stroke="#3aa5c9" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-        <path d="M20 14 q4 -3.5 9 -3.8" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".9"/>
-        <!-- العينان -->
-        <circle cx="32" cy="28" r="4.3" fill="#22d3ee"/>
-        <circle cx="30.9" cy="26.8" r="1.3" fill="#fff" opacity=".85"/>
-        <circle cx="46" cy="28" r="4.3" fill="#22d3ee"/>
-        <circle cx="44.9" cy="26.8" r="1.3" fill="#fff" opacity=".85"/>
-        <g class="fw-lids">
-          <rect x="27" y="23" width="10" height="10" rx="5" fill="url(#fwVisorG)"/>
-          <rect x="41" y="23" width="10" height="10" rx="5" fill="url(#fwVisorG)"/>
-        </g>
-        <path d="M34 35 Q39 38 44 35" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"/>
-        <!-- الهوائي -->
-        <line x1="39" y1="2.5" x2="39" y2="10" stroke="#5fc4ef" stroke-width="1.8" stroke-linecap="round"/>
-        <circle class="fw-ant" cx="39" cy="3" r="3.2" fill="#22d3ee"/>
-        <!-- الأذنان -->
-        <rect x="13" y="21" width="7" height="14" rx="3.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-        <circle cx="16.5" cy="28" r="1.6" fill="#0891b2" opacity=".5"/>
-        <rect x="58" y="21" width="7" height="14" rx="3.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
-        <circle cx="61.5" cy="28" r="1.6" fill="#0891b2" opacity=".5"/>
-      </g>
-    </g>
-  </svg>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
 <script>
-/* ═══ دورية قصيرة على يسار الشاشة: خطوتان-ثلاث (≈110px) ثم عودة ═══
-   السرعة مضبوطة على إيقاع الأرجل: خطوة كل .32s × طول خطوة ≈ 17px */
-(function(){
-  const w = document.getElementById('fmbotWalker');
+/* ═══════════ الروبوت ثلاثي الأبعاد ═══════════ */
+window.addEventListener('load', function(){
+  if (typeof THREE === 'undefined') return;   /* لو فشل تحميل المكتبة لا نكسر اللوحة */
+
+  const holder = document.getElementById('fmbotWalker');
   const bubble = document.getElementById('fmbotBubble');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const PATROL = 105;
-  const SPEED  = 0.88;   /* ≈53px/ثانية = متزامن مع إيقاع الخطوات فلا يبدو منزلقاً */
+  /* ── المشهد ── */
+  const W = holder.clientWidth, H = holder.clientHeight;
+  const renderer = new THREE.WebGLRenderer({ alpha:true, antialias:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(W, H);
+  holder.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, W/H, 0.1, 100);
+  camera.position.set(0, 2.4, 8.2);
+  camera.lookAt(0, 1.55, 0);
+
+  scene.add(new THREE.HemisphereLight(0xeaf8ff, 0x9fc8d8, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(3, 6, 5);
+  scene.add(sun);
+  const rim = new THREE.DirectionalLight(0x22d3ee, 0.35);
+  rim.position.set(-4, 3, -3);
+  scene.add(rim);
+
+  /* ── الخامات (ألوان هوية اللوحة) ── */
+  const M = {
+    shell : new THREE.MeshStandardMaterial({ color:0xfdfefe, roughness:.28, metalness:.22 }),  /* لؤلؤي */
+    shell2: new THREE.MeshStandardMaterial({ color:0xdce9ef, roughness:.35, metalness:.2  }),  /* رمادي فاتح بارد */
+    joint : new THREE.MeshStandardMaterial({ color:0x0a5468, roughness:.4,  metalness:.45 }),  /* مفاصل كحلية */
+    visor : new THREE.MeshStandardMaterial({ color:0x061e2a, roughness:.12, metalness:.65 }),  /* ڤايزر أسود-كحلي لامع */
+    teal  : new THREE.MeshStandardMaterial({ color:0x0891b2, roughness:.32, metalness:.35 }),
+    brass : new THREE.MeshStandardMaterial({ color:0xb08a4e, roughness:.28, metalness:.75 }),  /* نحاسي فاخر */
+    brass2: new THREE.MeshStandardMaterial({ color:0xd4af6a, emissive:0x4a3410, emissiveIntensity:.25, roughness:.25, metalness:.8 }),
+    glow  : new THREE.MeshStandardMaterial({ color:0x34e3ff, emissive:0x22d3ee, emissiveIntensity:1.3, roughness:.25 }),
+    shoe  : new THREE.MeshStandardMaterial({ color:0x083d4f, roughness:.45, metalness:.3  }),  /* حذاء كحلي */
+    sole  : new THREE.MeshStandardMaterial({ color:0xb08a4e, roughness:.35, metalness:.7 })    /* نعل نحاسي */
+  };
+
+  /* ── أدوات بناء ── */
+  function capsule(r, len, mat){  /* r128 لا يملك CapsuleGeometry — أسطوانة + كرتان */
+    const g = new THREE.Group();
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 20), mat);
+    const s1 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s1.position.y =  len/2;
+    const s2 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s2.position.y = -len/2;
+    g.add(cyl, s1, s2);
+    return g;
+  }
+  const box = (w,h,d,mat,r)=> new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+
+  /* ── الروبوت ── */
+  const robot = new THREE.Group();
+  scene.add(robot);
+  const torsoGrp = new THREE.Group();   /* للجسم العلوي (تنفّس/نط) */
+  robot.add(torsoGrp);
+
+  /* الرأس + الڤايزر */
+  const head = new THREE.Group();
+  head.position.y = 2.42;
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.62, 28, 22), M.shell);
+  skull.scale.set(1.06, 0.92, 0.98);
+  head.add(skull);
+  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.52, 28, 22, 0, Math.PI*2, 0, Math.PI*0.62), M.visor);
+  visor.scale.set(1.02, 0.88, 0.9);
+  visor.position.set(0, -0.02, 0.17);
+  head.add(visor);
+  /* العينان المتوهجتان */
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), M.glow);
+  const eyeR = eyeL.clone();
+  eyeL.position.set(-0.21, 0.03, 0.62);
+  eyeR.position.set( 0.21, 0.03, 0.62);
+  head.add(eyeL, eyeR);
+  /* الفم */
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 20, Math.PI*0.85), M.glow);
+  mouth.position.set(0, -0.2, 0.6);
+  mouth.rotation.z = Math.PI + Math.PI*0.075;
+  head.add(mouth);
+  /* الهوائي */
+  const antRod = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.34, 10), M.brass);
+  antRod.position.y = 0.72;
+  const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), M.glow);
+  antTip.position.y = 0.92;
+  head.add(antRod, antTip);
+  /* الأذنان */
+  const earL = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 20), M.shell2);
+  earL.rotation.z = Math.PI/2; earL.position.set(-0.63, 0, 0);
+  const earR = earL.clone(); earR.position.x = 0.63;
+  const earRingL = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 22), M.brass);
+  earRingL.rotation.y = Math.PI/2; earRingL.position.set(-0.69, 0, 0);
+  const earRingR = earRingL.clone(); earRingR.position.x = 0.69;
+  head.add(earL, earR, earRingL, earRingR);
+  torsoGrp.add(head);
+
+  /* الرقبة */
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.22, 14), M.joint);
+  neck.position.y = 1.98;
+  torsoGrp.add(neck);
+
+  /* الجذع */
+  const chest = capsule(0.56, 0.62, M.shell);
+  chest.position.y = 1.45;
+  chest.scale.set(1, 1, 0.82);
+  torsoGrp.add(chest);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.44, 22, 16), M.shell2);
+  belly.scale.set(1, 0.72, 0.6);
+  belly.position.set(0, 1.42, 0.22);
+  torsoGrp.add(belly);
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.07, 18), M.glow);
+  core.rotation.x = Math.PI/2;
+  core.position.set(0, 1.52, 0.47);
+  torsoGrp.add(core);
+  const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.032, 10, 28), M.brass2);
+  coreRing.position.copy(core.position);
+  torsoGrp.add(coreRing);
+  /* الحوض */
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 14), M.shell2);
+  pelvis.scale.set(1.05, 0.6, 0.8);
+  pelvis.position.y = 0.98;
+  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 10, 30), M.brass);
+  belt.rotation.x = Math.PI/2;
+  belt.position.y = 1.06;
+  robot.add(pelvis, belt);
+
+  /* ── ذراع: كتف→عضد→كوع→ساعد→كف ── */
+  function makeArm(side){        /* side: -1 يسار ، +1 يمين */
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side*0.68, 1.72, 0);
+    const shBall = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), M.joint);
+    shoulder.add(shBall);
+    const upper = capsule(0.115, 0.34, M.shell);
+    upper.position.y = -0.26;
+    shoulder.add(upper);
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.5;
+    const elBall = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 10), M.joint);
+    elbow.add(elBall);
+    const fore = capsule(0.1, 0.3, M.shell2);
+    fore.position.y = -0.23;
+    elbow.add(fore);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), M.joint);
+    hand.position.y = -0.46;
+    elbow.add(hand);
+    shoulder.add(elbow);
+    torsoGrp.add(shoulder);
+    return { shoulder, elbow };
+  }
+  const armL = makeArm(-1), armR = makeArm(1);
+
+  /* ── رجل: ورك→فخذ→ركبة→ساق→قدم ── */
+  function makeLeg(side){
+    const hip = new THREE.Group();
+    hip.position.set(side*0.26, 1.0, 0);
+    const hipBall = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), M.joint);
+    hip.add(hipBall);
+    const thigh = capsule(0.14, 0.34, M.shell);
+    thigh.position.y = -0.27;
+    hip.add(thigh);
+    const knee = new THREE.Group();
+    knee.position.y = -0.5;
+    const kneeBall = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), M.joint);
+    knee.add(kneeBall);
+    const shin = capsule(0.12, 0.3, M.shell2);
+    shin.position.y = -0.24;
+    knee.add(shin);
+    /* الحذاء */
+    const foot = new THREE.Group();
+    foot.position.y = -0.46;
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 12), M.shoe);
+    shoe.scale.set(1, 0.6, 1.55);
+    shoe.position.z = 0.08;
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.62), M.sole);
+    sole.position.set(0, -0.1, 0.08);
+    foot.add(shoe, sole);
+    knee.add(foot);
+    hip.add(knee);
+    robot.add(hip);
+    return { hip, knee };
+  }
+  const legL = makeLeg(-1), legR = makeLeg(1);
+
+  /* ── الظل الأرضي ── */
+  const shTex = (()=>{
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(64,64,4, 64,64,62);
+    grd.addColorStop(0,'rgba(8,61,79,.4)'); grd.addColorStop(1,'rgba(8,61,79,0)');
+    g.fillStyle = grd; g.fillRect(0,0,128,128);
+    return new THREE.CanvasTexture(c);
+  })();
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 1.3),
+    new THREE.MeshBasicMaterial({ map:shTex, transparent:true, depthWrite:false })
+  );
+  shadow.rotation.x = -Math.PI/2;
+  shadow.position.y = -0.62;
+  robot.add(shadow);
+
+  robot.position.y = -0.75;   /* القدمان على "أرض" أسفل الكادر */
+  robot.rotation.y = 0.35;    /* البداية: مواجه للكاميرا بميل خفيف */
+
+  /* ═══ الحالة والحركة ═══ */
+  const PATROL = 105, SPEED = 42;   /* px , px/ث */
   let x = 0, dir = 1, state = 'stand', hoverPause = false;
+  let phase = 0, blink = 0, nextBlink = 2.5, targetYaw = 0.35, jumpT = -1;
+  const YAW_WALK = 1.22;   /* ≈70° — وجهه ناحية اتجاه المشي مع ميل بسيط للكاميرا */
 
   const panelOpen = () => {
     const p = document.getElementById('fcbPanel');
@@ -1483,33 +1482,101 @@
     setTimeout(()=>{
       if (reduced) return schedule();
       dir = (x <= 2) ? 1 : -1;
-      w.classList.toggle('face-right', dir === 1);
-      setTimeout(()=>{ state = 'walk'; }, 350);
+      targetYaw = dir * YAW_WALK;                    /* يواجه اتجاه مشيه فعلياً */
+      setTimeout(()=>{ state = 'walk'; }, 420);
     }, 1800 + Math.random()*2600);
   }
+  function stop(){ state = 'stand'; targetYaw = dir * 0.3; /* عند الوقوف يلتفت للكاميرا */ schedule(); }
 
-  function frame(){
+  const lerp = (a,b,t)=> a+(b-a)*t;
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t  = clock.elapsedTime;
     const blocked = hoverPause || panelOpen() || reduced;
-    if (state === 'walk' && !blocked){
-      x += dir * SPEED;
+    const walking = state === 'walk' && !blocked;
+
+    /* الانتقال الأفقي */
+    if (walking){
+      x += dir * SPEED * dt;
       if (x >= PATROL){ x = PATROL; stop(); }
       else if (x <= 0){ x = 0; stop(); }
-      w.classList.add('walking');
-    } else {
-      w.classList.remove('walking');
     }
-    w.style.transform = 'translateX(' + x + 'px)';
-    requestAnimationFrame(frame);
+    holder.style.transform = 'translateX(' + x + 'px)';
+
+    /* استدارة الجسم نحو الاتجاه */
+    robot.rotation.y = lerp(robot.rotation.y, targetYaw, Math.min(1, dt*6));
+
+    if (walking){
+      phase += dt * 2 * Math.PI / 0.64;          /* دورة مشي = .64 ثانية */
+      const s = Math.sin(phase), c = Math.cos(phase);
+      /* الأوراك: أرجحة متعاكسة */
+      legL.hip.rotation.x =  s * 0.62;
+      legR.hip.rotation.x = -s * 0.62;
+      /* الركبة تنثني فقط أثناء أرجحة الرجل للأمام (نصف الدورة الخاص بها) */
+      legL.knee.rotation.x = Math.max(0, Math.sin(phase + Math.PI*0.5)) * (s <= 0 ? 1.05 : 0.18);
+      legR.knee.rotation.x = Math.max(0, Math.sin(phase + Math.PI*1.5)) * (s >= 0 ? 1.05 : 0.18);
+      /* الذراعان عكس الرجلين + كوع مثني */
+      armL.shoulder.rotation.x = -s * 0.55;
+      armR.shoulder.rotation.x =  s * 0.55;
+      armL.elbow.rotation.x = -0.35 - Math.max(0,-s)*0.25;
+      armR.elbow.rotation.x = -0.35 - Math.max(0, s)*0.25;
+      /* نط الجسم مرتين لكل دورة + تمايل جانبي خفيف */
+      const bob = Math.abs(Math.sin(phase)) * 0.075;
+      torsoGrp.position.y = bob;
+      robot.position.y = -0.75 + bob*0.4;
+      torsoGrp.rotation.z = Math.sin(phase) * 0.045;
+      torsoGrp.rotation.x = 0.1;               /* ميل للأمام */
+      head.rotation.x = -0.06;
+      shadow.scale.setScalar(1 - bob*1.6);
+    } else {
+      /* وقوف: تنفّس + رجوع المفاصل لوضعها بنعومة */
+      const ease = Math.min(1, dt*7);
+      [legL, legR].forEach(l=>{ l.hip.rotation.x = lerp(l.hip.rotation.x,0,ease); l.knee.rotation.x = lerp(l.knee.rotation.x,0,ease); });
+      [armL, armR].forEach(a=>{ a.shoulder.rotation.x = lerp(a.shoulder.rotation.x,0,ease); a.elbow.rotation.x = lerp(a.elbow.rotation.x,-0.15,ease); });
+      torsoGrp.rotation.x = lerp(torsoGrp.rotation.x, 0, ease);
+      torsoGrp.rotation.z = lerp(torsoGrp.rotation.z, 0, ease);
+      const br = Math.sin(t*1.9)*0.035;
+      torsoGrp.position.y = lerp(torsoGrp.position.y, br+0.02, ease);
+      head.rotation.x = Math.sin(t*1.9)*0.03;
+      head.rotation.y = Math.sin(t*0.55)*0.14;       /* يلتفت يتفرج */
+      robot.position.y = lerp(robot.position.y, -0.75, ease);
+      shadow.scale.setScalar(lerp(shadow.scale.x, 1, ease));
+    }
+
+    /* الرمش */
+    nextBlink -= dt;
+    if (nextBlink <= 0){ blink = 0.14; nextBlink = 2.6 + Math.random()*2.6; }
+    if (blink > 0){
+      blink -= dt;
+      const k = Math.max(0.08, Math.abs(blink/0.07 - 1));
+      eyeL.scale.y = eyeR.scale.y = k;
+    } else { eyeL.scale.y = eyeR.scale.y = 1; }
+
+    /* نبض الهوائي والقلب */
+    const p = 0.85 + Math.sin(t*4)*0.25;
+    antTip.material.emissiveIntensity = p;
+    core.scale.setScalar(1 + Math.sin(t*3.2)*0.08);
+
+    /* القفزة عند الضغط */
+    if (jumpT >= 0){
+      jumpT += dt;
+      const j = jumpT/0.5;
+      if (j >= 1){ jumpT = -1; }
+      else robot.position.y = -0.75 + Math.sin(j*Math.PI)*0.55;
+    }
+
+    renderer.render(scene, camera);
   }
-  function stop(){ state = 'stand'; schedule(); }
-
-  w.classList.add('face-right');
+  animate();
   schedule();
-  requestAnimationFrame(frame);
 
-  w.addEventListener('mouseenter', ()=> hoverPause = true);
-  w.addEventListener('mouseleave', ()=> hoverPause = false);
+  holder.addEventListener('mouseenter', ()=> hoverPause = true);
+  holder.addEventListener('mouseleave', ()=> hoverPause = false);
 
+  /* فقاعات التلميح */
   const hints = [
     'أنا مساعد إدارة المرافق الذكي 🤖',
     'لو عندك سؤال ممكن تسألني 💬',
@@ -1523,17 +1590,15 @@
     bubble.classList.add('show');
     setTimeout(()=> bubble.classList.remove('show'), 3000);
   }
-  setTimeout(showBubble, 900);
+  setTimeout(showBubble, 1200);
   setInterval(showBubble, 7500);
 
-  w.addEventListener('click', ()=>{
-    w.classList.remove('clicked'); void w.offsetWidth;
-    w.classList.add('clicked');
-    setTimeout(()=> w.classList.remove('clicked'), 520);
+  holder.addEventListener('click', ()=>{
+    jumpT = 0;
     bubble.classList.remove('show');
     if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
   });
-})();
+});
 </script>
 
 <div class="fcb-panel" id="fcbPanel">

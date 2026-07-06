@@ -1224,37 +1224,269 @@
 ╚════════════════════════════════════════════════════════════════════╝
 -->
 
-<div class="fcb-fab" id="fcbFab" onclick="fcbToggle()">
-  <span class="fcb-fab-icon" aria-hidden="true">
-    <svg viewBox="0 0 24 24" width="36" height="36" fill="none">
-      <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
-      <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
-      <rect x="4" y="5.5" width="16" height="13.6" rx="4.8" stroke="#fff" stroke-width="1.9"/>
-      <rect x="1.3" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
-      <rect x="19.9" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
-      <circle cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
-      <circle cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
-      <path d="M7.9 16.1c1.8 1.7 6.4 1.7 8.2 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-    </svg>
-  </span>
-  <span class="fcb-fab-close" aria-hidden="true">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-  </span>
-  <span class="fcb-fab-dot"></span>
-  <span class="fcb-fab-tip">مدير المرافق الخبير 🏫</span>
+<!-- ═══════════════ 🤖 الروبوت المتجول v3 — مساعد إدارة المرافق الذكي ═══════════════
+     إصلاح جذري: كانت أنيميشن CSS (transform:rotate) تمسح خاصية transform="translate(..)"
+     الخاصة بموضع الطرف في الـSVG، فتقفز الأذرع والأرجل إلى (0,0) وتختفي.
+     الحل: كل طرف داخل مجموعتين — الخارجية للموضع (translate ثابت لا يُلمس)
+     والداخلية للدوران فقط (هي التي تتحرك بالـCSS). -->
+<style>
+.fcb-fab{display:none!important}
+
+#fmbotWalker{
+  position:fixed; bottom:0; left:24px;
+  width:76px; height:110px; z-index:1200;
+  cursor:pointer; will-change:transform;
+  filter:drop-shadow(0 5px 12px rgba(8,145,178,.3));
+  transition:filter .25s;
+}
+#fmbotWalker:hover{filter:drop-shadow(0 7px 18px rgba(8,145,178,.5))}
+#fmbotWalker svg{width:100%;height:100%;overflow:visible;display:block}
+#fmbotWalker .fw-flip{transform-origin:50% 50%;transition:transform .28s}
+#fmbotWalker.face-right .fw-flip{transform:scaleX(-1)}
+
+/* ── الجذع: تنفّس واقفاً، تمايل ماشياً ── */
+.fw-torso{animation:fwBreathe 3.2s ease-in-out infinite}
+#fmbotWalker.walking .fw-torso{animation:fwSway .56s ease-in-out infinite}
+@keyframes fwBreathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes fwSway{0%,100%{transform:translateY(-1px)}25%,75%{transform:translateY(-3px)}50%{transform:translateY(-1px)}}
+
+/* ── الأطراف: المجموعة الداخلية فقط هي التي تدور ── */
+.fw-rot{transform-origin:0 0}   /* نقطة المفصل عند (0,0) داخل المجموعة */
+
+#fmbotWalker.walking .fw-hip-l .fw-rot.hip{animation:fwHip .56s linear infinite}
+#fmbotWalker.walking .fw-hip-r .fw-rot.hip{animation:fwHip .56s linear infinite;animation-delay:-.28s}
+#fmbotWalker.walking .fw-hip-l .fw-rot.knee{animation:fwKnee .56s linear infinite}
+#fmbotWalker.walking .fw-hip-r .fw-rot.knee{animation:fwKnee .56s linear infinite;animation-delay:-.28s}
+@keyframes fwHip{0%{transform:rotate(22deg)}50%{transform:rotate(-20deg)}100%{transform:rotate(22deg)}}
+@keyframes fwKnee{0%{transform:rotate(3deg)}30%{transform:rotate(45deg)}60%{transform:rotate(6deg)}100%{transform:rotate(3deg)}}
+
+.fw-arm-l .fw-rot{animation:fwArmIdle 3.2s ease-in-out infinite}
+.fw-arm-r .fw-rot{animation:fwArmIdle 3.2s ease-in-out infinite reverse}
+#fmbotWalker.walking .fw-arm-l .fw-rot{animation:fwArm .56s ease-in-out infinite;animation-delay:-.28s}
+#fmbotWalker.walking .fw-arm-r .fw-rot{animation:fwArm .56s ease-in-out infinite}
+@keyframes fwArmIdle{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(7deg)}}
+@keyframes fwArm{0%,100%{transform:rotate(22deg)}50%{transform:rotate(-22deg)}}
+
+/* ── الرمش (جفون) ── */
+.fw-lids rect{transform-box:fill-box;transform-origin:center top;transform:scaleY(0);animation:fwBlink 4.4s ease-in-out infinite}
+@keyframes fwBlink{0%,91%,100%{transform:scaleY(0)}94%,96%{transform:scaleY(1)}}
+.fw-ant{animation:fwPulse 1.5s ease-in-out infinite}
+.fw-chest{animation:fwPulse 1.9s ease-in-out infinite}
+@keyframes fwPulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.fw-shadow{transform-box:fill-box;transform-origin:center;animation:fwSh 3.2s ease-in-out infinite}
+#fmbotWalker.walking .fw-shadow{animation:fwSh .56s ease-in-out infinite}
+@keyframes fwSh{0%,100%{transform:scaleX(1);opacity:.18}50%{transform:scaleX(.85);opacity:.12}}
+
+#fmbotWalker.clicked{animation:fwJump .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes fwJump{0%{margin-bottom:0}35%{margin-bottom:16px}65%{margin-bottom:6px}100%{margin-bottom:0}}
+
+/* ── فقاعة التلميح (يسار الشاشة → ذيلها يسار) ── */
+#fmbotBubble{
+  position:absolute; bottom:116px; left:-4px;
+  background:linear-gradient(120deg,#083d4f,#0e7490);
+  color:#e6f7fc; font-size:12px; font-weight:700;
+  font-family:'Tajawal','IBM Plex Sans Arabic',sans-serif;
+  padding:8px 13px; border-radius:14px 14px 14px 4px;
+  box-shadow:0 8px 24px rgba(8,45,60,.25);
+  white-space:nowrap; pointer-events:none; direction:rtl;
+  opacity:0; transform:translateY(8px) scale(.94);
+  transition:opacity .35s,transform .35s;
+}
+#fmbotBubble.show{opacity:1;transform:translateY(0) scale(1)}
+#fmbotBubble::after{content:'';position:absolute;bottom:-8px;left:18px;border:8px solid transparent;border-top-color:#083d4f;border-bottom:0}
+
+@media (prefers-reduced-motion:reduce){#fmbotWalker,#fmbotWalker *{animation:none!important}}
+@media (max-width:640px){
+  #fmbotWalker{width:60px;height:88px;left:12px}
+  #fmbotBubble{bottom:92px;font-size:11px}
+}
+</style>
+
+<div id="fcbFab" style="display:none" aria-hidden="true"></div><!-- عنصر وهمي حتى لا يتعطل fcbToggle -->
+
+<div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
+  <div id="fmbotBubble">أنا مساعد إدارة المرافق الذكي 🤖</div>
+  <!-- viewBox 76×110 — الأرض عند y=108 -->
+  <svg viewBox="0 0 76 110" xmlns="http://www.w3.org/2000/svg" fill="none">
+    <ellipse class="fw-shadow" cx="38" cy="106.5" rx="22" ry="3" fill="#083d4f" opacity=".18"/>
+    <g class="fw-flip">
+
+      <!-- ══ الرِجلان — خلف الجسم. البنية:
+           <g translate=موضع الورك> ← ثابت، لا يُحرَّك أبداً
+             <g class=fw-rot hip>  ← يدور حول (0,0) = الورك
+               فخذ
+               <g translate=موضع الركبة> ← ثابت
+                 <g class=fw-rot knee> ساق + قدم </g>
+               </g>
+             </g>
+           </g> ══ -->
+      <g class="fw-hip-l">
+        <g transform="translate(31,78)">
+          <g class="fw-rot hip">
+            <rect x="-5" y="-2" width="10" height="16" rx="5" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
+            <g transform="translate(0,12)">
+              <g class="fw-rot knee">
+                <rect x="-4.5" y="0" width="9" height="13" rx="4.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+                <path d="M-7 11 h11 a4 4 0 0 1 4 4 q0 1.6 -1.6 1.6 h-13.5 q-1.5 0 -1.5 -1.5 v-1.6 a2.5 2.5 0 0 1 1.6 -2.5z" fill="#0e7490"/>
+                <rect x="-8.6" y="14.7" width="17" height="2" rx="1" fill="#083d4f"/>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="fw-hip-r">
+        <g transform="translate(45,78)">
+          <g class="fw-rot hip">
+            <rect x="-5" y="-2" width="10" height="16" rx="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.2"/>
+            <g transform="translate(0,12)">
+              <g class="fw-rot knee">
+                <rect x="-4.5" y="0" width="9" height="13" rx="4.5" fill="#c9ebf9" stroke="#5fc4ef" stroke-width="1.2"/>
+                <path d="M-7 11 h11 a4 4 0 0 1 4 4 q0 1.6 -1.6 1.6 h-13.5 q-1.5 0 -1.5 -1.5 v-1.6 a2.5 2.5 0 0 1 1.6 -2.5z" fill="#0891b2"/>
+                <rect x="-8.6" y="14.7" width="17" height="2" rx="1" fill="#083d4f"/>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- ══ الجذع + الرأس + الذراعان ══ -->
+      <g class="fw-torso">
+        <!-- الذراعان: نفس بنية المجموعتين -->
+        <g class="fw-arm-l">
+          <g transform="translate(11,50)">
+            <g class="fw-rot">
+              <rect x="-5.5" y="-3" width="11" height="25" rx="5.5" fill="#dff4fc" stroke="#5fc4ef" stroke-width="1.2"/>
+              <circle cx="0" cy="22" r="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+            </g>
+          </g>
+        </g>
+        <g class="fw-arm-r">
+          <g transform="translate(65,50)">
+            <g class="fw-rot">
+              <rect x="-5.5" y="-3" width="11" height="25" rx="5.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
+              <circle cx="0" cy="22" r="5" fill="#a9dff5" stroke="#5fc4ef" stroke-width="1.1"/>
+            </g>
+          </g>
+        </g>
+
+        <!-- الجسم — يغطي الوركين -->
+        <rect x="15" y="44" width="46" height="41" rx="14" fill="#f4fbfe" stroke="#5fc4ef" stroke-width="1.7"/>
+        <rect x="20" y="49" width="36" height="29" rx="10" fill="#e0f4fc"/>
+        <circle class="fw-chest" cx="38" cy="63" r="6" fill="#0891b2"/>
+        <circle cx="38" cy="63" r="3" fill="#fff" opacity=".85"/>
+        <rect x="28" y="72" width="20" height="2.8" rx="1.4" fill="#5fc4ef" opacity=".55"/>
+
+        <!-- الرأس -->
+        <rect x="16" y="11" width="44" height="35" rx="14" fill="#fbfeff" stroke="#5fc4ef" stroke-width="1.7"/>
+        <rect x="22" y="16" width="32" height="25" rx="9.5" fill="#083d4f"/>
+        <circle cx="31.5" cy="27.5" r="4.4" fill="#22d3ee"/>
+        <circle cx="30.4" cy="26.3" r="1.3" fill="#fff" opacity=".8"/>
+        <circle cx="44.5" cy="27.5" r="4.4" fill="#22d3ee"/>
+        <circle cx="43.4" cy="26.3" r="1.3" fill="#fff" opacity=".8"/>
+        <g class="fw-lids">
+          <rect x="26.5" y="22.5" width="10" height="10" rx="5" fill="#083d4f"/>
+          <rect x="39.5" y="22.5" width="10" height="10" rx="5" fill="#083d4f"/>
+        </g>
+        <path d="M33.5 35 Q38 38 42.5 35" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="38" y1="2.5" x2="38" y2="11" stroke="#5fc4ef" stroke-width="1.8" stroke-linecap="round"/>
+        <circle class="fw-ant" cx="38" cy="3" r="3.2" fill="#22d3ee"/>
+        <rect x="12" y="22" width="7" height="13" rx="3.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
+        <rect x="57" y="22" width="7" height="13" rx="3.5" fill="#eaf8fd" stroke="#5fc4ef" stroke-width="1.2"/>
+      </g>
+    </g>
+  </svg>
 </div>
+
+<script>
+/* ═══ دورية قصيرة على يسار الشاشة: خطوتان-ثلاث (≈110px) يميناً ثم عودة ═══ */
+(function(){
+  const w = document.getElementById('fmbotWalker');
+  const bubble = document.getElementById('fmbotBubble');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const PATROL = 110;
+  const SPEED  = 0.7;
+  let x = 0;                 /* 0 = نقطة البداية (يسار) ، PATROL = أقصى اليمين */
+  let dir = 1;               /* 1 → يتحرك يميناً */
+  let state = 'stand';
+  let hoverPause = false;
+
+  const panelOpen = () => {
+    const p = document.getElementById('fcbPanel');
+    return p && p.classList.contains('open');
+  };
+
+  function schedule(){
+    setTimeout(()=>{
+      if (reduced) return schedule();
+      dir = (x <= 2) ? 1 : -1;
+      w.classList.toggle('face-right', dir === 1);
+      setTimeout(()=>{ state = 'walk'; }, 350);
+    }, 1800 + Math.random()*2600);
+  }
+
+  function frame(){
+    const blocked = hoverPause || panelOpen() || reduced;
+    if (state === 'walk' && !blocked){
+      x += dir * SPEED;
+      if (x >= PATROL){ x = PATROL; stop(); }
+      else if (x <= 0){ x = 0; stop(); }
+      w.classList.add('walking');
+    } else {
+      w.classList.remove('walking');
+    }
+    w.style.transform = 'translateX(' + x + 'px)';
+    requestAnimationFrame(frame);
+  }
+  function stop(){ state = 'stand'; schedule(); }
+
+  w.classList.add('face-right');
+  schedule();
+  requestAnimationFrame(frame);
+
+  w.addEventListener('mouseenter', ()=> hoverPause = true);
+  w.addEventListener('mouseleave', ()=> hoverPause = false);
+
+  const hints = [
+    'أنا مساعد إدارة المرافق الذكي 🤖',
+    'لو عندك سؤال ممكن تسألني 💬',
+    'اسألني عن FCA والعقود والبلاغات ✨',
+    'اضغط عليّ لنبدأ المحادثة 👋'
+  ];
+  let hi = 0;
+  function showBubble(){
+    if (panelOpen()) return;
+    bubble.textContent = hints[hi++ % hints.length];
+    bubble.classList.add('show');
+    setTimeout(()=> bubble.classList.remove('show'), 3000);
+  }
+  setTimeout(showBubble, 900);
+  setInterval(showBubble, 7500);
+
+  w.addEventListener('click', ()=>{
+    w.classList.remove('clicked'); void w.offsetWidth;
+    w.classList.add('clicked');
+    setTimeout(()=> w.classList.remove('clicked'), 520);
+    bubble.classList.remove('show');
+    if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
+  });
+})();
+</script>
 
 <div class="fcb-panel" id="fcbPanel">
   <div class="fcb-head">
     <div class="fcb-avatar">
-      <svg viewBox="0 0 24 24" width="25" height="25" fill="none">
-        <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
-        <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+      <svg class="fcb-robot-svg" viewBox="0 0 24 24" width="25" height="25" fill="none">
+        <g class="fcb-robot-antenna">
+          <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
+          <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+        </g>
         <rect x="4" y="5.5" width="16" height="13.6" rx="4.8" stroke="#fff" stroke-width="1.9"/>
         <rect x="1.3" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
         <rect x="19.9" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
-        <circle cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
-        <circle cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
+        <circle class="fcb-robot-eye" cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
+        <circle class="fcb-robot-eye" cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
         <path d="M7.9 16.1c1.8 1.7 6.4 1.7 8.2 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
       </svg>
     </div>

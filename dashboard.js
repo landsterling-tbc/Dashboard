@@ -3833,30 +3833,31 @@ function buildKpiSeries_(rows) {
    values  : مصفوفة القيم الفعلية بالترتيب الزمني
    nFuture : عدد النقاط المطلوب توقّعها بعد آخر قيمة فعلية
    يرجع مصفوفة بطول nFuture بقيم محصورة بين 0 و100 */
-function linearForecast(values, nFuture) {
-  // بيتجاهل القيم الفارغة (null) — بيتوقع بس بناءً على النقاط الفعلية المتاحة
-  const pts = values.map((v, i) => ({ x: i, y: v })).filter((p) => p.y !== null && p.y !== undefined);
+/* ══════════════════════════════════════════════════════════════════
+   📐 Holt's Linear Exponential Smoothing
+   ──────────────────────────────────────────────────────────────────
+   المعادلة:
+     Lₜ = α·yₜ + (1−α)·(Lₜ₋₁ + Tₜ₋₁)   [Level]
+     Tₜ = β·(Lₜ − Lₜ₋₁) + (1−β)·Tₜ₋₁   [Trend]
+     ŷₜ₊ₕ = Lₜ + h·Tₜ                    [Forecast]
+   α=0.4: وزن للبيانات الحديثة على المستوى
+   β=0.2: تعديل بطيء للاتجاه (يتفادى تضخيم تقلبات شهر واحد)
+   ══════════════════════════════════════════════════════════════════ */
+function linearForecast(values, nFuture, alpha = 0.4, beta = 0.2) {
+  const pts = values
+    .map((v, i) => (v !== null && v !== undefined ? { i, y: v } : null))
+    .filter(Boolean);
   if (pts.length < 2) return Array(nFuture).fill(null);
-  const n = values.length,
-    xs = pts.map((p) => p.x),
-    ys = pts.map((p) => p.y),
-    xMean = avg(xs),
-    yMean = avg(ys);
-  let num = 0,
-    den = 0;
-  xs.forEach((x, i) => {
-    num += (x - xMean) * (ys[i] - yMean);
-    den += (x - xMean) ** 2;
-  });
-  const slope = den === 0 ? 0 : num / den,
-    intercept = yMean - slope * xMean,
-    future = [];
-  for (let i = 0; i < nFuture; i++) {
-    const x = n + i,
-      y = Math.max(0, Math.min(100, intercept + slope * x));
-    future.push(+y.toFixed(2));
+  let L = pts[0].y;
+  let T = (pts[pts.length - 1].y - pts[0].y) / (pts.length - 1);
+  for (let k = 1; k < pts.length; k++) {
+    const y = pts[k].y, Lp = L, Tp = T;
+    L = alpha * y + (1 - alpha) * (Lp + Tp);
+    T = beta  * (L - Lp) + (1 - beta) * Tp;
   }
-  return future;
+  return Array.from({ length: nFuture }, (_, h) =>
+    +Math.max(0, Math.min(100, L + (h + 1) * T)).toFixed(2)
+  );
 }
 
 /* 🧱 دالة عامة تبني تبويب مؤشر أداء كامل (بطاقات + رسم + تحليل + جدول)
@@ -3968,14 +3969,7 @@ function renderKpiTabGeneric_(opts) {
       <div class="chart-box" style="height:380px"><canvas id="${chartId}"></canvas></div>
       <div style="font-size:11px;color:var(--tx-muted);margin-top:10px;display:flex;align-items:center;gap:6px">
         <span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #64748B"></span>
-        الخط المنقّط = توقع تقديري بانحدار خطي بسيط من اتجاه البيانات الفعلية، وليس تأكيدًا — للمتابعة الفعلية
-      </div>
-    </div>
-
-    <div class="card mb14">
-      <div class="card-title">تحليل الأداء</div>
-      <div style="font-size:13px;line-height:2;color:var(--tx-main)">
-        ${kpiAnalysisHTML_(stats, months, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta, hasContract)}
+        الخط المنقّط = توقع بمعادلة Holt's Linear Exponential Smoothing (α=0.4، β=0.2) — يعطي البيانات الحديثة وزناً أكبر، وليس تأكيدًا — للمتابعة فقط
       </div>
     </div>
 
@@ -4088,50 +4082,6 @@ function renderKpiTabGeneric_(opts) {
       },
     });
   });
-}
-
-function kpiAnalysisHTML_(stats, months, monthlyAvg, best, worst, mostImproved, mostDeclined, overallDelta, hasContract) {
-  const last = months.length - 1,
-    trendWord = overallDelta === null ? null : overallDelta > 0.05 ? "تحسّناً" : overallDelta < -0.05 ? "تراجعاً" : "استقراراً نسبياً",
-    contractTxt = (c) => (hasContract && c ? ` (عقد ${esc(c)})` : ""),
-    lines = [];
-
-  if (trendWord && monthlyAvg[0] !== null && monthlyAvg[last] !== null) {
-    lines.push(
-      `سجّل متوسط مؤشر الأداء العام ${trendWord} خلال الفترة من ${esc(months[0])} إلى ${esc(months[last])}، منتقلاً من ${monthlyAvg[0].toFixed(1)}% إلى ${monthlyAvg[last].toFixed(1)}% (${overallDelta >= 0 ? "+" : ""}${overallDelta.toFixed(1)} نقطة مئوية).`,
-    );
-  }
-
-  if (best && worst) {
-    lines.push(
-      `<strong>${esc(best.region)}</strong> تتصدّر المناطق بمتوسط أداء ${best.avgVal.toFixed(1)}%${contractTxt(best.contract)}، بينما تسجّل <strong>${esc(worst.region)}</strong> أدنى متوسط أداء بـ ${worst.avgVal.toFixed(1)}%${contractTxt(worst.contract)}.`,
-    );
-  }
-
-  if (mostDeclined && mostDeclined.delta < -3) {
-    lines.push(
-      `⚠️ منطقة <strong>${esc(mostDeclined.region)}</strong>${contractTxt(mostDeclined.contract)} سجّلت أكبر تراجع بمقدار ${Math.abs(mostDeclined.delta).toFixed(1)} نقطة، وتحتاج متابعة مباشرة لمعرفة الأسباب ووضع خطة تصحيحية.`,
-    );
-  }
-
-  if (mostImproved && mostImproved.delta > 3) {
-    lines.push(
-      `✅ منطقة <strong>${esc(mostImproved.region)}</strong>${contractTxt(mostImproved.contract)} حقّقت أفضل تحسّن بمقدار +${mostImproved.delta.toFixed(1)} نقطة، ما يعكس التزاماً جيداً بمستوى الخدمة المتعاقد عليه.`,
-    );
-  }
-
-  const belowTarget = stats.filter((r) => r.last !== null && r.last < 75);
-  if (belowTarget.length || stats.some((r) => r.last !== null)) {
-    lines.push(
-      belowTarget.length
-        ? `${belowTarget.length === 1 ? "منطقة واحدة" : belowTarget.length + " مناطق"} (${belowTarget.map((r) => esc(r.region)).join("، ")}) أقل من نسبة 75% المستهدفة (تصنيف "جيد جداً") في آخر شهر مرصود، وتحتاج خطة تحسين.`
-        : `جميع المناطق حافظت على أداء 75% فأعلى (تصنيف "جيد جداً") خلال آخر شهر مرصود.`,
-    );
-  }
-
-  return lines.length
-    ? lines.map((t) => `<p style="margin:0 0 10px">${t}</p>`).join("")
-    : `<p style="margin:0;color:var(--tx-muted)">لا تتوفر بيانات كافية بعد لبناء تحليل — أضف قيم الشهور في الشيت.</p>`;
 }
 
 function renderMagKpiTab() {
@@ -11422,6 +11372,44 @@ function renderTajheezAllTable() {
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 🛡️ تبويب الأمن والسلامة (RAW_SECURITY_SAFETY)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const ss = Array.isArray(window.RAW_SECURITY_SAFETY) ? window.RAW_SECURITY_SAFETY : [];
+      if (ss.length) {
+        const total     = ss.length;
+        const deaths    = ss.reduce((s, r) => s + (parseFloat(r["وفيات"]) || 0), 0);
+        const injuries  = ss.reduce((s, r) => s + (parseFloat(r["إصابات"]) || 0), 0);
+        const critical  = ss.filter(r => r["حرج"] === "نعم").length;
+        const needInv   = ss.filter(r => r["يجب التحقيق"] === "نعم").length;
+        const doneInv   = ss.filter(r => r["اكتمل التحقيق"] === "نعم").length;
+        const byType    = {};
+        const byRegion  = {};
+        ss.forEach(r => {
+          const t = r["نوع الحادث"] || "غير محدد";
+          const rg = r["المنطقة"] || "غير محدد";
+          byType[t]   = (byType[t]   || 0) + 1;
+          byRegion[rg] = (byRegion[rg] || 0) + 1;
+        });
+        const topType   = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>k+": "+v);
+        const topRegion = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
+        summary.بلاغات_الأمن_والسلامة = {
+          مصدر: "تبويب الأمن والسلامة — شيت بلاغات_أمن_وسلامة",
+          إجمالي_البلاغات: total,
+          إجمالي_الوفيات: deaths,
+          إجمالي_الإصابات: injuries,
+          الحالات_الحرجة: critical,
+          تحتاج_تحقيق: needInv,
+          اكتمل_التحقيق: doneInv,
+          أبرز_أنواع_الحوادث: topType,
+          البلاغات_حسب_المنطقة: topRegion,
+        };
+      }
+    } catch (e) {
+      summary.بلاغات_الأمن_والسلامة = { تنبيه: "تعذّر تلخيص بيانات الأمن والسلامة: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // ❄️ تبويب خطة استبدال المكيفات (RAW — من بيانات المباني الرئيسية)
     // الحقول المستخدمة: acUnits, acWindowUnits, acSplitUnits, acPlanYear
     // ════════════════════════════════════════════════════════════════
@@ -16302,14 +16290,24 @@ window.addEventListener('load', function () {
     {
       id: 'mag-kpi', label: 'مؤشرات الأداء للمقاول',
       keywords: ['مؤشرات مقاول','contractor kpi','kpi مقاول','أداء مقاول','contractor performance','مقاول','contractor','مقاولين','contractors','تقييم مقاول','contractor rating','أداء','performance','mag kpi','مؤشرات الأداء مقاول'],
-      charts: ['مؤشرات أداء المقاول','مقارنة المقاولين'],
-      kpis: ['أعلى مقاول أداءً','أدنى مقاول أداءً','متوسط الأداء']
+      charts: ['تطور مؤشر الأداء الشهري حسب المنطقة','خط التوقع حسب Holt'],
+      kpis: ['أفضل منطقة أداءً','متوسط الأداء العام','التغير منذ بداية البيانات','توقع الأشهر القادمة']
     },
     {
       id: 'consultant-kpi', label: 'مؤشرات أداء الاستشاري',
       keywords: ['مؤشرات استشاري','consultant kpi','kpi استشاري','أداء استشاري','consultant performance','استشاري','consultant','استشاريين','consultants','تقييم استشاري','مؤشرات الأداء استشاري'],
-      charts: ['مؤشرات أداء الاستشاري','مقارنة الاستشاريين'],
-      kpis: ['أعلى استشاري أداءً','أدنى استشاري أداءً']
+      charts: ['تطور مؤشر الأداء الشهري حسب المنطقة','خط التوقع حسب Holt'],
+      kpis: ['أفضل منطقة أداءً','متوسط الأداء العام','التغير منذ بداية البيانات','توقع الأشهر القادمة']
+    },
+    {
+      id: 'security-safety', label: 'الأمن والسلامة',
+      keywords: [
+        'أمن وسلامة','أمن','سلامة','حوادث','حادثة','حادث','security','safety','security safety',
+        'بلاغات أمن','بلاغات سلامة','حوادث مدارس','إصابات','وفيات','حرج','تحقيق',
+        'حوادث مرورية','حريق','كهرباء حادث','بلاغ أمن','سلامة مدارس','إصابة طالب'
+      ],
+      charts: ['توزيع بلاغات الأمن والسلامة حسب نوع الحادث','البلاغات حسب المنطقة','اتجاه البلاغات الشهري'],
+      kpis: ['إجمالي البلاغات','إجمالي الإصابات','الحالات الحرجة','تحقيقات مكتملة']
     }
   ];
 

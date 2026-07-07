@@ -853,6 +853,7 @@ function applyFilters() {
       safeRun(renderTable, "table");
     }
     if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
+    if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
   } catch (err) {
     console.error("[applyFilters]", err);
     if (typeof showToast === "function") showToast("خطأ أثناء تحديث العرض: " + err.message, "err");
@@ -1051,7 +1052,8 @@ function showTab(name, el) {
     "table" === name && ((TBL.cur = 0), renderTable()),
     "ac-plan" === name && renderAcPlanTab(),
     "mag-kpi" === name && renderMagKpiTab(),
-    "consultant-kpi" === name && renderConsultantKpiTab());
+    "consultant-kpi" === name && renderConsultantKpiTab(),
+    "security-safety" === name && renderSecuritySafetyTab());
 
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
@@ -2635,6 +2637,7 @@ function renderTable() {
       (window.RAW_GATEKEEPERS      = sa(d.gatekeepers)),
       (window.RAW_RECRUITMENT      = sa(d.recruitment)),
       (window.RAW_PAYMENTS         = sa(d.payments)),
+      (window.RAW_SECURITY_SAFETY  = sa(d.securitySafety)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
@@ -4103,6 +4106,202 @@ function renderConsultantKpiTab() {
     entityLabel: "مناطق",
     followUpLabel: "تحتاج متابعة مع الاستشاري",
     emptyIcon: "📈",
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🛡️  JS تبويب: الأمن والسلامة
+   ║  (tab-security-safety) — بلاغات الأمن والسلامة
+   ║  أعمدة الشيت: المنطقة، رقم البلاغ، نوع الحادث، وفيات، إصابات،
+   ║               التاريخ، الإدارة التعليمية، المدرسة، الارتباط،
+   ║               حرج، يجب التحقيق، اكتمل التحقيق، استجابة بإفادة،
+   ║               وصف البلاغ، مكرر محتمل
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderSecuritySafetyTab() {
+  const el = document.getElementById("security-safety-content");
+  if (!el) return;
+
+  const rows = window.RAW_SECURITY_SAFETY || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🛡️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات أمن وسلامة</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "بلاغات_أمن_وسلامة" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const n_    = (v) => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  const total      = rows.length;
+  const totalDeaths = rows.reduce((s,r) => s + n_(r["وفيات"]), 0);
+  const totalInj    = rows.reduce((s,r) => s + n_(r["إصابات"]), 0);
+  const critical    = rows.filter(r => r["حرج"] === "نعم").length;
+  const needInv     = rows.filter(r => r["يجب التحقيق"] === "نعم").length;
+  const doneInv     = rows.filter(r => r["اكتمل التحقيق"] === "نعم").length;
+  const duplicates  = rows.filter(r => r["مكرر محتمل"] === "نعم").length;
+  const withReply   = rows.filter(r => r["استجابة بإفادة"] === "نعم").length;
+
+  // توزيع حسب نوع الحادث
+  const byType = {};
+  rows.forEach(r => { const t = r["نوع الحادث"] || "غير محدد"; byType[t] = (byType[t]||0)+1; });
+  const typeEntries = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // توزيع حسب المنطقة
+  const byRegion = {};
+  rows.forEach(r => { const g = r["المنطقة"] || "غير محدد"; byRegion[g] = (byRegion[g]||0)+1; });
+  const regionEntries = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]);
+
+  // توزيع حسب الإدارة التعليمية
+  const byEdAdmin = {};
+  rows.forEach(r => { const a = r["الإدارة التعليمية"] || "غير محدد"; byEdAdmin[a] = (byEdAdmin[a]||0)+1; });
+  const edAdminEntries = Object.entries(byEdAdmin).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  // اتجاه شهري
+  const byMonth = {};
+  rows.forEach(r => { const d = r["التاريخ"]; if (!d) return; const m = String(d).slice(0,7); byMonth[m]=(byMonth[m]||0)+1; });
+  const monthKeys = Object.keys(byMonth).sort();
+  const monthVals = monthKeys.map(k=>byMonth[k]);
+
+  // آخر 20 بلاغ
+  const recent = [...rows].reverse().slice(0,20);
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="card" style="border-top:3px solid #DC2626">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي البلاغات</div>
+      <div style="font-size:28px;font-weight:800;color:#DC2626">${total.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${duplicates} مكرر محتمل</div>
+    </div>
+    <div class="card" style="border-top:3px solid #7C3AED">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي الإصابات</div>
+      <div style="font-size:28px;font-weight:800;color:#7C3AED">${totalInj.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">وفيات: ${totalDeaths}</div>
+    </div>
+    <div class="card" style="border-top:3px solid #1D4ED8">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">حالات حرجة</div>
+      <div style="font-size:28px;font-weight:800;color:#1D4ED8">${critical.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+    </div>
+    <div class="card" style="border-top:3px solid #D97706">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">التحقيقات</div>
+      <div style="font-size:28px;font-weight:800;color:#D97706">${doneInv.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مكتملة من ${needInv} مطلوبة · ${withReply} استجابة بإفادة</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">توزيع البلاغات حسب نوع الحادث</div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-sec-type"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">البلاغات حسب المنطقة</div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-sec-region"></canvas></div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">الاتجاه الشهري للبلاغات</div>
+      <div class="chart-box" style="height:200px"><canvas id="ch-sec-month"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">البلاغات حسب الإدارة التعليمية</div>
+      <div class="chart-box" style="height:200px"><canvas id="ch-sec-edadmin"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">آخر 20 بلاغ <span class="sub">من الأحدث للأقدم</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">التاريخ</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">رقم البلاغ</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">الإدارة التعليمية</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">المدرسة</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">نوع الحادث</th>
+          <th style="padding:8px 10px;text-align:center;white-space:nowrap">وفيات</th>
+          <th style="padding:8px 10px;text-align:center;white-space:nowrap">إصابات</th>
+          <th style="padding:8px 10px;text-align:center;white-space:nowrap">حرج</th>
+          <th style="padding:8px 10px;text-align:center;white-space:nowrap">التحقيق</th>
+          <th style="padding:8px 10px;text-align:right;white-space:nowrap">الارتباط</th>
+        </tr></thead>
+        <tbody>
+          ${recent.map(r => {
+            const isCritical = r["حرج"] === "نعم";
+            const d = n_(r["وفيات"]), inj = n_(r["إصابات"]);
+            const invStatus = r["اكتمل التحقيق"]==="نعم"
+              ? `<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>`
+              : r["يجب التحقيق"]==="نعم"
+                ? `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">معلق</span>`
+                : `<span style="color:var(--tx-muted)">—</span>`;
+            return `<tr style="border-bottom:1px solid var(--brd);${isCritical?'background:#FEF2F2':''}">
+              <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(r["التاريخ"])||"—"}</td>
+              <td style="padding:6px 10px;font-family:monospace;font-size:11px;color:#0891B2">${esc(r["رقم البلاغ"])||"—"}</td>
+              <td style="padding:6px 10px;white-space:nowrap">${esc(r["المنطقة"])||"—"}</td>
+              <td style="padding:6px 10px;white-space:nowrap;font-size:11px">${esc(r["الإدارة التعليمية"])||"—"}</td>
+              <td style="padding:6px 10px;font-size:11px;max-width:150px">${esc(r["المدرسة"])||"—"}</td>
+              <td style="padding:6px 10px;max-width:140px;font-size:11px">${esc(r["نوع الحادث"])||"—"}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${d>0?'#DC2626':'var(--tx-muted)'}">${d||"—"}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${inj>0?'#7C3AED':'var(--tx-muted)'}">${inj||"—"}</td>
+              <td style="padding:6px 10px;text-align:center">${isCritical?'<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">حرج</span>':'<span style="color:var(--tx-muted)">—</span>'}</td>
+              <td style="padding:6px 10px;text-align:center">${invStatus}</td>
+              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted)">${esc(r["الارتباط"])||"—"}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  requestAnimationFrame(() => {
+    const PAL = ["#DC2626","#7C3AED","#1D4ED8","#D97706","#059669","#0891B2","#DB2777","#EA580C","#65A30D","#0284C7"];
+
+    // نوع الحادث — أفقي
+    const cType = document.getElementById("ch-sec-type");
+    if (cType && typeof Chart !== "undefined") {
+      killChart("ch-sec-type");
+      CHARTS["ch-sec-type"] = new Chart(cType, {
+        type: "bar",
+        data: { labels: typeEntries.map(e=>e[0]), datasets: [{ data: typeEntries.map(e=>e[1]), backgroundColor: PAL, borderRadius: 4 }] },
+        options: { indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}, maintainAspectRatio:false }
+      });
+    }
+
+    // المنطقة — دونات
+    const cRegion = document.getElementById("ch-sec-region");
+    if (cRegion && typeof Chart !== "undefined") {
+      killChart("ch-sec-region");
+      CHARTS["ch-sec-region"] = new Chart(cRegion, {
+        type: "doughnut",
+        data: { labels: regionEntries.map(e=>e[0]), datasets: [{ data: regionEntries.map(e=>e[1]), backgroundColor: PAL, borderWidth:2 }] },
+        options: { plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}}, cutout:"55%", maintainAspectRatio:false }
+      });
+    }
+
+    // الاتجاه الشهري
+    const cMonth = document.getElementById("ch-sec-month");
+    if (cMonth && typeof Chart !== "undefined") {
+      killChart("ch-sec-month");
+      CHARTS["ch-sec-month"] = new Chart(cMonth, {
+        type: "line",
+        data: { labels: monthKeys, datasets: [{ data: monthVals, borderColor:"#DC2626", backgroundColor:"rgba(220,38,38,0.08)", borderWidth:2, fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:"#DC2626" }] },
+        options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false }
+      });
+    }
+
+    // الإدارة التعليمية
+    const cEd = document.getElementById("ch-sec-edadmin");
+    if (cEd && typeof Chart !== "undefined") {
+      killChart("ch-sec-edadmin");
+      CHARTS["ch-sec-edadmin"] = new Chart(cEd, {
+        type: "bar",
+        data: { labels: edAdminEntries.map(e=>e[0]), datasets: [{ data: edAdminEntries.map(e=>e[1]), backgroundColor:"#1D4ED8", borderRadius:4 }] },
+        options: { indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}, maintainAspectRatio:false }
+      });
+    }
   });
 }
 
@@ -14725,15 +14924,13 @@ window.addEventListener('load', function(){
 
   /* ── Helper: دائماً يقرأ FILTERED الحالية من الـ scope الصحيح ── */
   function getFiltered() {
-    // FILTERED معرّف في scope خارجي في dashboard.js — نقرأه مباشرة
-    try { if (typeof FILTERED !== "undefined" && FILTERED.length) return FILTERED; } catch(e) {}
-    try { if (getFiltered() && getFiltered().length) return getFiltered(); } catch(e) {}
-    try { if (typeof RAW !== "undefined" && RAW.length) return RAW; } catch(e) {}
-    return getRaw();
+    try { if (typeof FILTERED !== "undefined" && Array.isArray(FILTERED) && FILTERED.length) return FILTERED; } catch(e) {}
+    try { if (typeof RAW !== "undefined" && Array.isArray(RAW) && RAW.length) return RAW; } catch(e) {}
+    return [];
   }
   function getRaw() {
-    try { if (typeof RAW !== "undefined" && RAW.length) return RAW; } catch(e) {}
-    return getRaw();
+    try { if (typeof RAW !== "undefined" && Array.isArray(RAW) && RAW.length) return RAW; } catch(e) {}
+    return [];
   }
 
   /* ──────────────────────────────────────────────

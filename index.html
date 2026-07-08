@@ -1255,6 +1255,15 @@
 
 <div id="fcbFab" style="display:none" aria-hidden="true"></div><!-- عنصر وهمي حتى لا يتعطل fcbToggle -->
 
+<!-- زر إخفاء الشات بوت مؤقتاً -->
+<button id="fcbHideBtn" onclick="fcbHideBot()" title="إخفاء المساعد مؤقتاً">🙈 إخفاء المساعد</button>
+
+<!-- زر إظهار الشات بوت من جديد (يظهر بعد الإخفاء) -->
+<button id="fcbShowBtn" onclick="fcbShowBot()" title="إظهار المساعد">
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" style="flex-shrink:0"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.2" stroke="#fff" stroke-width="1.5"/></svg>
+  إظهار المساعد
+</button>
+
 <div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
   <div id="fmbotBubble">
     <span class="bbl-line1">أنا مساعد إدارة المرافق الذكي</span>
@@ -1335,4 +1344,36 @@
 
 
 <script src="dashboard.js" defer></script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   إخفاء/إظهار المساعد الذكي مؤقتاً
+   ══════════════════════════════════════════════════════ */
+
+function fcbHideBot() {
+  document.body.classList.add('chatbot-hidden');
+  // إخفاء زر الإخفاء نفسه
+  const btn = document.getElementById('fcbHideBtn');
+  if (btn) { btn.classList.remove('show'); }
+}
+
+function fcbShowBot() {
+  document.body.classList.remove('chatbot-hidden');
+}
+
+/* إظهار زر الإخفاء لما الروبوت يكون مرئي وقريب من أسفل الشاشة */
+function updateHideBtn() {
+  const btn = document.getElementById('fcbHideBtn');
+  if (!btn) return;
+  const hidden = document.body.classList.contains('chatbot-hidden');
+  if (hidden) { btn.classList.remove('show'); return; }
+
+  // نظهر الزر لما المستخدم ينزل تحت الـ 300px من أعلى الصفحة
+  const scrolled = window.scrollY > 300;
+  btn.classList.toggle('show', scrolled);
+}
+
+window.addEventListener('scroll', updateHideBtn, { passive: true });
+window.addEventListener('load', updateHideBtn);
+</script>
 </body></html>

@@ -14768,6 +14768,10 @@ window.addEventListener('load', function(){
       torso.scale.set(br, br, br);
       robot.position.y = -0.35 + Math.sin(t*0.9)*0.11;
 
+      /* ── تمايل يمين/يسار خامل ── */
+      const swayTarget = (S.LISTEN || S.THINK) ? 0 : Math.sin(t * 0.9) * 0.18;
+      robot.position.x = lerp(robot.position.x, swayTarget, Math.min(1, dt * 1.8));
+
       /* ── حركة الرأس ── */
       if (S.LISTEN || S.THINK){
         headYawT = 0; headPitchT = S.THINK ? -0.05 : 0;      /* مواجهة للأمام */
@@ -14898,6 +14902,54 @@ window.addEventListener('load', function(){
     }
   }
   setInterval(syncWalkerPos, 300);
+
+  /* ══════════════════════════════════════════════════════
+     ✕ زر الإخفاء — يظهر عند hover على الروبوت
+     ══════════════════════════════════════════════════════ */
+  let hideBtn = document.getElementById('fcbHideWalkerBtn');
+  if (!hideBtn){
+    hideBtn = document.createElement('button');
+    hideBtn.id = 'fcbHideWalkerBtn';
+    hideBtn.title = 'إخفاء المساعد';
+    hideBtn.textContent = '✕';
+    document.body.appendChild(hideBtn);
+  }
+
+  let showBtn = document.getElementById('fcbShowWalkerBtn');
+  if (!showBtn){
+    showBtn = document.createElement('button');
+    showBtn.id = 'fcbShowWalkerBtn';
+    showBtn.innerHTML = '🤖 إظهار المساعد';
+    document.body.appendChild(showBtn);
+  }
+
+  function updateHideButtonPos(){
+    const rect = holder.getBoundingClientRect();
+    if (!rect.width) return;
+    hideBtn.style.top  = (rect.top - 8) + 'px';
+    hideBtn.style.left = (rect.right - 14) + 'px';
+    hideBtn.style.bottom = '';
+  }
+
+  holder.addEventListener('mouseenter', ()=>{
+    if (document.body.classList.contains('bot-hidden')) return;
+    updateHideButtonPos();
+    hideBtn.classList.add('show');
+  });
+  holder.addEventListener('mouseleave', (e)=>{
+    if (e.relatedTarget === hideBtn) return;
+    hideBtn.classList.remove('show');
+  });
+  hideBtn.addEventListener('mouseleave', ()=> hideBtn.classList.remove('show'));
+  hideBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    document.body.classList.add('bot-hidden');
+    hideBtn.classList.remove('show');
+    bubble.classList.remove('show');
+  });
+  showBtn.addEventListener('click', ()=>{
+    document.body.classList.remove('bot-hidden');
+  });
 
   setTimeout(()=>{ showBubble(); scheduleNextHint(); }, 2000);
 });
@@ -16833,4 +16885,497 @@ ${dataCtx}
     new MutationObserver(updateWalkerPos).observe(panel, { attributes: true, attributeFilter: ['class'] });
     updateWalkerPos();
   });
+})();
+
+/* ════════════════════════════════════════════════════════════════════════
+   📊 Impact Engine v1.0 — محرك تقرير الأثر التنفيذي
+   ════════════════════════════════════════════════════════════════════════
+   يُطلَق داخل الشات بوت لما المستخدم يكتب:
+     • "تقرير الأداء" / "تقرير الاداء"
+     • "Impact Report" / "impact report"
+     • "تقرير الأثر" / "ملخص تنفيذي" / "executive summary"
+     • "إيه اللي اتعمل" / "إيه التطور" / "ما الذي تغير"
+
+   يبني تقريراً شاملاً للإدارة العليا يضم:
+     1. ما الذي تغيّر   — مقارنة FCA تاريخية، إغلاق بلاغات، تجديد عقود
+     2. ما الذي أُنجز   — بلاغات محلولة، عقود فعّالة، تجهيزات مخصصة
+     3. ما الذي يُقلق   — مدارس حرجة، SLA مخترق، مصاعد متعطلة، عقود منتهية
+     4. التوصية الفورية — أعلى 5 أولويات تستحق قراراً الآن
+   ════════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  "use strict";
+
+  /* ── Trigger patterns ── */
+  const IMPACT_TRIGGERS = [
+    /تقرير\s*الأداء|تقرير\s*الاداء/i,
+    /impact\s*report/i,
+    /تقرير\s*الأثر|تقرير\s*الاثر/i,
+    /ملخص\s*تنفيذي/i,
+    /executive\s*summary/i,
+    /إيه\s*اللي\s*اتعمل|ايه\s*اللي\s*اتعمل/i,
+    /إيه\s*التطور|ايه\s*التطور/i,
+    /ما\s*الذي\s*تغير|ما\s*تغير|ماذا\s*تغير/i,
+    /وش\s*اللي\s*تغير|وش\s*صار/i,
+  ];
+
+  window.fcbIsImpactRequest = function (text) {
+    return IMPACT_TRIGGERS.some(function (re) { return re.test(text); });
+  };
+
+  /* ════════════════════════════════════════════════════════════════
+     🏗️ بناء ملخص التغيّر التاريخي (FCA قبل وبعد)
+  ════════════════════════════════════════════════════════════════ */
+  function buildHistoricalDelta() {
+    var fcaH = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
+    if (!fcaH.length) return null;
+
+    var getScore = function (r) {
+      var v = r["الدرجة"] != null ? r["الدرجة"] : (r["درجة"] != null ? r["درجة"] : (r["fca"] != null ? r["fca"] : r["score"]));
+      var n = parseFloat(v);
+      return isFinite(n) ? n : null;
+    };
+    var getYear = function (r) { return String(r["السنة"] || r["year"] || r["عام"] || "").trim(); };
+
+    var byYear = {};
+    fcaH.forEach(function (r) {
+      var y = getYear(r);
+      var s = getScore(r);
+      if (y && s != null) {
+        if (!byYear[y]) byYear[y] = [];
+        byYear[y].push(s);
+      }
+    });
+
+    var years = Object.keys(byYear).sort();
+    if (years.length < 2) return { ملاحظة: "بيانات تاريخية موجودة لسنة واحدة فقط — لا تتوفر مقارنة قبل/بعد.", سنوات: years };
+
+    var first = years[0], last = years[years.length - 1];
+    var avgFirst = +(byYear[first].reduce(function (a, b) { return a + b; }, 0) / byYear[first].length).toFixed(2);
+    var avgLast  = +(byYear[last].reduce(function (a, b) { return a + b; }, 0) / byYear[last].length).toFixed(2);
+    var delta    = +(avgLast - avgFirst).toFixed(2);
+
+    return {
+      أقدم_سنة: first,
+      أحدث_سنة: last,
+      متوسط_FCA_أقدم: avgFirst,
+      متوسط_FCA_أحدث: avgLast,
+      التغيّر: delta,
+      الاتجاه: delta > 2 ? "تحسّن ✅" : delta < -2 ? "تراجع ⚠️" : "مستقر 〰️",
+      اتجاه_سنوي: years.map(function (y) {
+        var vals = byYear[y];
+        return {
+          السنة: y,
+          متوسط_FCA: +(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length).toFixed(2),
+          عدد_تقييمات: vals.length,
+        };
+      }),
+    };
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     ✅ ما الذي أُنجز — الإجراءات الفعلية المكتملة
+  ════════════════════════════════════════════════════════════════ */
+  function buildAchievements() {
+    var achieved = {};
+
+    /* بلاغات مغلقة */
+    var bal = Array.isArray(window.RAW_BALAGH) ? window.RAW_BALAGH : [];
+    if (bal.length) {
+      var n = function (v) { return String(v == null ? "" : v).replace(/\uFEFF/g, "").trim(); };
+      var CLOSED = new Set(["تم حله", "ملغى", "مغلق", "مغلقة", "closed", "resolved"]);
+      var closed = bal.filter(function (r) { return CLOSED.has(n(r["الحالة"])); });
+      var byCategory = {};
+      closed.forEach(function (r) {
+        var c = n(r["الفئة الرئيسية"]) || "غير مصنف";
+        byCategory[c] = (byCategory[c] || 0) + 1;
+      });
+      achieved.بلاغات_مغلقة = {
+        الإجمالي: closed.length,
+        من_إجمالي_البلاغات: bal.length,
+        نسبة_الإغلاق: bal.length ? +(closed.length / bal.length * 100).toFixed(1) + "%" : "—",
+        توزيع_حسب_الفئة: Object.entries(byCategory)
+          .sort(function (a, b) { return b[1] - a[1]; })
+          .slice(0, 5)
+          .map(function (e) { return { الفئة: e[0], العدد: e[1] }; }),
+      };
+    }
+
+    /* عقود FM جارية وتم إنجاز مشاهدها */
+    var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
+    if (fm.length) {
+      var fmNum = function (v) { var n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : null; };
+      var active = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d > 0; }).length;
+      var complete = fm.filter(function (r) {
+        var s = String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] || "");
+        return s.includes("مكتملة") && !s.includes("غير");
+      }).length;
+      var totalSpent = fm.reduce(function (s, r) { return s + (fmNum(r["تراكمي المستخلصات المصروفة"]) || 0); }, 0);
+      achieved.عقود_FM = {
+        عقود_جارية: active,
+        مشاهد_إنجاز_مكتملة: complete,
+        إجمالي_مستخلصات_مصروفة_ريال: Math.round(totalSpent).toLocaleString("en-US"),
+      };
+    }
+
+    /* مدفوعات */
+    var pay = Array.isArray(window.RAW_PAYMENTS) ? window.RAW_PAYMENTS : [];
+    if (pay.length) {
+      var pn = function (v) { var n = parseFloat(String(v || "").replace(/,/g, "")); return isNaN(n) ? 0 : n; };
+      var totalPaid = pay.reduce(function (s, r) { return s + pn(r["Payment Released (SAR)"] || 0); }, 0);
+      achieved.مدفوعات_مصروفة_ريال = Math.round(totalPaid).toLocaleString("en-US");
+    }
+
+    return achieved;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     ⚠️ ما الذي يُقلق — نقاط الخطر والتحذير
+  ════════════════════════════════════════════════════════════════ */
+  function buildRisks() {
+    var risks = {};
+    var D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+
+    /* مدارس FCA حرجة */
+    if (D.length) {
+      var critical = D.filter(function (r) { return r.fca != null && r.fca < 25; });
+      var moderate = D.filter(function (r) { return r.fca != null && r.fca >= 25 && r.fca < 50; });
+      risks.FCA = {
+        مدارس_حرجة_تحت_25: critical.length,
+        مدارس_متوسطة_25_50: moderate.length,
+        أسوأ_5_مدارس: critical
+          .sort(function (a, b) { return a.fca - b.fca; })
+          .slice(0, 5)
+          .map(function (r) { return { الاسم: r.name, FCA: r.fca, المدينة: r.city || "" }; }),
+      };
+
+      /* مباني قديمة جداً */
+      var oldBuildings = D.filter(function (r) { return r.buildingAge > 40; });
+      if (oldBuildings.length) {
+        risks.مباني_قديمة_فوق_40_سنة = {
+          العدد: oldBuildings.length,
+          أقدم_5: oldBuildings
+            .sort(function (a, b) { return b.buildingAge - a.buildingAge; })
+            .slice(0, 5)
+            .map(function (r) { return { الاسم: r.name, عمر_المبنى: r.buildingAge, FCA: r.fca }; }),
+        };
+      }
+    }
+
+    /* بلاغات SLA مخترق */
+    var bal = Array.isArray(window.RAW_BALAGH) ? window.RAW_BALAGH : [];
+    if (bal.length) {
+      var n = function (v) { return String(v == null ? "" : v).replace(/\uFEFF/g, "").trim(); };
+      var overdue = bal.filter(function (r) { return n(r["حالة SLA"]) === "تم اختراقه"; });
+      var highPri = overdue.filter(function (r) { return /عالية|high|urgent|عاجل/i.test(n(r["الأولوية"])); });
+      if (overdue.length) {
+        risks.بلاغات_SLA_مخترق = {
+          الإجمالي: overdue.length,
+          منها_عالية_الأولوية: highPri.length,
+          أبرز_5: overdue.slice(0, 5).map(function (r) {
+            return {
+              رقم: n(r["مُعرّف الحالة"]),
+              المدرسة: n(r["اسم المبنى"]),
+              الفئة: n(r["الفئة الرئيسية"]),
+              الأولوية: n(r["الأولوية"]),
+            };
+          }),
+        };
+      }
+    }
+
+    /* مصاعد متعطلة */
+    var elv = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
+    if (elv.length) {
+      var broken = elv.filter(function (r) {
+        var s = String(r["حالة المصعد"] || "");
+        return s.includes("متعطل") || s.includes("لا يعمل");
+      });
+      if (broken.length) {
+        risks.مصاعد_متعطلة = {
+          العدد: broken.length,
+          من_إجمالي: elv.length,
+          أبرز_3: broken.slice(0, 3).map(function (r) {
+            return { المدرسة: r["اسم_المدرسة"] || r["اسم المدرسة"] || "", عمر: r["عمر المصعد"] || "" };
+          }),
+        };
+      }
+    }
+
+    /* عقود FM منتهية */
+    var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
+    if (fm.length) {
+      var fmNum = function (v) { var n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : null; };
+      var expired = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d <= 0; });
+      var expiring90 = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d > 0 && d <= 90; });
+      if (expired.length || expiring90.length) {
+        risks.عقود_FM = {
+          منتهية: expired.length,
+          قاربت_الانتهاء_90_يوم: expiring90.length,
+          أبرز_منتهية: expired.slice(0, 3).map(function (r) {
+            return { المقاول: r["المقاول"], رقم_العقد: r["رقم العقد"], المنطقة: r["المنطقة"] };
+          }),
+        };
+      }
+    }
+
+    return risks;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     🎯 أعلى 5 أولويات تستحق قراراً فورياً
+  ════════════════════════════════════════════════════════════════ */
+  function buildTopPriorities() {
+    var items = [];
+    var D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+
+    /* أولوية ١: مدارس FCA حرجة */
+    var critical = D.filter(function (r) { return r.fca != null && r.fca < 25; });
+    if (critical.length) {
+      items.push({
+        أولوية: 1,
+        عنوان: "مدارس في حالة حرجة (FCA < 25)",
+        عدد: critical.length,
+        الإجراء: "تخصيص بند طارئ في الميزانية وجدولة فحص فني ميداني فوري خلال 30 يوماً.",
+        أمثلة: critical.sort(function (a, b) { return a.fca - b.fca; }).slice(0, 3)
+          .map(function (r) { return r.name + " (FCA: " + r.fca + ")"; }).join(" | "),
+      });
+    }
+
+    /* أولوية ٢: بلاغات SLA مخترق عالية الأولوية */
+    var bal = Array.isArray(window.RAW_BALAGH) ? window.RAW_BALAGH : [];
+    if (bal.length) {
+      var n = function (v) { return String(v == null ? "" : v).replace(/\uFEFF/g, "").trim(); };
+      var critBal = bal.filter(function (r) {
+        return n(r["حالة SLA"]) === "تم اختراقه" && /عالية|high|urgent|عاجل/i.test(n(r["الأولوية"]));
+      });
+      if (critBal.length) {
+        items.push({
+          أولوية: 2,
+          عنوان: "بلاغات عالية الأولوية تجاوزت SLA",
+          عدد: critBal.length,
+          الإجراء: "مراجعة فورية مع المقاول المعني وإصدار تنبيه رسمي — تأخر أكثر يؤثر على تقييم الأداء التعاقدي.",
+          أمثلة: critBal.slice(0, 3).map(function (r) { return n(r["اسم المبنى"]) || n(r["مُعرّف الحالة"]); }).join(" | "),
+        });
+      }
+    }
+
+    /* أولوية ٣: عقود FM منتهية دون تجديد */
+    var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
+    if (fm.length) {
+      var fmNum = function (v) { var nn = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(nn) ? nn : null; };
+      var expired = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d <= 0; });
+      if (expired.length) {
+        items.push({
+          أولوية: 3,
+          عنوان: "عقود FM منتهية بدون تجديد",
+          عدد: expired.length,
+          الإجراء: "مراجعة وتجديد فوري — استمرار العمل بعقد منتهٍ يعرّض المشروع لمخاطر قانونية وتشغيلية.",
+          أمثلة: expired.slice(0, 3).map(function (r) { return (r["المقاول"] || "") + " — " + (r["رقم العقد"] || ""); }).join(" | "),
+        });
+      }
+    }
+
+    /* أولوية ٤: مصاعد متعطلة */
+    var elv = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
+    if (elv.length) {
+      var broken = elv.filter(function (r) { return String(r["حالة المصعد"] || "").includes("متعطل"); });
+      if (broken.length) {
+        items.push({
+          أولوية: 4,
+          عنوان: "مصاعد متعطلة",
+          عدد: broken.length,
+          الإجراء: "توجيه أوامر إصلاح عاجلة — المصاعد المتعطلة تؤثر على ذوي الاحتياجات الخاصة وسلامة المستخدمين.",
+          أمثلة: broken.slice(0, 3).map(function (r) { return r["اسم_المدرسة"] || r["اسم المدرسة"] || ""; }).join(" | "),
+        });
+      }
+    }
+
+    /* أولوية ٥: مباني قديمة جداً دون تحديث */
+    if (D.length) {
+      var oldB = D.filter(function (r) { return r.buildingAge > 45 && r.fca != null && r.fca < 50; });
+      if (oldB.length) {
+        items.push({
+          أولوية: 5,
+          عنوان: "مباني عمرها أكثر من 45 سنة مع FCA منخفض",
+          عدد: oldB.length,
+          الإجراء: "إدراجها في خطة إحلال وتجديد المدى المتوسط مع رفع تقرير للجهة المختصة.",
+          أمثلة: oldB.sort(function (a, b) { return a.fca - b.fca; }).slice(0, 3)
+            .map(function (r) { return r.name + " (عمر: " + r.buildingAge + "، FCA: " + r.fca + ")"; }).join(" | "),
+        });
+      }
+    }
+
+    return items.slice(0, 5);
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     📋 تجميع تقرير الأثر الكامل في JSON يُحقن للـ AI
+  ════════════════════════════════════════════════════════════════ */
+  window.fcbBuildImpactReport = function () {
+    var D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+    var timestamp = new Date().toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
+
+    return {
+      نوع_التقرير: "تقرير_الأثر_التنفيذي",
+      تاريخ_التقرير: timestamp,
+      إجمالي_المدارس: D.length,
+
+      "١_التغيّر_التاريخي_FCA": buildHistoricalDelta(),
+      "٢_ما_تم_إنجازه": buildAchievements(),
+      "٣_نقاط_الخطر_والمخاوف": buildRisks(),
+      "٤_أعلى_5_أولويات_تستحق_قراراً_الآن": buildTopPriorities(),
+
+      تعليمات_للـAI: [
+        "قدّم هذا التقرير بأسلوب تنفيذي موجز يناسب الإدارة العليا.",
+        "ابدأ بـ 3 نقاط إيجابية (الإنجازات) ثم 3 مخاوف رئيسية، ثم الأولويات.",
+        "استخدم emoji بشكل معتدل للوضوح البصري.",
+        "في نهاية التقرير ضع جدول Markdown يلخص الأرقام الرئيسية.",
+        "لا تتجاوز 600 كلمة إجمالاً — الإدارة العليا تريد وضوح لا تفصيل مفرط.",
+        "إذا كانت البيانات التاريخية محدودة، اذكر ذلك بصراحة واعتمد على البيانات الحالية.",
+      ],
+    };
+  };
+
+  /* ════════════════════════════════════════════════════════════════
+     Patch على fcbSend — اعتراض طلبات Impact قبل إرسالها للـ AI
+  ════════════════════════════════════════════════════════════════ */
+  (function patchFcbSendForImpact() {
+    var CHECK_INTERVAL = setInterval(function () {
+      /* ننتظر حتى يصبح الشات بوت جاهزاً عبر وجود fcbPanel */
+      var panel = document.getElementById("fcbPanel");
+      if (!panel) return;
+      clearInterval(CHECK_INTERVAL);
+
+      /* نراقب زر الإرسال وحقل النص لنعترض رسائل Impact */
+      var inputEl  = document.getElementById("fcbInput");
+      var sendBtn  = document.getElementById("fcbSendBtn");
+      if (!inputEl || !sendBtn) return;
+
+      function maybeInjectImpact(text) {
+        if (!text || !window.fcbIsImpactRequest(text)) return false;
+        /* نبني التقرير ونخزّنه في window لتلتقطه buildSystemPrompt */
+        var report = window.fcbBuildImpactReport();
+        window.__IMPACT_REPORT__ = { report: report, توقيت: Date.now() };
+        console.log("[ImpactEngine] ✅ تقرير الأثر جاهز —",
+          Object.keys(report["٣_نقاط_الخطر_والمخاوف"] || {}).length, "مخاطر،",
+          (report["٤_أعلى_5_أولويات_تستحق_قراراً_الآن"] || []).length, "أولويات");
+        return true;
+      }
+
+      inputEl.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) maybeInjectImpact(inputEl.value);
+      }, true);
+
+      sendBtn.addEventListener("click", function () {
+        maybeInjectImpact(inputEl.value);
+      }, true);
+
+    }, 300);
+  })();
+
+  /* ════════════════════════════════════════════════════════════════
+     Patch على buildSystemPrompt لإضافة تقرير الأثر للـ system prompt
+  ════════════════════════════════════════════════════════════════ */
+  (function patchBuildSystemForImpact() {
+    var CHECK = setInterval(function () {
+      if (typeof window.__FCB_BUILD_SYSTEM === "function") {
+        clearInterval(CHECK);
+        var orig = window.__FCB_BUILD_SYSTEM;
+
+        window.__FCB_BUILD_SYSTEM = function (snap) {
+          var base = orig(snap);
+
+          /* أضف تقرير Impact لو موجود وحديث (10 ثوان) */
+          var ir = window.__IMPACT_REPORT__;
+          if (ir && (Date.now() - ir.توقيت) < 10000) {
+            var section =
+              "\n\n════════════════════════════════════════\n" +
+              "📊 تقرير الأثر التنفيذي — Impact Report\n" +
+              "════════════════════════════════════════\n" +
+              "البيانات التالية محسوبة لحظياً من اللوحة الكاملة.\n" +
+              "اتبع تعليمات_للـAI الموجودة داخل JSON أدناه حرفياً:\n\n" +
+              JSON.stringify(ir.report, null, 0) +
+              "\n════════════════════════════════════════";
+            return base + section;
+          }
+          return base;
+        };
+
+        console.log("[ImpactEngine] ✅ تم ربط تقرير الأثر بـ buildSystemPrompt");
+      }
+    }, 400);
+  })();
+
+  /* ════════════════════════════════════════════════════════════════
+     💬 أضف زر اختصار "تقرير الأداء" داخل الشات بوت
+  ════════════════════════════════════════════════════════════════ */
+  (function addImpactShortcutBtn() {
+    document.addEventListener("DOMContentLoaded", function () {
+      var foot = document.querySelector(".fcb-foot");
+      if (!foot) return;
+
+      /* شريط الاختصارات السريعة */
+      var shortcuts = document.createElement("div");
+      shortcuts.id = "fcb-shortcuts-bar";
+      shortcuts.style.cssText = [
+        "display:flex",
+        "align-items:center",
+        "gap:6px",
+        "padding:6px 10px 0",
+        "flex-wrap:wrap",
+      ].join(";");
+
+      var btns = [
+        { label: "📊 تقرير الأداء", msg: "تقرير الأداء" },
+        { label: "🔴 المدارس الحرجة", msg: "أعطني قائمة المدارس الحرجة FCA أقل من 25 مرتبة من الأسوأ للأفضل" },
+        { label: "⚠️ SLA المخترق", msg: "كم عدد البلاغات التي تجاوزت SLA وما أبرزها؟" },
+        { label: "📋 العقود المنتهية", msg: "أي العقود انتهت ولم تُجدَّد؟" },
+      ];
+
+      btns.forEach(function (b) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = b.label;
+        btn.style.cssText = [
+          "padding:5px 10px",
+          "border:1px solid var(--bd-light,rgba(255,255,255,.15))",
+          "border-radius:16px",
+          "background:var(--bg-2,rgba(255,255,255,.06))",
+          "color:var(--tx-sec,rgba(255,255,255,.7))",
+          "font-size:11px",
+          "font-family:inherit",
+          "cursor:pointer",
+          "white-space:nowrap",
+          "transition:background .15s",
+        ].join(";");
+
+        btn.addEventListener("mouseover", function () {
+          btn.style.background = "var(--accent-dim,rgba(8,145,178,.25))";
+          btn.style.color = "#fff";
+        });
+        btn.addEventListener("mouseout", function () {
+          btn.style.background = "var(--bg-2,rgba(255,255,255,.06))";
+          btn.style.color = "var(--tx-sec,rgba(255,255,255,.7))";
+        });
+
+        btn.addEventListener("click", function () {
+          var inputEl = document.getElementById("fcbInput");
+          if (!inputEl) return;
+          inputEl.value = b.msg;
+          /* نحاكي Enter */
+          if (typeof window.fcbSend === "function") {
+            window.fcbSend();
+          } else {
+            document.getElementById("fcbSendBtn") && document.getElementById("fcbSendBtn").click();
+          }
+        });
+
+        shortcuts.appendChild(btn);
+      });
+
+      foot.parentNode.insertBefore(shortcuts, foot);
+    });
+  })();
+
 })();

@@ -214,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
 /* === الإعدادات العامة + الفلاتر + التبويبات الأساسية === */
 const CFG = {
     GAS_URL:
-      "https://script.google.com/macros/s/AKfycbwkzDdgEXRJSzmDJqyk5LAUslLCXfqQ-nfi4VWxA4pDtb9uiG_LSFiioK9VgbI-KhAZ/exec",
+      "https://script.google.com/macros/s/AKfycbw5M_EQ7sfH5doRcL2xcALwii7CeD9SpaB0NNvf14VKJgGHtgXeOm5886tVnDLdEdDC/exec",
     AUTO_INTERVAL_MS: 3e5,
     RETRY_MAX: 3,
     RETRY_DELAY_MS: 4e3,
@@ -236,6 +236,13 @@ const CFG = {
     BALAGH_SHEET_KEY: "balaghReports", // المفتاح في SHEET_NAMES
     OPENAI_MODEL: "gpt-5.4", // الموديل ثابت بالكود
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
+    // 📚 مخزن المتجهات (Vector Store) الخاص بـ"الدليل الوطني الشامل لخدمات المرافق"
+    // (هيئة كفاءة الإنفاق — الدليل الوطني لإدارة الأصول والمرافق).
+    // لما يكون معبأ، AIService.chat يتحول تلقائياً إلى Responses API
+    // مع أداة file_search حتى يبحث GPT داخل ملفات الدليل ويجاوب منها.
+    // لتعطيل البحث في الدليل مؤقتاً: اجعله سلسلة فارغة "".
+    VECTOR_STORE_ID: "vs_6a4dd674534c8191802d76fce58a802e",
+    OPENAI_RESPONSES_URL: "https://api.openai.com/v1/responses",
     // 🔒 رابط الوسيط (Proxy) على Deno Deploy — يحتفظ بمفتاح OpenAI بأمان
     // في الباك إند بدل أن يدخله كل مستخدم بنفسه. عند تعبئة هذا الرابط،
     // AIService.chat يرسل الطلبات هنا بدل OpenAI مباشرة، ولا حاجة لأي
@@ -854,6 +861,9 @@ function applyFilters() {
     }
     if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
+    if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
+    if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
+    if (activeId === "tab-training") safeRun(renderTrainingTab, "training");
   } catch (err) {
     console.error("[applyFilters]", err);
     if (typeof showToast === "function") showToast("خطأ أثناء تحديث العرض: " + err.message, "err");
@@ -1053,7 +1063,10 @@ function showTab(name, el) {
     "ac-plan" === name && renderAcPlanTab(),
     "mag-kpi" === name && renderMagKpiTab(),
     "consultant-kpi" === name && renderConsultantKpiTab(),
-    "security-safety" === name && renderSecuritySafetyTab());
+    "security-safety" === name && renderSecuritySafetyTab(),
+    "fuel"            === name && renderFuelTab(),
+    "vehicles"        === name && renderVehiclesTab(),
+    "training"        === name && renderTrainingTab());
 
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
@@ -2638,6 +2651,9 @@ function renderTable() {
       (window.RAW_RECRUITMENT      = sa(d.recruitment)),
       (window.RAW_PAYMENTS         = sa(d.payments)),
       (window.RAW_SECURITY_SAFETY  = sa(d.securitySafety)),
+      (window.RAW_FUEL             = sa(d.fuelConsumption)),
+      (window.RAW_VEHICLES         = sa(d.vehicles)),
+      (window.RAW_TRAINING         = sa(d.training)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
@@ -4166,26 +4182,30 @@ function renderSecuritySafetyTab() {
   const recent = [...rows].reverse().slice(0,20);
 
   el.innerHTML = `
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="card" style="border-top:3px solid #DC2626">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي البلاغات</div>
-      <div style="font-size:28px;font-weight:800;color:#DC2626">${total.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${duplicates} مكرر محتمل</div>
+  <div class="kpi-row" style="margin-bottom:16px">
+    <div class="kpi kc-red">
+      <div class="kpi-icon">🛡️</div>
+      <div class="kpi-val">${total.toLocaleString()}</div>
+      <div class="kpi-lbl">إجمالي البلاغات</div>
+      <div class="kpi-sub">${duplicates} مكرر محتمل</div>
     </div>
-    <div class="card" style="border-top:3px solid #7C3AED">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي الإصابات</div>
-      <div style="font-size:28px;font-weight:800;color:#7C3AED">${totalInj.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">وفيات: ${totalDeaths}</div>
+    <div class="kpi kc-purple">
+      <div class="kpi-icon">🤕</div>
+      <div class="kpi-val">${totalInj.toLocaleString()}</div>
+      <div class="kpi-lbl">إجمالي الإصابات</div>
+      <div class="kpi-sub">وفيات: ${totalDeaths}</div>
     </div>
-    <div class="card" style="border-top:3px solid #1D4ED8">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">حالات حرجة</div>
-      <div style="font-size:28px;font-weight:800;color:#1D4ED8">${critical.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+    <div class="kpi kc-blue">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-val">${critical.toLocaleString()}</div>
+      <div class="kpi-lbl">حالات حرجة</div>
+      <div class="kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
     </div>
-    <div class="card" style="border-top:3px solid #D97706">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">التحقيقات</div>
-      <div style="font-size:28px;font-weight:800;color:#D97706">${doneInv.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مكتملة من ${needInv} مطلوبة · ${withReply} استجابة بإفادة</div>
+    <div class="kpi kc-amber">
+      <div class="kpi-icon">🔍</div>
+      <div class="kpi-val">${doneInv.toLocaleString()}</div>
+      <div class="kpi-lbl">التحقيقات المكتملة</div>
+      <div class="kpi-sub">من ${needInv} مطلوبة · ${withReply} استجابة بإفادة</div>
     </div>
   </div>
 
@@ -10782,15 +10802,36 @@ function renderTajheezAllTable() {
       // الوسيط (main.ts) مصمم ليقبل الصيغتين، فلا حاجة لتغيير أي شيء هناك.
       const headers = useProxy ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" };
       if (!useProxy) headers.Authorization = "Bearer " + apiKey;
-      const resp = await fetch(url, {
+
+      // ── 📚 وضع "الدليل الوطني" (file_search) ──
+      // لو VECTOR_STORE_ID معبأ، نستخدم Responses API بدل chat/completions
+      // لأنها الوحيدة التي تدعم أداة file_search (البحث داخل ملفات الدليل).
+      // ملاحظة: عند استخدام الوسيط (Proxy)، لازم يكون main.ts محدّثاً
+      // ليوجّه الطلبات التي تحتوي حقل "input" إلى /v1/responses.
+      const vsId = (CFG.VECTOR_STORE_ID || "").trim();
+      const useFileSearch = !!vsId;
+      const targetUrl = useFileSearch
+        ? (useProxy ? CFG.PROXY_URL.trim() : CFG.OPENAI_RESPONSES_URL)
+        : url;
+
+      const payload = useFileSearch
+        ? {
+            model: this.getModel(),
+            input: messages, // Responses API تقبل نفس مصفوفة الرسائل كـ input
+            tools: [{ type: "file_search", vector_store_ids: [vsId] }],
+            max_output_tokens: 1500,
+          }
+        : {
+            model: this.getModel(),
+            messages: messages,
+            temperature: 0.4,
+            max_completion_tokens: 1500,
+          };
+
+      const resp = await fetch(targetUrl, {
         method: "POST",
         headers: headers,
-        body: JSON.stringify({
-          model: this.getModel(),
-          messages: messages,
-          temperature: 0.4,
-          max_completion_tokens: 1500,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         let errMsg = "HTTP " + resp.status;
@@ -10803,7 +10844,20 @@ function renderTajheezAllTable() {
         throw err;
       }
       const data = await resp.json();
-      const reply = data?.choices?.[0]?.message?.content?.trim();
+      // نقرأ الرد من الصيغتين: Responses API (output/output_text) أو chat/completions (choices)
+      let reply = null;
+      if (typeof data?.output_text === "string" && data.output_text.trim()) {
+        reply = data.output_text.trim();
+      } else if (Array.isArray(data?.output)) {
+        reply = data.output
+          .filter((it) => it?.type === "message")
+          .flatMap((it) => it.content || [])
+          .filter((c) => c?.type === "output_text" && c.text)
+          .map((c) => c.text)
+          .join("\n")
+          .trim() || null;
+      }
+      if (!reply) reply = data?.choices?.[0]?.message?.content?.trim();
       if (!reply) {
         const err = new Error("EMPTY_RESPONSE");
         err.code = "EMPTY_RESPONSE";
@@ -12810,6 +12864,27 @@ function renderTajheezAllTable() {
 - البيئة المدرسية كمؤشر فعلي على جودة الخدمة.
 
 ══════════════════════════════════════════════════════
+📚 المرجع المعرفي — الدليل الوطني الشامل لخدمات المرافق
+══════════════════════════════════════════════════════
+لديك عبر أداة file_search نسخة كاملة من "الدليل الوطني لإدارة الأصول والمرافق" الصادر عن هيئة كفاءة الإنفاق والمشروعات الحكومية (expro.gov.sa) — وهو المرجع الوطني السعودي المعتمد لإدارة الأصول والمرافق، ويتكون من عدة ملفات (كل ملف = فصل من أحد مجلدات الدليل).
+
+▸ متى تبحث في الدليل — نطاق واسع وليس ضيقاً:
+لا تكتفِ بالبحث فقط عند وجود كلمة مفتاحية واضحة (SLA، صيانة، تعريف...). ابحث في الدليل كلما كان السؤال متعلقاً بأي جانب من جوانب إدارة المرافق والأصول والسلامة والتشغيل والصيانة — حتى لو صياغة السؤال عامة أو غير مباشرة أو تبدو "خارج" مواضيعك المعتادة (مثال: أسئلة عن إجراءات الطوارئ، التعامل مع المواد/الإسطوانات الخطرة، السلامة العامة، اللافتات والتحذيرات، النظافة العامة، مسؤوليات الموظفين... إلخ). القاعدة: أي سؤال ممكن منطقياً أن يكون له إجابة في دليل وطني لإدارة الأصول والمرافق → ابحث فيه أولاً قبل الرد، حتى لو لم تكن متأكداً أن الملف يغطيه.
+استثناء واضح: الأسئلة غير المتعلقة بإدارة المرافق إطلاقاً (رياضيات عامة، برمجة، ثقافة عامة، دردشة) لا داعي للبحث فيها بالدليل.
+
+▸ الاستشهاد بالمصدر — إلزامي وتفصيلي:
+عند أي إجابة مبنية على نتيجة من file_search، اذكر دائماً في نهاية أو بداية الإجابة (وليس فقط "وفق الدليل الوطني" بشكل عام):
+  • اسم الفصل/الموضوع الظاهر في نتيجة البحث (مثال: "إجراءات التعامل مع إسطوانات الغاز المضغوط")
+  • المجلد ورقم الفصل إن ظهرا (مثال: "المجلد (10) الفصل (3)")
+  • رقم الوثيقة/اسم الملف إن ظهر في نتيجة البحث (مثال: "EOM-KSS-PR-000009-AR")
+اعرضها بصيغة مختصرة وواضحة، مثال:
+"📄 المصدر: الدليل الوطني لإدارة الأصول والمرافق — المجلد (10) الفصل (3) — إجراءات التعامل مع إسطوانات الغاز المضغوط (EOM-KSS-PR-000009-AR)"
+لو السؤال جمع بين أكثر من ملف/فصل، اذكر كل مصدر استخدمته بنفس الطريقة.
+
+- الأسئلة عن أرقام وبيانات المدارس الفعلية تُجاب من بيانات اللوحة المرفقة أدناه، أما الأسئلة المنهجية/التنظيمية/السلامة تُجاب من الدليل — ويمكنك الجمع بينهما (مثلاً: مقارنة أداء المقاول الفعلي بالمعيار المرجعي في الدليل).
+- لا تخترع محتوى وتنسبه للدليل؛ إن لم تجد الإجابة في ملفاته بعد البحث، قل ذلك صراحة ولا تذكر مصدراً وهمياً.
+
+══════════════════════════════════════════════════════
 نظام التصنيف الموحّد — التزم به في كل رد
 ══════════════════════════════════════════════════════
 أي مؤشر من 100 (FCA، البيئة، تقييم عاين، درجة الحالة) يُصنَّف حصرياً هكذا:
@@ -14188,6 +14263,72 @@ ${(() => {
     });
   }
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   🙈  إخفاء تلقائي شامل لأي card يحوي chart فارغة — كل التبويبات
+   نفس منطق FCA fixup لكن يعمل على الصفحة كلها
+══════════════════════════════════════════════════════════════════ */
+(function () {
+  function hideEmptyCharts(tabEl) {
+    if (!tabEl) return;
+    tabEl.querySelectorAll("canvas").forEach(function (canvas) {
+      var chart = (typeof Chart !== "undefined" && Chart.getChart) ? Chart.getChart(canvas) : null;
+      var empty = !chart
+        || !chart.data
+        || !chart.data.datasets
+        || chart.data.datasets.length === 0
+        || chart.data.datasets.every(function (ds) {
+          return !ds.data || ds.data.length === 0
+            || ds.data.every(function (v) { return v == null || v === 0 || (Array.isArray(v) && v.length === 0); });
+        });
+      if (empty) {
+        var card = canvas.closest(".card");
+        if (card) {
+          card.style.display = "none";
+          var row = card.parentElement;
+          if (row && (row.classList.contains("g2") || row.classList.contains("g3") || row.classList.contains("g4"))) {
+            var anyVisible = Array.prototype.some.call(row.children, function (c) { return c.style.display !== "none"; });
+            if (!anyVisible) row.style.display = "none";
+          }
+        }
+      }
+    });
+  }
+
+  var fns = [
+    "renderOverviewCharts","renderFcaCharts","renderEnvCharts","renderStageCharts",
+    "renderStageCompareTab","renderFcaRefTab","renderAllContracts","renderSysMain",
+    "renderSysDetail","renderBalaghTab","renderTajheezInventoryTab","renderGatekeepersTab",
+    "renderKhanadeqTab","renderSpareTab","renderStudentsTab","renderAyenTab",
+    "renderAcPlanTab","renderSecuritySafetyTab","renderFuelTab","renderVehiclesTab",
+    "renderTrainingTab"
+  ];
+
+  function wrapFn(name) {
+    if (!window[name] || window[name].__emptyWrapped) return;
+    var orig = window[name];
+    window[name] = function () {
+      orig.apply(this, arguments);
+      setTimeout(function () {
+        var active = document.querySelector(".panel.active");
+        hideEmptyCharts(active);
+      }, 120);
+    };
+    window[name].__emptyWrapped = true;
+  }
+
+  function init() {
+    fns.forEach(wrapFn);
+    setTimeout(function () { fns.forEach(wrapFn); }, 2000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+
 
 /* ══════════════════════════════════════════════════════════════════
    إضافة زر تنزيل تلقائي لكل جدول في الصفحة (أي تبويب / أي جدول)
@@ -17378,4 +17519,731 @@ ${dataCtx}
     });
   })();
 
+})();
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  ⛽  JS تبويب: استهلاك الوقود
+   ║  (tab-fuel)
+   ║  أعمدة الشيت: التاريخ، الشهر، لوحة_السيارة، مفتاح_اللوحة،
+   ║               الطراز، التكلفة، اللترات، المنطقة، المجموعة، اسم_السائق
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderFuelTab() {
+  const el = document.getElementById("fuel-content");
+  if (!el) return;
+
+  const rows = window.RAW_FUEL || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">⛽</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات استهلاك وقود</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "استهلاك_الوقود" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const n_ = (v) => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
+  const totalLiters   = rows.reduce((s,r) => s + n_(r["اللترات"]),0);
+  const totalCost     = rows.reduce((s,r) => s + n_(r["التكلفة"]),0);
+  const avgCostPerL   = totalLiters ? (totalCost / totalLiters) : 0;
+  const uniqueCars    = new Set(rows.map(r=>r["لوحة_السيارة"]||r["مفتاح_اللوحة"]||"")).size;
+
+  // توزيع حسب المنطقة
+  const byRegion = {};
+  rows.forEach(r => {
+    const g = r["المنطقة"] || r["المجموعة"] || "غير محدد";
+    if (!byRegion[g]) byRegion[g] = {liters:0, cost:0};
+    byRegion[g].liters += n_(r["اللترات"]);
+    byRegion[g].cost   += n_(r["التكلفة"]);
+  });
+  const regionEntries = Object.entries(byRegion).sort((a,b)=>b[1].cost - a[1].cost);
+
+  // توزيع حسب الطراز
+  const byModel = {};
+  rows.forEach(r => {
+    const m = r["الطراز"] || "غير محدد";
+    if (!byModel[m]) byModel[m] = {liters:0,cost:0,count:0};
+    byModel[m].liters += n_(r["اللترات"]);
+    byModel[m].cost   += n_(r["التكلفة"]);
+    byModel[m].count  += 1;
+  });
+  const modelEntries = Object.entries(byModel).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
+
+  // اتجاه شهري
+  const byMonth = {};
+  rows.forEach(r => {
+    const m = String(r["الشهر"]||r["التاريخ"]||"").slice(0,7);
+    if (!m) return;
+    if (!byMonth[m]) byMonth[m] = {liters:0,cost:0};
+    byMonth[m].liters += n_(r["اللترات"]);
+    byMonth[m].cost   += n_(r["التكلفة"]);
+  });
+  const monthKeys = Object.keys(byMonth).sort();
+  const monthLiters = monthKeys.map(k=>byMonth[k].liters);
+  const monthCosts  = monthKeys.map(k=>byMonth[k].cost);
+
+  // أعلى 10 سائقين استهلاكاً
+  const byDriver = {};
+  rows.forEach(r => {
+    const d = r["اسم_السائق"] || "غير محدد";
+    if (!byDriver[d]) byDriver[d] = {liters:0,cost:0};
+    byDriver[d].liters += n_(r["اللترات"]);
+    byDriver[d].cost   += n_(r["التكلفة"]);
+  });
+  const topDrivers = Object.entries(byDriver).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="card" style="border-top:3px solid #0891B2">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي الاستهلاك</div>
+      <div style="font-size:28px;font-weight:800;color:#0891B2">${totalLiters.toLocaleString('ar',{maximumFractionDigits:0})}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">لتر · ${rows.length.toLocaleString()} سجل</div>
+    </div>
+    <div class="card" style="border-top:3px solid #059669">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي التكلفة</div>
+      <div style="font-size:28px;font-weight:800;color:#059669">${totalCost.toLocaleString('ar',{maximumFractionDigits:0})}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ريال سعودي</div>
+    </div>
+    <div class="card" style="border-top:3px solid #D97706">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">متوسط سعر اللتر</div>
+      <div style="font-size:28px;font-weight:800;color:#D97706">${avgCostPerL.toFixed(2)}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ريال / لتر</div>
+    </div>
+    <div class="card" style="border-top:3px solid #7C3AED">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">عدد السيارات</div>
+      <div style="font-size:28px;font-weight:800;color:#7C3AED">${uniqueCars.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">سيارة نشطة</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">الاتجاه الشهري — اللترات والتكلفة</div>
+      <div class="chart-box" style="height:240px"><canvas id="ch-fuel-trend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">التكلفة حسب المنطقة</div>
+      <div class="chart-box" style="height:240px"><canvas id="ch-fuel-region"></canvas></div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">الاستهلاك حسب طراز السيارة <span class="sub">أعلى 10</span></div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-model"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">أعلى 10 سائقين تكلفةً</div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-driver"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">آخر 30 سجل وقود <span class="sub">من الأحدث للأقدم</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">التاريخ</th>
+          <th style="padding:8px 10px;text-align:right">لوحة السيارة</th>
+          <th style="padding:8px 10px;text-align:right">الطراز</th>
+          <th style="padding:8px 10px;text-align:right">السائق</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">اللترات</th>
+          <th style="padding:8px 10px;text-align:center">التكلفة (ر.س)</th>
+        </tr></thead>
+        <tbody>
+          ${[...rows].reverse().slice(0,30).map(r=>`<tr style="border-bottom:1px solid var(--brd)">
+            <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(r["التاريخ"])||"—"}</td>
+            <td style="padding:6px 10px;font-weight:600;color:#0891B2">${esc(r["لوحة_السيارة"])||"—"}</td>
+            <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
+            <td style="padding:6px 10px">${esc(r["اسم_السائق"])||"—"}</td>
+            <td style="padding:6px 10px;font-size:11px">${esc(r["المنطقة"]||r["المجموعة"])||"—"}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:600">${n_(r["اللترات"]).toFixed(1)}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:600;color:#059669">${n_(r["التكلفة"]).toLocaleString()}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  requestAnimationFrame(() => {
+    const PAL = ["#0891B2","#059669","#D97706","#7C3AED","#DC2626","#1D4ED8","#DB2777","#EA580C","#65A30D","#0284C7"];
+
+    // اتجاه شهري
+    const cTrend = document.getElementById("ch-fuel-trend");
+    if (cTrend && typeof Chart !== "undefined") {
+      killChart("ch-fuel-trend");
+      CHARTS["ch-fuel-trend"] = new Chart(cTrend, {
+        type: "bar",
+        data: {
+          labels: monthKeys,
+          datasets: [
+            { type:"bar",  label:"اللترات", data: monthLiters, backgroundColor:"rgba(8,145,178,0.6)", yAxisID:"y" },
+            { type:"line", label:"التكلفة (ر.س)", data: monthCosts, borderColor:"#059669", backgroundColor:"rgba(5,150,105,0.1)", borderWidth:2, yAxisID:"y1", fill:true, tension:0.3 }
+          ]
+        },
+        options: { maintainAspectRatio:false, plugins:{legend:{position:"top"}},
+          scales:{ y:{beginAtZero:true,position:"right",title:{display:true,text:"لتر"}}, y1:{beginAtZero:true,position:"left",title:{display:true,text:"ر.س"}} } }
+      });
+    }
+
+    // المنطقة
+    const cReg = document.getElementById("ch-fuel-region");
+    if (cReg && typeof Chart !== "undefined") {
+      killChart("ch-fuel-region");
+      CHARTS["ch-fuel-region"] = new Chart(cReg, {
+        type:"doughnut",
+        data:{ labels:regionEntries.map(e=>e[0]), datasets:[{ data:regionEntries.map(e=>e[1].cost), backgroundColor:PAL, borderWidth:2 }] },
+        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}} }
+      });
+    }
+
+    // الطراز
+    const cModel = document.getElementById("ch-fuel-model");
+    if (cModel && typeof Chart !== "undefined") {
+      killChart("ch-fuel-model");
+      CHARTS["ch-fuel-model"] = new Chart(cModel, {
+        type:"bar",
+        data:{ labels:modelEntries.map(e=>e[0]), datasets:[{ data:modelEntries.map(e=>e[1].liters), backgroundColor:PAL, borderRadius:4 }] },
+        options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ل"}}} }
+      });
+    }
+
+    // السائقين
+    const cDrv = document.getElementById("ch-fuel-driver");
+    if (cDrv && typeof Chart !== "undefined") {
+      killChart("ch-fuel-driver");
+      CHARTS["ch-fuel-driver"] = new Chart(cDrv, {
+        type:"bar",
+        data:{ labels:topDrivers.map(e=>e[0]), datasets:[{ data:topDrivers.map(e=>e[1].cost), backgroundColor:"#D97706", borderRadius:4 }] },
+        options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ر"}}} }
+      });
+    }
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🚗  JS تبويب: السيارات
+   ║  (tab-vehicles)
+   ║  أعمدة الشيت: رقم اللوحة، الماركة، الطراز، سنة الصنع،
+   ║               اللون، اسم المستخدم، رقم الهوية، رقم الجوال،
+   ║               موقع السيارة، اعطال/حوادث، ملاحظات، المستخدم البديل
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderVehiclesTab() {
+  const el = document.getElementById("vehicles-content");
+  if (!el) return;
+
+  const rows = window.RAW_VEHICLES || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🚗</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات سيارات</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "السيارات" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const total        = rows.length;
+  const withFaults   = rows.filter(r => r["اعطال/حوادث"] && r["اعطال/حوادث"] !== "لا يوجد").length;
+  const uniqueUsers  = new Set(rows.map(r=>r["اسم المستخدم"]||"").filter(Boolean)).size;
+  const uniqueLoc    = new Set(rows.map(r=>r["موقع السيارة"]||"").filter(Boolean)).size;
+
+  // توزيع حسب الماركة
+  const byMake = {};
+  rows.forEach(r => { const m = r["الماركة"]||"غير محدد"; byMake[m]=(byMake[m]||0)+1; });
+  const makeEntries = Object.entries(byMake).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // توزيع حسب الموقع
+  const byLoc = {};
+  rows.forEach(r => { const l = r["موقع السيارة"]||"غير محدد"; byLoc[l]=(byLoc[l]||0)+1; });
+  const locEntries = Object.entries(byLoc).sort((a,b)=>b[1]-a[1]);
+
+  // توزيع حسب سنة الصنع
+  const byYear = {};
+  rows.forEach(r => { const y = r["سنة الصنع"]||"غير محدد"; byYear[y]=(byYear[y]||0)+1; });
+  const yearEntries = Object.entries(byYear).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="card" style="border-top:3px solid #0891B2">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي السيارات</div>
+      <div style="font-size:28px;font-weight:800;color:#0891B2">${total.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">سيارة مسجلة</div>
+    </div>
+    <div class="card" style="border-top:3px solid #DC2626">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">لديها أعطال/حوادث</div>
+      <div style="font-size:28px;font-weight:800;color:#DC2626">${withFaults.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((withFaults/total)*100).toFixed(1) : 0}% من الأسطول</div>
+    </div>
+    <div class="card" style="border-top:3px solid #059669">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المستخدمون</div>
+      <div style="font-size:28px;font-weight:800;color:#059669">${uniqueUsers.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مستخدم نشط</div>
+    </div>
+    <div class="card" style="border-top:3px solid #7C3AED">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المواقع</div>
+      <div style="font-size:28px;font-weight:800;color:#7C3AED">${uniqueLoc.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">موقع مختلف</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">توزيع السيارات حسب الماركة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-make"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">السيارات حسب الموقع</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-loc"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">توزيع السيارات حسب سنة الصنع</div>
+    <div class="chart-box" style="height:200px"><canvas id="ch-veh-year"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
+          <th style="padding:8px 10px;text-align:right">الماركة</th>
+          <th style="padding:8px 10px;text-align:right">الطراز</th>
+          <th style="padding:8px 10px;text-align:center">السنة</th>
+          <th style="padding:8px 10px;text-align:right">المستخدم</th>
+          <th style="padding:8px 10px;text-align:right">الموقع</th>
+          <th style="padding:8px 10px;text-align:center">أعطال/حوادث</th>
+          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const hasFault = r["اعطال/حوادث"] && r["اعطال/حوادث"] !== "لا يوجد";
+            return `<tr style="border-bottom:1px solid var(--brd);${hasFault?'background:#FEF2F2':''}">
+              <td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
+              <td style="padding:6px 10px">${esc(r["الماركة"])||"—"}</td>
+              <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
+              <td style="padding:6px 10px;text-align:center">${esc(r["سنة الصنع"])||"—"}</td>
+              <td style="padding:6px 10px;font-size:11px">${esc(r["اسم المستخدم"])||"—"}</td>
+              <td style="padding:6px 10px;font-size:11px">${esc(r["موقع السيارة"])||"—"}</td>
+              <td style="padding:6px 10px;text-align:center">${hasFault
+                ? `<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ ${esc(r["اعطال/حوادث"])}</span>`
+                : '<span style="color:var(--tx-muted);font-size:11px">—</span>'}</td>
+              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">${esc(r["ملاحظات"])||"—"}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  requestAnimationFrame(() => {
+    const PAL = ["#0891B2","#059669","#D97706","#7C3AED","#DC2626","#1D4ED8","#DB2777","#EA580C","#65A30D","#0284C7"];
+
+    const cMake = document.getElementById("ch-veh-make");
+    if (cMake && typeof Chart !== "undefined") {
+      killChart("ch-veh-make");
+      CHARTS["ch-veh-make"] = new Chart(cMake, {
+        type:"doughnut",
+        data:{ labels:makeEntries.map(e=>e[0]), datasets:[{ data:makeEntries.map(e=>e[1]), backgroundColor:PAL, borderWidth:2 }] },
+        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}} }
+      });
+    }
+
+    const cLoc = document.getElementById("ch-veh-loc");
+    if (cLoc && typeof Chart !== "undefined") {
+      killChart("ch-veh-loc");
+      CHARTS["ch-veh-loc"] = new Chart(cLoc, {
+        type:"bar",
+        data:{ labels:locEntries.map(e=>e[0]), datasets:[{ data:locEntries.map(e=>e[1]), backgroundColor:"#7C3AED", borderRadius:4 }] },
+        options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
+      });
+    }
+
+    const cYear = document.getElementById("ch-veh-year");
+    if (cYear && typeof Chart !== "undefined") {
+      killChart("ch-veh-year");
+      CHARTS["ch-veh-year"] = new Chart(cYear, {
+        type:"bar",
+        data:{ labels:yearEntries.map(e=>e[0]), datasets:[{ data:yearEntries.map(e=>e[1]), backgroundColor:"#0891B2", borderRadius:4 }] },
+        options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{maxRotation:45}},y:{beginAtZero:true,ticks:{stepSize:1}}} }
+      });
+    }
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🎓  JS تبويب: برامج التدريب
+   ║  (tab-training)
+   ║  أعمدة الشيت: تاريخ التقرير، الاسم، البريد الإلكتروني،
+   ║               آخر دخول للمنصة، حالة دورة النظافة،
+   ║               وحدات مكتملة (من 12)، نسبة الإنجاز،
+   ║               متوسط الدرجة %، حالة برنامج المشرفين،
+   ║               وحدات مكتملة (من 24)، نسبة الإنجاز، ملاحظات التنظيف
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderTrainingTab() {
+  const el = document.getElementById("training-content");
+  if (!el) return;
+
+  const rows = window.RAW_TRAINING || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🎓</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات تدريب</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "برامج_التدريب" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const n_ = (v) => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
+
+  const total = rows.length;
+
+  // دورة النظافة (12 وحدة)
+  const clean_completed  = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("مكتمل")).length;
+  const clean_inProgress = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("قيد")).length;
+  const clean_notStarted = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("لم يبدأ")).length;
+  const clean_avgScore   = rows.filter(r=>n_(r["متوسط الدرجة %"])>0).reduce((s,r,_,a)=>s+n_(r["متوسط الدرجة %"])/a.length, 0);
+
+  // برنامج المشرفين (24 وحدة)
+  const sup_completed  = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("مكتمل")).length;
+  const sup_inProgress = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("قيد")).length;
+  const sup_notStarted = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("لم يبدأ")).length;
+
+  const neverLogged = rows.filter(r => (r["آخر دخول للمنصة"]||"").includes("لم يدخل")).length;
+
+  // توزيع حالة دورة النظافة
+  const cleanStatusMap = { "مكتملة": clean_completed, "قيد التنفيذ": clean_inProgress, "لم يبدأ": clean_notStarted };
+  const supStatusMap   = { "مكتملة": sup_completed, "قيد التنفيذ": sup_inProgress, "لم يبدأ": sup_notStarted };
+
+  // توزيع عدد الوحدات المكتملة (نظافة)
+  const unitBuckets12 = {"0":0,"1-3":0,"4-6":0,"7-9":0,"10-11":0,"12":0};
+  rows.forEach(r => {
+    const u = n_(r["وحدات مكتملة (من 12)"]);
+    if (u===12)       unitBuckets12["12"]++;
+    else if (u>=10)   unitBuckets12["10-11"]++;
+    else if (u>=7)    unitBuckets12["7-9"]++;
+    else if (u>=4)    unitBuckets12["4-6"]++;
+    else if (u>=1)    unitBuckets12["1-3"]++;
+    else              unitBuckets12["0"]++;
+  });
+
+  const statsCleanCols = Object.keys(cleanStatusMap);
+  const statsCleanVals = Object.values(cleanStatusMap);
+  const statsSupCols   = Object.keys(supStatusMap);
+  const statsSupVals   = Object.values(supStatusMap);
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="card" style="border-top:3px solid #0891B2">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المتدربين</div>
+      <div style="font-size:28px;font-weight:800;color:#0891B2">${total.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${neverLogged} لم يدخلوا أبداً</div>
+    </div>
+    <div class="card" style="border-top:3px solid #059669">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مكتملو دورة النظافة</div>
+      <div style="font-size:28px;font-weight:800;color:#059669">${clean_completed.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((clean_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+    </div>
+    <div class="card" style="border-top:3px solid #7C3AED">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مكتملو برنامج المشرفين</div>
+      <div style="font-size:28px;font-weight:800;color:#7C3AED">${sup_completed.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((sup_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+    </div>
+    <div class="card" style="border-top:3px solid #D97706">
+      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">متوسط الدرجة</div>
+      <div style="font-size:28px;font-weight:800;color:#D97706">${clean_avgScore.toFixed(1)}%</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">دورة النظافة</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">حالة دورة النظافة <span class="sub">12 وحدة</span></div>
+      <div class="chart-box" style="height:220px"><canvas id="ch-tr-clean-status"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">حالة برنامج المشرفين <span class="sub">24 وحدة</span></div>
+      <div class="chart-box" style="height:220px"><canvas id="ch-tr-sup-status"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">توزيع الوحدات المكتملة — دورة النظافة</div>
+    <div class="chart-box" style="height:180px"><canvas id="ch-tr-units12"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">قائمة المتدربين <span class="sub">${total} متدرب</span></div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">الاسم</th>
+          <th style="padding:8px 10px;text-align:right">آخر دخول</th>
+          <th style="padding:8px 10px;text-align:center">حالة النظافة</th>
+          <th style="padding:8px 10px;text-align:center">وحدات (12)</th>
+          <th style="padding:8px 10px;text-align:center">الدرجة %</th>
+          <th style="padding:8px 10px;text-align:center">حالة المشرفين</th>
+          <th style="padding:8px 10px;text-align:center">وحدات (24)</th>
+          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const cleanDone = (r["حالة دورة النظافة"]||"").includes("مكتمل");
+            const supDone   = (r["حالة برنامج المشرفين"]||"").includes("مكتمل");
+            const neverIn   = (r["آخر دخول للمنصة"]||"").includes("لم يدخل");
+            const score     = n_(r["متوسط الدرجة %"]);
+            const scoreColor = score >= 80 ? "#059669" : score >= 60 ? "#D97706" : "#DC2626";
+            return `<tr style="border-bottom:1px solid var(--brd)${neverIn?';background:#FFFBEB':''}">
+              <td style="padding:6px 10px;font-weight:600">${esc(r["الاسم"])||"—"}</td>
+              <td style="padding:6px 10px;font-size:11px;color:${neverIn?'#DC2626':'var(--tx-muted)'}">${esc(r["آخر دخول للمنصة"])||"—"}</td>
+              <td style="padding:6px 10px;text-align:center">${cleanDone
+                ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
+                : `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r["حالة دورة النظافة"])||"—"}</span>`}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r["وحدات مكتملة (من 12)"])||"0"} / 12</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${scoreColor}">${score ? score+"%":"—"}</td>
+              <td style="padding:6px 10px;text-align:center">${supDone
+                ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
+                : `<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r["حالة برنامج المشرفين"])||"—"}</span>`}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r["وحدات مكتملة (من 24)"])||"0"} / 24</td>
+              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">${esc(r["ملاحظات التنظيف"])||"—"}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  requestAnimationFrame(() => {
+    const COLORS_STATUS = ["#059669","#D97706","#DC2626"];
+
+    const cClean = document.getElementById("ch-tr-clean-status");
+    if (cClean && typeof Chart !== "undefined") {
+      killChart("ch-tr-clean-status");
+      CHARTS["ch-tr-clean-status"] = new Chart(cClean, {
+        type:"doughnut",
+        data:{ labels:statsCleanCols, datasets:[{ data:statsCleanVals, backgroundColor:COLORS_STATUS, borderWidth:2 }] },
+        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}} }
+      });
+    }
+
+    const cSup = document.getElementById("ch-tr-sup-status");
+    if (cSup && typeof Chart !== "undefined") {
+      killChart("ch-tr-sup-status");
+      CHARTS["ch-tr-sup-status"] = new Chart(cSup, {
+        type:"doughnut",
+        data:{ labels:statsSupCols, datasets:[{ data:statsSupVals, backgroundColor:COLORS_STATUS, borderWidth:2 }] },
+        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}} }
+      });
+    }
+
+    const cUnits = document.getElementById("ch-tr-units12");
+    if (cUnits && typeof Chart !== "undefined") {
+      killChart("ch-tr-units12");
+      CHARTS["ch-tr-units12"] = new Chart(cUnits, {
+        type:"bar",
+        data:{
+          labels: Object.keys(unitBuckets12).map(k => "وحدات: "+k),
+          datasets:[{ data:Object.values(unitBuckets12), backgroundColor:["#DC2626","#EA580C","#D97706","#65A30D","#059669","#0891B2"], borderRadius:4 }]
+        },
+        options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
+      });
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PATCH: تبويبات جديدة للشات بوت + إصلاح Chart context errors
+   ══════════════════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  /* ── 1. إضافة التبويبات الجديدة لـ TAB_INDEX الخاص بالشات بوت ── */
+  function patchTabIndex() {
+    const idx = window.__FCB_TAB_INDEX;
+    if (!Array.isArray(idx)) return;
+
+    const newTabs = [
+      {
+        id: 'fuel',
+        label: 'استهلاك الوقود',
+        keywords: [
+          'وقود','استهلاك الوقود','fuel','fuel consumption','بنزين','ديزل','diesel','petrol',
+          'لتر','liters','تكلفة الوقود','fuel cost','سائق','سائقين','driver','drivers',
+          'لوحة سيارة','طراز سيارة','اللترات','تكلفة شهرية وقود','محطة وقود','تعبئة وقود',
+          'استهلاك وقود','وقود سيارات','توزيع وقود','منطقة وقود'
+        ],
+        charts: [
+          'الاتجاه الشهري — اللترات والتكلفة',
+          'التكلفة حسب المنطقة',
+          'الاستهلاك حسب طراز السيارة (أعلى 10)',
+          'أعلى 10 سائقين تكلفةً'
+        ],
+        kpis: [
+          'إجمالي الاستهلاك (لتر)',
+          'إجمالي التكلفة (ريال)',
+          'متوسط سعر اللتر',
+          'عدد السيارات النشطة'
+        ]
+      },
+      {
+        id: 'vehicles',
+        label: 'السيارات',
+        keywords: [
+          'سيارات','سيارة','vehicles','vehicle','cars','car','أسطول','fleet',
+          'لوحة','رقم اللوحة','plate','license plate','ماركة','طراز','model','brand',
+          'مستخدم سيارة','سائق','مالك سيارة','موقع سيارة','أعطال سيارة','حوادث سيارة',
+          'سنة الصنع','لون سيارة','سيارة شركة','fleet management','إدارة أسطول',
+          'صيانة سيارة','بيانات سيارات','سيارات الشركة','المركبات'
+        ],
+        charts: [
+          'توزيع السيارات حسب الماركة',
+          'توزيع السيارات حسب الحالة',
+          'توزيع حسب المستخدم',
+          'السيارات حسب المنطقة'
+        ],
+        kpis: [
+          'إجمالي السيارات',
+          'الماركات الأكثر',
+          'متوسط عمر السيارات',
+          'سيارات بها أعطال'
+        ]
+      },
+      {
+        id: 'training',
+        label: 'برامج التدريب',
+        keywords: [
+          'تدريب','برامج التدريب','training','training programs','دورة','دورات',
+          'course','courses','متدرب','متدربين','trainee','trainees','مدرب','trainer',
+          'ساعات تدريب','training hours','شهادات','certificates','certification',
+          'برنامج تدريبي','تأهيل','تطوير كوادر','workforce development','upskilling',
+          'كفاءة','competency','مهارات','skills','تقييم تدريب','training evaluation',
+          'حضور تدريب','attendance','completion rate','معدل إتمام التدريب','وحدات تدريب'
+        ],
+        charts: [
+          'توزيع المتدربين حسب المنطقة',
+          'توزيع حسب نوع التدريب',
+          'اتجاه الدورات الشهري',
+          'معدل الإتمام'
+        ],
+        kpis: [
+          'إجمالي المتدربين',
+          'إجمالي الدورات',
+          'إجمالي ساعات التدريب',
+          'معدل الإتمام (%)'
+        ]
+      }
+    ];
+
+    newTabs.forEach(tab => {
+      if (!idx.find(t => t.id === tab.id)) {
+        idx.push(tab);
+      }
+    });
+
+    /* تحديث semantic rules في buildSystemPrompt */
+    const origBuild = window.__FCB_BUILD_SYSTEM;
+    if (typeof origBuild === 'function') {
+      window.__FCB_BUILD_SYSTEM = function(snap) {
+        let prompt = origBuild(snap);
+
+        const extraRules = `
+- "وقود/استهلاك وقود/لترات/بنزين/ديزل/سائقين وقود/fuel" → تبويب استهلاك الوقود
+- "سيارات/أسطول/لوحة/ماركة/طراز سيارة/fleet/vehicles" → تبويب السيارات
+- "تدريب/دورة/متدربين/ساعات تدريب/training/courses" → تبويب برامج التدريب`;
+
+        prompt = prompt.replace(
+          '- "خنادق/drainage/صرف" → تبويب خنادق الصرف',
+          '- "خنادق/drainage/صرف" → تبويب خنادق الصرف' + extraRules
+        );
+
+        /* إضافة snapshot للتبويبات الجديدة */
+        const fuelRows = window.RAW_FUEL || [];
+        const vehRows  = window.RAW_VEHICLES || [];
+        const trRows   = window.RAW_TRAINING || [];
+
+        if (fuelRows.length || vehRows.length || trRows.length) {
+          const n_ = v => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x)?0:x; };
+          const fuelData = fuelRows.length ? `
+- بيانات الوقود: ${fuelRows.length.toLocaleString()} سجل · إجمالي اللترات: ${fuelRows.reduce((s,r)=>s+n_(r['اللترات']),0).toLocaleString(undefined,{maximumFractionDigits:0})} · إجمالي التكلفة: ${fuelRows.reduce((s,r)=>s+n_(r['التكلفة']),0).toLocaleString(undefined,{maximumFractionDigits:0})} ريال · ${new Set(fuelRows.map(r=>r['لوحة_السيارة']||r['مفتاح_اللوحة']||'')).size} سيارة` : '';
+          const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة` : '';
+          const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
+
+          prompt += '\n' + (fuelData + vehData + trData).trim();
+        }
+
+        return prompt;
+      };
+
+      /* patch fcbGetSystemPrompt ليستخدم الـ build المحدّث */
+      const origSnap = window.__FCB_BUILD_SNAPSHOT;
+      window.fcbGetSystemPrompt = function() {
+        const snap = typeof origSnap === 'function' ? origSnap() : {};
+        return window.__FCB_BUILD_SYSTEM(snap);
+      };
+    }
+  }
+
+  /* ── 2. إصلاح chart context errors — guard قبل كل new Chart() ── */
+  function patchChartGuard() {
+    if (typeof Chart === 'undefined') return;
+    const OrigChart = Chart;
+
+    /* نغلّف Chart constructor بـ try/catch + visibility check */
+    window.Chart = function(canvas, config) {
+      try {
+        /* لو canvas مش موجود في DOM أو parent مخفي → نتجاهل */
+        const el = (typeof canvas === 'string')
+          ? document.getElementById(canvas)
+          : canvas;
+
+        if (!el) return { destroy: () => {} };
+
+        /* تحقق إن الـ canvas visible ويقدر يعمل context */
+        if (el.offsetParent === null && !el.closest('.panel.active')) {
+          return { destroy: () => {}, __skipped: true };
+        }
+
+        return new OrigChart(el, config);
+      } catch(e) {
+        console.warn('[ChartGuard] تجاوز خطأ chart:', e.message);
+        return { destroy: () => {} };
+      }
+    };
+
+    /* نحتفظ بالـ static methods */
+    Object.keys(OrigChart).forEach(k => {
+      try { window.Chart[k] = OrigChart[k]; } catch(e) {}
+    });
+
+    /* نحتفظ بالـ prototype */
+    window.Chart.prototype = OrigChart.prototype;
+
+    /* الـ register method مهمة جداً */
+    if (OrigChart.register) window.Chart.register = OrigChart.register.bind(OrigChart);
+    if (OrigChart.defaults) window.Chart.defaults = OrigChart.defaults;
+    if (OrigChart.overrides) window.Chart.overrides = OrigChart.overrides;
+  }
+
+  /* ── 3. تطبيق الـ patches ── */
+  function init() {
+    patchTabIndex();
+    /* نؤخر patchChartGuard قليلاً حتى يكتمل تحميل Chart.js */
+    if (typeof Chart !== 'undefined') {
+      patchChartGuard();
+    } else {
+      const waitChart = setInterval(() => {
+        if (typeof Chart !== 'undefined') {
+          clearInterval(waitChart);
+          patchChartGuard();
+        }
+      }, 200);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();

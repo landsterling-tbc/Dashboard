@@ -292,6 +292,9 @@
     <div class="tab" onclick="showTab('table',this)">الجدول التفصيلي</div>
     <div class="tab" onclick="showTab('mag-kpi',this)">مؤشرات الأداء للمقاول</div>
     <div class="tab" onclick="showTab('consultant-kpi',this)">مؤشرات أداء الاستشاري</div>
+    <div class="tab" onclick="showTab('fuel',this)"> استهلاك الوقود</div>
+    <div class="tab" onclick="showTab('vehicles',this)"> السيارات</div>
+    <div class="tab" onclick="showTab('training',this)"> برامج التدريب</div>
   </div>
 
 <!--
@@ -1218,6 +1221,51 @@
     </div>
   </div>
 
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  ⛽  تبويب: استهلاك الوقود
+║  ID: tab-fuel
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-fuel">
+    <div id="fuel-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">⛽</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🚗  تبويب: السيارات
+║  ID: tab-vehicles
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-vehicles">
+    <div id="vehicles-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🚗</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🎓  تبويب: برامج التدريب
+║  ID: tab-training
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-training">
+    <div id="training-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🎓</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <footer style="margin-top:36px;padding:16px 28px;background:#071E28;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid rgba(255,255,255,.06)">
@@ -1255,14 +1303,9 @@
 
 <div id="fcbFab" style="display:none" aria-hidden="true"></div><!-- عنصر وهمي حتى لا يتعطل fcbToggle -->
 
-<!-- زر إخفاء الشات بوت مؤقتاً -->
-<button id="fcbHideBtn" onclick="fcbHideBot()" title="إخفاء المساعد مؤقتاً">🙈 إخفاء المساعد</button>
-
-<!-- زر إظهار الشات بوت من جديد (يظهر بعد الإخفاء) -->
-<button id="fcbShowBtn" onclick="fcbShowBot()" title="إظهار المساعد">
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" style="flex-shrink:0"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.2" stroke="#fff" stroke-width="1.5"/></svg>
-  إظهار المساعد
-</button>
+<!-- أزرار المساعد مخفية -->
+<button id="fcbHideBtn" style="display:none!important" aria-hidden="true"></button>
+<button id="fcbShowBtn" style="display:none!important" aria-hidden="true"></button>
 
 <div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
   <div id="fmbotBubble">

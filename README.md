@@ -2,8 +2,6 @@
 
 نظام Dashboard لإدارة ومتابعة منشآت مدرسية — مباني، صيانة، عقود، مصاعد، بلاغات، ومؤشرات أداء المقاولين.
 
-🔗 **الداشبورد اللايف:** [landsterling-tbc.github.io/Dashboard](https://landsterling-tbc.github.io/Dashboard)
-
 ---
 
 ## البنية التقنية
@@ -21,23 +19,13 @@
 - `dashboard.css` — التنسيق والتصميم
 - `Code.gs` — Apps Script، بيقرأ من Google Sheet ويحوّله JSON
 
-## التبويبات (20 تبويب)
+## التبويبات
 
-نظرة عامة، تحليل FCA، البيئة المدرسية، المرحلة الدراسية، عقود غير المجال، البلاغات، التجهيزات، الأنظمة الرئيسية، الأنظمة التفصيلية، خنادق الصرف، المصاعد، التكلفة، الخريطة، الطلاب وعمر المبنى، قطع الغيار، تقييم عاين، المدفوعات والعقود، الجدول التفصيلي، خطة استبدال المكيفات، مؤشرات الأداء للمقاول.
-
-كل تبويب له `id` بصيغة `tab-xxx` (مثال: `tab-balagh` للبلاغات).
+الداشبورد يحتوي على 20 تبويب (Tabs) تغطي جوانب مختلفة من إدارة المنشآت (مباني، عقود، صيانة، بلاغات، مؤشرات أداء...). كل تبويب له `id` بصيغة `tab-xxx` (مثال: `tab-balagh` للبلاغات).
 
 ## مصدر البيانات
 
-البيانات الحقيقية تعيش في **Google Sheet منفصل** (غير موجود في هذا الريبو لأسباب أمان — يحتوي بيانات تشغيلية حساسة). الـ `Code.gs` يقرأ منه مباشرة عبر `SpreadsheetApp.getActiveSpreadsheet()` — لا يوجد Spreadsheet ID مكتوب هنا.
-
-مفاتيح الشيتات المستخدمة في الكود (`SHEET_NAMES`):
-
-```
-buildings, fcaHistory, spareParts, fmContracts, allSystems, elevators,
-tajheezInventory, gatekeepers, kpiContractor, consultantKpi, payments,
-recruitment, balaghReports, securitySafety, fuelConsumption, vehicles, training
-```
+البيانات الحقيقية تعيش في **Google Sheet منفصل وخاص** — غير موجود في هذا الريبو لأسباب أمان. الـ `Code.gs` يقرأ منه مباشرة عبر `SpreadsheetApp.getActiveSpreadsheet()` — لا يوجد Spreadsheet ID أو رابط مكتوب هنا.
 
 ## حالة المشروع
 

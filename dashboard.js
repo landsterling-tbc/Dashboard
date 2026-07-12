@@ -1,10 +1,80 @@
 /* dashboard.js — updated 2026-06-24 07:40 */
+
+/* ════════════════════════════════════════════════════════════════
+   🎨 CSS_TOKENS — مصدر الألوان الموحّد في JS
+   ----------------------------------------------------------------
+   كل لون في هذا الملف يجب أن يمر من هنا.
+   لا تكتب hex مباشرة في أي مكان — استخدم CSS_TOKENS دايماً.
+   المتغيرات مربوطة بـ :root في dashboard.css (مصدر واحد للحقيقة).
+
+   ⚠️ نقطة مهمة: القراءة تحدث مرة واحدة عند تحميل الصفحة.
+   لو احتجت قيمة بعد DOM جاهز، استخدم CSS_TOKENS مباشرة.
+   ════════════════════════════════════════════════════════════════ */
+const CSS_TOKENS = (() => {
+  const s = () => getComputedStyle(document.documentElement);
+  const v = (name) => s().getPropertyValue(name).trim();
+  return {
+    // ── ألوان دلالية (Semantic) ─────────────────────────────────
+    danger:   () => v("--c-danger")   || "#7d1f2c",  // خطر / حرج / وفيات
+    warning:  () => v("--c-warning")  || "#c07a14",  // تحذير / متوسط
+    positive: () => v("--c-positive") || "#066a52",  // إيجابي / جيد / مكتمل
+    info:     () => v("--c-info")     || "#0d849c",  // معلومة / رئيسي / أزرق
+    info2:    () => v("--c-info-2")   || "#0b6b7e",  // ثانوي / تيل داكن
+    special:  () => v("--c-special")  || "#6c2bd9",  // مميز / خاص / بنفسجي
+    primary:  () => v("--c-primary")  || "#0d2f40",  // الأساسي الداكن
+    secondary:() => v("--c-secondary")|| "#163d52",  // الثانوي
+    accent:   () => v("--c-accent")   || "#b08a4e",  // ذهبي / مالي
+
+    // ── خلفيات دلالية ──────────────────────────────────────────
+    bgDanger:  () => v("--bg-danger")  || CSS_TOKENS.bgDanger(),
+    bgWarning: () => v("--bg-warning") || CSS_TOKENS.bgWarning(),
+    bgPositive:() => v("--bg-positive")|| CSS_TOKENS.bgPositive(),
+    bgInfo:    () => v("--bg-info")    || CSS_TOKENS.bgInfo(),
+    bgSpecial: () => v("--bg-special") || CSS_TOKENS.bgSpecial(),
+    bgAccent:  () => v("--bg-accent")  || CSS_TOKENS.bgAccent(),
+    bgNeutral: () => v("--bg-neutral") || CSS_TOKENS.bgNeutral(),
+
+    // ── حدود دلالية ─────────────────────────────────────────────
+    bdDanger:  () => v("--bd-danger")  || "rgba(125,31,44,.3)",
+    bdWarning: () => v("--bd-warning") || "rgba(192,122,20,.3)",
+    bdPositive:() => v("--bd-positive")|| "rgba(6,106,82,.3)",
+    bdInfo:    () => v("--bd-info")    || "rgba(13,132,156,.3)",
+
+    // ── نصوص ────────────────────────────────────────────────────
+    txMain:  () => v("--tx-main")  || CSS_TOKENS.txMain(),
+    txSec:   () => v("--tx-sec")   || CSS_TOKENS.txSec(),
+    txMuted: () => v("--tx-muted") || CSS_TOKENS.txMuted(),
+
+    // ── ألوان الشارتات (Palette) ─────────────────────────────────
+    // مربوطة بـ --ch-1 → --ch-6 في :root
+    palette: () => [
+      v("--ch-1") || "#0d849c",   // تيل
+      v("--ch-2") || CSS_TOKENS.info2(),   // أخضر تيل
+      v("--ch-3") || "#6c2bd9",   // بنفسجي
+      v("--ch-4") || "#b08a4e",   // ذهبي
+      v("--ch-5") || CSS_TOKENS.danger(),   // أحمر داكن
+      v("--ch-6") || "#066a52",   // أخضر داكن
+    ],
+
+    // ── اختصارات (Shortcuts) ────────────────────────────────────
+    // α(color, opacity) → يضيف شفافية لأي hex بـ CSS
+    α(color, opacity) {
+      const c = color.startsWith("#") ? color : color;
+      const hex = c.replace("#","");
+      const r = parseInt(hex.slice(0,2),16);
+      const g = parseInt(hex.slice(2,4),16);
+      const b = parseInt(hex.slice(4,6),16);
+      return `rgba(${r},${g},${b},${opacity})`;
+    },
+  };
+})();
+
 /* تنسيقات الشارتات بعد تحميل الصفحة */
 document.addEventListener("DOMContentLoaded", () => {
   "undefined" != typeof Chart &&
     ((Chart.defaults.font.family = "'IBM Plex Sans Arabic','Tajawal',sans-serif"),
     (Chart.defaults.font.size = 11),
-    (Chart.defaults.color = "#7095A4"),
+    (Chart.defaults.color = CSS_TOKENS.txMuted()),
     (Chart.defaults.animation.duration = 700),
     (Chart.defaults.animation.easing = "easeOutQuart"),
     (Chart.defaults.plugins.legend.labels.boxWidth = 10),
@@ -16,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     (Chart.defaults.plugins.tooltip.backgroundColor = "rgba(7,28,38,.92)"),
     (Chart.defaults.plugins.tooltip.titleColor = "rgba(255,255,255,.95)"),
     (Chart.defaults.plugins.tooltip.bodyColor = "rgba(255,255,255,.75)"),
-    (Chart.defaults.plugins.tooltip.borderColor = "rgba(8,145,178,.3)"),
+    (Chart.defaults.plugins.tooltip.borderColor = CSS_TOKENS.α(CSS_TOKENS.info(), .3)),
     (Chart.defaults.plugins.tooltip.borderWidth = 1),
     (Chart.defaults.plugins.tooltip.padding = 10),
     (Chart.defaults.plugins.tooltip.cornerRadius = 10),
@@ -286,25 +356,27 @@ const CFG = {
     buildingAge: ["عمر_المبني"],
     ayenScore: ["تقييم_عاين"],
   },
+  // ⚠️ TIER يستخدم CSS_TOKENS — كل الألوان من مصدر واحد
   TIER = {
-    critical: { label: "حرج",      color: "#7d1f2c", bg: "#fdf0f2", min: 0,  max: 24.99 },
-    fair:     { label: "متوسط",    color: "#c07a14", bg: "#fdf6ec", min: 25, max: 49.99 },
-    good:     { label: "جيد",      color: "#066a52", bg: "#edfaf5", min: 50, max: 74.99 },
-    vgood:    { label: "جيد جداً", color: "#0b6b7e", bg: "#eaf6fa", min: 75, max: 100   },
+    critical: { label: "حرج",      get color() { return CSS_TOKENS.danger();   }, get bg() { return CSS_TOKENS.bgDanger();   }, min: 0,  max: 24.99 },
+    fair:     { label: "متوسط",    get color() { return CSS_TOKENS.warning();  }, get bg() { return CSS_TOKENS.bgWarning();  }, min: 25, max: 49.99 },
+    good:     { label: "جيد",      get color() { return CSS_TOKENS.positive(); }, get bg() { return CSS_TOKENS.bgPositive(); }, min: 50, max: 74.99 },
+    vgood:    { label: "جيد جداً", get color() { return CSS_TOKENS.info2();   }, get bg() { return CSS_TOKENS.bgInfo();     }, min: 75, max: 100   },
   },
+  // PALETTE — palette الشارتات يتبع --ch-1..6 في :root
   PALETTE = [
-    "#0d2f40",
-    "#0b6b7e",
-    "#066a52",
-    "#c07a14",
-    "#7d1f2c",
-    "#6c2bd9",
-    "#0d849c",
-    "#b08a4e",
-    "#163d52",
-    "#0e9488",
-    "#9c2a3a",
-    "#b45309",
+    CSS_TOKENS.primary(),   // #0d2f40 — navy
+    CSS_TOKENS.info2(),     // #0b6b7e — teal داكن
+    CSS_TOKENS.positive(),  // #066a52 — أخضر
+    CSS_TOKENS.warning(),   // #c07a14 — ذهبي/تحذير
+    CSS_TOKENS.danger(),    // #7d1f2c — خطر
+    CSS_TOKENS.special(),   // #6c2bd9 — بنفسجي
+    CSS_TOKENS.info(),      // #0d849c — teal
+    CSS_TOKENS.accent(),    // #b08a4e — ذهبي فاخر
+    CSS_TOKENS.secondary(), // #163d52 — navy ثانوي
+    CSS_TOKENS.info2(),     // #0b6b7e
+    "#9c2a3a",              // أحمر داكن (--red-2 في النظام)
+    CSS_TOKENS.warning(),   // #c07a14
   ];
 let RAW = [],
   FILTERED = [],
@@ -444,7 +516,7 @@ function getTier(v) {
           ? "good"
           : "vgood";
 }
-const tierColor = (v) => TIER[getTier(v)]?.color || "#64748b",
+const tierColor = (v) => TIER[getTier(v)]?.color || CSS_TOKENS.txMuted(),
   tierBg = (v) => TIER[getTier(v)]?.bg || "#f1f5f9";
 function killChart(id) {
   if (CHARTS[id]) {
@@ -529,7 +601,7 @@ function renderLoadingState(container, message = "جاري التحميل…") {
   const el = typeof container === "string" ? document.getElementById(container) : container;
   if (!el) return;
   el.innerHTML = `<div class="chart-loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:var(--tx-muted);gap:10px">
-    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid rgba(8,145,178,.15);border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
+    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid CSS_TOKENS.α(CSS_TOKENS.info(),.15);border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
     <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
   </div>`;
 }
@@ -1097,7 +1169,7 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
       ctx.fillStyle = "#0d2f40";
       ctx.font = `900 ${Math.max(16, Math.min(22, width * .13))}px Tajawal,sans-serif`;
       ctx.fillText(total.toLocaleString("ar"), cx, cy - 7);
-      ctx.fillStyle = "#6d8794";
+      ctx.fillStyle = CSS_TOKENS.txMuted();
       ctx.font = `600 10px Tajawal,sans-serif`;
       ctx.fillText("إجمالي", cx, cy + 9);
       ctx.restore();
@@ -1186,7 +1258,7 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
           beginAtZero: true,
           max: maxVal || undefined,
           grid: { color: "rgba(8,45,60,.04)" },
-          ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: "#6d8794", callback: (v) => (maxVal ? v + "%" : v.toLocaleString("ar")) },
+          ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.txMuted(), callback: (v) => (maxVal ? v + "%" : v.toLocaleString("ar")) },
         },
         y: {
           grid: { display: false },
@@ -1232,7 +1304,7 @@ function makeVBar(id, labels, datasets) {
         },
       },
       scales: {
-        y: { beginAtZero: true, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: "#6d8794", callback: safeTickCallback } },
+        y: { beginAtZero: true, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.txMuted(), callback: safeTickCallback } },
         x: { grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: "#0d2f40", maxRotation: 30, callback: safeTickCallback } },
       },
       animation: { duration: 500 },
@@ -1323,10 +1395,10 @@ function renderOverviewCharts() {
     r.linkType   && (linkMap[r.linkType]    = (linkMap[r.linkType]    || 0) + 1);
     r.subscriptionStatus && (subMap[r.subscriptionStatus] = (subMap[r.subscriptionStatus] || 0) + 1);
   }),
-    makeDoughnut("ch-size",  sizeMap,  { كبير: "#083D4F", متوسط: "#0891B2", صغير: "#059669" }),
-    makeDoughnut("ch-owner", ownerMap, { حكومي: "#083D4F", مستأجر: "#D97706" }),
+    makeDoughnut("ch-size",  sizeMap,  { كبير: CSS_TOKENS.primary(), متوسط: CSS_TOKENS.info(), صغير: CSS_TOKENS.positive() }),
+    makeDoughnut("ch-owner", ownerMap, { حكومي: CSS_TOKENS.primary(), مستأجر: CSS_TOKENS.warning() }),
     // نوع الارتباط (مستقل/مشترك) — يعتمد على نوع_المبنى
-    makeDoughnut("ch-link", linkMap, { مستقل: "#0891B2", مشترك: "#7C3AED" }),
+    makeDoughnut("ch-link", linkMap, { مستقل: CSS_TOKENS.info(), مشترك: CSS_TOKENS.special() }),
     // حالة الاشتراك — يعتمد على حالة_الاشتراك
     makeDoughnut("ch-sub-status", subMap, {}));
 }
@@ -1398,7 +1470,7 @@ function renderFcaCharts() {
           label: "متوسط FCA",
           data: stData.map((x) => +x.a.toFixed(1)),
           backgroundColor: "#0891B2BB",
-          borderColor: "#0891B2",
+          borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -1413,7 +1485,7 @@ function renderFcaCharts() {
       (szMap[r.schoolSize] || (szMap[r.schoolSize] = []), szMap[r.schoolSize].push(r.fca));
   });
   const szData = Object.entries(szMap).map(([k, v]) => ({ k: k, a: avg(v) })),
-    szColors = { كبير: "#083D4F", متوسط: "#0891B2", صغير: "#059669" };
+    szColors = { كبير: CSS_TOKENS.primary(), متوسط: CSS_TOKENS.info(), صغير: CSS_TOKENS.positive() };
   (killChart("ch-fca-size"),
     makeVBar(
       "ch-fca-size",
@@ -1422,8 +1494,8 @@ function renderFcaCharts() {
         {
           label: "متوسط FCA",
           data: szData.map((x) => +x.a.toFixed(1)),
-          backgroundColor: szData.map((x) => (szColors[x.k] || "#64748b") + "BB"),
-          borderColor: szData.map((x) => szColors[x.k] || "#64748b"),
+          backgroundColor: szData.map((x) => (szColors[x.k] || CSS_TOKENS.txMuted()) + "BB"),
+          borderColor: szData.map((x) => szColors[x.k] || CSS_TOKENS.txMuted()),
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -1509,7 +1581,7 @@ function renderEnvCharts() {
       }
       function textColor(v) {
         const t = v / maxVal;
-        return t < 0.35 ? "#0B3443" : "#ffffff";
+        return t < 0.35 ? CSS_TOKENS.primary() : "#ffffff";
       }
 
       /* خلايا */
@@ -1548,7 +1620,7 @@ function renderEnvCharts() {
 
       /* --- محاور --- */
       const LABELS = ["0–20", "20–40", "40–60", "60–80", "80–100"];
-      const TIER_COLORS = ["#DC2626", "#D97706", "#059669", "#059669", "#0891B2"];
+      const TIER_COLORS = [CSS_TOKENS.danger(), CSS_TOKENS.warning(), CSS_TOKENS.positive(), CSS_TOKENS.positive(), CSS_TOKENS.info()];
 
       ctx.textAlign = "center";
       ctx.font = `700 10px ${FONT}`;
@@ -1559,7 +1631,7 @@ function renderEnvCharts() {
         ctx.fillStyle = TIER_COLORS[i];
         ctx.fillText(lbl, x, H - PAD.bottom + 14);
       });
-      ctx.fillStyle = "#6B8795";
+      ctx.fillStyle = CSS_TOKENS.txMuted();
       ctx.font = `700 11px ${FONT}`;
       ctx.fillText("FCA %", PAD.left + plotW / 2, H - PAD.bottom + 30);
 
@@ -1577,7 +1649,7 @@ function renderEnvCharts() {
       ctx.translate(13, PAD.top + plotH / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.textAlign = "center";
-      ctx.fillStyle = "#6B8795";
+      ctx.fillStyle = CSS_TOKENS.txMuted();
       ctx.font = `700 10px ${FONT}`;
       ctx.fillText("البيئة المدرسية %", 0, 0);
       ctx.restore();
@@ -1593,7 +1665,7 @@ function renderEnvCharts() {
     /* --- Tooltip تفاعلي --- */
     const tooltip = document.createElement("div");
     tooltip.style.cssText =
-      "position:fixed;background:rgba(7,24,33,.94);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;padding:10px 14px;border-radius:10px;pointer-events:none;display:none;z-index:9999;direction:rtl;max-width:220px;border:1px solid rgba(8,145,178,.3);line-height:1.6";
+      "position:fixed;background:rgba(7,24,33,.94);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;padding:10px 14px;border-radius:10px;pointer-events:none;display:none;z-index:9999;direction:rtl;max-width:220px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.3);line-height:1.6";
     document.body.appendChild(tooltip);
 
     canvas.addEventListener("mousemove", (e) => {
@@ -1706,7 +1778,7 @@ function renderEnvCharts() {
           label: "متوسط البيئة",
           data: eData.map((x) => +x.a.toFixed(1)),
           backgroundColor: "#059669BB",
-          borderColor: "#059669",
+          borderColor: CSS_TOKENS.positive(),
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -1719,10 +1791,10 @@ function renderEnvCharts() {
     r.envRating && (ratingMap[r.envRating] = (ratingMap[r.envRating] || 0) + 1);
   });
   makeDoughnut("ch-env-rating", ratingMap, {
-    التميز: "#0891B2",
-    التقدم: "#059669",
-    الانطلاق: "#D97706",
-    التهيئة: "#DC2626",
+    التميز: CSS_TOKENS.info(),
+    التقدم: CSS_TOKENS.positive(),
+    الانطلاق: CSS_TOKENS.warning(),
+    التهيئة: CSS_TOKENS.danger(),
   });
   const secMapEnv = {};
   D.forEach((r) => {
@@ -1758,10 +1830,10 @@ function renderEnvCharts() {
             `\n    <div class="school-row">\n      <span class="school-score" style="color:${color}">${pct(r.envScore)}</span>\n      <div class="mini-track"><div class="mini-fill" style="width:${r.envScore}%;background:${color}80"></div></div>\n      <div style="min-width:0;flex:2">\n        <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${esc(r.name)}</div>\n        <div style="font-size:10px;color:var(--tx-muted)">${esc(r.sector || r.district)} · ${esc(r.stage)} ${r.envRating ? "· <strong>" + esc(r.envRating) + "</strong>" : ""}${null != r.fca ? ' · FCA: <strong style="color:' + tierColor(r.fca) + '">' + pct(r.fca) + "</strong>" : ""}</div>\n      </div>\n    </div>`,
         )
         .join("");
-  ((document.getElementById("env-top-list").innerHTML = makeList(sorted.slice(0, 10), "#059669")),
+  ((document.getElementById("env-top-list").innerHTML = makeList(sorted.slice(0, 10), CSS_TOKENS.positive())),
     (document.getElementById("env-bot-list").innerHTML = makeList(
       [...sorted].reverse().slice(0, 10),
-      "#DC2626",
+      CSS_TOKENS.danger(),
     )));
 }
 /* ╔════════════════════════════════════════════════════════════╗
@@ -1802,7 +1874,7 @@ function renderStageCharts() {
             label: "بنات",
             data: stages.map((s) => D.filter((r) => r.stage === s && "بنات" === r.gender).length),
             backgroundColor: "#DC262688",
-            borderColor: "#DC2626",
+            borderColor: CSS_TOKENS.danger(),
             borderWidth: 1,
             borderRadius: 3,
           },
@@ -1810,7 +1882,7 @@ function renderStageCharts() {
             label: "بنين",
             data: stages.map((s) => D.filter((r) => r.stage === s && "بنين" === r.gender).length),
             backgroundColor: "#0891B288",
-            borderColor: "#0891B2",
+            borderColor: CSS_TOKENS.info(),
             borderWidth: 1,
             borderRadius: 3,
           },
@@ -1834,7 +1906,7 @@ function renderStageCharts() {
       label: "بنات",
       data: girlAvg.map((v) => (v ? +v.toFixed(1) : null)),
       backgroundColor: "#DC262688",
-      borderColor: "#DC2626",
+      borderColor: CSS_TOKENS.danger(),
       borderWidth: 1,
       borderRadius: 3,
     },
@@ -1842,7 +1914,7 @@ function renderStageCharts() {
       label: "بنين",
       data: boyAvg.map((v) => (v ? +v.toFixed(1) : null)),
       backgroundColor: "#0891B288",
-      borderColor: "#0891B2",
+      borderColor: CSS_TOKENS.info(),
       borderWidth: 1,
       borderRadius: 3,
     },
@@ -1869,7 +1941,7 @@ function renderStageCharts() {
           label: "مدارس",
           data: clData,
           backgroundColor: "#0891B2BB",
-          borderColor: "#0891B2",
+          borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -1897,7 +1969,7 @@ function renderStageCharts() {
           label: "مدارس",
           data: acData,
           backgroundColor: "#0E7490BB",
-          borderColor: "#0E7490",
+          borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
         },
@@ -1937,14 +2009,14 @@ function renderStageCompareTab() {
 
   // ألوان ديناميكية لأي عدد من المراحل
   const STAGE_PALETTE = [
-    {bg:"rgba(8,145,178,0.55)",  bd:"#0891B2", kc:"kc-blue"},
-    {bg:"rgba(124,58,237,0.55)", bd:"#7C3AED", kc:"kc-purple"},
-    {bg:"rgba(5,150,105,0.55)",  bd:"#059669", kc:"kc-green"},
-    {bg:"rgba(245,158,11,0.55)", bd:"#D97706", kc:"kc-amber"},
-    {bg:"rgba(239,68,68,0.55)",  bd:"#DC2626", kc:"kc-red"},
-    {bg:"rgba(99,102,241,0.55)", bd:"#6366F1", kc:"kc-blue"},
-    {bg:"rgba(20,184,166,0.55)", bd:"#14B8A6", kc:"kc-teal"},
-    {bg:"rgba(249,115,22,0.55)", bd:"#EA580C", kc:"kc-amber"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.info(),0.55)",  bd:CSS_TOKENS.info(), kc:"kc-blue"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.special(),0.55)", bd:CSS_TOKENS.special(), kc:"kc-purple"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.positive(),0.55)",  bd:CSS_TOKENS.positive(), kc:"kc-green"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.warning(),0.55)", bd:CSS_TOKENS.warning(), kc:"kc-amber"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.danger(),0.55)",  bd:CSS_TOKENS.danger(), kc:"kc-red"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.special(),0.55)", bd:CSS_TOKENS.special(), kc:"kc-blue"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.info2(),0.55)", bd:CSS_TOKENS.info2(), kc:"kc-teal"},
+    {bg:"CSS_TOKENS.α(CSS_TOKENS.warning(),0.55)", bd:CSS_TOKENS.warning(), kc:"kc-amber"},
   ];
 
   /* ── مصدر البيانات ── */
@@ -2089,7 +2161,7 @@ function renderStageCompareTab() {
         plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
         scales:{ x:{ticks:{font:{size:9},maxRotation:35},grid:{display:false}},
           y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:10}},
-            title:{display:true,text:"تقييم FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
+            title:{display:true,text:"تقييم FCA",font:{size:10,weight:"700"},color:CSS_TOKENS.txMuted()}} } }
     });
   }
 
@@ -2145,7 +2217,7 @@ function renderStageCompareTab() {
         plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
         scales:{ x:{ticks:{font:{size:10},maxRotation:40},grid:{display:false}},
           y:{beginAtZero:false,suggestedMin:0,suggestedMax:100,ticks:{font:{size:10}},
-            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
+            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:CSS_TOKENS.txMuted()}} } }
     });
   }
 
@@ -2185,7 +2257,7 @@ function renderStageCompareTab() {
         plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
         scales:{ x:{ticks:{font:{size:9},maxRotation:35},grid:{display:false}},
           y:{beginAtZero:true,suggestedMax:100,ticks:{font:{size:10}},
-            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:"#6B8795"}} } }
+            title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:CSS_TOKENS.txMuted()}} } }
     });
   }
 
@@ -2538,10 +2610,10 @@ function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
                 label: "المتوسط",
                 data: stageData.map((s) => +s.avg.toFixed(1)),
                 backgroundColor: stageData.map(
-                  (_, i) => [color, "#0891B2", "#059669", "#D97706"][i % 4] + "BB",
+                  (_, i) => [color, CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning()][i % 4] + "BB",
                 ),
                 borderColor: stageData.map(
-                  (_, i) => [color, "#0891B2", "#059669", "#D97706"][i % 4],
+                  (_, i) => [color, CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning()][i % 4],
                 ),
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -2620,7 +2692,7 @@ function renderTable() {
       tr.dataset.rowIdx = String(start + pageIdx);
       tr.dataset.minId = r.minId || "";
       ((tr.innerHTML = `
- <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div> </td> <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td> <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td> <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td> <td> <span class="badge" style="background:${"حكومي" === r.ownership ? "#ECFEFF" : "#FFFBEB"}; color:${"حكومي" === r.ownership ? "#0891B2" : "#D97706"}; border:1px solid ${"حكومي" === r.ownership ? "#A5F3FC" : "#FDE68A"}"> ${esc(r.ownership)} </span> </td> <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td> <td style="font-weight:700">${r.classrooms ?? "—"}</td> <td style="font-size:11px">${esc(r.schoolSize)}</td> <td> ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td> ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center"> ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span> <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'} </td> <td style="font-weight:700;color:${null != r.students ? "#059669" : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td> <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669") : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td> <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td> <td style="font-weight:700;color:${null != r.quantity ? "#059669" : "#ccc"}">${r.quantity ?? "—"}</td> <td style="font-weight:700;color:${null != r.unitValue ? "#0891B2" : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
+ <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div> </td> <td style="font-size:11px;display:${showCity ? "" : "none"}">${esc(r.city)}</td> <td style="font-size:11px;display:${showSector ? "" : "none"}">${esc(r.sector) || "—"}</td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td><span class="badge" style="${genderStyle};border:1px solid">${esc(r.gender)}</span></td> <td style="font-size:11px;white-space:normal">${esc(r.stage)}</td> <td> <span class="badge" style="background:${"حكومي" === r.ownership ? CSS_TOKENS.bgInfo() : CSS_TOKENS.bgWarning()}; color:${"حكومي" === r.ownership ? CSS_TOKENS.info() : CSS_TOKENS.warning()}; border:1px solid ${"حكومي" === r.ownership ? CSS_TOKENS.bgInfo() : CSS_TOKENS.bgWarning()}"> ${esc(r.ownership)} </span> </td> <td style="font-size:11px;max-width:100px;white-space:normal">${esc(r.district)}</td> <td style="font-weight:700">${r.classrooms ?? "—"}</td> <td style="font-size:11px">${esc(r.schoolSize)}</td> <td> ${null != r.fca ? `<span style="font-size:13px;font-weight:800;color:${fc}">${pct(r.fca)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td> ${null != r.envScore ? `<span style="font-size:13px;font-weight:800;color:${ec}">${pct(r.envScore)}</span>` : '<span style="color:#ddd">—</span>'} </td> <td style="background:${null != r.ayenScore ? tierBg(r.ayenScore) : "transparent"};text-align:center"> ${null != r.ayenScore ? `<span style="font-size:13px;font-weight:800;color:${tierColor(r.ayenScore)}">${r.ayenScore.toFixed(1)}%</span> <div style="height:3px;width:${Math.min(r.ayenScore, 100)}%;max-width:56px;margin:3px auto 0;background:${tierColor(r.ayenScore)};border-radius:2px;opacity:.55"></div>` : '<span style="color:#ddd">—</span>'} </td> <td style="font-weight:700;color:${null != r.students ? CSS_TOKENS.positive() : "#ccc"}">${null != r.students ? r.students.toLocaleString() : "—"}</td> <td style="font-weight:700;color:${null != r.buildingAge ? (r.buildingAge >= 40 ? CSS_TOKENS.danger() : r.buildingAge >= 25 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()) : "#ccc"}">${null != r.buildingAge ? r.buildingAge + ("en" === LANG ? " yr" : " سنة") : "—"}</td> <td style="font-size:11px;max-width:160px;white-space:normal;line-height:1.4;color:${r.description ? "var(--tx-main)" : "#ccc"}">${esc(r.description) || "—"}</td> <td style="font-weight:700;color:${null != r.quantity ? CSS_TOKENS.positive() : "#ccc"}">${r.quantity ?? "—"}</td> <td style="font-weight:700;color:${null != r.unitValue ? CSS_TOKENS.info() : "#ccc"}">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td>`),
         frag.appendChild(tr));
     }),
     tbody.appendChild(frag),
@@ -3035,28 +3107,28 @@ let _map = null,
   _mapMode = "fca";
 function getMarkerStyle(r, mode) {
   if ("fca" === mode) {
-    if (null == r.fca) return { color: "#94A3B8", label: "—" };
+    if (null == r.fca) return { color: CSS_TOKENS.txMuted(), label: "—" };
     const t = getTier(r.fca);
     return { color: TIER[t].color, label: pct(r.fca) };
   }
   if ("env" === mode) {
-    if (null == r.envScore) return { color: "#94A3B8", label: "—" };
+    if (null == r.envScore) return { color: CSS_TOKENS.txMuted(), label: "—" };
     const t = getTier(r.envScore);
     return { color: TIER[t].color, label: pct(r.envScore) };
   }
   if ("gender" === mode) {
     return {
-      color: "بنات" === r.gender ? "#DC2626" : "بنين" === r.gender ? "#0891B2" : "#94A3B8",
+      color: "بنات" === r.gender ? CSS_TOKENS.danger() : "بنين" === r.gender ? CSS_TOKENS.info() : CSS_TOKENS.txMuted(),
       label: r.gender || "—",
     };
   }
   if ("owner" === mode) {
     return {
-      color: "حكومي" === r.ownership ? "#0891B2" : "مستأجر" === r.ownership ? "#D97706" : "#94A3B8",
+      color: "حكومي" === r.ownership ? CSS_TOKENS.info() : "مستأجر" === r.ownership ? CSS_TOKENS.warning() : CSS_TOKENS.txMuted(),
       label: r.ownership || "—",
     };
   }
-  return { color: "#083D4F", label: "" };
+  return { color: CSS_TOKENS.primary(), label: "" };
 }
 function buildLegendHTML(mode) {
   if ("fca" === mode || "env" === mode) {
@@ -3256,7 +3328,7 @@ function renderStudentsTab() {
                 label: "عدد الطلاب",
                 data: top20stud.map((r) => r.students),
                 backgroundColor: "#05966988",
-                borderColor: "#059669",
+                borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -3297,7 +3369,7 @@ function renderStudentsTab() {
                       : "#05966988",
                 ),
                 borderColor: top20age.map((r) =>
-                  r.buildingAge >= 40 ? "#DC2626" : r.buildingAge >= 25 ? "#D97706" : "#059669",
+                  r.buildingAge >= 40 ? CSS_TOKENS.danger() : r.buildingAge >= 25 ? CSS_TOKENS.warning() : CSS_TOKENS.positive(),
                 ),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -3332,7 +3404,7 @@ function renderStudentsTab() {
                 label: "عدد المدارس",
                 data: studBinData,
                 backgroundColor: "#0891B2BB",
-                borderColor: "#0891B2",
+                borderColor: CSS_TOKENS.info(),
                 borderWidth: 1,
                 borderRadius: 4,
               },
@@ -3367,7 +3439,7 @@ function renderStudentsTab() {
                 ),
                 borderColor: ageBins.map(
                   (_, i) =>
-                    ["#059669", "#0891B2", "#D97706", "#D97706", "#DC2626", "#DC2626", "#7C3AED"][
+                    [CSS_TOKENS.positive(), CSS_TOKENS.info(), CSS_TOKENS.warning(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.danger(), CSS_TOKENS.special()][
                       i
                     ],
                 ),
@@ -3417,7 +3489,7 @@ function renderStudentsTab() {
                 label: "متوسط عمر المبنى",
                 data: stageAgeData.map((x) => +x.avg.toFixed(1)),
                 backgroundColor: ["#D97706BB", "#DC2626BB", "#0891B2BB", "#059669BB"],
-                borderColor: ["#D97706", "#DC2626", "#0891B2", "#059669"],
+                borderColor: [CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.info(), CSS_TOKENS.positive()],
                 borderWidth: 1.5,
                 borderRadius: 5,
               },
@@ -3439,7 +3511,7 @@ function renderStudentsTab() {
                 label: "إجمالي الطلاب",
                 data: distStudData.map((x) => x.total),
                 backgroundColor: "#05966988",
-                borderColor: "#059669",
+                borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1,
                 borderRadius: 4,
               },
@@ -3472,7 +3544,7 @@ function renderStudentsTab() {
                 p.age >= 40 ? "#DC262666" : p.age >= 25 ? "#D9770666" : "#05966666",
               ),
               borderColor: scatterPts1.map((p) =>
-                p.age >= 40 ? "#DC2626" : p.age >= 25 ? "#D97706" : "#059669",
+                p.age >= 40 ? CSS_TOKENS.danger() : p.age >= 25 ? CSS_TOKENS.warning() : CSS_TOKENS.positive(),
               ),
               borderWidth: 1,
               pointRadius: 4,
@@ -3514,7 +3586,7 @@ function renderStudentsTab() {
               label: "المدارس",
               data: scatterPts2,
               backgroundColor: "#0891B266",
-              borderColor: "#0891B2",
+              borderColor: CSS_TOKENS.info(),
               borderWidth: 1,
               pointRadius: 4,
               pointHoverRadius: 7,
@@ -3575,8 +3647,8 @@ function renderAcPlanTab() {
   const el = document.getElementById("ac-plan-content");
   if (!el) return;
   const data = AC_PLAN_DATA,
-    COLOR_SPLIT = "#0891B2",
-    COLOR_WINDOW = "#D97706",
+    COLOR_SPLIT = CSS_TOKENS.info(),
+    COLOR_WINDOW = CSS_TOKENS.warning(),
     totalSplit = data.reduce((s, r) => s + (r.split || 0), 0),
     totalWindow = data.reduce((s, r) => s + (r.window || 0), 0),
     totalAll = totalSplit + totalWindow,
@@ -3988,7 +4060,7 @@ function renderKpiTabGeneric_(opts) {
     mostDeclined = sortedByDelta[0] || null,
     mostImproved = sortedByDelta[sortedByDelta.length - 1] || null;
 
-  const deltaColor = (d) => (d > 0 ? "#059669" : d < 0 ? "#DC2626" : "#64748B"),
+  const deltaColor = (d) => (d > 0 ? CSS_TOKENS.positive() : d < 0 ? CSS_TOKENS.danger() : CSS_TOKENS.txMuted()),
     deltaArrow = (d) => (d > 0 ? "▲" : d < 0 ? "▼" : "—"),
     deltaText = (d) => (d === null ? "—" : `${d > 0 ? "+" : ""}${d.toFixed(2)}`),
     pctText = (v) => (v === null ? "—" : v.toFixed(2) + "%");
@@ -4117,7 +4189,7 @@ function renderKpiTabGeneric_(opts) {
           {
             label: "المتوسط العام",
             data: [...monthlyAvg, ...Array(nFuture).fill(null)],
-            borderColor: "#64748B",
+            borderColor: CSS_TOKENS.txMuted(),
             borderDash: [6, 4],
             borderWidth: 2,
             tension: 0.3,
@@ -4329,7 +4401,7 @@ function renderSecuritySafetyTab() {
   </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = ["#DC2626","#7C3AED","#1D4ED8","#D97706","#059669","#0891B2","#DB2777","#EA580C","#65A30D","#0284C7"];
+    const PAL = CSS_TOKENS.palette(); // palette موحد من :root
 
     // نوع الحادث — أفقي
     const cType = document.getElementById("ch-sec-type");
@@ -4359,7 +4431,7 @@ function renderSecuritySafetyTab() {
       killChart("ch-sec-month");
       CHARTS["ch-sec-month"] = new Chart(cMonth, {
         type: "line",
-        data: { labels: monthKeys, datasets: [{ data: monthVals, borderColor:"#DC2626", backgroundColor:"rgba(220,38,38,0.08)", borderWidth:2, fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:"#DC2626" }] },
+        data: { labels: monthKeys, datasets: [{ data: monthVals, borderColor:CSS_TOKENS.danger(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.danger(), 0.08), borderWidth:2, fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:CSS_TOKENS.danger() }] },
         options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false }
       });
     }
@@ -4370,7 +4442,7 @@ function renderSecuritySafetyTab() {
       killChart("ch-sec-edadmin");
       CHARTS["ch-sec-edadmin"] = new Chart(cEd, {
         type: "bar",
-        data: { labels: edAdminEntries.map(e=>e[0]), datasets: [{ data: edAdminEntries.map(e=>e[1]), backgroundColor:"#1D4ED8", borderRadius:4 }] },
+        data: { labels: edAdminEntries.map(e=>e[0]), datasets: [{ data: edAdminEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.info(), borderRadius:4 }] },
         options: { indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}, maintainAspectRatio:false }
       });
     }
@@ -4385,7 +4457,7 @@ function renderSpareTab() {
   const el = document.getElementById("spare-content");
   if (!el) return;
   const D = FILTERED,
-    COLOR = "#0E7490",
+    COLOR = CSS_TOKENS.info(),
     rows = D.filter((r) => r.description || null != r.quantity || null != r.unitValue);
   if (!rows.length)
     return void (el.innerHTML =
@@ -4434,7 +4506,7 @@ function renderSpareTab() {
                 label: "الكمية",
                 data: top20qty.map((r) => r.quantity),
                 backgroundColor: "#05966999",
-                borderColor: "#059669",
+                borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -4502,10 +4574,10 @@ function renderSpareTab() {
                 label: "الكمية",
                 data: stageArr.map((s) => s[1].qty),
                 backgroundColor: stageArr.map(
-                  (_, i) => ["#059669", COLOR, "#7C3AED", "#D97706"][i % 4] + "BB",
+                  (_, i) => [CSS_TOKENS.positive(), COLOR, CSS_TOKENS.special(), CSS_TOKENS.warning()][i % 4] + "BB",
                 ),
                 borderColor: stageArr.map(
-                  (_, i) => ["#059669", COLOR, "#7C3AED", "#D97706"][i % 4],
+                  (_, i) => [CSS_TOKENS.positive(), COLOR, CSS_TOKENS.special(), CSS_TOKENS.warning()][i % 4],
                 ),
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -4528,10 +4600,10 @@ function renderSpareTab() {
                 label: "إجمالي القيمة",
                 data: stageArr.map((s) => +s[1].val.toFixed(0)),
                 backgroundColor: stageArr.map(
-                  (_, i) => ["#7C3AED", "#D97706", COLOR, "#059669"][i % 4] + "BB",
+                  (_, i) => [CSS_TOKENS.special(), CSS_TOKENS.warning(), COLOR, CSS_TOKENS.positive()][i % 4] + "BB",
                 ),
                 borderColor: stageArr.map(
-                  (_, i) => ["#7C3AED", "#D97706", COLOR, "#059669"][i % 4],
+                  (_, i) => [CSS_TOKENS.special(), CSS_TOKENS.warning(), COLOR, CSS_TOKENS.positive()][i % 4],
                 ),
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -4727,7 +4799,7 @@ function renderAyenTab() {
                 label: "متوسط عاين",
                 data: genderData.map((x) => +x.avg.toFixed(1)),
                 backgroundColor: genderData.map((x) => gColors[x.k] || "#083D4F88"),
-                borderColor: genderData.map((x) => (gColors[x.k] || "#083D4F").replace("88", "FF")),
+                borderColor: genderData.map((x) => (gColors[x.k] || CSS_TOKENS.primary()).replace("88", "FF")),
                 borderWidth: 1.5,
                 borderRadius: 5,
               },
@@ -4754,7 +4826,7 @@ function renderAyenTab() {
                 label: "متوسط عاين",
                 data: ownerData.map((x) => +x.avg.toFixed(1)),
                 backgroundColor: ownerData.map((x) => oColors[x.k] || "#083D4F88"),
-                borderColor: ownerData.map((x) => (oColors[x.k] || "#083D4F").replace("88", "FF")),
+                borderColor: ownerData.map((x) => (oColors[x.k] || CSS_TOKENS.primary()).replace("88", "FF")),
                 borderWidth: 1.5,
                 borderRadius: 5,
               },
@@ -4890,8 +4962,8 @@ function renderAyenTab() {
           `\n    <div class="school-row">\n      <span class="school-score" style="color:${color}">${r.ayenScore.toFixed(1)}%</span>\n      <div class="mini-track"><div class="mini-fill" style="width:${r.ayenScore}%;background:${color}80"></div></div>\n      <div style="min-width:0;flex:2">\n        <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${esc(r.name)}</div>\n        <div style="font-size:10px;color:var(--tx-muted)">\n          FCA: <strong style="color:${null != r.fca ? tierColor(r.fca) : "#ccc"}">${null != r.fca ? pct(r.fca) : "—"}</strong>\n          ${null != r.envScore ? ` · بيئة: <strong>${pct(r.envScore)}</strong>` : ""}\n          · ${esc(r.district || r.sector || "")} · ${esc(r.stage || "")}\n        </div>\n      </div>\n    </div>`,
       )
       .join("");
-  ((document.getElementById("ayen-worst-list").innerHTML = makeAyenList(worst10, "#DC2626")),
-    (document.getElementById("ayen-best-list").innerHTML = makeAyenList(best10, "#059669")),
+  ((document.getElementById("ayen-worst-list").innerHTML = makeAyenList(worst10, CSS_TOKENS.danger())),
+    (document.getElementById("ayen-best-list").innerHTML = makeAyenList(best10, CSS_TOKENS.positive())),
     renderAyenTable());
 }
 function renderAyenTable() {
@@ -4930,7 +5002,7 @@ function renderAyenTable() {
       tier = getTier(r.ayenScore),
       tierLbl = TIER[tier]?.label || "—",
       tierClr = TIER[tier]?.color || "#888",
-      tierBg = TIER[tier]?.bg || "#f5f5f5",
+      tierBg = TIER[tier]?.bg || CSS_TOKENS.bgNeutral(),
       tr = document.createElement("tr");
  ((tr.innerHTML = ` <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;white-space:normal;line-height:1.4">${esc(r.name)}</div> <div style="font-size:10px;color:var(--tx-muted)">${esc(r.district || "")}</div> </td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td style="font-size:11px">${esc(r.district) || "—"}</td> <td style="font-size:11px">${esc(r.stage) || "—"}</td> <td style="font-size:11px">${esc(r.gender) || "—"}</td> <td><span style="font-weight:800;color:${fc}">${pct(r.fca)}</span></td> <td><span style="font-weight:800;color:${ec}">${pct(r.envScore)}</span></td> <td> <span style="font-size:14px;font-weight:900;color:${ac}">${r.ayenScore.toFixed(1)}%</span> <div style="height:4px;width:${r.ayenScore}%;max-width:60px;background:${ac};border-radius:2px;margin-top:3px;opacity:.6"></div> </td> <td> <span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px; background:${tierBg};color:${tierClr};border:1px solid ${tierClr}44;white-space:nowrap"> ${tierLbl} </span> </td>`),
       frag.appendChild(tr));
@@ -5124,7 +5196,7 @@ function renderAllContractsBody() {
     .map(([name, f]) => ({ name, ...f }))
     .sort((a, b) => b.updated - a.updated);
 
-  const regionColors = ["#0891B2", "#059669", "#D97706", "#7C3AED", "#DC2626", "#0E7490", "#DB2777", "#65A30D"];
+  const regionColors = [CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning(), CSS_TOKENS.special(), CSS_TOKENS.danger(), CSS_TOKENS.info(), CSS_TOKENS.danger(), CSS_TOKENS.positive()];
   const regions = Object.keys(byRegion);
   const topContractors = Object.entries(byContractor)
     .sort((a, b) => b[1] - a[1])
@@ -5147,7 +5219,7 @@ function renderAllContractsBody() {
         <div style="font-size:18px;font-weight:800;color:#0E7490">${fmt(totalSpent, 0)}</div>
         <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
       </div>
-      <div class="card" style="border-top:3px solid ${expired ? "#DC2626" : "#059669"};padding:16px">
+      <div class="card" style="border-top:3px solid ${expired ? CSS_TOKENS.danger() : CSS_TOKENS.positive()};padding:16px">
         <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">جارية / منتهية / قاربت</div>
         <div style="font-size:20px;font-weight:800;color:var(--tx-main)">
           <span style="color:#059669">${active}</span>
@@ -5206,13 +5278,13 @@ function renderAllContractsBody() {
           <tbody>
             ${contractorFinRows
               .map(
-                (c, i) => `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">
+                (c, i) => `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">
                   <td style="padding:9px 10px;font-weight:700">${esc(c.name)}</td>
                   <td style="padding:9px 10px;font-weight:700;color:#0891B2">${c.count}</td>
                   <td style="padding:9px 10px">${fmt(c.base, 0)} ر.س</td>
                   <td style="padding:9px 10px;font-weight:700;color:#7C3AED">${fmt(c.updated, 0)} ر.س</td>
                   <td style="padding:9px 10px;color:#0E7490">${fmt(c.spent, 0)} ر.س</td>
-                  <td style="padding:9px 10px;font-weight:700;color:${c.due > 0 ? "#DC2626" : "var(--tx-muted)"}">${fmt(c.due, 0)} ر.س</td>
+                  <td style="padding:9px 10px;font-weight:700;color:${c.due > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(c.due, 0)} ر.س</td>
                   <td style="padding:9px 10px">${fmt(c.lastInvoice, 0)} ر.س</td>
                   <td style="padding:9px 10px">${c.updated ? Math.round((c.spent / c.updated) * 100) : 0}%</td>
                 </tr>`,
@@ -5268,7 +5340,7 @@ function renderAllContractsBody() {
                       ? "—"
                       : rem <= 0
                         ? `<span style="color:#DC2626;font-weight:800">${rem} (منتهي)</span>`
-                        : `<span style="color:${rem <= 90 ? "#D97706" : "#059669"};font-weight:800">${rem}</span>`,
+                        : `<span style="color:${rem <= 90 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()};font-weight:800">${rem}</span>`,
                   lastVal = num(r["القيمة"]),
                   lastMonth = r["الشهر"],
                   lastYear = r["السنة"],
@@ -5278,7 +5350,7 @@ function renderAllContractsBody() {
                       : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`,
                   dueVal = num(r["القيمة المستحقة للمستخلصات حتى تاريخه"]),
                   responsible = [r["اسم المسؤل من المقاول"], r["رقم التواصل"]].filter(Boolean).join(" · ");
-                return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">
+                return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:160px">${esc(r["المقاول"] || "")}</td>
                   <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:240px">${esc(r["المشروع"] || "")}</td>
@@ -5319,7 +5391,7 @@ function renderAllContractsBody() {
                 label: "جارية",
                 data: regionActive,
                 backgroundColor: "#05966988",
-                borderColor: "#059669",
+                borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5327,7 +5399,7 @@ function renderAllContractsBody() {
                 label: "منتهية",
                 data: regionExpired,
                 backgroundColor: "#DC262688",
-                borderColor: "#DC2626",
+                borderColor: CSS_TOKENS.danger(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5377,7 +5449,7 @@ function renderAllContractsBody() {
                 label: "عدد العقود",
                 data: ctrData,
                 backgroundColor: "#0891B299",
-                borderColor: "#0891B2",
+                borderColor: CSS_TOKENS.info(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5406,7 +5478,7 @@ function renderAllContractsBody() {
                 label: "قيمة العقد المحدثة",
                 data: topValRows.map((c) => c.updated),
                 backgroundColor: "#7C3AED99",
-                borderColor: "#7C3AED",
+                borderColor: CSS_TOKENS.special(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5414,7 +5486,7 @@ function renderAllContractsBody() {
                 label: "المستخلصات المصروفة",
                 data: topValRows.map((c) => c.spent),
                 backgroundColor: "#0E749099",
-                borderColor: "#0E7490",
+                borderColor: CSS_TOKENS.info(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5422,7 +5494,7 @@ function renderAllContractsBody() {
                 label: "القيمة المستحقة",
                 data: topValRows.map((c) => c.due),
                 backgroundColor: "#DC262699",
-                borderColor: "#DC2626",
+                borderColor: CSS_TOKENS.danger(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
@@ -5456,32 +5528,32 @@ function renderAllContractsBody() {
   "undefined" != typeof Chart &&
     ((Chart.defaults.font.family = "'IBM Plex Sans Arabic','Tajawal',sans-serif"),
     (Chart.defaults.font.weight = "500"),
-    (Chart.defaults.color = "#2E6478"),
+    (Chart.defaults.color = CSS_TOKENS.txSec()),
     (Chart.defaults.plugins.legend.labels.usePointStyle = !0),
     (Chart.defaults.plugins.legend.labels.padding = 12),
-    (Chart.defaults.plugins.tooltip.backgroundColor = "#083D4F"),
-    (Chart.defaults.plugins.tooltip.titleColor = "#06B6D4"),
+    (Chart.defaults.plugins.tooltip.backgroundColor = CSS_TOKENS.primary()),
+    (Chart.defaults.plugins.tooltip.titleColor = CSS_TOKENS.info()),
     (Chart.defaults.plugins.tooltip.bodyColor = "rgba(255,255,255,.88)"),
-    (Chart.defaults.plugins.tooltip.borderColor = "rgba(8,145,178,.35)"),
+    (Chart.defaults.plugins.tooltip.borderColor = CSS_TOKENS.α(CSS_TOKENS.info(), .35)),
     (Chart.defaults.plugins.tooltip.borderWidth = 1),
     (Chart.defaults.plugins.tooltip.padding = 10),
     (Chart.defaults.plugins.tooltip.cornerRadius = 8),
     (Chart.defaults.scale.grid.color = "rgba(0,0,0,.04)"),
     (Chart.defaults.elements.bar.borderSkipped = !1)));
 const SYS_TIER = {
-  حرج: { color: "#DC2626", bg: "#FEF2F2", border: "#DC262644" },
-  متوسط: { color: "#D97706", bg: "#FFFBEB", border: "#D9770644" },
-  جيد: { color: "#059669", bg: "#ECFDF5", border: "#05966944" },
-  "جيد جداً": { color: "#0891B2", bg: "#ECFEFF", border: "#0891B244" },
+  حرج: { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), border: "#DC262644" },
+  متوسط: { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), border: "#D9770644" },
+  جيد: { color: CSS_TOKENS.positive(), bg: CSS_TOKENS.bgPositive(), border: "#05966944" },
+  "جيد جداً": { color: CSS_TOKENS.info(), bg: CSS_TOKENS.bgInfo(), border: "#0891B244" },
 };
 function sysBadge(cat) {
-  const t = SYS_TIER[cat] || { color: "#64748b", bg: "#f1f5f9", border: "#64748b44" };
+  const t = SYS_TIER[cat] || { color: CSS_TOKENS.txMuted(), bg: "#f1f5f9", border: "#64748b44" };
   return `<span style="padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;\n    background:${t.bg};color:${t.color};border:1px solid ${t.border}">${cat || "—"}</span>`;
 }
 function sysScoreDot(score) {
   const s = parseFloat(score);
   if (isNaN(s)) return '<span style="color:var(--tx-muted)">—</span>';
-  return `<span style="font-weight:800;color:${["", "#DC2626", "#D97706", "#D97706", "#059669", "#0891B2"][Math.round(s)] || "#64748b"}">${s.toFixed(0)}</span>`;
+  return `<span style="font-weight:800;color:${["", CSS_TOKENS.danger(), CSS_TOKENS.warning(), CSS_TOKENS.warning(), CSS_TOKENS.positive(), CSS_TOKENS.info()][Math.round(s)] || CSS_TOKENS.txMuted()}">${s.toFixed(0)}</span>`;
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  ⚙️  JS تبويب: الأنظمة الرئيسية
@@ -5586,7 +5658,7 @@ function renderSysMain() {
       const total = Object.values(cats).reduce((a, b) => a + b, 0),
         pctCrit = total ? (((cats["حرج"] || 0) / total) * 100).toFixed(1) : "0.0",
         barW = parseFloat(pctCrit);
-      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"}">\n              <td style="padding:10px 14px;font-weight:600">${esc(sys)}</td>\n              <td style="padding:10px;text-align:center;color:#DC2626;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#D97706;font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#059669;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#0891B2;font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;font-weight:600">${total.toLocaleString()}</td>\n                          </tr>`;
+      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">\n              <td style="padding:10px 14px;font-weight:600">${esc(sys)}</td>\n              <td style="padding:10px;text-align:center;color:#DC2626;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#D97706;font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#059669;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#0891B2;font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;font-weight:600">${total.toLocaleString()}</td>\n                          </tr>`;
     })
     .join(
       "",
@@ -5626,7 +5698,7 @@ function renderSysMain() {
       const avgLabels = sysAvg.filter((s) => "6" !== s.name).map((s) => s.name),
         avgVals = sysAvg.filter((s) => "6" !== s.name).map((s) => +s.avg.toFixed(2)),
         barColors = avgVals.map((v) =>
-          v >= 4 ? "#0891B2" : v >= 3 ? "#059669" : v >= 2 ? "#D97706" : "#DC2626",
+          v >= 4 ? CSS_TOKENS.info() : v >= 3 ? CSS_TOKENS.positive() : v >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(),
         );
       (killChart("ch-sys-avg"),
         (CHARTS["ch-sys-avg"] = new Chart(document.getElementById("ch-sys-avg"), {
@@ -5661,7 +5733,7 @@ function renderSysMain() {
         })));
       const tierLabels = Object.keys(tierCount).filter((k) => k),
         tierVals = tierLabels.map((k) => tierCount[k]),
-        tierColors = tierLabels.map((k) => SYS_TIER[k]?.color || "#64748b");
+        tierColors = tierLabels.map((k) => SYS_TIER[k]?.color || CSS_TOKENS.txMuted());
       (killChart("ch-sys-tier"),
         (CHARTS["ch-sys-tier"] = new Chart(document.getElementById("ch-sys-tier"), {
           type: "doughnut",
@@ -5706,14 +5778,14 @@ function fillSysMainTable(rows) {
         try {
           const scoreNum = parseFloat(r.score),
             scoreClr = isNaN(scoreNum)
-              ? "#64748b"
+              ? CSS_TOKENS.txMuted()
               : scoreNum >= 70
-                ? "#0891B2"
+                ? CSS_TOKENS.info()
                 : scoreNum >= 50
-                  ? "#059669"
+                  ? CSS_TOKENS.positive()
                   : scoreNum >= 35
-                    ? "#D97706"
-                    : "#DC2626",
+                    ? CSS_TOKENS.warning()
+                    : CSS_TOKENS.danger(),
             sysAvgCells = systems
               .map((s) => {
                 try {
@@ -5721,7 +5793,7 @@ function fillSysMainTable(rows) {
                   if (!sg)
                     return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
                   const av = sg.sum / sg.cnt;
-                  return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av >= 4 ? "#0891B2" : av >= 3 ? "#059669" : av >= 2 ? "#D97706" : "#DC2626"}">${av.toFixed(1)}</td>`;
+                  return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av >= 4 ? CSS_TOKENS.info() : av >= 3 ? CSS_TOKENS.positive() : av >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${av.toFixed(1)}</td>`;
                 } catch (_) {
                   return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
                 }
@@ -5735,10 +5807,10 @@ function fillSysMainTable(rows) {
             data-sysm-minid="${esc(minIdDisplay)}"
             data-sysm-name="${esc(String(r.name || "").trim())}"
             data-sysm-city="${esc(String(r.city || "").trim())}"
-            style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "#fbfdfe"};cursor:pointer"
+            style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()};cursor:pointer"
             title="انقر لعرض تفاصيل المدرسة">
             <td style="padding:9px 12px;font-weight:600;white-space:normal;line-height:1.4">${esc(r.name || "")}</td>
-            <td style="padding:9px 8px;white-space:nowrap;font-size:11px;color:${minIdDisplay ? "#0891B2" : "var(--tx-muted)"};font-weight:${minIdDisplay ? "700" : "400"}">${minIdDisplay ? esc(minIdDisplay) : "—"}</td>
+            <td style="padding:9px 8px;white-space:nowrap;font-size:11px;color:${minIdDisplay ? CSS_TOKENS.info() : "var(--tx-muted)"};font-weight:${minIdDisplay ? "700" : "400"}">${minIdDisplay ? esc(minIdDisplay) : "—"}</td>
             <td style="padding:9px 8px;white-space:nowrap">${esc(r.city || "")}</td>
             <td style="padding:9px 8px;font-weight:800;color:${scoreClr};white-space:nowrap">${isNaN(scoreNum) ? "—" : scoreNum.toFixed(1) + "%"}</td>
             <td style="padding:9px 8px">${sysBadge(r.tier)}</td>
@@ -5902,7 +5974,7 @@ function _sysBrowseRenderMain() {
     const info = sysMap[s];
     const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
     const avgNum = parseFloat(avg);
-    const clr = isNaN(avgNum) ? "#64748b" : avgNum >= 4 ? "#0891B2" : avgNum >= 3 ? "#059669" : avgNum >= 2 ? "#D97706" : "#DC2626";
+    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum >= 4 ? CSS_TOKENS.info() : avgNum >= 3 ? CSS_TOKENS.positive() : avgNum >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
     const icon = _sysBrowseIcon(s);
     const schoolsCnt = info.schools.size;
     return `<div onclick="sysBrowseSelectMain('${s.replace(/'/g,"\\'")}')
@@ -5971,7 +6043,7 @@ function sysBrowseSelectMain(mainSys) {
     const info = subMap[s];
     const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
     const avgNum = parseFloat(avg);
-    const clr = isNaN(avgNum) ? "#64748b" : avgNum >= 4 ? "#0891B2" : avgNum >= 3 ? "#059669" : avgNum >= 2 ? "#D97706" : "#DC2626";
+    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum >= 4 ? CSS_TOKENS.info() : avgNum >= 3 ? CSS_TOKENS.positive() : avgNum >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
     const bar = info.cnt
       ? Math.round((avgNum / 5) * 100)
       : 0;
@@ -6127,13 +6199,13 @@ function renderSysDetail() {
     bodyRows = showSch
       .map((s) => {
         const sc = s.score || 0,
-          scoreClr = sc >= 70 ? "#0891B2" : sc >= 50 ? "#059669" : sc >= 35 ? "#D97706" : "#DC2626",
+          scoreClr = sc >= 70 ? CSS_TOKENS.info() : sc >= 50 ? CSS_TOKENS.positive() : sc >= 35 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(),
           cells = subCols
             .map((sys) => {
               const sg = s.systems[sys];
               if (!sg) return '<td style="text-align:center;color:var(--tx-muted)">—</td>';
               const v = sg.sum / sg.cnt;
-              return `<td style="text-align:center;font-weight:700;color:${v >= 4 ? "#0891B2" : v >= 3 ? "#059669" : v >= 2 ? "#D97706" : "#DC2626"}">${v.toFixed(1)}</td>`;
+              return `<td style="text-align:center;font-weight:700;color:${v >= 4 ? CSS_TOKENS.info() : v >= 3 ? CSS_TOKENS.positive() : v >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${v.toFixed(1)}</td>`;
             })
             .join("");
         return `<tr>\n      <td style="white-space:nowrap">${esc(s.id || "—")}</td>\n      <td style="white-space:normal;word-break:break-word">${esc(s.name || "")}</td>\n      <td style="text-align:center;font-weight:800;color:${scoreClr};white-space:nowrap">${sc > 0 ? sc.toFixed(1) + "%" : "—"}</td>\n      ${cells}\n    </tr>`;
@@ -6148,25 +6220,25 @@ function renderSysDetail() {
           `<option value="${n}" ${n === showN ? "selected" : ""}>${n === hmSchools.length ? "الكل (" + n + ")" : n + " مدرسة"}</option>`,
       )
       .join("");
-  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:rgba(8,145,178,.1);color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
+  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:CSS_TOKENS.α(CSS_TOKENS.info(),.1);color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
     .map((row, i) => {
       const cats = subTiers[row.name] || {},
         total = row.cnt,
         pctCrit = total ? (((cats["حرج"] || 0) / total) * 100).toFixed(1) : "0.0",
         avgClr =
           row.avg >= 4
-            ? "#0891B2"
+            ? CSS_TOKENS.info()
             : row.avg >= 3
-              ? "#059669"
+              ? CSS_TOKENS.positive()
               : row.avg >= 2
-                ? "#D97706"
-                : "#DC2626",
+                ? CSS_TOKENS.warning()
+                : CSS_TOKENS.danger(),
         riskW = parseFloat(pctCrit);
       return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-2)"}">\n              <td style="padding:9px 14px;font-size:10px;color:var(--tx-muted)">${esc(row.main || "")}</td>\n              <td style="padding:9px 14px;font-weight:600">${esc(row.name)}</td>\n              <td style="padding:9px 8px;text-align:center">\n                <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;color:${avgClr};background:${avgClr}18">${row.avg.toFixed(2)}</span>\n              </td>\n              <td style="padding:9px 8px;text-align:center;color:#DC2626;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#D97706;font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#059669;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#0891B2;font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              \n            </tr>`;
     })
     .join(
       "",
-    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:rgba(8,145,178,.1);color:var(--teal);border:1px solid rgba(8,145,178,.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
+    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:CSS_TOKENS.α(CSS_TOKENS.info(),.1);color:var(--teal);border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
     requestAnimationFrame(() => {
       const subLabels = subAvg.map((s) =>
           s.name,
@@ -6203,7 +6275,7 @@ function renderSysDetail() {
                 title: {
                   display: !0,
                   text: "التقييم (1–5)",
-                  color: "#6B8795",
+                  color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
               },
@@ -6212,7 +6284,7 @@ function renderSysDetail() {
                 title: {
                   display: !0,
                   text: "النظام الفرعي",
-                  color: "#6B8795",
+                  color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
               },
@@ -6254,7 +6326,7 @@ function renderSysDetail() {
                 title: {
                   display: !0,
                   text: "نسبة الحرج (%)",
-                  color: "#6B8795",
+                  color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
               },
@@ -6263,7 +6335,7 @@ function renderSysDetail() {
                 title: {
                   display: !0,
                   text: "النظام الفرعي",
-                  color: "#6B8795",
+                  color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
               },
@@ -7193,7 +7265,7 @@ function _sysExcelTableHTML(title, headers, rows) {
               </select>
             </span>
           </div>
-          ${renderBarList(schoolCounts, totalForBars, "#D97706", (sn) => {
+          ${renderBarList(schoolCounts, totalForBars, CSS_TOKENS.warning(), (sn) => {
             const name = schoolNumberNameMap[sn] || sn;
             // نستخدم data-sn بدل onclick inline لتفادي كسر الـ JS لو كان sn يحتوي '
             const safeAttr = escText(sn);
@@ -7206,7 +7278,7 @@ function _sysExcelTableHTML(title, headers, rows) {
             <span class="card-title-icon" style="background:#FEE2E2;color:#B91C1C">⚠️</span>
             <span>الأولوية</span>
           </div>
-          ${renderBarList(priorityCounts, totalForBars, "#DC2626", balaghPriorityLabel)}
+          ${renderBarList(priorityCounts, totalForBars, CSS_TOKENS.danger(), balaghPriorityLabel)}
         </div>
       </div>
 
@@ -7216,14 +7288,14 @@ function _sysExcelTableHTML(title, headers, rows) {
             <span class="card-title-icon" style="background:#E0F2FE;color:#0369A1">🏷️</span>
             <span>الفئات</span>
           </div>
-          ${renderBarList(categoryCounts, totalForBars, "#0891B2")}
+          ${renderBarList(categoryCounts, totalForBars, CSS_TOKENS.info())}
         </div>
         <div class="card">
           <div class="card-title">
             <span class="card-title-icon" style="background:#ECFDF5;color:#047857">📍</span>
             <span>المدن / المواقع</span>
           </div>
-          ${renderBarList(locationCounts, totalForBars, "#059669")}
+          ${renderBarList(locationCounts, totalForBars, CSS_TOKENS.positive())}
         </div>
       </div>
 
@@ -7313,12 +7385,12 @@ function _sysExcelTableHTML(title, headers, rows) {
                 <tr>
                   <td style="font-weight:800">${escText(r.recordNo)}</td>
                   <td>${escText(r.creationDate)}</td>
-                  <td><span class="badge" style="background:${r.isClosed ? "#ECFDF5" : r.isOverdue ? "#FEF2F2" : "#FFF7ED"};color:${r.isClosed ? "#047857" : r.isOverdue ? "#B91C1C" : "#B45309"}">${escText(balaghStatusLabel(r.status))}</span></td>
+                  <td><span class="badge" style="background:${r.isClosed ? CSS_TOKENS.bgPositive() : r.isOverdue ? CSS_TOKENS.bgDanger() : CSS_TOKENS.bgWarning()};color:${r.isClosed ? CSS_TOKENS.positive() : r.isOverdue ? CSS_TOKENS.danger() : CSS_TOKENS.warning()}">${escText(balaghStatusLabel(r.status))}</span></td>
                   <td style="text-align:right;font-weight:700">${escText(r.schoolName)}</td>
                   <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? '#0891B2' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
                   <td>${escText(r.location)}</td>
                   <td>${escText(r.category)}</td>
-                  <td><span class="badge" style="background:${r.priority === "Critical" ? "#FEE2E2" : r.priority === "High" ? "#FEF3C7" : "#ECFDF5"};color:${r.priority === "Critical" ? "#991B1B" : r.priority === "High" ? "#B45309" : "#047857"}">${escText(balaghPriorityLabel(r.priority))}</span></td>
+                  <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
                   <td style="text-align:right;max-width:320px">${escText(r.problemDescription)}</td>
                   <td style="text-align:right;max-width:360px">${escText(r.issueDescription || "—")}</td>
                   <td>${escText(r.creator || "—")}</td>
@@ -7455,7 +7527,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                   backgroundColor: PALETTE.map((c) => c + "BB")
                     .slice(0, monthVals.length)
                     .map((_, i) => (i === monthVals.length - 1 ? "#D97706BB" : "#0891B2BB")),
-                  borderColor: "#0891B2",
+                  borderColor: CSS_TOKENS.info(),
                   borderWidth: 1.5,
                   borderRadius: 6,
                 },
@@ -7476,7 +7548,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                   title: {
                     display: true,
                     text: "عدد البلاغات",
-                    color: "#6B8795",
+                    color: CSS_TOKENS.txMuted(),
                     font: { size: 10, weight: "700" },
                   },
                 },
@@ -7515,7 +7587,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                   label: "مغلقة",
                   data: last18Months.map((k) => monthClosedMap.get(k) || 0),
                   backgroundColor: "#05966999",
-                  borderColor: "#059669",
+                  borderColor: CSS_TOKENS.positive(),
                   borderWidth: 1.5,
                   borderRadius: 4,
                 },
@@ -7523,7 +7595,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                   label: "قيد التنفيذ",
                   data: last18Months.map((k) => monthProgMap.get(k) || 0),
                   backgroundColor: "#0891B299",
-                  borderColor: "#0891B2",
+                  borderColor: CSS_TOKENS.info(),
                   borderWidth: 1.5,
                   borderRadius: 4,
                 },
@@ -7531,7 +7603,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                   label: "مفتوحة",
                   data: last18Months.map((k) => monthOpenMap.get(k) || 0),
                   backgroundColor: "#DC262699",
-                  borderColor: "#DC2626",
+                  borderColor: CSS_TOKENS.danger(),
                   borderWidth: 1.5,
                   borderRadius: 4,
                 },
@@ -7585,9 +7657,9 @@ function _sysExcelTableHTML(title, headers, rows) {
                 label: "بلاغات أسبوعية",
                 data: weekVals,
                 backgroundColor: "rgba(109,40,217,0.12)",
-                borderColor: "#7C3AED",
+                borderColor: CSS_TOKENS.special(),
                 borderWidth: 2.5,
-                pointBackgroundColor: "#7C3AED",
+                pointBackgroundColor: CSS_TOKENS.special(),
                 pointRadius: 5,
                 pointHoverRadius: 7,
                 fill: true,
@@ -7607,7 +7679,7 @@ function _sysExcelTableHTML(title, headers, rows) {
                 title: {
                   display: true,
                   text: "عدد البلاغات",
-                  color: "#6B8795",
+                  color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
               },
@@ -7652,7 +7724,7 @@ function _sysExcelTableHTML(title, headers, rows) {
           y
         );
       });
-      const catColors = ["#0891B2", "#7C3AED", "#D97706", "#DC2626", "#059669"];
+      const catColors = [CSS_TOKENS.info(), CSS_TOKENS.special(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive()];
       if (document.getElementById("balagh-cat-trend-chart")) {
         if (typeof CHARTS !== "undefined" && CHARTS["balagh-cat-trend-chart"]) {
           try {
@@ -7943,7 +8015,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         : num.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : String(value);
   }
-  function drawLabelPill(ctx, text, x, y, fill, stroke, textColor = "#0B2530") {
+  function drawLabelPill(ctx, text, x, y, fill, stroke, textColor = CSS_TOKENS.primary()) {
     (ctx.save(), (ctx.font = `700 10px ${FONT}`));
     const w = ctx.measureText(text).width + 12;
     ((ctx.fillStyle = fill),
@@ -7996,22 +8068,22 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
       (y.grid.drawBorder = !1),
       (x.ticks = x.ticks || {}),
       (y.ticks = y.ticks || {}),
-      (x.ticks.color = x.ticks.color || "#6B8795"),
-      (y.ticks.color = y.ticks.color || "#6B8795"),
+      (x.ticks.color = x.ticks.color || CSS_TOKENS.txMuted()),
+      (y.ticks.color = y.ticks.color || CSS_TOKENS.txMuted()),
       (x.ticks.padding = x.ticks.padding ?? 6),
       (y.ticks.padding = y.ticks.padding ?? 6),
       xTitle &&
         (x.title = {
           display: !0,
           text: xTitle,
-          color: "#6B8795",
+          color: CSS_TOKENS.txMuted(),
           font: { size: 10, weight: "700" },
         }),
       yTitle &&
         (y.title = {
           display: !0,
           text: yTitle,
-          color: "#6B8795",
+          color: CSS_TOKENS.txMuted(),
           font: { size: 10, weight: "700" },
         }),
       isHorizontal &&
@@ -8067,14 +8139,14 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
                         y,
                         fill,
                         "rgba(13,43,54,.08)",
-                        "#0B2530",
+                        CSS_TOKENS.primary(),
                       );
                     } else {
                       const y =
                           element.y - 20 < chartArea.top + 8 ? element.y + 12 : element.y - 12,
                         x = element.x;
                       if (y < chartArea.top + 8 || y > chartArea.bottom - 4) return;
-                      drawLabelPill(ctx, text, x, y, fill, "rgba(13,43,54,.08)", "#0B2530");
+                      drawLabelPill(ctx, text, x, y, fill, "rgba(13,43,54,.08)", CSS_TOKENS.primary());
                     }
                   });
               });
@@ -8090,13 +8162,13 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
                 centerX = (chartArea.left + chartArea.right) / 2,
                 centerY = (chartArea.top + chartArea.bottom) / 2;
               (ctx.save(),
-                (ctx.fillStyle = "#0B2530"),
+                (ctx.fillStyle = CSS_TOKENS.primary()),
                 (ctx.textAlign = "center"),
                 (ctx.textBaseline = "middle"),
                 (ctx.font = `800 16px ${FONT}`),
                 ctx.fillText(formatNumber(total), centerX, centerY - 4),
                 (ctx.font = `600 10px ${FONT}`),
-                (ctx.fillStyle = "#6B8795"),
+                (ctx.fillStyle = CSS_TOKENS.txMuted()),
                 ctx.fillText("إجمالي", centerX, centerY + 16),
                 ctx.restore());
             }
@@ -8105,7 +8177,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         }),
         (Chart.defaults.font.family = FONT),
         (Chart.defaults.font.size = 11),
-        (Chart.defaults.color = "#6B8795"),
+        (Chart.defaults.color = CSS_TOKENS.txMuted()),
         (Chart.defaults.animation.duration = 650),
         (Chart.defaults.animation.easing = "easeOutQuart"),
         (Chart.defaults.maintainAspectRatio = !1),
@@ -8119,12 +8191,12 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         (Chart.defaults.plugins.legend.labels.boxWidth = 10),
         (Chart.defaults.plugins.legend.labels.boxHeight = 10),
         (Chart.defaults.plugins.legend.labels.padding = 12),
-        (Chart.defaults.plugins.legend.labels.color = "#3D6070"),
+        (Chart.defaults.plugins.legend.labels.color = CSS_TOKENS.txSec()),
         (Chart.defaults.plugins.legend.labels.font = { size: 11, weight: "600" }),
         (Chart.defaults.plugins.tooltip.backgroundColor = "rgba(7,24,33,.94)"),
         (Chart.defaults.plugins.tooltip.titleColor = "#FFFFFF"),
         (Chart.defaults.plugins.tooltip.bodyColor = "rgba(255,255,255,.88)"),
-        (Chart.defaults.plugins.tooltip.borderColor = "rgba(8,145,178,.24)"),
+        (Chart.defaults.plugins.tooltip.borderColor = CSS_TOKENS.α(CSS_TOKENS.info(), .24)),
         (Chart.defaults.plugins.tooltip.borderWidth = 1),
         (Chart.defaults.plugins.tooltip.padding = 12),
         (Chart.defaults.plugins.tooltip.cornerRadius = 12),
@@ -8139,7 +8211,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
         (Chart.defaults.scale.border = { dash: [3, 3] }),
         (Chart.defaults.scale.title = {
           display: !1,
-          color: "#6B8795",
+          color: CSS_TOKENS.txMuted(),
           font: { size: 10, weight: "700" },
         })));
   }
@@ -8185,7 +8257,7 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
               boxHeight: 10,
               padding: 8,
               font: { size: 10, weight: "600" },
-              color: "#3D6070",
+              color: CSS_TOKENS.txSec(),
             },
           },
           tooltip: {
@@ -8246,14 +8318,14 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
               grid: { color: "rgba(168,195,214,.22)" },
               title: { display: !!maxVal, text: maxVal ? "درجة FCA (%)" : "" },
               ticks: {
-                color: "#6B8795",
+                color: CSS_TOKENS.txMuted(),
                 padding: 6,
                 callback: (v) => (maxVal ? `${v}%` : formatNumber(v)),
               },
             },
             y: {
               grid: { color: "rgba(168,195,214,.08)" },
-              ticks: { color: "#6B8795", font: { size: 10 }, maxRotation: 0, padding: 6 },
+              ticks: { color: CSS_TOKENS.txMuted(), font: { size: 10 }, maxRotation: 0, padding: 6 },
               afterFit: (s) => {
                 s.width = Math.max(s.width, 220);
               },
@@ -8374,15 +8446,15 @@ window.renderElevatorsTab = function () {
     const s = String(status || "").trim();
     return s && s !== "—"
       ? s.includes("متعطل") || s.includes("لا يعمل")
-        ? "#DC2626"
+        ? CSS_TOKENS.danger()
         : s.includes("يعمل")
-          ? "#059669"
+          ? CSS_TOKENS.positive()
           : s.includes("مخلى")
-            ? "#94A3B8"
+            ? CSS_TOKENS.txMuted()
             : s.includes("صيانة")
-              ? "#D97706"
-              : "#0891B2"
-      : "#6B7280";
+              ? CSS_TOKENS.warning()
+              : CSS_TOKENS.info()
+      : CSS_TOKENS.txMuted();
   };
 
   const cityOptions = ['<option value="">الكل</option>']
@@ -8528,9 +8600,9 @@ window.renderElevatorsTab = function () {
     const el = $("cost-toast");
     if (!el) return;
     const styles = {
-      ok: { bg: "#ECFDF5", bd: "#A7F3D0", tx: "#065F46" },
-      err: { bg: "#FEF2F2", bd: "#FECACA", tx: "#991B1B" },
-      info: { bg: "#ECFEFF", bd: "#A5F3FC", tx: "#0E7490" },
+      ok: { bg: CSS_TOKENS.bgPositive(), bd: CSS_TOKENS.bgPositive(), tx: CSS_TOKENS.positive() },
+      err: { bg: CSS_TOKENS.bgDanger(), bd: CSS_TOKENS.bgDanger(), tx: CSS_TOKENS.danger() },
+      info: { bg: CSS_TOKENS.bgInfo(), bd: CSS_TOKENS.bgInfo(), tx: CSS_TOKENS.info() },
     };
     const s = styles[type] || styles.info;
     el.innerHTML =
@@ -8551,7 +8623,7 @@ window.renderElevatorsTab = function () {
   function setStatus(kind) {
     const dot = $("cost-status-dot");
     if (!dot) return;
-    dot.style.background = kind === "live" ? "#059669" : kind === "loading" ? "#D97706" : "#DC2626";
+    dot.style.background = kind === "live" ? CSS_TOKENS.positive() : kind === "loading" ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
   }
   function destroyChart(id) {
     if (charts[id]) {
@@ -8817,18 +8889,18 @@ window.renderElevatorsTab = function () {
       .slice(0, 12);
 
     const barBase = [
-      "#083D4F",
-      "#0891B2",
-      "#059669",
-      "#D97706",
-      "#7C3AED",
-      "#DC2626",
-      "#0E7490",
-      "#B8860B",
-      "#1D4ED8",
-      "#9333EA",
-      "#0F766E",
-      "#C2410C",
+      CSS_TOKENS.primary(),
+      CSS_TOKENS.info(),
+      CSS_TOKENS.positive(),
+      CSS_TOKENS.warning(),
+      CSS_TOKENS.special(),
+      CSS_TOKENS.danger(),
+      CSS_TOKENS.info(),
+      CSS_TOKENS.warning(),
+      CSS_TOKENS.info(),
+      CSS_TOKENS.special(),
+      CSS_TOKENS.info2(),
+      CSS_TOKENS.warning(),
     ];
 
     destroyChart("cost-chart-categories");
@@ -9469,7 +9541,7 @@ window.renderElevatorsTab = function () {
     if (!PAY_TIP_EL) {
       PAY_TIP_EL = document.createElement("div");
       PAY_TIP_EL.style.cssText =
-        "position:fixed;background:rgba(7,28,38,.96);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;padding:8px 14px;border-radius:10px;border:1px solid rgba(8,145,178,.35);box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;display:none;z-index:99999;direction:ltr";
+        "position:fixed;background:rgba(7,28,38,.96);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;padding:8px 14px;border-radius:10px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.35);box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;display:none;z-index:99999;direction:ltr";
       document.body.appendChild(PAY_TIP_EL);
     }
     const root = scopeEl || document;
@@ -9534,7 +9606,7 @@ window.renderElevatorsTab = function () {
 
     const kpi = calcKPIs(rows);
     const pctNum = kpi.pct <= 1 ? kpi.pct * 100 : kpi.pct; // نسبة مئوية
-    const pctColor = pctNum >= 70 ? "#059669" : pctNum >= 40 ? "#D97706" : "#0891B2";
+    const pctColor = pctNum >= 70 ? CSS_TOKENS.positive() : pctNum >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.info();
 
     el.innerHTML = `
     <!-- شريط الحالة -->
@@ -9663,7 +9735,7 @@ window.renderElevatorsTab = function () {
       const kpiDed     = payNum(r["KPI Deduction"]                || r["KPI_Deduction"]              || 0);
       const pctRaw     = payNum(r["% Paid"]                       || r["Pct_Paid"]                   || 0);
       const pct        = pctRaw <= 1 ? pctRaw * 100 : pctRaw;
-      const pctColor   = pct >= 70 ? "#059669" : pct >= 40 ? "#D97706" : "#0891B2";
+      const pctColor   = pct >= 70 ? CSS_TOKENS.positive() : pct >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.info();
 
       return `
       <div style="background:var(--bg-2);border:1px solid var(--bd-light);border-radius:14px;padding:16px 18px;border-right:3px solid ${pctColor}">
@@ -9713,8 +9785,8 @@ window.renderElevatorsTab = function () {
       data: {
         labels,
         datasets: [
-          { label: "المدفوع", data: paid,      backgroundColor: "#05966988", borderColor: "#059669", borderWidth: 1.5, borderRadius: 4 },
-          { label: "المتبقي", data: remaining, backgroundColor: "#D9770644", borderColor: "#D97706", borderWidth: 1.5, borderRadius: 4 },
+          { label: "المدفوع", data: paid,      backgroundColor: "#05966988", borderColor: CSS_TOKENS.positive(), borderWidth: 1.5, borderRadius: 4 },
+          { label: "المتبقي", data: remaining, backgroundColor: "#D9770644", borderColor: CSS_TOKENS.warning(), borderWidth: 1.5, borderRadius: 4 },
         ],
       },
       options: {
@@ -9798,15 +9870,15 @@ function renderKhanadeqTab() {
 
   // ── ألوان المدن ──
   const CITY_COLORS = [
-    "#083D4F",
-    "#0891B2",
-    "#059669",
-    "#D97706",
-    "#7C3AED",
-    "#0E7490",
-    "#DC2626",
-    "#B8860B",
-    "#1D4ED8",
+    CSS_TOKENS.primary(),
+    CSS_TOKENS.info(),
+    CSS_TOKENS.positive(),
+    CSS_TOKENS.warning(),
+    CSS_TOKENS.special(),
+    CSS_TOKENS.info(),
+    CSS_TOKENS.danger(),
+    CSS_TOKENS.warning(),
+    CSS_TOKENS.info(),
   ];
 
   // ── نسب الخنادق لكل مدرسة ──
@@ -10201,12 +10273,12 @@ function pctFmt(v) {
 /* مؤشر تغطية لوني */
 function coverageBadge(need, alloc) {
   if (need === null || alloc === null)
-    return { color: "#64748b", bg: "#F1F5F9", label: "غير محدد" };
-  if (alloc === 0 && need > 0) return { color: "#DC2626", bg: "#FEF2F2", label: "عجز كامل" };
+    return { color: CSS_TOKENS.txMuted(), bg: "#F1F5F9", label: "غير محدد" };
+  if (alloc === 0 && need > 0) return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز كامل" };
   const pct = need > 0 ? (alloc / need) * 100 : 100;
-  if (pct >= 100) return { color: "#059669", bg: "#ECFDF5", label: "مغطى ✓" };
-  if (pct >= 75) return { color: "#D97706", bg: "#FFFBEB", label: "قريب" };
-  return { color: "#DC2626", bg: "#FEF2F2", label: "عجز" };
+  if (pct >= 100) return { color: CSS_TOKENS.positive(), bg: CSS_TOKENS.bgPositive(), label: "مغطى ✓" };
+  if (pct >= 75) return { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), label: "قريب" };
+  return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز" };
 }
 
 function getTajheezFiltered() {
@@ -10720,7 +10792,7 @@ function renderTajheezInventoryTab() {
               label: "قيمة الاحتياج",
               data: qismEntries.map(([, v]) => +v.toFixed(0)),
               backgroundColor: "#D9770688",
-              borderColor: "#D97706",
+              borderColor: CSS_TOKENS.warning(),
               borderWidth: 1.5,
               borderRadius: 5,
             },
@@ -10753,7 +10825,7 @@ function renderTajheezInventoryTab() {
               label: "المخصصات",
               data: qismEntries.map(([k]) => +(byQismAlloc[k] || 0).toFixed(0)),
               backgroundColor: "#0891B288",
-              borderColor: "#0891B2",
+              borderColor: CSS_TOKENS.info(),
               borderWidth: 1.5,
               borderRadius: 4,
             },
@@ -10761,7 +10833,7 @@ function renderTajheezInventoryTab() {
               label: "الاحتياج",
               data: qismEntries.map(([, v]) => +v.toFixed(0)),
               backgroundColor: "#D9770688",
-              borderColor: "#D97706",
+              borderColor: CSS_TOKENS.warning(),
               borderWidth: 1.5,
               borderRadius: 4,
             },
@@ -10830,7 +10902,7 @@ function renderTajheezInventoryTab() {
           {
             data: [cov3.مغطى, cov3.قريب, cov3.عجز],
             backgroundColor: ["#05966999", "#D9770699", "#DC262699"],
-            borderColor: ["#059669", "#D97706", "#DC2626"],
+            borderColor: [CSS_TOKENS.positive(), CSS_TOKENS.warning(), CSS_TOKENS.danger()],
             borderWidth: 2,
           },
         ],
@@ -10872,7 +10944,7 @@ function renderTajheezNeedTable() {
       (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${numFmt(r.مخصص.كلي)}</td>`,
       (r) =>
-        `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? "#DC2626" : r.نسبة !== null && r.نسبة > 75 ? "#D97706" : "#059669"}">${pctFmt(r.نسبة)}</td>`,
+        `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? CSS_TOKENS.danger() : r.نسبة !== null && r.نسبة > 75 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${pctFmt(r.نسبة)}</td>`,
       (r) => {
         const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
         return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
@@ -10955,11 +11027,11 @@ function renderTajheezAllTable() {
       (r) => `<td style="font-weight:700;text-align:center">${numFmt(r.احتياج.كلي)}</td>`,
       (r) => `<td style="font-weight:700;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
       (r) =>
-        `<td style="text-align:center;font-weight:700;color:${r.فرق_كمية !== null ? (r.فرق_كمية >= 0 ? "#059669" : "#DC2626") : "#ccc"}">${numFmt(r.فرق_كمية)}</td>`,
+        `<td style="text-align:center;font-weight:700;color:${r.فرق_كمية !== null ? (r.فرق_كمية >= 0 ? CSS_TOKENS.positive() : CSS_TOKENS.danger()) : "#ccc"}">${numFmt(r.فرق_كمية)}</td>`,
       (r) =>
-        `<td style="font-weight:700;color:${r.فرق_قيمة !== null ? (r.فرق_قيمة >= 0 ? "#059669" : "#DC2626") : "#ccc"}">${sarFmt(r.فرق_قيمة)}</td>`,
+        `<td style="font-weight:700;color:${r.فرق_قيمة !== null ? (r.فرق_قيمة >= 0 ? CSS_TOKENS.positive() : CSS_TOKENS.danger()) : "#ccc"}">${sarFmt(r.فرق_قيمة)}</td>`,
       (r) =>
-        `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? "#DC2626" : r.نسبة !== null && r.نسبة > 75 ? "#D97706" : "#059669"}">${pctFmt(r.نسبة)}</td>`,
+        `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? CSS_TOKENS.danger() : r.نسبة !== null && r.نسبة > 75 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${pctFmt(r.نسبة)}</td>`,
       (r) => {
         const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
         return `<td><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
@@ -12342,7 +12414,7 @@ function renderTajheezAllTable() {
   }
 
   let FCB_CHART_SEQ = 0;
-  const FCB_CHART_PALETTE = ["#0891b2", "#0d9488", "#7c3aed", "#d97706", "#dc2626", "#059669", "#2563eb", "#db2777"];
+  const FCB_CHART_PALETTE = [CSS_TOKENS.info(), CSS_TOKENS.info2(), CSS_TOKENS.special(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive(), CSS_TOKENS.info(), CSS_TOKENS.danger()];
 
   /* ════════════════════════════════════════════════════════════════
      📤 ExportEngine — تصدير أي محتوى يولّده المساعد الذكي (جدول/رسم/نص)
@@ -12822,7 +12894,7 @@ function renderTajheezAllTable() {
     row.className = "fcb-row " + who;
     const bubbleId = who === "bot" ? "fcbBubble_" + (++FCB_MSG_SEQ) : "";
     row.innerHTML =
-      (who === "bot" ? '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>' : "") +
+      (who === "bot" ? '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill=CSS_TOKENS.primary()/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>' : "") +
       `<div class="fcb-col"><div class="fcb-bubble"${bubbleId ? ` id="${bubbleId}"` : ""}></div><div class="fcb-time"></div></div>`;
     const bubble = row.querySelector(".fcb-bubble");
     if (who === "bot") {
@@ -12854,7 +12926,7 @@ function renderTajheezAllTable() {
     row.className = "fcb-row bot";
     row.id = "fcbTyping";
     row.innerHTML =
-      '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div><div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
+      '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill=CSS_TOKENS.primary()/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div><div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
     wrap.appendChild(row);
     const body = document.getElementById("fcbBody");
     body.scrollTop = body.scrollHeight;
@@ -14093,7 +14165,7 @@ ${(() => {
         '<div class="card"><div class="card-title">' +
         '<span class="card-title-icon" style="background:#ECFDF5;color:#047857">📍</span>' +
         "<span>عدد البوابين حسب المدينة</span></div>" +
-        renderBarList(cityCounts, totalForBars, "#0891B2") +
+        renderBarList(cityCounts, totalForBars, CSS_TOKENS.info()) +
         "</div>" +
         '<div class="card"><div class="card-title">' +
         '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA">🧾</span>' +
@@ -14140,7 +14212,7 @@ ${(() => {
     });
   };
 
-  var STATUS_COLORS = { "Joined": "#059669", "Vacant": "#dc2626", "Will Joined": "#d97706" };
+  var STATUS_COLORS = { "Joined": CSS_TOKENS.positive(), "Vacant": CSS_TOKENS.danger(), "Will Joined": CSS_TOKENS.warning() };
   var STATUS_AR = { "Joined": "منضم", "Vacant": "شاغر", "Will Joined": "قيد الانضمام" };
   var REGION_ICONS = { "Jeddah": "", "Makkah": "", "Madinah": "", "Taif": "", "WR": "" };
 
@@ -14232,7 +14304,7 @@ ${(() => {
   }
 
   function statusBadge(status) {
-    var color = STATUS_COLORS[status] || "#64748b";
+    var color = STATUS_COLORS[status] || CSS_TOKENS.txMuted();
     var label = STATUS_AR[status] || status || "—";
     return '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;background:' +
       color + '1A;color:' + color + '">' + esc_(label) + "</span>";
@@ -14341,7 +14413,7 @@ ${(() => {
         .map(function (c) {
           return (
             '<div class="card" style="cursor:pointer;padding:16px;border:2px solid ' +
-            (c.isActive ? "#0891B2" : "transparent") + ";background:" + (c.isActive ? "#ECFEFF" : "var(--card-bg,#fff)") +
+            (c.isActive ? CSS_TOKENS.info() : "transparent") + ";background:" + (c.isActive ? CSS_TOKENS.bgInfo() : "var(--card-bg,#fff)") +
             ';transition:.15s" onclick="window.__recruitSelectRegion(\'' + c.rg.replace(/'/g, "\\'") + '\')">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
             '<div style="font-size:13px;font-weight:800;color:var(--tx-main)">' + esc_(c.rg) + "</div>" +
@@ -14487,7 +14559,7 @@ ${(() => {
         var regionMap = {};
         regionRows.forEach(function (r) { var k = r.region || "غير محدد"; regionMap[k] = (regionMap[k] || 0) + 1; });
         var regionEntries = Object.entries(regionMap).sort(function (a, b) { return b[1] - a[1]; });
-        var PAL = typeof PALETTE !== "undefined" ? PALETTE : ["#0891B2", "#059669", "#D97706", "#DC2626", "#7C3AED"];
+        var PAL = typeof PALETTE !== "undefined" ? PALETTE : [CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.special()];
         var regionColors = regionEntries.map(function (_, i) { return PAL[i % PAL.length] + "DD"; });
         makeHBar("ch-recruit-region", regionEntries.map(function (x) { return x[0]; }), regionEntries.map(function (x) { return x[1]; }), regionColors);
 
@@ -14765,7 +14837,7 @@ ${(() => {
   hook();
 
   function mean(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
-  function tCol(v) { try { return (window.tierColor && window.tierColor(v)) || "#5f7d95"; } catch (_) { return "#5f7d95"; } }
+  function tCol(v) { try { return (window.tierColor && window.tierColor(v)) || CSS_TOKENS.txMuted(); } catch (_) { return CSS_TOKENS.txMuted(); } }
   function kill(id) { try { window.killChart && window.killChart(id); } catch (_) {} try { if (window.CHARTS && window.CHARTS[id]) { window.CHARTS[id].destroy(); delete window.CHARTS[id]; } } catch (_) {} }
 
   function groupAvg(D, key) {
@@ -14818,10 +14890,10 @@ ${(() => {
 
     // (أ) توزيع مستويات FCA — دائماً متاح
     var tiers = [
-      { lbl: "حرج · 0–24%",     f: function (v) { return v < 25; },            c: "#c05a68" },
-      { lbl: "متوسط · 25–49%",  f: function (v) { return v >= 25 && v < 50; }, c: "#d1975a" },
-      { lbl: "جيد · 50–74%",    f: function (v) { return v >= 50 && v < 75; }, c: "#4fa084" },
-      { lbl: "جيد جداً · 75–100%", f: function (v) { return v >= 75; },        c: "#3a8fa3" },
+      { lbl: "حرج · 0–24%",     f: function (v) { return v < 25; },            c: CSS_TOKENS.danger() },
+      { lbl: "متوسط · 25–49%",  f: function (v) { return v >= 25 && v < 50; }, c: CSS_TOKENS.accent() },
+      { lbl: "جيد · 50–74%",    f: function (v) { return v >= 50 && v < 75; }, c: CSS_TOKENS.info2() },
+      { lbl: "جيد جداً · 75–100%", f: function (v) { return v >= 75; },        c: CSS_TOKENS.info2() },
     ];
     cards.push({
       title: "توزيع مستويات FCA", sub: withF.length.toLocaleString() + " مدرسة", h: 280,
@@ -14947,6 +15019,10 @@ ${(() => {
         if (card) {
           card.style.display = "none";
           var row = card.parentElement;
+          // ملاحظة: .g2/.g3/.g4 بقت flex-wrap في dashboard.css، فالكروت الباقية
+          // في نفس الصف بتتمدد تلقائياً تملأ مكان الكارت المخفي (flex-grow via
+          // "flex: 1 1 ...") من غير ما نحتاج JS إضافي. إحنا هنا بس بنتأكد إن
+          // الصف كله يختفي لو كل الكروت فيه بقت فاضية.
           if (row && (row.classList.contains("g2") || row.classList.contains("g3") || row.classList.contains("g4"))) {
             var anyVisible = Array.prototype.some.call(row.children, function (c) { return c.style.display !== "none"; });
             if (!anyVisible) row.style.display = "none";
@@ -15813,8 +15889,8 @@ window.addEventListener('load', function(){
       .ix-filter-bar {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
         padding: 8px 16px; margin: 0 0 12px;
-        background: linear-gradient(135deg, rgba(8,145,178,.08), rgba(8,145,178,.04));
-        border: 1px solid rgba(8,145,178,.2);
+        background: linear-gradient(135deg, CSS_TOKENS.α(CSS_TOKENS.info(),.08), CSS_TOKENS.α(CSS_TOKENS.info(),.04));
+        border: 1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);
         border-radius: 12px; font-size: 12px; font-weight: 700;
         color: var(--teal-3); animation: ixFadeIn .25s ease;
       }
@@ -15878,7 +15954,7 @@ window.addEventListener('load', function(){
         position: fixed; top: 0; left: 0; bottom: 0; z-index: 9001;
         width: min(580px, 94vw);
         background: var(--bg-3);
-        box-shadow: 4px 0 40px rgba(6,20,28,.18), 12px 0 64px rgba(8,145,178,.08);
+        box-shadow: 4px 0 40px rgba(6,20,28,.18), 12px 0 64px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
         display: flex; flex-direction: column;
         transform: translateX(-100%); transition: transform .3s cubic-bezier(.22,.6,.34,1);
         border-right: 2px solid var(--bd-light);
@@ -15968,7 +16044,7 @@ window.addEventListener('load', function(){
 
       .ix-kpi-modal {
         background: var(--bg-3); border-radius: 20px;
-        box-shadow: 0 24px 64px rgba(6,20,28,.24), 0 6px 24px rgba(8,145,178,.1);
+        box-shadow: 0 24px 64px rgba(6,20,28,.24), 0 6px 24px CSS_TOKENS.α(CSS_TOKENS.info(),.1);
         width: min(780px, 95vw); max-height: 85vh;
         display: flex; flex-direction: column; overflow: hidden;
         animation: ixSlideUp .26s cubic-bezier(.22,.6,.34,1);
@@ -16038,11 +16114,11 @@ window.addEventListener('load', function(){
       .ix-suggestion-item:hover, .ix-suggestion-item:focus { background: var(--bg-2); outline: none; }
       .ix-sug-name { font-size: 12px; font-weight: 700; color: var(--tx-main); }
       .ix-sug-meta { font-size: 10px; color: var(--tx-muted); margin-top: 2px; }
-      .ix-sug-mark { background: rgba(8,145,178,.15); color: var(--teal-3); border-radius: 2px; }
+      .ix-sug-mark { background: CSS_TOKENS.α(CSS_TOKENS.info(),.15); color: var(--teal-3); border-radius: 2px; }
 
       /* ── Loading Spinner ── */
       .ix-spinner {
-        width: 20px; height: 20px; border: 2.5px solid rgba(8,145,178,.2);
+        width: 20px; height: 20px; border: 2.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);
         border-top-color: var(--teal); border-radius: 50%;
         animation: ixSpin .7s linear infinite; flex-shrink: 0;
       }
@@ -16261,7 +16337,7 @@ window.addEventListener('load', function(){
     badgesEl.innerHTML = badges.map(b => `<span class="ix-panel-badge">${esc(b)}</span>`).join("");
 
     // ── مساعدات التقييم ──
-    const fcaColor  = v => v == null ? "#94a3b8" : v < 25 ? "#DC2626" : v < 50 ? "#D97706" : v < 75 ? "#059669" : "#0891B2";
+    const fcaColor  = v => v == null ? CSS_TOKENS.txMuted() : v < 25 ? CSS_TOKENS.danger() : v < 50 ? CSS_TOKENS.warning() : v < 75 ? CSS_TOKENS.positive() : CSS_TOKENS.info();
     const tierLabel = v => v == null ? "—" : v < 25 ? "حرج" : v < 50 ? "متوسط" : v < 75 ? "جيد" : "جيد جداً";
     const tierIcon  = v => v == null ? "⚪" : v < 25 ? "🔴" : v < 50 ? "🟡" : v < 75 ? "🟢" : "🔵";
 
@@ -16503,7 +16579,7 @@ window.addEventListener('load', function(){
             // Marker مع popup باسم المدرسة
             const marker = L.circleMarker([r.lat, r.lng], {
               radius: 10,
-              fillColor: "#0891B2",
+              fillColor: CSS_TOKENS.info(),
               color: "#fff",
               weight: 3,
               opacity: 1,
@@ -16537,7 +16613,7 @@ window.addEventListener('load', function(){
   // دالة مساعدة لبناء جدول KPI (تُستخدم من openKpiModal وبحث الـ modal)
   // بناء جدول KPI — يحدّث tbody فقط دون المساس بشريط البحث
   function _buildKpiTable(bodyEl, filteredRows, allRows, columns) {
-    const fcaColor = (v) => (v == null ? "#ccc" : v <= 24.99 ? "#DC2626" : v <= 49.99 ? "#D97706" : v <= 74.99 ? "#059669" : "#0891B2");
+    const fcaColor = (v) => (v == null ? "#ccc" : v <= 24.99 ? CSS_TOKENS.danger() : v <= 49.99 ? CSS_TOKENS.warning() : v <= 74.99 ? CSS_TOKENS.positive() : CSS_TOKENS.info());
     const headerRow = columns.map(c => `<th>${esc(c.label)}</th>`).join("");
 
     // كل صف يحمل index المدرسة في allRows مباشرة (مش indexOf لأنه قد يرجع -1 بعد فلتر)
@@ -16755,10 +16831,10 @@ window.addEventListener('load', function(){
     if (!strip) return;
 
     const tierDefs = [
-      { id: "t-crit",  min: 0,  max: 24.99,  label: "مدارس FCA حرج (0–24%)",     color: "#DC2626" },
-      { id: "t-fair",  min: 25, max: 49.99,  label: "مدارس FCA متوسط (25–49%)",  color: "#D97706" },
-      { id: "t-good",  min: 50, max: 74.99,  label: "مدارس FCA جيد (50–74%)",   color: "#059669" },
-      { id: "t-vgood", min: 75, max: 100,    label: "مدارس FCA جيد جداً (75–100%)", color: "#0891B2" },
+      { id: "t-crit",  min: 0,  max: 24.99,  label: "مدارس FCA حرج (0–24%)",     color: CSS_TOKENS.danger() },
+      { id: "t-fair",  min: 25, max: 49.99,  label: "مدارس FCA متوسط (25–49%)",  color: CSS_TOKENS.warning() },
+      { id: "t-good",  min: 50, max: 74.99,  label: "مدارس FCA جيد (50–74%)",   color: CSS_TOKENS.positive() },
+      { id: "t-vgood", min: 75, max: 100,    label: "مدارس FCA جيد جداً (75–100%)", color: CSS_TOKENS.info() },
     ];
 
     tierDefs.forEach(td => {
@@ -17618,7 +17694,7 @@ ${dataCtx}
   style.textContent = `
     /* Panel refinements */
     .fcb-panel {
-      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px rgba(8,145,178,.06) !important;
+      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px CSS_TOKENS.α(CSS_TOKENS.info(),.06) !important;
     }
     .fcb-panel.open {
       /* Panel is open — no special override needed, walker JS handles position */
@@ -18153,7 +18229,7 @@ ${dataCtx}
         ].join(";");
 
         btn.addEventListener("mouseover", function () {
-          btn.style.background = "var(--accent-dim,rgba(8,145,178,.25))";
+          btn.style.background = "var(--accent-dim,CSS_TOKENS.α(CSS_TOKENS.info(),.25))";
           btn.style.color = "#fff";
         });
         btn.addEventListener("mouseout", function () {
@@ -18327,7 +18403,7 @@ function renderFuelTab() {
   </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = ["#0891B2","#059669","#D97706","#7C3AED","#DC2626","#1D4ED8","#DB2777","#EA580C","#65A30D","#0284C7"];
+    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info(),CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.info()];
 
     // اتجاه شهري
     const cTrend = document.getElementById("ch-fuel-trend");
@@ -18338,8 +18414,8 @@ function renderFuelTab() {
         data: {
           labels: monthKeys,
           datasets: [
-            { type:"bar",  label:"اللترات", data: monthLiters, backgroundColor:"rgba(8,145,178,0.6)", yAxisID:"y" },
-            { type:"line", label:"التكلفة (ر.س)", data: monthCosts, borderColor:"#059669", backgroundColor:"rgba(5,150,105,0.1)", borderWidth:2, yAxisID:"y1", fill:true, tension:0.3 }
+            { type:"bar",  label:"اللترات", data: monthLiters, backgroundColor:CSS_TOKENS.α(CSS_TOKENS.info(),0.6), borderColor:CSS_TOKENS.info(), borderWidth:1, borderRadius:4, yAxisID:"y" },
+            { type:"line", label:"التكلفة (ر.س)", data: monthCosts, borderColor:CSS_TOKENS.positive(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.positive(),0.1), borderWidth:2, yAxisID:"y1", fill:true, tension:0.3 }
           ]
         },
         options: { maintainAspectRatio:false, plugins:{legend:{position:"top"}},
@@ -18375,7 +18451,7 @@ function renderFuelTab() {
       killChart("ch-fuel-driver");
       CHARTS["ch-fuel-driver"] = new Chart(cDrv, {
         type:"bar",
-        data:{ labels:topDrivers.map(e=>e[0]), datasets:[{ data:topDrivers.map(e=>e[1].cost), backgroundColor:"#D97706", borderRadius:4 }] },
+        data:{ labels:topDrivers.map(e=>e[0]), datasets:[{ data:topDrivers.map(e=>e[1].cost), backgroundColor:CSS_TOKENS.warning(), borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ر"}}} }
       });
     }
@@ -18499,7 +18575,7 @@ function renderVehiclesTab() {
   </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = ["#0891B2","#059669","#D97706","#7C3AED","#DC2626","#1D4ED8","#DB2777","#EA580C","#65A30D","#0284C7"];
+    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info(),CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.info()];
 
     const cMake = document.getElementById("ch-veh-make");
     if (cMake && typeof Chart !== "undefined") {
@@ -18516,7 +18592,7 @@ function renderVehiclesTab() {
       killChart("ch-veh-loc");
       CHARTS["ch-veh-loc"] = new Chart(cLoc, {
         type:"bar",
-        data:{ labels:locEntries.map(e=>e[0]), datasets:[{ data:locEntries.map(e=>e[1]), backgroundColor:"#7C3AED", borderRadius:4 }] },
+        data:{ labels:locEntries.map(e=>e[0]), datasets:[{ data:locEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.special(), borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
       });
     }
@@ -18526,7 +18602,7 @@ function renderVehiclesTab() {
       killChart("ch-veh-year");
       CHARTS["ch-veh-year"] = new Chart(cYear, {
         type:"bar",
-        data:{ labels:yearEntries.map(e=>e[0]), datasets:[{ data:yearEntries.map(e=>e[1]), backgroundColor:"#0891B2", borderRadius:4 }] },
+        data:{ labels:yearEntries.map(e=>e[0]), datasets:[{ data:yearEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.info(), borderRadius:4 }] },
         options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{maxRotation:45}},y:{beginAtZero:true,ticks:{stepSize:1}}} }
       });
     }
@@ -18654,7 +18730,7 @@ function renderTrainingTab() {
             const supDone   = (r["حالة برنامج المشرفين"]||"").includes("مكتمل");
             const neverIn   = (r["آخر دخول للمنصة"]||"").includes("لم يدخل");
             const score     = n_(r["متوسط الدرجة %"]);
-            const scoreColor = score >= 80 ? "#059669" : score >= 60 ? "#D97706" : "#DC2626";
+            const scoreColor = score >= 80 ? CSS_TOKENS.positive() : score >= 60 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
             return `<tr style="border-bottom:1px solid var(--brd)${neverIn?';background:#FFFBEB':''}">
               <td style="padding:6px 10px;font-weight:600">${esc(r["الاسم"])||"—"}</td>
               <td style="padding:6px 10px;font-size:11px;color:${neverIn?'#DC2626':'var(--tx-muted)'}">${esc(r["آخر دخول للمنصة"])||"—"}</td>
@@ -18676,7 +18752,7 @@ function renderTrainingTab() {
   </div>`;
 
   requestAnimationFrame(() => {
-    const COLORS_STATUS = ["#059669","#D97706","#DC2626"];
+    const COLORS_STATUS = [CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.danger()];
 
     const cClean = document.getElementById("ch-tr-clean-status");
     if (cClean && typeof Chart !== "undefined") {
@@ -18705,7 +18781,7 @@ function renderTrainingTab() {
         type:"bar",
         data:{
           labels: Object.keys(unitBuckets12).map(k => "وحدات: "+k),
-          datasets:[{ data:Object.values(unitBuckets12), backgroundColor:["#DC2626","#EA580C","#D97706","#65A30D","#059669","#0891B2"], borderRadius:4 }]
+          datasets:[{ data:Object.values(unitBuckets12), backgroundColor:[CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.positive(),CSS_TOKENS.info()], borderRadius:4 }]
         },
         options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
       });
@@ -19237,7 +19313,7 @@ function _hasrRenderFilterBanner() {
     banner.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
                   padding:10px 14px;margin-bottom:12px;border-radius:10px;
-                  background:rgba(8,145,178,.08);border:1.5px solid rgba(8,145,178,.25)">
+                  background:CSS_TOKENS.α(CSS_TOKENS.info(),.08);border:1.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.25)">
         <span style="font-size:16px">🔍</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:2px">فلتر نشط</div>
@@ -19267,7 +19343,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; left:0; bottom:0; z-index:9100;
       width:min(420px,94vw);
       background:var(--bg-3);
-      box-shadow:4px 0 40px rgba(6,20,28,.22),12px 0 60px rgba(8,145,178,.08);
+      box-shadow:4px 0 40px rgba(6,20,28,.22),12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .3s cubic-bezier(.22,.6,.34,1);
@@ -19279,7 +19355,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; left:0; bottom:0; z-index:9200;
       width:min(460px,96vw);
       background:var(--bg-3);
-      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px rgba(8,145,178,.1);
+      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.1);
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .28s cubic-bezier(.22,.6,.34,1);
@@ -19291,7 +19367,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; right:0; bottom:0; z-index:9150;
       width:min(420px,94vw);
       background:var(--bg-3);
-      box-shadow:-4px 0 40px rgba(6,20,28,.22),-12px 0 60px rgba(8,145,178,.08);
+      box-shadow:-4px 0 40px rgba(6,20,28,.22),-12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
       display:flex; flex-direction:column;
       transform:translateX(105%);
       transition:transform .3s cubic-bezier(.22,.6,.34,1);
@@ -19401,10 +19477,10 @@ function _hasrRenderFilterBanner() {
     .hasr-back-btn {
       display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
       padding:6px 14px;border-radius:8px;background:var(--bg-2);color:var(--teal,#0891B2);
-      border:1.5px solid rgba(8,145,178,.3);cursor:pointer;font-family:Tajawal;
+      border:1.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.3);cursor:pointer;font-family:Tajawal;
       margin-bottom:14px;transition:background .15s;
     }
-    .hasr-back-btn:hover { background:rgba(8,145,178,.12); }
+    .hasr-back-btn:hover { background:CSS_TOKENS.α(CSS_TOKENS.info(),.12); }
   `;
   document.head.appendChild(s);
 })();
@@ -19964,7 +20040,7 @@ function _hPanelMainSystems(body) {
           const isActive = ctx.filter.mainSys===s.name && !ctx.filter.subSys;
           return `
           <div class="hasr-srow" onclick="hasrSelectMainSystem('${_hE(s.name)}')"
-               style="border:1.5px solid ${isActive?'rgba(8,145,178,.4)':'transparent'};background:${isActive?'rgba(8,145,178,.06)':''}">
+               style="border:1.5px solid ${isActive?'CSS_TOKENS.α(CSS_TOKENS.info(),.4)':'transparent'};background:${isActive?'CSS_TOKENS.α(CSS_TOKENS.info(),.06)':''}">
             <div style="flex:1">
               <div class="hasr-sname">${_hE(s.name)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
@@ -20170,7 +20246,7 @@ function hasrShowSubDetail(mainSys, subSys) {
     </div>
     ${sc ? `
     <div class="hasr-sec" style="margin-top:12px">المدرسة</div>
-    <div style="padding:10px 12px;background:rgba(8,145,178,.06);border-radius:8px;border:1px solid rgba(8,145,178,.18)">
+    <div style="padding:10px 12px;background:CSS_TOKENS.α(CSS_TOKENS.info(),.06);border-radius:8px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.18)">
       <div style="font-size:12px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
       <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
     </div>` : ''}

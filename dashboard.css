@@ -411,6 +411,36 @@ b, strong { font-weight: 700; }
 }
 
 /* ══════════════════════════════════════════════════════════════
+   7-ب. وضع الشاشات الكبيرة / التلفزيون (TV / large display mode)
+   بيفعّل تلقائياً على أي شاشة عرض ≥1600px (شاشات تلفزيون، عرض تقديمي،
+   بروجكتور). يكبّر الخط والمساحات والبطاقات عشان يفضل مقروء من بعيد،
+   بدل ما يفضل بنفس مقاس الشاشة العادية ومكدّس في نص شاشة كبيرة.
+   ══════════════════════════════════════════════════════════════ */
+@media (min-width: 1600px) {
+  body { font-size: 15px; }
+  .content { max-width: 2200px; padding: 28px 40px 40px; }
+  .card-title { font-size: 15px; }
+  .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+  .kpi { padding: 18px 20px; }
+  .kpi-val, .kpi-value { font-size: 30px; }
+  .chart-box { padding: 14px; }
+  .g2, .g3, .g4, .g12, .g21 { gap: 20px; }
+  .tab { font-size: 13px; padding: 12px 18px; }
+  .tb-title { font-size: 17px; }
+  table th, table td { font-size: 13px; padding: 10px 12px; }
+}
+
+@media (min-width: 2200px) {
+  body { font-size: 17px; }
+  .content { max-width: 2600px; padding: 34px 56px 48px; }
+  .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+  .kpi-val, .kpi-value { font-size: 36px; }
+  .card-title { font-size: 17px; }
+  .tab { font-size: 14px; padding: 14px 20px; }
+  table th, table td { font-size: 14px; padding: 12px 14px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
    8. TOAST
    ══════════════════════════════════════════════════════════════ */
 #toast-area {
@@ -701,15 +731,18 @@ html[dir="ltr"] .fsel {
    13. GRID LAYOUTS
    ══════════════════════════════════════════════════════════════ */
 .g2, .g3, .g4, .g12, .g21 {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
 }
-.g2  { grid-template-columns: repeat(2, minmax(0,1fr)); }
-.g3  { grid-template-columns: repeat(3, minmax(0,1fr)); }
-.g4  { grid-template-columns: repeat(4, minmax(0,1fr)); }
-.g12 { grid-template-columns: 1fr 2fr; }
-.g21 { grid-template-columns: 2fr 1fr; }
+.g2  > *  { flex: 1 1 calc(50% - 16px); min-width: 320px; }
+.g3  > *  { flex: 1 1 calc(33.333% - 16px); min-width: 260px; }
+.g4  > *  { flex: 1 1 calc(25% - 16px); min-width: 220px; }
+.g12 > *:nth-child(1) { flex: 1 1 calc(33.333% - 16px); min-width: 260px; }
+.g12 > *:nth-child(2) { flex: 2 1 calc(66.666% - 16px); min-width: 320px; }
+.g21 > *:nth-child(1) { flex: 2 1 calc(66.666% - 16px); min-width: 320px; }
+.g21 > *:nth-child(2) { flex: 1 1 calc(33.333% - 16px); min-width: 260px; }
 
 .mb14 { margin-bottom: 16px; }
 

@@ -162,6 +162,9 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: 120px;
   color-scheme: light;
+  /* منع zoom غير مقصود على iOS عند focus الـ input */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body, html {
@@ -173,6 +176,9 @@ body, html {
   color: var(--tx-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* تحسين touch على الجوال */
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
   background:
     radial-gradient(1000px 500px at 95% -8%, rgba(13,132,156,.07), transparent 50%),
     radial-gradient(800px 450px at -5% 105%, rgba(176,138,78,.05), transparent 48%),
@@ -622,11 +628,14 @@ html[dir="ltr"] .fsel {
    12. CARDS
    ══════════════════════════════════════════════════════════════ */
 .card {
-  background: rgba(255,255,255,.96);
+  background: rgba(255,255,255,.97);
   border: 1px solid var(--bd-light);
   border-radius: var(--r-2xl);
   padding: 22px 24px;
-  box-shadow: var(--sh-d4);
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 4px 14px rgba(8,45,60,.07),
+    inset 0 1px 0 rgba(255,255,255,.8);
   position: relative;
   overflow: hidden;
   transition: transform .2s var(--ease-std), box-shadow .2s ease, border-color .2s ease;
@@ -645,8 +654,11 @@ html[dir="ltr"] .fsel {
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: #c5dde8;
-  box-shadow: var(--sh-d8);
+  border-color: #bcd7e6;
+  box-shadow:
+    0 2px 4px rgba(8,45,60,.06),
+    0 10px 28px rgba(8,45,60,.11),
+    inset 0 1px 0 rgba(255,255,255,.9);
 }
 
 .card-title {
@@ -707,9 +719,10 @@ html[dir="ltr"] .fsel {
 .chart-box {
   position: relative;
   padding: 10px;
-  background: linear-gradient(180deg, #fdfeff 0%, #fafcfe 100%);
+  background: linear-gradient(180deg, #fdfeff 0%, #f8fbfd 100%);
   border-radius: var(--r-lg);
   border: 1px solid #eaf1f6;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 1px 4px rgba(8,45,60,.04);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -727,10 +740,13 @@ html[dir="ltr"] .fsel {
   border: 1px solid var(--bd-light);
   border-radius: var(--r-xl);
   padding: 19px 18px 17px;
-  box-shadow: var(--sh-d4);
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 4px 12px rgba(8,45,60,.08),
+    inset 0 1px 0 rgba(255,255,255,.9);
   position: relative;
   overflow: hidden;
-  transition: transform .2s var(--ease-std), box-shadow .2s ease, border-color .2s ease;
+  transition: transform .22s var(--ease-std), box-shadow .22s ease, border-color .22s ease;
 }
 
 .kpi::before {
@@ -753,9 +769,12 @@ html[dir="ltr"] .fsel {
 }
 
 .kpi:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sh-d8);
-  border-color: #ccdee8;
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px rgba(8,45,60,.06),
+    0 10px 28px rgba(8,45,60,.13),
+    inset 0 1px 0 rgba(255,255,255,.95);
+  border-color: #b8d4e0;
 }
 
 .kpi-icon {
@@ -1678,12 +1697,12 @@ tbody tr:last-child td { border-bottom: none; }
   position: fixed;
   bottom: 22px;
   left: 24px;
-  width: 355px;
-  max-width: 95vw;
-  height: min(540px, 82vh);
+  width: 370px;
+  max-width: calc(100vw - 32px);
+  height: min(580px, 82vh);
   background: var(--bg-3);
   border: 1px solid var(--bd-light);
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 24px 64px rgba(8,45,60,.22), 0 4px 18px rgba(8,45,60,.1);
   z-index: 599;
   overflow: visible;
@@ -1697,7 +1716,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .fcb-panel.open {
-  height: min(540px, 82vh);
+  height: min(580px, 82vh);
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -2278,9 +2297,20 @@ body.bot-hidden #fmbotBubble { opacity: 0 !important; pointer-events: none !impo
 
 body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 
+/* ── كروت الأرقام الكبيرة المبنية inline في JS — نفس نظام hover ── */
+.card[style*="border-top"] {
+  box-shadow: 0 1px 2px rgba(8,45,60,.04), 0 4px 12px rgba(8,45,60,.07), inset 0 1px 0 rgba(255,255,255,.9) !important;
+  transition: transform .22s cubic-bezier(.34,1.3,.64,1), box-shadow .22s ease !important;
+}
+.card[style*="border-top"]:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 2px 4px rgba(8,45,60,.06), 0 10px 28px rgba(8,45,60,.13), inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+
 /* ══════════════════════════════════════════════════════════════
-   36. RESPONSIVE
+   36. RESPONSIVE — نظام متجاوب شامل لكل الأحجام
    ══════════════════════════════════════════════════════════════ */
+
 @media (max-width: 1280px) {
   .kpi-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
 }
@@ -2297,9 +2327,11 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .map-stat  { min-width: calc(50% - 6px); }
 }
 
+/* ── جوال متوسط (768px) ── */
 @media (max-width: 768px) {
   body, html { font-size: 13.5px; }
 
+  /* topbar */
   .topbar { height: auto; flex-wrap: wrap; }
   .tb-ls, .tb-tbc { padding: 10px 14px; }
   .tb-right {
@@ -2309,9 +2341,11 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     border-top: 1px solid rgba(255,255,255,.07);
   }
 
-  .content { padding: 14px 14px 22px; }
+  /* content */
+  .content { padding: 14px 14px 100px; } /* bottom padding للشات بوت */
   .prog-bar { top: auto; position: sticky; }
 
+  /* tabs */
   .tabs {
     position: relative;
     top: auto;
@@ -2319,28 +2353,71 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { scroll-snap-align: start; white-space: nowrap; }
+  .tab { scroll-snap-align: start; white-space: nowrap; min-width: max-content; }
 
-  .card { padding: 18px; border-radius: var(--r-xl); }
+  /* cards */
+  .card { padding: 16px; border-radius: var(--r-lg); }
 
-  .kpi-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  /* grids */
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
   .tier-strip, .contracts-grid { grid-template-columns: 1fr; }
 
-  .filters-row { padding: 14px; border-radius: var(--r-lg); }
+  /* filters */
+  .filters-row { padding: 12px; border-radius: var(--r-lg); gap: 8px; }
   .finp, .fsel, .f-clear { width: 100%; min-width: 0; }
+  .fg { width: 100%; margin: 0; }
 
+  /* map */
   .map-stat { min-width: calc(50% - 6px); }
-  #map-container { height: 480px; }
+  #map-container { height: 440px; }
 
-  .fcb-panel { width: calc(100vw - 16px); left: 8px; bottom: 12px; height: 78vh; }
-  #fmbotWalker { width: 100px; height: 130px; left: 10px; bottom: 10px; }
-  #fmbotWalker::before { width: 80px; height: 24px; }
-  #fmbotWalker::after  { width: 100px; height: 100px; }
-  #fmbotBubble { bottom: auto; top: auto; font-size: 11px; }
+  /* ── الشات بوت على الجوال — يملأ الشاشة من الأسفل ── */
+  .fcb-panel {
+    width: 100vw;
+    max-width: 100vw;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    height: 72vh;
+    max-height: 72vh;
+    transform-origin: bottom center;
+    box-shadow: 0 -8px 40px rgba(8,45,60,.18);
+  }
+  .fcb-panel.open {
+    height: 72vh;
+    max-height: 72vh;
+  }
+
+  /* الروبوت على الجوال */
+  #fmbotWalker {
+    width: 90px;
+    height: 118px;
+    left: 10px;
+    bottom: 10px;
+  }
+  #fmbotWalker::before { width: 72px; height: 22px; }
+  #fmbotWalker::after  { width: 90px; height: 90px; }
+  #fmbotBubble {
+    font-size: 11px;
+    min-width: 160px;
+    max-width: 210px;
+    bottom: 128px;
+    left: 6px;
+  }
+
+  /* foot input on mobile */
+  .fcb-foot { padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .fcb-input { font-size: 16px; } /* 16px يمنع zoom في iOS */
 }
 
+/* ── جوال صغير (560px) ── */
 @media (max-width: 560px) {
   .kpi-grid    { grid-template-columns: 1fr; }
   .kpi-val     { font-size: 26px; }
@@ -2350,11 +2427,32 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   #btnPresentationMode { display: none; }
   .map-stat    { min-width: 100%; }
   .ix-kpi-modal { width: 96vw; max-height: 88vh; }
+
+  /* الشات بوت على الشاشات الصغيرة جداً */
+  .fcb-panel { height: 80vh; max-height: 80vh; }
+  .fcb-panel.open { height: 80vh; }
+  .fcb-head-title { font-size: 13px; }
+
+  /* الروبوت يصغر أكثر */
+  #fmbotWalker { width: 76px; height: 100px; left: 8px; bottom: 8px; }
+  #fmbotBubble { display: none; } /* يُخفى Bubble على الشاشات الصغيرة */
 }
 
+/* ── جوال أصغر (420px) ── */
 @media (max-width: 420px) {
   .tb-sub     { display: none; }
   .tb-divider { display: none; }
+  .content    { padding: 10px 10px 90px; }
+  .kpi-grid   { gap: 8px; }
+  .card       { padding: 14px; }
+}
+
+/* ── safe area لأجهزة iPhone X+ ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  @media (max-width: 768px) {
+    .fcb-panel { padding-bottom: env(safe-area-inset-bottom); }
+    .content   { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2364,6 +2462,5 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
-
   #fmbotWalker, #fmbotWalker * { animation: none !important; transition: none !important; }
 }

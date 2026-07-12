@@ -7,6 +7,36 @@
    1. DESIGN TOKENS — متغيرات التصميم الموحّدة (مصدر واحد)
    ══════════════════════════════════════════════════════════════ */
 :root {
+  /* ═══════════════════════════════════════════════════════════════
+     🎨 نظام الألوان الموحد — TBC Dashboard Color System
+     ═══════════════════════════════════════════════════════════════
+     ⚠️  AI MAINTAINER NOTE — اقرأ قبل أي تعديل:
+     كل الألوان في الداشبورد تمر من هنا.
+     لا تكتب hex مباشرة في JS أو HTML — استخدم المتغيرات دايماً.
+
+     نظام المعنى (Semantic):
+       --c-positive  = إيجابي / نجاح / مكتمل
+       --c-danger    = خطر / حرج / فوري
+       --c-warning   = تحذير / يحتاج انتباه
+       --c-info      = معلومة / رئيسي / محايد إيجابي
+       --c-special   = مميز / خاص / إعادة تقييم
+       --c-primary   = اللون الأساسي للداشبورد
+       --c-secondary = اللون الثانوي
+       --c-accent    = الذهبي للعناصر المميزة/المالية
+
+     ألوان الأصول (Assets Condition):
+       --c-excellent = ممتاز
+       --c-good-cond = جيد
+       --c-bad-cond  = سئ
+       --c-detr      = متهالك
+
+     الخلفيات الدلالية (bg):
+       --bg-positive  --bg-danger  --bg-warning  --bg-info  --bg-special
+
+     الحدود الدلالية (border):
+       --bd-positive  --bd-danger  --bd-warning  --bd-info  --bd-special
+     ═══════════════════════════════════════════════════════════════ */
+
   /* الألوان الأساسية */
   --navy:       #0d2f40;
   --navy-2:     #163d52;
@@ -25,6 +55,42 @@
   --good-2:     #0e9488;
   --purple:     #6c2bd9;
   --muted-ink:  #6e8fa0;
+
+  /* ── ألوان دلالية موحدة (Semantic Colors) ── */
+  /* استخدم هذه دايماً بدل hex مباشرة */
+  --c-positive:  #066a52;   /* إيجابي / نجاح / مكتمل        ← --good     */
+  --c-danger:    #7d1f2c;   /* خطر / حرج / فوري             ← --red      */
+  --c-warning:   #c07a14;   /* تحذير / يحتاج انتباه          ← --warn     */
+  --c-info:      #0d849c;   /* معلومة / رئيسي                ← --teal     */
+  --c-info-2:    #0b6b7e;   /* ثانوي / تفصيلي               ← --teal-3   */
+  --c-special:   #6c2bd9;   /* مميز / خاص / معادة            ← --purple   */
+  --c-primary:   #0d2f40;   /* الأساسي للداشبورد             ← --navy     */
+  --c-secondary: #163d52;   /* الثانوي للداشبورد             ← --navy-2   */
+  --c-accent:    #b08a4e;   /* ذهبي / مالي / مميز            ← --brass    */
+  --c-accent-2:  #d4af6a;   /* ذهبي فاتح                    ← --brass-2  */
+
+  /* ── ألوان حالة الأصول (Assets Condition) ── */
+  --c-excellent: #066a52;   /* ممتاز  */
+  --c-good-cond: #0b6b7e;   /* جيد    */
+  --c-bad-cond:  #c07a14;   /* سئ     */
+  --c-detr:      #7d1f2c;   /* متهالك */
+
+  /* ── خلفيات دلالية (Semantic Backgrounds) ── */
+  --bg-positive: #edfaf5;
+  --bg-danger:   #fdf0f2;
+  --bg-warning:  #fdf6ec;
+  --bg-info:     #eaf6fa;
+  --bg-special:  #f3eefe;
+  --bg-accent:   #faf4eb;
+  --bg-neutral:  #f7fafc;
+
+  /* ── حدود دلالية (Semantic Borders) ── */
+  --bd-positive: rgba(6, 106, 82, 0.30);
+  --bd-danger:   rgba(125, 31, 44, 0.30);
+  --bd-warning:  rgba(192, 122, 20, 0.30);
+  --bd-info:     rgba(13, 132, 156, 0.30);
+  --bd-special:  rgba(108, 43, 217, 0.30);
+  --bd-accent:   rgba(176, 138, 78, 0.35);
 
   /* الخلفيات */
   --bg:         #eef3f7;
@@ -746,10 +812,16 @@ html[dir="ltr"] .fsel {
 .kpi.kc-navy .kpi-icon { background: var(--navy); }
 .kpi.kc-navy .kpi-val  { color: var(--navy); }
 
-.kpi.kc-green::before  { background: linear-gradient(90deg, #047857, #10b981); }
-.kpi.kc-green::after   { background: var(--good); }
-.kpi.kc-green .kpi-icon { background: var(--good); }
-.kpi.kc-green .kpi-val  { color: #065f46; }
+.kpi.kc-green::before  { background: linear-gradient(90deg, #044d3b, var(--c-positive)); }
+.kpi.kc-green::after   { background: var(--c-positive); }
+.kpi.kc-green .kpi-icon { background: var(--c-positive); }
+.kpi.kc-green .kpi-val  { color: var(--c-positive); }
+
+/* kc-info — للمعلومات المحايدة (مرادف kc-teal) */
+.kpi.kc-info::before  { background: linear-gradient(90deg, var(--teal-3), var(--teal-2)); }
+.kpi.kc-info::after   { background: var(--c-info); }
+.kpi.kc-info .kpi-icon { background: var(--c-info); }
+.kpi.kc-info .kpi-val  { color: var(--c-info-2); }
 
 .kpi.kc-amber::before  { background: linear-gradient(90deg, #b45309, #f59e0b); }
 .kpi.kc-amber::after   { background: var(--warn); }
@@ -899,9 +971,20 @@ tbody td:first-child {
   padding-right: 18px;
 }
 
-tbody tr:nth-child(2n) td { background: #fbfdfe; }
-tbody tr:hover td { background: rgba(13,132,156,.06) !important; }
+tbody tr:nth-child(2n) td { background: var(--bg-neutral); }
+tbody tr:hover td { background: var(--teal-glow) !important; }
 tbody tr:last-child td { border-bottom: none; }
+
+/* ── ألوان حالة الأصول الموحدة — تُستخدم في كل التبويبات ── */
+.cond-excellent { color: var(--c-excellent); font-weight: 700; }
+.cond-good      { color: var(--c-good-cond); font-weight: 700; }
+.cond-bad       { color: var(--c-bad-cond);  font-weight: 700; }
+.cond-detr      { color: var(--c-detr);      font-weight: 700; }
+
+.badge-excellent { background: var(--bg-positive); color: var(--c-excellent); border: 1px solid var(--bd-positive); border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-good      { background: var(--bg-info);     color: var(--c-good-cond); border: 1px solid var(--bd-info);     border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-bad       { background: var(--bg-warning);  color: var(--c-bad-cond);  border: 1px solid var(--bd-warning);  border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-detr      { background: var(--bg-danger);   color: var(--c-detr);      border: 1px solid var(--bd-danger);   border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════════
    18. PAGINATION

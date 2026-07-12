@@ -206,8 +206,8 @@
       <div class="kpi-sub" id="k-students-avg">—</div>
       <div class="kpi-sub" id="k-students-ctx" style="margin-top:2px;font-size:10px;color:var(--tx-muted)"></div>
     </div>
-    <div class="kpi kc-teal" id="kpi-students-max" style="border-top:3px solid #0891B2">
-      <div class="kpi-val" id="k-students-max" style="color:#0891B2">—</div>
+    <div class="kpi kc-teal" id="kpi-students-max" style="border-top:3px solid var(--c-info-2)">
+      <div class="kpi-val" id="k-students-max" style="color:var(--c-info-2)">—</div>
       <div class="kpi-lbl" data-ar="أكبر مدرسة (طلاب)" data-en="Largest School (students)">أكبر مدرسة (طلاب)</div>
       <div class="kpi-sub" id="k-students-max-name">—</div>
     </div>
@@ -233,31 +233,31 @@
 
   <div class="card mb14" style="padding-bottom:20px">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">▦</span>
+      <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">▦</span>
       <span data-ar="توزيع المدارس حسب درجة FCA" data-en="Schools Distribution by FCA Score">توزيع المدارس حسب درجة FCA</span>
       <span class="sub" id="tier-sub"></span>
     </div>
     <div class="tier-strip" id="tier-strip">
-      <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
-        <div class="tier-indicator" style="background:#DC2626"></div>
+      <div class="tier-seg" style="background:var(--bg-danger);color:var(--c-danger);border:1px solid var(--bd-danger)">
+        <div class="tier-indicator" style="background:var(--c-danger)"></div>
         <div class="tier-num" id="t-crit">—</div>
         <div class="tier-pct" id="t-crit-pct"></div>
         <div class="tier-sub" data-ar="حرج · 0–24%" data-en="Critical · 0–24%">حرج · 0–24%</div>
       </div>
-      <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A">
-        <div class="tier-indicator" style="background:#D97706"></div>
+      <div class="tier-seg" style="background:var(--bg-warning);color:var(--c-warning);border:1px solid #FDE68A">
+        <div class="tier-indicator" style="background:var(--c-warning)"></div>
         <div class="tier-num" id="t-fair">—</div>
         <div class="tier-pct" id="t-fair-pct"></div>
         <div class="tier-sub" data-ar="متوسط · 25–49%" data-en="Fair · 25–49%">متوسط · 25–49%</div>
       </div>
-      <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0">
-        <div class="tier-indicator" style="background:#059669"></div>
+      <div class="tier-seg" style="background:#F0FDF4;color:var(--c-positive);border:1px solid var(--bd-positive)">
+        <div class="tier-indicator" style="background:var(--c-positive)"></div>
         <div class="tier-num" id="t-good">—</div>
         <div class="tier-pct" id="t-good-pct"></div>
         <div class="tier-sub" data-ar="جيد · 50–74%" data-en="Good · 50–74%">جيد · 50–74%</div>
       </div>
-      <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC">
-        <div class="tier-indicator" style="background:#0891B2"></div>
+      <div class="tier-seg" style="background:var(--bg-info);color:var(--c-info-2);border:1px solid #A5F3FC">
+        <div class="tier-indicator" style="background:var(--c-info-2)"></div>
         <div class="tier-num" id="t-vgood">—</div>
         <div class="tier-pct" id="t-vgood-pct"></div>
         <div class="tier-sub" data-ar="جيد جداً · 75–100%" data-en="Very Good · 75–100%">جيد جداً · 75–100%</div>
@@ -431,11 +431,11 @@
       <div class="card-title">أفضل وأسوأ المدارس في البيئة المدرسية</div>
       <div class="g2">
         <div>
-          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-block">أفضل 10 مدارس</div>
+          <div style="font-size:11px;font-weight:700;color:var(--c-positive);margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-block">أفضل 10 مدارس</div>
           <div id="env-top-list"></div>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-block">أسوأ 10 مدارس</div>
+          <div style="font-size:11px;font-weight:700;color:var(--c-danger);margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-block">أسوأ 10 مدارس</div>
           <div id="env-bot-list"></div>
         </div>
       </div>
@@ -487,7 +487,7 @@
   <div class="panel" id="tab-stage-compare">
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">📊</span>
+        <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">📊</span>
         مقارنة مراحل FCA
       </div>
 
@@ -530,7 +530,7 @@
       <!-- Chart 1: متوسط كل مرحلة (bar grouped) -->
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">📊</span>
+          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">📊</span>
           متوسط FCA لكل مرحلة — مقارنة شاملة
           <span class="sub">كل مرحلة موجودة في الملف تظهر تلقائياً</span>
         </div>
@@ -540,7 +540,7 @@
       <!-- Chart 2: التطور الزمني لكل مرحلة -->
       <div class="card mb14" style="border:1.5px solid rgba(8,145,178,0.2)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">📈</span>
+          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info-2)">📈</span>
           تطور متوسط FCA عبر الشهور — كل المراحل
           <span class="sub">كل شهر موجود في الملف يظهر تلقائياً</span>
         </div>
@@ -553,7 +553,7 @@
       <!-- Chart 3: حسب المنطقة -->
       <div class="card mb14" style="border:1.5px solid rgba(5,150,105,0.18)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#ECFDF5;color:#065F46">🗺️</span>
+          <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46">🗺️</span>
           متوسط FCA حسب المنطقة الرئيسية — مقارنة المراحل
         </div>
         <div id="stageRegionEmpty" style="display:none;text-align:center;padding:32px;color:var(--tx-muted);font-size:13px">
@@ -565,7 +565,7 @@
       <!-- Chart 4: تغطية البيانات per stage (doughnut row) -->
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#F5F3FF;color:#6D28D9">🥧</span>
+          <span class="card-title-icon" style="background:#F5F3FF;color:var(--c-special)">🥧</span>
           تغطية البيانات حسب المرحلة
           <span class="sub">عدد المدارس لكل مرحلة</span>
         </div>
@@ -595,7 +595,7 @@
   <div class="panel" id="tab-fca-ref">
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFDF5;color:#065F46">📋</span>
+        <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46">📋</span>
         FCA المرجعي — آخر تقييم لكل مدرسة
         <span class="sub">مبني على أحدث تقييم متاح (Jun &gt; May &gt; Apr)</span>
       </div>
@@ -942,30 +942,30 @@
 
     <div class="map-stat-bar" id="map-stat-bar">
       <div class="map-stat">
-        <div class="map-stat-dot" style="background:#DC2626"></div>
+        <div class="map-stat-dot" style="background:var(--c-danger)"></div>
         <div>
-          <div class="map-stat-val" id="ms-crit" style="color:#DC2626">—</div>
+          <div class="map-stat-val" id="ms-crit" style="color:var(--c-danger)">—</div>
           <div class="map-stat-lbl">حرج · 0–24%</div>
         </div>
       </div>
       <div class="map-stat">
-        <div class="map-stat-dot" style="background:#D97706"></div>
+        <div class="map-stat-dot" style="background:var(--c-warning)"></div>
         <div>
-          <div class="map-stat-val" id="ms-fair" style="color:#D97706">—</div>
+          <div class="map-stat-val" id="ms-fair" style="color:var(--c-warning)">—</div>
           <div class="map-stat-lbl">متوسط · 25–49%</div>
         </div>
       </div>
       <div class="map-stat">
-        <div class="map-stat-dot" style="background:#059669"></div>
+        <div class="map-stat-dot" style="background:var(--c-positive)"></div>
         <div>
-          <div class="map-stat-val" id="ms-good" style="color:#059669">—</div>
+          <div class="map-stat-val" id="ms-good" style="color:var(--c-positive)">—</div>
           <div class="map-stat-lbl">جيد · 50–74%</div>
         </div>
       </div>
       <div class="map-stat">
-        <div class="map-stat-dot" style="background:#0891B2"></div>
+        <div class="map-stat-dot" style="background:var(--c-info-2)"></div>
         <div>
-          <div class="map-stat-val" id="ms-vgood" style="color:#0891B2">—</div>
+          <div class="map-stat-val" id="ms-vgood" style="color:var(--c-info-2)">—</div>
           <div class="map-stat-lbl">جيد جداً · 75–100%</div>
         </div>
       </div>
@@ -1360,7 +1360,7 @@
       </div>
       <button onclick="hasrClearSubFilter()"
         style="font-size:11px;font-weight:700;padding:6px 16px;border-radius:8px;cursor:pointer;
-               background:#EFF6FF;color:#1D4ED8;border:1.5px solid #BFDBFE;font-family:Tajawal;white-space:nowrap">
+               background:var(--bg-info);color:var(--c-info);border:1.5px solid var(--bd-info);font-family:Tajawal;white-space:nowrap">
         ✕ إزالة فلتر النظام
       </button>
     </div>
@@ -1369,67 +1369,67 @@
     <div class="kpi-grid" id="hasr-kpi-row" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
 
       <!-- كارت 1: المدارس المحصورة -->
-      <div class="kpi" style="border-top:3px solid #1D4ED8">
-        <div style="font-size:10px;font-weight:700;color:#1D4ED8;margin-bottom:4px;letter-spacing:.04em">🏫 المدارس المحصورة</div>
-        <div class="kpi-val" id="hasr-k-surveyed" style="color:#1D4ED8">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-info)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-info);margin-bottom:4px;letter-spacing:.04em">🏫 المدارس المحصورة</div>
+        <div class="kpi-val" id="hasr-k-surveyed" style="color:var(--c-info)">—</div>
         <div class="kpi-lbl">من <span id="hasr-k-target" style="font-weight:800">3,750</span> مدرسة</div>
         <div style="margin-top:8px;background:#E8F0FE;border-radius:999px;height:6px;overflow:hidden">
-          <div id="hasr-prog-schools" style="height:100%;background:#1D4ED8;border-radius:999px;width:0%;transition:width .6s ease"></div>
+          <div id="hasr-prog-schools" style="height:100%;background:var(--c-info);border-radius:999px;width:0%;transition:width .6s ease"></div>
         </div>
-        <div class="kpi-sub" id="hasr-k-coverage" style="margin-top:4px;color:#1D4ED8">0%</div>
+        <div class="kpi-sub" id="hasr-k-coverage" style="margin-top:4px;color:var(--c-info)">0%</div>
       </div>
 
       <!-- كارت 2: إجمالي الأصول -->
-      <div class="kpi" style="border-top:3px solid #059669">
-        <div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:4px;letter-spacing:.04em">📊 إجمالي الأصول</div>
-        <div class="kpi-val" id="hasr-k-assets" style="color:#059669">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-positive)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-positive);margin-bottom:4px;letter-spacing:.04em">📊 إجمالي الأصول</div>
+        <div class="kpi-val" id="hasr-k-assets" style="color:var(--c-positive)">—</div>
         <div class="kpi-lbl">أصل موثّق</div>
         <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap" id="hasr-assets-breakdown"></div>
       </div>
 
       <!-- كارت 3: المدارس المعادة -->
-      <div class="kpi" style="border-top:3px solid #7C3AED">
-        <div style="font-size:10px;font-weight:700;color:#7C3AED;margin-bottom:4px;letter-spacing:.04em">🔄 المدارس المعادة</div>
-        <div class="kpi-val" id="hasr-k-reassessed" style="color:#7C3AED">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-special)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-special);margin-bottom:4px;letter-spacing:.04em">🔄 المدارس المعادة</div>
+        <div class="kpi-val" id="hasr-k-reassessed" style="color:var(--c-special)">—</div>
         <div class="kpi-lbl">أعيد تقييمها</div>
-        <div style="margin-top:8px;background:#EDE9FE;border-radius:999px;height:6px;overflow:hidden">
-          <div id="hasr-prog-reassessed" style="height:100%;background:#7C3AED;border-radius:999px;width:0%;transition:width .6s ease"></div>
+        <div style="margin-top:8px;background:var(--bg-special);border-radius:999px;height:6px;overflow:hidden">
+          <div id="hasr-prog-reassessed" style="height:100%;background:var(--c-special);border-radius:999px;width:0%;transition:width .6s ease"></div>
         </div>
-        <div class="kpi-sub" id="hasr-k-reassessed-pct" style="margin-top:4px;color:#7C3AED">0%</div>
+        <div class="kpi-sub" id="hasr-k-reassessed-pct" style="margin-top:4px;color:var(--c-special)">0%</div>
       </div>
 
       <!-- كارت 4: متوسط الأصول -->
-      <div class="kpi" style="border-top:3px solid #0891B2">
-        <div style="font-size:10px;font-weight:700;color:#0891B2;margin-bottom:4px;letter-spacing:.04em">📐 متوسط الأصول</div>
-        <div class="kpi-val" id="hasr-k-avg-assets" style="color:#0891B2">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-info-2)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-info-2);margin-bottom:4px;letter-spacing:.04em">📐 متوسط الأصول</div>
+        <div class="kpi-val" id="hasr-k-avg-assets" style="color:var(--c-info-2)">—</div>
         <div class="kpi-lbl">أصل / مدرسة</div>
       </div>
 
       <!-- كارت 5: المباني -->
-      <div class="kpi" style="border-top:3px solid #D97706">
-        <div style="font-size:10px;font-weight:700;color:#D97706;margin-bottom:4px;letter-spacing:.04em">🏗️ إجمالي المباني</div>
-        <div class="kpi-val" id="hasr-k-total-buildings" style="color:#D97706">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-warning)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-warning);margin-bottom:4px;letter-spacing:.04em">🏗️ إجمالي المباني</div>
+        <div class="kpi-val" id="hasr-k-total-buildings" style="color:var(--c-warning)">—</div>
         <div class="kpi-lbl" id="hasr-k-avg-buildings">— مبنى / مدرسة</div>
       </div>
 
       <!-- كارت 6: الغرف -->
-      <div class="kpi" style="border-top:3px solid #DC2626">
-        <div style="font-size:10px;font-weight:700;color:#DC2626;margin-bottom:4px;letter-spacing:.04em">🚪 إجمالي الغرف</div>
-        <div class="kpi-val" id="hasr-k-total-rooms" style="color:#DC2626">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-danger)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-danger);margin-bottom:4px;letter-spacing:.04em">🚪 إجمالي الغرف</div>
+        <div class="kpi-val" id="hasr-k-total-rooms" style="color:var(--c-danger)">—</div>
         <div class="kpi-lbl" id="hasr-k-avg-rooms">— غرفة / مدرسة</div>
       </div>
 
       <!-- كارت 7: الأنظمة الرئيسية -->
-      <div class="kpi" style="border-top:3px solid #1E3A8A">
-        <div style="font-size:10px;font-weight:700;color:#1E3A8A;margin-bottom:4px;letter-spacing:.04em">⚙️ الأنظمة الرئيسية</div>
-        <div class="kpi-val" id="hasr-k-main-systems" style="color:#1E3A8A">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-primary)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-primary);margin-bottom:4px;letter-spacing:.04em">⚙️ الأنظمة الرئيسية</div>
+        <div class="kpi-val" id="hasr-k-main-systems" style="color:var(--c-primary)">—</div>
         <div class="kpi-lbl">نظام رئيسي</div>
       </div>
 
       <!-- كارت 8: الأنظمة الفرعية -->
-      <div class="kpi" style="border-top:3px solid #0E7490">
-        <div style="font-size:10px;font-weight:700;color:#0E7490;margin-bottom:4px;letter-spacing:.04em">🔩 الأنظمة الفرعية</div>
-        <div class="kpi-val" id="hasr-k-sub-systems" style="color:#0E7490">—</div>
+      <div class="kpi" style="border-top:3px solid var(--c-info-2)">
+        <div style="font-size:10px;font-weight:700;color:var(--c-info-2);margin-bottom:4px;letter-spacing:.04em">🔩 الأنظمة الفرعية</div>
+        <div class="kpi-val" id="hasr-k-sub-systems" style="color:var(--c-info-2)">—</div>
         <div class="kpi-lbl">نظام فرعي</div>
       </div>
 
@@ -1440,11 +1440,11 @@
     <!-- الرسوم البيانية -->
     <div class="g2 mb14">
       <div class="card">
-        <div class="card-title"><span class="card-title-icon" style="background:#F0FDF4;color:#059669">📊</span>توزيع الأصول حسب الحالة</div>
+        <div class="card-title"><span class="card-title-icon" style="background:#F0FDF4;color:var(--c-positive)">📊</span>توزيع الأصول حسب الحالة</div>
         <div class="chart-box" style="height:260px"><canvas id="hasr-ch-condition"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title"><span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">⚙️</span>الأصول حسب النظام الرئيسي<span class="sub">أعلى 10</span></div>
+        <div class="card-title"><span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">⚙️</span>الأصول حسب النظام الرئيسي<span class="sub">أعلى 10</span></div>
         <div class="chart-box" style="height:340px"><canvas id="hasr-ch-systems"></canvas></div>
       </div>
     </div>
@@ -1509,7 +1509,7 @@
     </div>
     <div id="hasr-error" style="display:none;text-align:center;padding:60px 20px">
       <div style="font-size:32px;margin-bottom:12px">❌</div>
-      <div style="font-size:14px;color:#DC2626" id="hasr-error-msg">حدث خطأ</div>
+      <div style="font-size:14px;color:var(--c-danger)" id="hasr-error-msg">حدث خطأ</div>
       <button class="tb-btn" onclick="loadHasrData()" style="margin-top:12px">↻ إعادة المحاولة</button>
     </div>
 

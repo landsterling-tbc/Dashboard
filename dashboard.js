@@ -234,7 +234,7 @@ const CFG = {
     // اتركه فارغاً لو البلاغات في نفس الـ GAS_URL كشيت منفصلة
     // أو ضع رابط CSV مباشر من Google Drive: ?export&format=csv
     BALAGH_SHEET_KEY: "balaghReports", // المفتاح في SHEET_NAMES
-    OPENAI_MODEL: "gpt-5.4", // الموديل ثابت بالكود
+    OPENAI_MODEL: "gpt-5.6-sol", // الموديل ثابت بالكود
     OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
     // 📚 مخزن المتجهات (Vector Store) الخاص بـ"الدليل الوطني الشامل لخدمات المرافق"
     // (هيئة كفاءة الإنفاق — الدليل الوطني لإدارة الأصول والمرافق).
@@ -10981,7 +10981,7 @@ function renderTajheezAllTable() {
     },
     /** اسم الموديل: ثابت بالكود دايماً (CFG.OPENAI_MODEL)، بدون اعتماد على أي إعداد محلي */
     getModel() {
-      return CFG.OPENAI_MODEL || "gpt-5.4";
+      return CFG.OPENAI_MODEL || "gpt-5.6-sol";
     },
     saveSettings(key, model) {
       if (key) localStorage.setItem("fcb_openai_key", key);
@@ -11252,19 +11252,18 @@ function renderTajheezAllTable() {
           if (!v) return;
           احتياجَ_حسب_القسم[q] = (احتياجَ_حسب_القسم[q] || 0) + v;
         });
-        const أعلى_10_أقسام_احتياجاً_بالقيمة = Object.entries(احتياجَ_حسب_القسم)
+        const كل_الأقسام_احتياجاً_بالقيمة = Object.entries(احتياجَ_حسب_القسم)
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
           .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
-        const أعلى_15_صنف_احتياجاً_بالقيمة = [...taj]
+        const أعلى_25_صنف_احتياجاً_بالقيمة = [...taj]
           .filter((r) => r.احتياج?.قيمة)
           .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0))
-          .slice(0, 15)
+          .slice(0, 25)
           .map((r) => ({ القسم: r.قسم, الصنف: r.صنف, قيمة_الاحتياج: r.احتياج.قيمة, كمية_الاحتياج: r.احتياج.كلي }));
-        const أعلى_10_فروقات_نقص_بالقيمة = [...taj]
+        const أعلى_20_فروقات_نقص_بالقيمة = [...taj]
           .filter((r) => null != r.فرق_قيمة)
           .sort((a, b) => (a.فرق_قيمة || 0) - (b.فرق_قيمة || 0)) // أكثر سالب = أكبر نقص
-          .slice(0, 10)
+          .slice(0, 20)
           .map((r) => ({ القسم: r.قسم, الصنف: r.صنف, فرق_القيمة: r.فرق_قيمة, فرق_الكمية: r.فرق_كمية }));
         summary.تجهيزات_المخزون = {
           مصدر: "تبويب التجهيزات — ملف التجهيزات_منظف.csv (مخصص حالي مقابل احتياج فعلي لكل مدينة)",
@@ -11276,9 +11275,9 @@ function renderTajheezAllTable() {
           إجمالي_الكمية_المطلوبة_احتياج: +إجمالي_احتياج_كمية.toFixed(2),
           إجمالي_قيمة_الاحتياج_ريال: +إجمالي_احتياج_قيمة.toFixed(2),
           الفرق_الإجمالي_قيمة_ريال: +(إجمالي_مخصص_قيمة - إجمالي_احتياج_قيمة).toFixed(2),
-          أعلى_10_أقسام_احتياجاً_بالقيمة: أعلى_10_أقسام_احتياجاً_بالقيمة,
-          أعلى_15_صنف_احتياجاً_بالقيمة: أعلى_15_صنف_احتياجاً_بالقيمة,
-          أعلى_10_فروقات_نقص_بالقيمة_الأكثر_عجزاً: أعلى_10_فروقات_نقص_بالقيمة,
+          كل_الأقسام_احتياجاً_بالقيمة: كل_الأقسام_احتياجاً_بالقيمة,
+          أعلى_25_صنف_احتياجاً_بالقيمة: أعلى_25_صنف_احتياجاً_بالقيمة,
+          أعلى_20_فروقات_نقص_بالقيمة_الأكثر_عجزاً: أعلى_20_فروقات_نقص_بالقيمة,
           توزيع_المخصص_حسب_المدينة: {
             مكة: fcbSum(taj.map((r) => ({ v: r.مخصص?.مكة })), "v"),
             جدة: fcbSum(taj.map((r) => ({ v: r.مخصص?.جدة })), "v"),
@@ -11467,8 +11466,8 @@ function renderTajheezAllTable() {
         summary.بلاغات_CSV = {
           مصدر: "تبويب البلاغات — ملف بلاغات منفصل (CSV)",
           إجمالي_السجلات: bal.length,
-          ...(typeKey ? { توزيع_حسب_النوع: fcbCountBy(bal, typeKey, 10) } : {}),
-          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(bal, statusKey, 10) } : {}),
+          ...(typeKey ? { توزيع_حسب_النوع: fcbCountBy(bal, typeKey, 50) } : {}),
+          ...(statusKey ? { توزيع_حسب_الحالة: fcbCountBy(bal, statusKey, 50) } : {}),
         };
       }
     } catch (_) {}
@@ -11484,13 +11483,13 @@ function renderTajheezAllTable() {
         const totalValue = items.reduce((s, r) => s + r.qty * r.unitPrice, 0);
         const valueByItem = {};
         items.forEach((r) => { if (r.name && r.name !== "—") valueByItem[r.name] = (valueByItem[r.name] || 0) + r.qty * r.unitPrice; });
-        const أعلى_10_أصناف_قيمة = Object.entries(valueByItem).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
+        const أعلى_30_أصناف_قيمة = Object.entries(valueByItem).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
         summary.قطع_الغيار = {
           مصدر: "تبويب قطع الغيار",
           إجمالي_السجلات: sp.length,
           إجمالي_الكمية: +totalQty.toFixed(2),
           إجمالي_القيمة_التقديرية_ريال: +totalValue.toFixed(2),
-          أعلى_10_أصناف_من_حيث_القيمة: أعلى_10_أصناف_قيمة,
+          أعلى_30_أصناف_من_حيث_القيمة: أعلى_30_أصناف_قيمة,
         };
       }
     } catch (_) {}
@@ -11518,9 +11517,9 @@ function renderTajheezAllTable() {
         const totalLastInv = fm.reduce((s,r)=>s+(fmNum(r["القيمة"])||0),0);
 
         // توزيعات
-        const byRegion     = fcbCountBy(fm, "المنطقة", 10);
-        const byScope      = fcbCountBy(fm, "النطاق", 15);
-        const byContractor = fcbCountBy(fm, "المقاول", 15);
+        const byRegion     = fcbCountBy(fm, "المنطقة", 50);
+        const byScope      = fcbCountBy(fm, "النطاق", 50);
+        const byContractor = fcbCountBy(fm, "المقاول", 50);
 
         // أعلى عقود من حيث القيمة المستحقة غير المصروفة
         const topDue = [...fm]
@@ -11796,9 +11795,9 @@ function renderTajheezAllTable() {
           إجمالي_البلاغات: rows.length,
           حالة_البلاغات: { مغلقة: closed, قيد_التنفيذ: inprog, مفتوحة_أخرى: open },
           متأخرة_عن_SLA: overdue.length,
-          توزيع_حسب_الفئة: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({الفئة:k,العدد:v})),
+          توزيع_حسب_الفئة: Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الفئة:k,العدد:v})),
           توزيع_حسب_الأولوية: Object.entries(byPriority).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الأولوية:k,العدد:v})),
-          توزيع_حسب_الموقع: Object.entries(byLocation).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({الموقع:k,العدد:v})),
+          توزيع_حسب_الموقع: Object.entries(byLocation).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الموقع:k,العدد:v})),
           أعلى_10_مدارس_في_عدد_البلاغات: أعلى_10_مدارس,
         };
       }
@@ -12017,8 +12016,16 @@ function renderTajheezAllTable() {
         const cityMap = {};
         hsc.forEach(sc => { cityMap[sc.city] = (cityMap[sc.city]||0) + (sc.totalAssets||0); });
         const topCitiesByAssets = Object.entries(cityMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([city,total])=>({city,total}));
-        // توزيع الأنظمة (أعلى 10)
+        // توزيع الأنظمة — القائمة الكاملة (كل نظام رئيسي + كل أنظمته الفرعية بالتفصيل)
         const topSystems = (window.HASR.data.systems||[]).slice(0,10).map(s=>({name:s.name,total:s.total,excellent:s.excellent,good:s.good,bad:s.bad,deteriorated:s.deteriorated}));
+        const allSystemsFull = (window.HASR.data.systems||[]).map(s=>({
+          النظام_الرئيسي: s.name,
+          الإجمالي: s.total, ممتاز: s.excellent, جيد: s.good, سيئ: s.bad, متهالك: s.deteriorated,
+          الأنظمة_الفرعية: (s.subSystems||[]).map(sub=>({
+            النظام_الفرعي: sub.name, الإجمالي: sub.total,
+            ممتاز: sub.excellent, جيد: sub.good, سيئ: sub.bad, متهالك: sub.deteriorated
+          }))
+        }));
         // المدارس العشر الأعلى أصولاً
         const top10Schools = [...hsc].sort((a,b)=>b.totalAssets-a.totalAssets).slice(0,10).map(sc=>({name:sc.name,city:sc.city,code:sc.code,totalAssets:sc.totalAssets,excellent:sc.excellent,good:sc.good,bad:sc.bad,deteriorated:sc.deteriorated,buildings:sc.buildings,rooms:sc.rooms,reassessed:sc.reassessed}));
         // المدارس المعادة
@@ -12063,9 +12070,18 @@ function renderTajheezAllTable() {
           المدن: (window.HASR.data.cities||[]).map(c=>c.city).join(" · "),
           أعلى_10_مدن_أصولاً: topCitiesByAssets,
           أعلى_10_أنظمة_أصولاً: topSystems,
+          الأنظمة_الرئيسية_والفرعية_الكاملة: allSystemsFull,
           أعلى_10_مدارس_أصولاً: top10Schools,
           المدارس_المعادة: reassessedList.slice(0,30),
           التكييف_في_الحصر: acDataForChat,
+        };
+      } else {
+        /* 🩺 لسه مش محمّلة رغم محاولة السحب التلقائي — نديّ سبب تقني واضح
+           عشان الشات بوت يقدر يشرحه للمستخدم بدل ما يقول "دوس ↻" بس */
+        summary.حصر_الأصول = {
+          تنبيه: "تعذّر تحميل بيانات حصر الأصول تلقائياً في هذه اللحظة.",
+          السبب_التقني: (window.HASR && HASR._lastLoadError) ? HASR._lastLoadError : "لم تتم أي محاولة تحميل بعد (window.HASR غير مهيأ أو لم يُستدعَ fcbEnsureHasrLoaded).",
+          تعليمات_للمساعد: "اشرح للمستخدم بوضوح إن فيه مشكلة تقنية في سحب بيانات حصر الأصول (اذكر السبب_التقني حرفياً لو موجود)، ووجّهه يجرّب يفتح تبويب حصر الأصول يدوياً ويضغط ↻ كحل مؤقت.",
         };
       }
     } catch(e) { summary.حصر_الأصول = { تنبيه: "تعذّر تلخيص بيانات حصر الأصول: " + (e?.message||e) }; }
@@ -12795,22 +12811,102 @@ function renderTajheezAllTable() {
   // ════════════════════════════════════════════════════════════════
   // 🧠 كشف نوع السؤال — يحدد أي بيانات نضيفها للـ context
   // ════════════════════════════════════════════════════════════════
+  /* كاش أسماء الأنظمة الرئيسية والفرعية من بيانات حصر الأصول — يُبنى مرة واحدة
+     ويُستخدم للتعرف التلقائي على أسماء الأنظمة الفرعية داخل سؤال المستخدم
+     حتى لو مقالش "حصر أصول" صراحة */
+  let _fcbHasrSysNamesCache = null;
+  function fcbHasrSysNames() {
+    if (_fcbHasrSysNamesCache) return _fcbHasrSysNamesCache;
+    if (!(window.HASR && window.HASR.loaded && window.HASR.data)) return [];
+    const names = [];
+    (window.HASR.data.systems || []).forEach(s => {
+      if (s.name) names.push({ name: s.name, main: s.name });
+      (s.subSystems || []).forEach(sub => {
+        if (sub.name) names.push({ name: sub.name, main: s.name });
+      });
+    });
+    // أطول الأسماء أولاً لتفادي تطابقات جزئية مضللة
+    names.sort((a, b) => b.name.length - a.name.length);
+    _fcbHasrSysNamesCache = names;
+    return names;
+  }
+  // يرجع أول اسم نظام رئيسي/فرعي موجود داخل نص المستخدم، أو null
+  function fcbMatchHasrSysName(text) {
+    const t = String(text || "");
+    for (const entry of fcbHasrSysNames()) {
+      if (entry.name.length >= 2 && t.includes(entry.name)) return entry;
+    }
+    return null;
+  }
+
+  /* نفس فكرة الكاش أعلاه لكن لأسماء أصناف قطع الغيار — يسمح للمستخدم يسأل
+     عن صنف بعينه بالاسم من غير ما يقول "قطع غيار" صراحة */
+  let _fcbSparePartNamesCache = null;
+  function fcbSparePartNames() {
+    if (_fcbSparePartNamesCache) return _fcbSparePartNamesCache;
+    if (!Array.isArray(window.RAW_SPARE_PARTS) || !window.RAW_SPARE_PARTS.length) return [];
+    const seen = new Set();
+    window.RAW_SPARE_PARTS.forEach(r => {
+      const name = String(r["وصف_الصنف"] ?? "").trim();
+      if (name && name !== "—") seen.add(name);
+    });
+    const names = [...seen].sort((a, b) => b.length - a.length);
+    _fcbSparePartNamesCache = names;
+    return names;
+  }
+  function fcbMatchSparePartName(text) {
+    const t = String(text || "");
+    for (const name of fcbSparePartNames()) {
+      if (name.length >= 3 && t.includes(name)) return name;
+    }
+    return null;
+  }
+
+  /* نفس الفكرة لأسماء أقسام وأصناف تبويب التجهيزات */
+  let _fcbTajheezNamesCache = null;
+  function fcbTajheezNames() {
+    if (_fcbTajheezNamesCache) return _fcbTajheezNamesCache;
+    if (!Array.isArray(window.RAW_TAJHEEZ_INV) || !window.RAW_TAJHEEZ_INV.length || typeof parseTajheezRow !== "function") return [];
+    const taj = window.RAW_TAJHEEZ_INV.map(parseTajheezRow).filter((r) => r.صنف || r.قسم);
+    const seen = new Map(); // name -> {name, isDept}
+    taj.forEach(r => {
+      if (r.قسم) seen.set(r.قسم, { name: r.قسم, isDept: true });
+      if (r.صنف && !seen.has(r.صنف)) seen.set(r.صنف, { name: r.صنف, isDept: false });
+    });
+    const names = [...seen.values()].sort((a, b) => b.name.length - a.name.length);
+    _fcbTajheezNamesCache = names;
+    return names;
+  }
+  function fcbMatchTajheezName(text) {
+    const t = String(text || "");
+    for (const entry of fcbTajheezNames()) {
+      if (entry.name.length >= 3 && t.includes(entry.name)) return entry;
+    }
+    return null;
+  }
+
   function fcbDetectTopics(text) {
     const t = text;
+    const hasrSysMatch = fcbMatchHasrSysName(t);
+    const sparePartMatch = fcbMatchSparePartName(t);
+    const tajheezMatch = fcbMatchTajheezName(t);
     return {
       بوابين:    /بواب|بوابين|حارس|gatekeeper/i.test(t),
       عقود:      /عقد|عقود|مستحق|مقاول|contract|مدة|انتهاء|تجديد|fm|صروف/i.test(t),
       بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق/i.test(t),
       fca:       /fca|حالة فنية|تقييم|حرج|متوسط.*مبنى|أسوأ مدرسة/i.test(t),
       أنظمة:     /نظام|تكييف|كهرباء|سباكة|hvac|درجة.*نظام/i.test(t),
-      تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t),
+      تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t) || !!tajheezMatch,
       مدفوعات:   /دفع|مدفوع|متبقي|صرف.*ميزانية|payment/i.test(t),
       أولويات:   /أولوي|حل|يستحق|أشد|أخطر|أهم|urgent/i.test(t),
       طلاب:      /طالب|طلاب|عمر.*مبنى|مبنى.*قديم/i.test(t),
-      قطع:       /قطع.*غيار|قطعة|spare/i.test(t),
+      قطع:       /قطع.*غيار|قطعة|spare/i.test(t) || !!sparePartMatch,
       مصاعد:     /مصعد|مصاعد|elevator/i.test(t),
-      حصر:       /حصر.*أصول|حصر.*اصول|تبويب.*حصر|حصر.*مدارس|أصول.*مدرسة|اصول.*مدرسة|hasr|معادة|متهالك.*مدرسة|ممتاز.*أصل|جيد.*أصل|مبان.*مدرسة|غرف.*مدرسة|نسبة.*تغطية|تغطية.*مدارس|تكييف.*حصر|حصر.*تكييف|مكيف.*حصر|حصر.*مكيف|تكييفات.*حصر|وحدات.*حصر|حصر.*وحدات/i.test(t),
+      حصر:       /حصر.*أصول|حصر.*اصول|تبويب.*حصر|حصر.*مدارس|أصول.*مدرسة|اصول.*مدرسة|hasr|معادة|متهالك.*مدرسة|ممتاز.*أصل|جيد.*أصل|مبان.*مدرسة|غرف.*مدرسة|نسبة.*تغطية|تغطية.*مدارس|تكييف.*حصر|حصر.*تكييف|مكيف.*حصر|حصر.*مكيف|تكييفات.*حصر|وحدات.*حصر|حصر.*وحدات/i.test(t) || !!hasrSysMatch,
       كبير:      false, // يتحدد بعد كشف الباقي
+      _hasrSysMatch: hasrSysMatch, // {name, main} لو النص فيه اسم نظام رئيسي/فرعي معروف من الحصر
+      _sparePartMatch: sparePartMatch, // اسم صنف قطع غيار معروف لو مذكور في النص
+      _tajheezMatch: tajheezMatch,     // {name, isDept} لو النص فيه اسم قسم/صنف معروف من التجهيزات
     };
   }
 
@@ -13056,6 +13152,16 @@ function renderTajheezAllTable() {
       throw err;
     }
 
+    // ── 🤖 تحميل تلقائي وصامت لبيانات حصر الأصول (HASR) لو لسه ما اتحمّلتش ──
+    // ده بيحل مشكلة إن الشات بوت كان بيرفض الإجابة على أسئلة حصر الأصول
+    // (زي عدد أجهزة الحاسب) لمجرد إن المستخدم ما فتحش تبويب "حصر الأصول"
+    // بنفسه وما ضغطش زر التحديث ↻. دلوقتي الشات بوت بيسحب البيانات لوحده
+    // أول ما يحتاجها، بنفس الطريقة اللي التبويب بيسحب بيها بياناته من
+    // Google Apps Script، وبيخزّنها في window.HASR عشان ميكررش السحب.
+    if (!(window.HASR && window.HASR.loaded && window.HASR.data)) {
+      await fcbEnsureHasrLoaded();
+    }
+
     const topics = fcbDetectTopics(userText);
 
     // ── سياق الداشبورد الحالي + محرك الاستعلامات الذكي (المرحلة 4) ──
@@ -13142,6 +13248,30 @@ function renderTajheezAllTable() {
       extraContext += `\n\nمصاعد متعطلة:\n${JSON.stringify(broken)}`;
     }
 
+    // ── قطع الغيار: بيانات صنف بعينه لو اتذكر اسمه في السؤال ──
+    if (topics._sparePartMatch && Array.isArray(window.RAW_SPARE_PARTS) && window.RAW_SPARE_PARTS.length) {
+      const rows = window.RAW_SPARE_PARTS.filter(r => String(r["وصف_الصنف"] ?? "").trim() === topics._sparePartMatch);
+      const detail = rows.map(r => ({
+        الصنف: r["وصف_الصنف"], الكمية: r["الكمية"], سعر_الوحدة: r["سعر_الوحدة"],
+        القيمة_الإجمالية: (parseFloat(r["الكمية"])||0) * (parseFloat(r["سعر_الوحدة"])||0),
+      }));
+      extraContext += `\n\nبيانات صنف قطع الغيار "${topics._sparePartMatch}":\n${JSON.stringify(detail)}`;
+    }
+
+    // ── التجهيزات: بيانات قسم أو صنف بعينه لو اتذكر اسمه في السؤال ──
+    if (topics._tajheezMatch && Array.isArray(window.RAW_TAJHEEZ_INV) && window.RAW_TAJHEEZ_INV.length && typeof parseTajheezRow === "function") {
+      const taj = window.RAW_TAJHEEZ_INV.map(parseTajheezRow).filter((r) => r.صنف || r.قسم);
+      const { name: matchedName, isDept } = topics._tajheezMatch;
+      const rows = isDept ? taj.filter(r => r.قسم === matchedName) : taj.filter(r => r.صنف === matchedName);
+      const detail = rows.map(r => ({
+        القسم: r.قسم, الصنف: r.صنف,
+        مخصص_كمية: r.مخصص?.كلي, مخصص_قيمة: r.مخصص?.قيمة,
+        احتياج_كمية: r.احتياج?.كلي, احتياج_قيمة: r.احتياج?.قيمة,
+        الفرق_قيمة: r.فرق_قيمة, الفرق_كمية: r.فرق_كمية,
+      }));
+      extraContext += `\n\nبيانات ${isDept ? "قسم" : "صنف"} التجهيزات "${matchedName}" (${detail.length} سجل):\n${JSON.stringify(detail.slice(0,60))}`;
+    }
+
     // ── حصر الأصول: تفاصيل المدارس التي تطابق السؤال ──
     if (topics.حصر && window.HASR && window.HASR.loaded && window.HASR.data) {
       const hsc = window.HASR.data.schools || [];
@@ -13155,9 +13285,42 @@ function renderTajheezAllTable() {
         totalAssets: sc.totalAssets,
         excellent: sc.excellent, good: sc.good, bad: sc.bad, deteriorated: sc.deteriorated,
         buildings: sc.buildings, rooms: sc.rooms, reassessed: sc.reassessed,
-        systems: (sc.systems||[]).filter(s=>s.total>0).map(s=>s.name+':'+s.total).join(', ')
+        systems: (sc.systems||[]).filter(s=>s.total>0).map(s=>({
+          النظام_الرئيسي: s.name, الإجمالي: s.total,
+          ممتاز: s.excellent, جيد: s.good, سيئ: s.bad, متهالك: s.deteriorated,
+          الأنظمة_الفرعية: (s.subSystems||[]).map(sub=>sub.name+':'+sub.total).join(', ')
+        }))
       }));
       extraContext += `\n\nتفاصيل مدارس حصر الأصول (${subset.length} مدرسة متاحة، أعرض أول ${Math.min(subset.length,40)}):\n${JSON.stringify(detail)}`;
+
+      // ── تعرّف تلقائي على اسم نظام رئيسي/فرعي مذكور في السؤال (حتى لو لم يذكر "حصر") ──
+      if (topics._hasrSysMatch) {
+        const { name: matchedName, main: matchedMain } = topics._hasrSysMatch;
+        const allSysNow = window.HASR.data.systems || [];
+        if (matchedName === matchedMain) {
+          // اسم نظام رئيسي
+          const sysObj = allSysNow.find(s => s.name === matchedMain);
+          if (sysObj) {
+            const perSchool = hsc.map(sc => {
+              const s = (sc.systems || []).find(x => x.name === matchedMain);
+              return s && s.total > 0 ? { name: sc.name, city: sc.city, code: sc.code, total: s.total, excellent: s.excellent, good: s.good, bad: s.bad, deteriorated: s.deteriorated } : null;
+            }).filter(Boolean).sort((a, b) => b.total - a.total);
+            extraContext += `\n\nبيانات النظام الرئيسي "${matchedMain}" في حصر الأصول:\nالإجمالي: ${sysObj.total} | ممتاز: ${sysObj.excellent} | جيد: ${sysObj.good} | سيئ: ${sysObj.bad} | متهالك: ${sysObj.deteriorated}\nالأنظمة الفرعية:\n${JSON.stringify((sysObj.subSystems||[]).map(sub=>({name:sub.name,total:sub.total,excellent:sub.excellent,good:sub.good,bad:sub.bad,deteriorated:sub.deteriorated})))}\nأعلى 15 مدرسة في هذا النظام:\n${JSON.stringify(perSchool.slice(0,15))}`;
+          }
+        } else {
+          // اسم نظام فرعي
+          const sysObj = allSysNow.find(s => s.name === matchedMain);
+          const subObj = sysObj ? (sysObj.subSystems||[]).find(sub => sub.name === matchedName) : null;
+          if (subObj) {
+            const perSchoolSub = hsc.map(sc => {
+              const s = (sc.systems || []).find(x => x.name === matchedMain);
+              const sub = s ? (s.subSystems||[]).find(x => x.name === matchedName) : null;
+              return sub && sub.total > 0 ? { name: sc.name, city: sc.city, code: sc.code, total: sub.total, excellent: sub.excellent, good: sub.good, bad: sub.bad, deteriorated: sub.deteriorated } : null;
+            }).filter(Boolean).sort((a, b) => b.total - a.total);
+            extraContext += `\n\nبيانات النظام الفرعي "${matchedName}" (ضمن النظام الرئيسي "${matchedMain}") في حصر الأصول:\nالإجمالي: ${subObj.total} | ممتاز: ${subObj.excellent} | جيد: ${subObj.good} | سيئ: ${subObj.bad} | متهالك: ${subObj.deteriorated}\nأعلى 15 مدرسة في هذا النظام الفرعي:\n${JSON.stringify(perSchoolSub.slice(0,15))}`;
+          }
+        }
+      }
 
       // ── تكييف: حقن بيانات التكييف التفصيلية من حصر الأصول ──
       const isAcQuestion = /تكييف|مكيف|تكييفات|وحدات.*تكييف|تكييف.*وحدات|cooling|ac\b/i.test(userText);
@@ -13303,15 +13466,17 @@ function renderTajheezAllTable() {
 • المدفوعات              → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
 • خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
 • مؤشرات الأداء للمقاول  → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف)
-• حصر الأصول             → حصر_الأصول: إجمالي الأصول، توزيع الحالة (ممتاز/جيد/سيئ/متهالك)، المباني، الغرف، المعادة، أعلى 10 مدارس، توزيع الأنظمة، أعلى المدن أصولاً
+• حصر الأصول             → حصر_الأصول: إجمالي الأصول، توزيع الحالة (ممتاز/جيد/سيئ/متهالك)، المباني، الغرف، المعادة، أعلى 10 مدارس، أعلى 10 أنظمة، الأنظمة_الرئيسية_والفرعية_الكاملة (كل نظام رئيسي وكل نظام فرعي بداخله بالتفصيل الكامل)، أعلى المدن أصولاً
 
 ══════════════════════════════════════════════════════
 تعليمات خاصة لكل نوع سؤال
 ══════════════════════════════════════════════════════
 ▸ أسئلة عن حصر الأصول:
   بيانات الحصر الكاملة محقونة تلقائياً في حصر_الأصول ضمن ملخص اللوحة.
-  لو ذكر اسم مدرسة أو مدينة → ابحث في تفاصيل_مدارس_حصر_الأصول الموجودة في extraContext.
-  الحقول: name (اسم)، code (كود وزاري)، city (مدينة)، totalAssets (إجمالي الأصول)، excellent/good/bad/deteriorated (توزيع الحالة)، buildings/rooms (مباني/غرف)، reassessed (معادة: نعم/لا)، systems (الأنظمة وإجمالياتها).
+  حصر_الأصول → الأنظمة_الرئيسية_والفرعية_الكاملة: قائمة كاملة (مش أعلى 10 بس) بكل نظام رئيسي (كهرباء/سباكة/تكييف/إنارة/حريق/أمن...إلخ) ومعاه كل أنظمته الفرعية بإجمالياتها وتوزيع حالتها. استخدمها لأي سؤال عن نظام أو نظام فرعي بعينه.
+  المساعد يتعرف تلقائياً على أسماء الأنظمة الفرعية حتى لو المستخدم مقالش "حصر أصول" — مجرد ما يذكر اسم نظام رئيسي أو فرعي (زي "الإنارة" أو "الصرف الصحي") هتلاقي بياناته الكاملة (الإجمالي + توزيع الحالة + أعلى 15 مدرسة فيه) محقونة تلقائياً في extraContext تحت عنوان "بيانات النظام الرئيسي/الفرعي".
+  لو ذكر اسم مدرسة أو مدينة → ابحث في تفاصيل_مدارس_حصر_الأصول الموجودة في extraContext؛ كل مدرسة فيها الآن systems بالتفصيل الكامل (كل نظام رئيسي + إجمالياته + الأنظمة الفرعية جواه)، مش بس إجمالي مجمّع.
+  الحقول: name (اسم)، code (كود وزاري)، city (مدينة)، totalAssets (إجمالي الأصول)، excellent/good/bad/deteriorated (توزيع الحالة)، buildings/rooms (مباني/غرف)، reassessed (معادة: نعم/لا)، systems (الأنظمة الرئيسية مع الأنظمة الفرعية بداخل كل منها).
   الحالات الأربع: ممتاز 🟢 / جيد 🔵 / سيئ 🟡 / متهالك 🔴 — استخدم نفس الألوان عند العرض.
   نسبة التغطية = (المحصورة / الهدف_الإجمالي 3742) × 100.
 
@@ -18881,6 +19046,23 @@ function _hasrApplyFilters() {
 function _hasrRenderFilterBanner() {
   const ctx = HASR._ctx;
   if (!ctx) return;
+
+  /* شريط إزالة الفلتر فوق الـ KPIs */
+  const filterBar   = document.getElementById('hasr-active-filter-bar');
+  const filterLabel = document.getElementById('hasr-active-filter-label');
+  if (filterBar && filterLabel) {
+    if (ctx.filterLabel) {
+      filterBar.style.display   = 'flex';
+      filterLabel.textContent   = ctx.filterLabel;
+    } else {
+      filterBar.style.display   = 'none';
+    }
+  }
+
+  /* زر إزالة الفلتر القديم في شريط الجدول (للتوافق) */
+  const clearSysBtn = document.getElementById('hasr-clear-sys-btn');
+  if (clearSysBtn) clearSysBtn.style.display = 'none';
+
   let banner = document.getElementById('hasr-filter-banner');
   if (ctx.filterLabel) {
     if (!banner) {
@@ -18943,6 +19125,18 @@ function _hasrRenderFilterBanner() {
       overflow:hidden;
     }
     #hasr-dp.hasr-open { transform:translateX(0); }
+    #hasr-spr {
+      position:fixed; top:0; right:0; bottom:0; z-index:9150;
+      width:min(420px,94vw);
+      background:var(--bg-3);
+      box-shadow:-4px 0 40px rgba(6,20,28,.22),-12px 0 60px rgba(8,145,178,.08);
+      display:flex; flex-direction:column;
+      transform:translateX(105%);
+      transition:transform .3s cubic-bezier(.22,.6,.34,1);
+      border-left:2px solid var(--bd-light);
+      overflow:hidden;
+    }
+    #hasr-spr.hasr-open { transform:translateX(0); }
     #hasr-ov {
       position:fixed; inset:0; z-index:9050;
       background:rgba(6,20,28,.45); backdrop-filter:blur(3px);
@@ -19100,6 +19294,29 @@ function _hasrInjectDOM() {
     `;
     document.body.appendChild(dp);
   }
+  if (!document.getElementById('hasr-spr')) {
+    const spr = document.createElement('div');
+    spr.id = 'hasr-spr';
+    spr.innerHTML = `
+      <div class="hasr-head">
+        <button class="hasr-head-close" onclick="hasrCloseSubPanel()">✕</button>
+        <div class="hasr-head-title" id="hasr-spr-title">—</div>
+        <div class="hasr-head-sub"   id="hasr-spr-sub"></div>
+      </div>
+      <div class="hasr-body" id="hasr-spr-body"></div>
+    `;
+    document.body.appendChild(spr);
+  }
+}
+
+/* فتح/إغلاق البانل الجانبي الفرعي (يمين) — يظهر جنب البانل الرئيسي (يسار) */
+function hasrOpenSubPanel() {
+  document.getElementById('hasr-spr')?.classList.add('hasr-open');
+  document.getElementById('hasr-ov')?.classList.add('hasr-open');
+}
+
+function hasrCloseSubPanel() {
+  document.getElementById('hasr-spr')?.classList.remove('hasr-open');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -19111,6 +19328,42 @@ function renderHasrTab() {
   loadHasrData();
 }
 
+/* 🤖 تحميل صامت لبيانات حصر الأصول (من نفس مصدر Google Apps Script) خصيصاً
+   للشات بوت — بدون لمس أي عنصر DOM الخاص بتبويب الحصر. يُستخدم عشان الشات
+   بوت يقدر يجاوب على أي سؤال يخص حصر الأصول حتى لو المستخدم لسه ما فتحش
+   تبويب "حصر الأصول" وما ضغطش زر التحديث ↻ فيه. النتيجة تتخزّن في نفس
+   window.HASR.data/loaded عشان لو المستخدم فتح التبويب بعدين يلاقيها جاهزة. */
+async function fcbEnsureHasrLoaded() {
+  if (HASR.loaded && HASR.data) return true;
+  if (fcbEnsureHasrLoaded._inflight) return fcbEnsureHasrLoaded._inflight;
+  fcbEnsureHasrLoaded._inflight = (async () => {
+    try {
+      const r = await fetch(HASR_SCRIPT_URL);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      HASR.data = await r.json();
+      HASR.loaded = true;
+      const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
+      if (typeof targetFromApi === 'number' && targetFromApi > 0) {
+        HASR_TOTAL_TARGET = targetFromApi;
+      }
+      // 🧠 مهم جداً: نبطّل كاش ملخص اللوحة (fcbBuildDashboardSummary) عشان
+      // يُعاد حسابه ويشمل حصر الأصول اللي لسه واصل. من غير السطر ده، أول
+      // سؤال بيُبنى له ملخص قبل ما التحميل يخلص، ويفضل الشات بوت شايف
+      // نسخة قديمة من الملخص من غير حصر_الأصول حتى لو HASR.loaded بقت true.
+      window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1;
+      console.log('✅ fcbEnsureHasrLoaded: بيانات حصر الأصول اتحمّلت بنجاح للشات بوت', HASR.data?.summary);
+      return true;
+    } catch (e) {
+      HASR._lastLoadError = (e && e.message) ? e.message : String(e);
+      console.error('fcbEnsureHasrLoaded فشل السحب:', e);
+      return false;
+    } finally {
+      fcbEnsureHasrLoaded._inflight = null;
+    }
+  })();
+  return fcbEnsureHasrLoaded._inflight;
+}
+
 async function loadHasrData() {
   _hasrShowLoading(true);
   try {
@@ -19118,6 +19371,7 @@ async function loadHasrData() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     HASR.data   = await r.json();
     HASR.loaded = true;
+    window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1; // 🧠 يبطّل كاش ملخص الشات بوت أيضاً
     /* مزامنة الهدف الإجمالي من الـ payload — Code.gs هو المصدر الوحيد للرقم */
     const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
     if (typeof targetFromApi === 'number' && targetFromApi > 0) {
@@ -19225,6 +19479,7 @@ function _hasrBindKPIs() {
 ════════════════════════════════════════════════════════════════ */
 function _hasrOpenSP(key) {
   HASR._activeK = key;
+  hasrCloseSubPanel();
   const sp = document.getElementById('hasr-sp');
   const ov = document.getElementById('hasr-ov');
   sp.classList.add('hasr-open');
@@ -19245,6 +19500,7 @@ function _hasrOpenSP(key) {
 function _hasrCloseAll() {
   document.getElementById('hasr-sp')?.classList.remove('hasr-open');
   document.getElementById('hasr-dp')?.classList.remove('hasr-open');
+  document.getElementById('hasr-spr')?.classList.remove('hasr-open');
   document.getElementById('hasr-ov')?.classList.remove('hasr-open');
   document.querySelectorAll('.hasr-clickable').forEach(el => el.classList.remove('hasr-active'));
   HASR._activeK   = null;
@@ -19598,50 +19854,84 @@ function _hPanelSubSystems(body) {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   اختيار نظام رئيسي من البانيل → عرض الفرعية
+   اختيار نظام رئيسي من البانيل → عرض الفرعية في نفس البانل
 ════════════════════════════════════════════════════════════════ */
 function hasrSelectMainSystem(mainSys) {
-  /* إذا ضُغط على نفس النظام النشط → مسح الفلتر */
-  if (HASR._filterMain === mainSys && !HASR._filterSub) {
-    HASR._filterMain = '';
-    HASR._filterSub  = '';
-    _hasrApplyFilters();
-    hasrTab('systems');
-    return;
-  }
-  /* عرض الأنظمة الفرعية التابعة له (بدون تطبيق فلتر بعد) */
   const ctx = HASR._ctx;
-  const sysEntry = ctx.systems.find(s=>s.name===mainSys) ||
-                   (HASR.data?.systems||[]).find(s=>s.name===mainSys);
-  const subs = sysEntry ? (sysEntry.subSystems||[]) : [];
-  const body = document.getElementById('hasr-sp-body');
+  const sc  = HASR._schoolCtx;
+
+  /* نأخذ الأنظمة الفرعية: من المدرسة لو في سياق، وإلا من الإجمالي */
+  let sysEntry;
+  if (sc) {
+    const rawSchool = (HASR.data?.schools||[]).find(s=>s.code===sc.code);
+    sysEntry = (rawSchool?.systems||[]).find(s=>s.name===mainSys);
+  } else {
+    sysEntry = ctx.systems.find(s=>s.name===mainSys) ||
+               (HASR.data?.systems||[]).find(s=>s.name===mainSys);
+  }
+  const subs    = sysEntry ? (sysEntry.subSystems||[]) : [];
+  const totAll  = subs.reduce((t,s)=>t+(s.total||0),0) || 1;
+
+  /* نفتح البانل الفرعي الجانبي (يمين) — البانل الرئيسي يفضل زي ما هو */
+  hasrOpenSubPanel();
+  const body = document.getElementById('hasr-spr-body');
   if (!body) return;
 
-  _hS('hasr-sp-title', '⚙️ ' + mainSys);
-  const spSub = document.getElementById('hasr-sp-sub');
-  if (spSub) spSub.textContent = subs.length + ' نظام فرعي';
-  const tabsEl = document.querySelector('#hasr-sp .hasr-tabs');
-  if (tabsEl) tabsEl.style.display = 'none';
+  /* رأس البانل الفرعي */
+  _hS('hasr-spr-title', '⚙️ ' + mainSys);
+  const spSub = document.getElementById('hasr-spr-sub');
+  if (spSub) spSub.textContent = sc
+    ? ('🏫 ' + sc.name + ' · ' + subs.length + ' نظام فرعي')
+    : (subs.length + ' نظام فرعي');
 
-  const totAll = subs.reduce((t,s)=>t+(s.total||0),0) || 1;
+  /* بنر المدرسة لو في سياق */
+  const schoolBanner = sc
+    ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;
+                   background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
+        <span style="font-size:11px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:10px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
+        <button onclick="HASR._schoolCtx=null;hasrTab('systems')"
+          style="margin-right:auto;font-size:9px;padding:2px 8px;border-radius:999px;
+                 background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ كل المدارس</button>
+      </div>`
+    : '';
+
+  /* بنر معلومات النظام الرئيسي */
+  const totSys = sysEntry?.total || 0;
+  const tE=sysEntry?.excellent||0, tG=sysEntry?.good||0, tB=sysEntry?.bad||0, tD=sysEntry?.deteriorated||0;
+  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
+  const barTot = totSys||1;
+
   body.innerHTML = `
-    <button class="hasr-back-btn" onclick="hasrBackToSystems()">← رجوع للأنظمة الرئيسية</button>
+    ${schoolBanner}
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#1E3A8A">
-        <div class="hasr-ic-lbl">${_hE(mainSys)}</div>
+      <div class="hasr-ic" style="--hc:#1E3A8A">
+        <div class="hasr-ic-lbl">إجمالي الأصول</div>
+        <div class="hasr-ic-val">${totSys.toLocaleString('ar')}</div>
+      </div>
+      <div class="hasr-ic" style="--hc:#0E7490">
+        <div class="hasr-ic-lbl">الأنظمة الفرعية</div>
         <div class="hasr-ic-val">${subs.length}</div>
-        <div class="hasr-ic-sub">نظام فرعي</div>
       </div>
     </div>
-    <div class="hasr-sec">اضغط على نظام فرعي لتطبيق الفلتر</div>
+
+    <div class="hasr-cbar" style="margin-bottom:8px">
+      ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/barTot)*100).toFixed(0)}%</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      ${bars.map(x=>`<span style="font-size:10px;color:var(--tx-sec)">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>
+        ${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong>
+      </span>`).join('')}
+    </div>
+
+    <div class="hasr-sec">الأنظمة الفرعية — اضغط لعرض التفاصيل</div>
     ${!subs.length
       ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد أنظمة فرعية</div>'
       : subs.map(sub=>{
-          const tot=sub.total||1;
-          const isActive = HASR._filterSub===sub.name && HASR._filterMain===mainSys;
+          const pct = ((sub.total/totAll)*100).toFixed(1);
           return `
-          <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(mainSys)}','${_hE(sub.name)}')"
-               style="border:1.5px solid ${isActive?'rgba(14,116,144,.4)':'transparent'};background:${isActive?'rgba(14,116,144,.06)':''}">
+          <div class="hasr-srow" onclick="hasrShowSubDetail('${_hE(mainSys)}','${_hE(sub.name)}')">
             <div style="flex:1">
               <div class="hasr-sname">${_hE(sub.name)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:5px">
@@ -19650,7 +19940,7 @@ function hasrSelectMainSystem(mainSys) {
                 ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
                 ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
               </div>
-              <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${((sub.total/totAll)*100).toFixed(1)}%</div>
+              <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${pct}%</div>
             </div>
             <div class="hasr-sbadge">${(sub.total||0).toLocaleString('ar')}</div>
           </div>`;
@@ -19658,19 +19948,74 @@ function hasrSelectMainSystem(mainSys) {
   `;
 }
 
-/* اختيار نظام فرعي → تطبيق الفلتر وتحديث كل شيء */
-function hasrSelectSubSystem(mainSys, subSys) {
-  /* toggle: نفس الفلتر → مسح */
-  if (HASR._filterMain === mainSys && HASR._filterSub === subSys) {
-    HASR._filterMain = '';
-    HASR._filterSub  = '';
+/* ════════════════════════════════════════════════════════════════
+   عرض تفاصيل النظام الفرعي — بدون فلترة، يفضل البانل مفتوح
+════════════════════════════════════════════════════════════════ */
+function hasrShowSubDetail(mainSys, subSys) {
+  const ctx  = HASR._ctx;
+  const sc   = HASR._schoolCtx;
+
+  /* نجيب بيانات النظام الفرعي */
+  let subObj;
+  if (sc) {
+    const rawSchool = (HASR.data?.schools||[]).find(s=>s.code===sc.code);
+    const sysEntry  = (rawSchool?.systems||[]).find(s=>s.name===mainSys);
+    subObj = (sysEntry?.subSystems||[]).find(s=>s.name===subSys);
   } else {
-    HASR._filterMain = mainSys;
-    HASR._filterSub  = subSys;
+    const sysEntry = ctx.systems.find(s=>s.name===mainSys) ||
+                     (HASR.data?.systems||[]).find(s=>s.name===mainSys);
+    subObj = (sysEntry?.subSystems||[]).find(s=>s.name===subSys);
   }
-  _hasrApplyFilters();
-  /* إغلاق البانيل بعد التطبيق */
-  _hasrCloseAll();
+
+  const tot  = subObj?.total || 0;
+  const tE=subObj?.excellent||0, tG=subObj?.good||0, tB=subObj?.bad||0, tD=subObj?.deteriorated||0;
+  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
+  const barTot = tot||1;
+  const body = document.getElementById('hasr-spr-body');
+  if (!body) return;
+
+  _hS('hasr-spr-title', '🔩 ' + subSys);
+  const spSub = document.getElementById('hasr-spr-sub');
+  if (spSub) spSub.textContent = mainSys + (sc ? ' · 🏫 ' + sc.name : '');
+
+  body.innerHTML = `
+    <button class="hasr-back-btn" onclick="hasrSelectMainSystem('${_hE(mainSys)}')">← رجوع لـ ${_hE(mainSys)}</button>
+
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#0E7490">
+        <div class="hasr-ic-lbl">${_hE(subSys)}</div>
+        <div class="hasr-ic-val">${tot.toLocaleString('ar')}</div>
+        <div class="hasr-ic-sub">إجمالي الأصول</div>
+      </div>
+    </div>
+
+    <div class="hasr-sec">توزيع الحالة</div>
+    <div class="hasr-cbar" style="margin-bottom:8px">
+      ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/barTot)*100).toFixed(0)}%</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      ${bars.map(x=>`<span style="font-size:10px;color:var(--tx-sec)">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>
+        ${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong>
+      </span>`).join('')}
+    </div>
+
+    <div class="hasr-sec">النظام الرئيسي</div>
+    <div style="padding:10px 12px;background:rgba(30,58,138,.06);border-radius:8px;border:1px solid rgba(30,58,138,.15)">
+      <span style="font-size:12px;font-weight:700;color:#1E3A8A">⚙️ ${_hE(mainSys)}</span>
+    </div>
+    ${sc ? `
+    <div class="hasr-sec" style="margin-top:12px">المدرسة</div>
+    <div style="padding:10px 12px;background:rgba(8,145,178,.06);border-radius:8px;border:1px solid rgba(8,145,178,.18)">
+      <div style="font-size:12px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
+      <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
+    </div>` : ''}
+  `;
+}
+
+/* اختيار نظام فرعي من تاب الفرعية العام — يعرض معلومات بدون فلترة */
+function hasrSelectSubSystem(mainSys, subSys) {
+  hasrShowSubDetail(mainSys, subSys);
 }
 
 /* رجوع لقائمة الأنظمة الرئيسية */
@@ -19723,9 +20068,9 @@ function hasrOpenSystemDetail(name) {
   const body=document.getElementById('hasr-sp-body');
 
   const subHtml = subSystems.length>0
-    ? `<div class="hasr-sec">الأنظمة الفرعية (${subSystems.length}) — اضغط لتطبيق الفلتر</div>
+    ? `<div class="hasr-sec">الأنظمة الفرعية (${subSystems.length}) — اضغط لعرض التفاصيل</div>
        ${subSystems.map(sub=>`
-         <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(name)}','${_hE(sub.name)}')">
+         <div class="hasr-srow" onclick="hasrShowSubDetail('${_hE(name)}','${_hE(sub.name)}')">
            <div style="flex:1">
              <div class="hasr-sname">${_hE(sub.name)}</div>
              <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
@@ -19836,7 +20181,7 @@ function hasrOpenSchoolSystems(code, sysName) {
   if (!school) return;
   HASR._schoolCtx={code:school.code,name:school.name,city:school.city,systems:school.systems||[]};
   _hasrOpenSP('systems');
-  if (sysName) setTimeout(()=>hasrOpenSystemDetail(sysName),60);
+  if (sysName) setTimeout(()=>hasrSelectMainSystem(sysName),60);
 }
 
 /* ════════════════════════════════════════════════════════════════

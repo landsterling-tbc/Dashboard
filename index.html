@@ -1303,6 +1303,22 @@
       </div>
     </div>
 
+    <!-- ══ شريط إزالة الفلتر — يظهر فقط لما يكون فلتر نشط ══ -->
+    <div id="hasr-active-filter-bar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
+         padding:10px 16px;margin-bottom:14px;border-radius:12px;
+         background:rgba(8,145,178,.08);border:1.5px solid rgba(8,145,178,.3)">
+      <span style="font-size:18px">🔩</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:1px">فلتر نشط</div>
+        <div id="hasr-active-filter-label" style="font-size:13px;font-weight:800;color:var(--tx-main)">—</div>
+      </div>
+      <button onclick="hasrClearSubFilter()"
+        style="font-size:11px;font-weight:700;padding:6px 16px;border-radius:8px;cursor:pointer;
+               background:#EFF6FF;color:#1D4ED8;border:1.5px solid #BFDBFE;font-family:Tajawal;white-space:nowrap">
+        ✕ إزالة الفلتر
+      </button>
+    </div>
+
     <!-- ══ 6 كروت — كل كارت يفتح البانيل بمحتواه ══ -->
     <div class="kpi-grid" id="hasr-kpi-row" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
 
@@ -1447,6 +1463,13 @@
           </select>
         </div>
         <button class="f-clear" onclick="clearHasrFilters()">✕ مسح</button>
+        <button id="hasr-clear-sys-btn"
+          onclick="hasrClearSubFilter()"
+          style="display:none;font-size:11px;font-weight:700;padding:6px 14px;border-radius:8px;
+                 cursor:pointer;background:#FEF3C7;color:#92400E;border:1.5px solid #FDE68A;
+                 font-family:Tajawal;white-space:nowrap;transition:.15s">
+          🔩 ✕ إزالة فلتر النظام
+        </button>
       </div>
       <div class="tbl-wrap">
         <table>

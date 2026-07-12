@@ -295,6 +295,7 @@
     <div class="tab" onclick="showTab('fuel',this)"> استهلاك الوقود</div>
     <div class="tab" onclick="showTab('vehicles',this)"> السيارات</div>
     <div class="tab" onclick="showTab('training',this)"> برامج التدريب</div>
+    <div class="tab" onclick="showTab('hasr',this)">📦 حصر الأصول</div>
   </div>
 
 <!--
@@ -1266,6 +1267,224 @@
     </div>
   </div>
 
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  📦  تبويب: حصر الأصول                                            ║
+║  ID: tab-hasr                                                      ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+
+
+
+
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  📦  تبويب: حصر الأصول                                            ║
+║  ID: tab-hasr                                                      ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<div class="panel" id="tab-hasr">
+  <div id="hasr-content">
+
+    <!-- شريط الإجراءات -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📦</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--tx-main)">حصر الأصول</div>
+          <div style="font-size:11px;color:var(--tx-muted)" id="hasr-fetch-time">جاري التحميل...</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="tb-btn" onclick="loadHasrData()" style="font-size:11px">↻ تحديث</button>
+        <button class="export-btn export-btn-csv" onclick="exportHasrCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+
+    <!-- ══ 6 كروت — كل كارت يفتح البانيل بمحتواه ══ -->
+    <div class="kpi-grid" id="hasr-kpi-row" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
+
+      <!-- كارت 1: المدارس المحصورة -->
+      <div class="kpi" style="border-top:3px solid #1D4ED8">
+        <div style="font-size:10px;font-weight:700;color:#1D4ED8;margin-bottom:4px;letter-spacing:.04em">🏫 المدارس المحصورة</div>
+        <div class="kpi-val" id="hasr-k-surveyed" style="color:#1D4ED8">—</div>
+        <div class="kpi-lbl">من <span id="hasr-k-target" style="font-weight:800">3,750</span> مدرسة</div>
+        <div style="margin-top:8px;background:#E8F0FE;border-radius:999px;height:6px;overflow:hidden">
+          <div id="hasr-prog-schools" style="height:100%;background:#1D4ED8;border-radius:999px;width:0%;transition:width .6s ease"></div>
+        </div>
+        <div class="kpi-sub" id="hasr-k-coverage" style="margin-top:4px;color:#1D4ED8">0%</div>
+      </div>
+
+      <!-- كارت 2: إجمالي الأصول -->
+      <div class="kpi" style="border-top:3px solid #059669">
+        <div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:4px;letter-spacing:.04em">📊 إجمالي الأصول</div>
+        <div class="kpi-val" id="hasr-k-assets" style="color:#059669">—</div>
+        <div class="kpi-lbl">أصل موثّق</div>
+        <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap" id="hasr-assets-breakdown"></div>
+      </div>
+
+      <!-- كارت 3: المدارس المعادة -->
+      <div class="kpi" style="border-top:3px solid #7C3AED">
+        <div style="font-size:10px;font-weight:700;color:#7C3AED;margin-bottom:4px;letter-spacing:.04em">🔄 المدارس المعادة</div>
+        <div class="kpi-val" id="hasr-k-reassessed" style="color:#7C3AED">—</div>
+        <div class="kpi-lbl">أعيد تقييمها</div>
+        <div style="margin-top:8px;background:#EDE9FE;border-radius:999px;height:6px;overflow:hidden">
+          <div id="hasr-prog-reassessed" style="height:100%;background:#7C3AED;border-radius:999px;width:0%;transition:width .6s ease"></div>
+        </div>
+        <div class="kpi-sub" id="hasr-k-reassessed-pct" style="margin-top:4px;color:#7C3AED">0%</div>
+      </div>
+
+      <!-- كارت 4: متوسط الأصول -->
+      <div class="kpi" style="border-top:3px solid #0891B2">
+        <div style="font-size:10px;font-weight:700;color:#0891B2;margin-bottom:4px;letter-spacing:.04em">📐 متوسط الأصول</div>
+        <div class="kpi-val" id="hasr-k-avg-assets" style="color:#0891B2">—</div>
+        <div class="kpi-lbl">أصل / مدرسة</div>
+      </div>
+
+      <!-- كارت 5: المباني -->
+      <div class="kpi" style="border-top:3px solid #D97706">
+        <div style="font-size:10px;font-weight:700;color:#D97706;margin-bottom:4px;letter-spacing:.04em">🏗️ إجمالي المباني</div>
+        <div class="kpi-val" id="hasr-k-total-buildings" style="color:#D97706">—</div>
+        <div class="kpi-lbl" id="hasr-k-avg-buildings">— مبنى / مدرسة</div>
+      </div>
+
+      <!-- كارت 6: الغرف -->
+      <div class="kpi" style="border-top:3px solid #DC2626">
+        <div style="font-size:10px;font-weight:700;color:#DC2626;margin-bottom:4px;letter-spacing:.04em">🚪 إجمالي الغرف</div>
+        <div class="kpi-val" id="hasr-k-total-rooms" style="color:#DC2626">—</div>
+        <div class="kpi-lbl" id="hasr-k-avg-rooms">— غرفة / مدرسة</div>
+      </div>
+
+      <!-- كارت 7: الأنظمة الرئيسية -->
+      <div class="kpi" style="border-top:3px solid #1E3A8A">
+        <div style="font-size:10px;font-weight:700;color:#1E3A8A;margin-bottom:4px;letter-spacing:.04em">⚙️ الأنظمة الرئيسية</div>
+        <div class="kpi-val" id="hasr-k-main-systems" style="color:#1E3A8A">—</div>
+        <div class="kpi-lbl">نظام رئيسي</div>
+      </div>
+
+      <!-- كارت 8: الأنظمة الفرعية -->
+      <div class="kpi" style="border-top:3px solid #0E7490">
+        <div style="font-size:10px;font-weight:700;color:#0E7490;margin-bottom:4px;letter-spacing:.04em">🔩 الأنظمة الفرعية</div>
+        <div class="kpi-val" id="hasr-k-sub-systems" style="color:#0E7490">—</div>
+        <div class="kpi-lbl">نظام فرعي</div>
+      </div>
+
+    </div><!-- /kpi-grid -->
+
+    <!-- فلتر الرسوم -->
+    <div class="card mb14" style="padding:12px 16px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:var(--tx-sec)">🔍 فلتر الرسوم:</span>
+        <div class="fg" style="margin:0">
+          <div class="fg-lbl">المدينة</div>
+          <select class="fsel" id="hasr-chart-city" onchange="hasrChartCityChanged()" style="min-width:160px">
+            <option value="">— كل المدن —</option>
+          </select>
+        </div>
+        <div style="font-size:10px;color:var(--tx-muted)">الرسوم تتحدّث تلقائياً</div>
+      </div>
+    </div>
+
+    <!-- الرسوم البيانية -->
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon" style="background:#F0FDF4;color:#059669">📊</span>توزيع الأصول حسب الحالة</div>
+        <div class="chart-box" style="height:260px"><canvas id="hasr-ch-condition"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">⚙️</span>الأصول حسب النظام الرئيسي<span class="sub">أعلى 10</span></div>
+        <div class="chart-box" style="height:340px"><canvas id="hasr-ch-systems"></canvas></div>
+      </div>
+    </div>
+    <div class="card mb14">
+      <div class="card-title"><span class="card-title-icon" style="background:#FFF7ED;color:#C2410C">🌍</span>المدارس المحصورة حسب المدينة</div>
+      <div class="chart-box" style="height:240px"><canvas id="hasr-ch-cities"></canvas></div>
+    </div>
+
+    <!-- جدول المدارس -->
+    <div class="card mb14">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">🏫</span>
+        جدول المدارس المحصورة
+        <span class="sub" id="hasr-tbl-count"></span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
+        <div class="fg" style="flex:1;min-width:200px">
+          <div class="fg-lbl">🔍 بحث بالاسم أو الكود</div>
+          <input class="finp" id="hasr-search" placeholder="اسم المدرسة أو الكود..." oninput="renderHasrTable()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المدينة</div>
+          <select class="fsel" id="hasr-filter-city" onchange="renderHasrTable()"><option value="">— الكل —</option></select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الحالة</div>
+          <select class="fsel" id="hasr-filter-condition" onchange="renderHasrTable()">
+            <option value="">— الكل —</option>
+            <option value="excellent">ممتاز</option>
+            <option value="good">جيد</option>
+            <option value="bad">سئ</option>
+            <option value="deteriorated">متهالك</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">معادة؟</div>
+          <select class="fsel" id="hasr-filter-reassessed" onchange="renderHasrTable()">
+            <option value="">— الكل —</option>
+            <option value="نعم">معادة فقط</option>
+            <option value="لا">غير معادة</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">ترتيب</div>
+          <select class="fsel" id="hasr-sort" onchange="renderHasrTable()">
+            <option value="assets_desc">الأصول ↓</option>
+            <option value="assets_asc">الأصول ↑</option>
+            <option value="name">الاسم</option>
+            <option value="city">المدينة</option>
+          </select>
+        </div>
+        <button class="f-clear" onclick="clearHasrFilters()">✕ مسح</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="min-width:200px;text-align:right;padding-right:14px">اسم المدرسة</th>
+              <th style="min-width:100px">الكود</th>
+              <th style="min-width:90px">المدينة</th>
+              <th style="min-width:70px">الأصول</th>
+              <th style="min-width:55px">ممتاز</th>
+              <th style="min-width:55px">جيد</th>
+              <th style="min-width:55px">سئ</th>
+              <th style="min-width:65px">متهالك</th>
+              <th style="min-width:65px">مباني</th>
+              <th style="min-width:65px">غرف</th>
+              <th style="min-width:65px">معادة</th>
+              <th style="min-width:75px">تفاصيل</th>
+            </tr>
+          </thead>
+          <tbody id="hasr-tbl-body"></tbody>
+        </table>
+      </div>
+      <div class="pag-bar" id="hasr-pag" style="margin-top:8px"></div>
+    </div>
+
+    <div id="hasr-loading" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:32px;margin-bottom:12px">⏳</div>
+      <div style="font-size:14px;color:var(--tx-muted)">جاري سحب البيانات من Google Sheet...</div>
+    </div>
+    <div id="hasr-error" style="display:none;text-align:center;padding:60px 20px">
+      <div style="font-size:32px;margin-bottom:12px">❌</div>
+      <div style="font-size:14px;color:#DC2626" id="hasr-error-msg">حدث خطأ</div>
+      <button class="tb-btn" onclick="loadHasrData()" style="margin-top:12px">↻ إعادة المحاولة</button>
+    </div>
+
+  </div>
+</div><!-- /tab-hasr -->
+
 </div>
 
 <footer style="margin-top:36px;padding:16px 28px;background:#071E28;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid rgba(255,255,255,.06)">
@@ -1385,6 +1604,48 @@
 </div>
 
 
+
+<!-- ══════════════════════════════════════════════════════════════
+     Modal: تصفح الأنظمة الرئيسية ← الفرعية
+     يُفتح عند الضغط على كارت الأنظمة الرئيسية في تبويب sys-main
+     لا يؤثر على أي منطق آخر في المشروع
+     ══════════════════════════════════════════════════════════════ -->
+<div id="sysBrowseOverlay" style="
+  display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(7,30,40,.62);backdrop-filter:blur(4px);
+  justify-content:center;align-items:center;">
+  <div id="sysBrowsePanel" style="
+    background:var(--bg-1,#fff);border-radius:18px;
+    box-shadow:0 24px 80px rgba(0,0,0,.28);
+    width:min(560px,92vw);max-height:82vh;
+    display:flex;flex-direction:column;overflow:hidden;
+    border:1px solid var(--bd-light,#dbe7ee);
+    font-family:'Tajawal',sans-serif;">
+    <!-- رأس الـ Modal -->
+    <div style="
+      display:flex;align-items:center;gap:12px;
+      padding:18px 20px 14px;
+      border-bottom:1px solid var(--bd-light,#dbe7ee);
+      background:linear-gradient(135deg,#071e28 0%,#0b3040 100%);
+      border-radius:18px 18px 0 0;">
+      <button id="sysBrowseBack" onclick="sysBrowseGoBack()" style="
+        display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+        color:#fff;border-radius:10px;width:34px;height:34px;cursor:pointer;
+        font-size:18px;line-height:1;flex-shrink:0;transition:.15s"
+        title="رجوع">‹</button>
+      <div style="flex:1;min-width:0">
+        <div id="sysBrowseTitle" style="font-size:15px;font-weight:800;color:#fff;line-height:1.3">الأنظمة الرئيسية</div>
+        <div id="sysBrowseSub"   style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">اختر نظاماً لعرض أنظمته الفرعية</div>
+      </div>
+      <button onclick="sysBrowseClose()" style="
+        background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+        color:rgba(255,255,255,.7);border-radius:10px;width:34px;height:34px;
+        cursor:pointer;font-size:16px;line-height:1;flex-shrink:0">✕</button>
+    </div>
+    <!-- جسم القائمة -->
+    <div id="sysBrowseBody" style="overflow-y:auto;padding:14px 16px;flex:1;"></div>
+  </div>
+</div>
 
 <script src="dashboard.js" defer></script>
 

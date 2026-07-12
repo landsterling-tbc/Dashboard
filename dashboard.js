@@ -1066,16 +1066,23 @@ function showTab(name, el) {
     "security-safety" === name && renderSecuritySafetyTab(),
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
-    "training"        === name && renderTrainingTab());
+    "training"        === name && renderTrainingTab(),
+    "hasr"            === name && renderHasrTab());
 
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
-  killChart(id);
   const entries = Object.entries(dataMap)
     .filter((x) => x[1] > 0)
     .sort((a, b) => b[1] - a[1]);
-  entries.length &&
-    (CHARTS[id] = new Chart(document.getElementById(id), {
+  if (!entries.length) {
+    renderEmptyState(
+      document.getElementById(id)?.closest(".chart-box") || document.getElementById(id),
+      "لا توجد بيانات متاحة"
+    );
+    return;
+  }
+  killChart(id);
+  (CHARTS[id] = new Chart(document.getElementById(id), {
       type: "doughnut",
       data: {
         labels: entries.map((x) => x[0] || "—"),
@@ -1105,6 +1112,16 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
     }));
 }
 function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) {
+  // نتحقق من البيانات أولاً — لا نحذف الشارت القديم إلا لو فيه داتا جديدة
+  const safeValues = Array.isArray(values) ? values.filter((v) => v != null && v !== "") : [];
+  const safeLabels = Array.isArray(labels) ? labels : [];
+  if (!safeLabels.length || !safeValues.length) {
+    renderEmptyState(
+      document.getElementById(id)?.closest(".chart-box") || document.getElementById(id),
+      "لا توجد بيانات متاحة"
+    );
+    return;
+  }
   killChart(id);
   // نحتفظ بالتسميات كاملة في data.labels (لا قص) — اللف يتم على المحور عبر
   // الإضافة العامة ChartLabels، والـ Tooltip يقرأ النص الكامل تلقائياً.
@@ -1159,13 +1176,13 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
   });
 }
 function makeVBar(id, labels, datasets) {
-  killChart(id);
-  // 🛡️ تنظيف شامل: نمنع وصول undefined/null/NaN لأي تسمية أو قيمة على المحاور
+  // نتحقق من البيانات أولاً — لا نحذف الشارت القديم إلا لو فيه داتا جديدة
   const { labels: cleanLabels, datasets: cleanDatasets } = normalizeChartData(labels, datasets);
   if (!cleanLabels.length || !cleanDatasets.length) {
     renderEmptyState(document.getElementById(id)?.closest(".chart-box") || document.getElementById(id), "لا توجد بيانات متاحة");
     return;
   }
+  killChart(id);
   const fullLabels = cleanLabels,
     displayLabels = cleanLabels;
   CHARTS[id] = new Chart(document.getElementById(id), {
@@ -5526,7 +5543,7 @@ function renderSysMain() {
   const mainSystems = [...new Set(data.map((r) => r["القسم الرئيسي"]).filter(Boolean))]
     .filter((s) => !HIDDEN_SYSTEMS.includes(s))
     .sort();
-  ((el.innerHTML = `\n  \n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1–5)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
+  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1–5)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
     tierRows,
   )
     .filter(([k]) => "6" !== k)
@@ -5763,6 +5780,207 @@ function fillSysMainTable(rows) {
     console.warn("[fillSysMainTable] خطأ عام:", err);
   }
 }
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  ⚙️  Modal: تصفح الأنظمة الرئيسية ← الفرعية
+   ║  دوال مستقلة — لا تمس أي منطق موجود
+   ╚════════════════════════════════════════════════════════════╝ */
+
+/* حالة الـ Modal: null = قائمة الرئيسية، string = نظام رئيسي محدد */
+window._sysBrowseState = null;
+
+/* أيقونات لكل نظام رئيسي شائع (تزيينية فقط) */
+const SYS_ICONS = {
+  "الكهرباء": "⚡", "التكييف": "❄️", "السباكة": "🚿",
+  "الأمن والسلامة": "🛡️", "المصاعد": "🛗",
+  "الإنشائي": "🏗️", "المدني": "🏗️",
+  "الاتصالات": "📡", "الإطفاء": "🔥",
+  "التشطيبات": "🪟", "الإنارة": "💡",
+  "المولدات": "⚙️", "الصرف الصحي": "🌊",
+};
+
+function _sysBrowseIcon(name) {
+  for (const k in SYS_ICONS) if (name && name.includes(k.replace(/.*\|/, ""))) return SYS_ICONS[k];
+  return "⚙️";
+}
+
+/* فتح الـ Modal على قائمة الأنظمة الرئيسية */
+function sysBrowseOpen() {
+  const overlay = document.getElementById("sysBrowseOverlay");
+  if (!overlay) return;
+  window._sysBrowseState = null;
+  overlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+  _sysBrowseRenderMain();
+}
+
+/* إغلاق الـ Modal */
+function sysBrowseClose() {
+  const overlay = document.getElementById("sysBrowseOverlay");
+  if (overlay) overlay.style.display = "none";
+  document.body.style.overflow = "";
+  window._sysBrowseState = null;
+}
+
+/* الرجوع إلى قائمة الأنظمة الرئيسية */
+function sysBrowseGoBack() {
+  window._sysBrowseState = null;
+  _sysBrowseRenderMain();
+}
+
+/* عرض قائمة الأنظمة الرئيسية */
+function _sysBrowseRenderMain() {
+  const raw = window.RAW_ALL_SYSTEMS || [];
+  const cityF = document.getElementById("fCity")?.value || "";
+  const sectorF = document.getElementById("fSector")?.value || "";
+  const data = raw.filter(r =>
+    (!cityF || r["المدينة الرئيسية"] === cityF) &&
+    (!sectorF || r["المحافظة"] === sectorF)
+  );
+
+  /* تجميع الأنظمة الرئيسية مع إحصائياتها */
+  const sysMap = {};
+  data.forEach(r => {
+    const s = r["القسم الرئيسي"];
+    const v = parseFloat(r["التقييم (1–5)"]);
+    if (!s || HIDDEN_SYSTEMS.includes(s)) return;
+    if (!sysMap[s]) sysMap[s] = { sum: 0, cnt: 0, schools: new Set() };
+    if (!isNaN(v) && v > 0) { sysMap[s].sum += v; sysMap[s].cnt++; }
+    r["رقم المدرسة"] && sysMap[s].schools.add(r["رقم المدرسة"]);
+  });
+
+  const mainList = Object.keys(sysMap).filter(s => s !== "6").sort();
+
+  /* رأس الـ Modal */
+  document.getElementById("sysBrowseTitle").textContent = "الأنظمة الرئيسية";
+  document.getElementById("sysBrowseSub").textContent =
+    `${mainList.length} نظام — اختر نظاماً لعرض أنظمته الفرعية`;
+  document.getElementById("sysBrowseBack").style.display = "none";
+
+  /* بناء القائمة */
+  const body = document.getElementById("sysBrowseBody");
+  if (!mainList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--tx-muted)">لا توجد بيانات بعد</div>';
+    return;
+  }
+
+  body.innerHTML = mainList.map(s => {
+    const info = sysMap[s];
+    const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
+    const avgNum = parseFloat(avg);
+    const clr = isNaN(avgNum) ? "#64748b" : avgNum >= 4 ? "#0891B2" : avgNum >= 3 ? "#059669" : avgNum >= 2 ? "#D97706" : "#DC2626";
+    const icon = _sysBrowseIcon(s);
+    const schoolsCnt = info.schools.size;
+    return `<div onclick="sysBrowseSelectMain('${s.replace(/'/g,"\\'")}')
+" style="
+      display:flex;align-items:center;gap:14px;padding:14px 16px;
+      border:1px solid var(--bd-light,#dbe7ee);border-radius:14px;
+      cursor:pointer;margin-bottom:10px;background:var(--bg-2,#f7fafc);
+      transition:box-shadow .15s,border-color .15s;
+      " onmouseover="this.style.boxShadow='0 4px 18px rgba(13,132,156,.13)';this.style.borderColor='var(--teal)'"
+         onmouseout="this.style.boxShadow='';this.style.borderColor='var(--bd-light)'">
+      <div style="font-size:28px;flex-shrink:0;width:42px;text-align:center">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:800;color:var(--tx-main)">${esc(s)}</div>
+        <div style="font-size:11px;color:var(--tx-muted);margin-top:3px">
+          ${schoolsCnt.toLocaleString()} مدرسة
+        </div>
+      </div>
+      <div style="text-align:center;flex-shrink:0">
+        <div style="font-size:18px;font-weight:800;color:${clr}">${isNaN(avgNum) ? "—" : avg}</div>
+        <div style="font-size:9px;color:var(--tx-muted)">متوسط / 5</div>
+      </div>
+      <div style="font-size:18px;color:var(--tx-muted)">‹</div>
+    </div>`;
+  }).join("");
+}
+
+/* عند اختيار نظام رئيسي → عرض الأنظمة الفرعية */
+function sysBrowseSelectMain(mainSys) {
+  window._sysBrowseState = mainSys;
+
+  const raw = window.RAW_ALL_SYSTEMS || [];
+  const cityF = document.getElementById("fCity")?.value || "";
+  const sectorF = document.getElementById("fSector")?.value || "";
+  const data = raw.filter(r =>
+    r["القسم الرئيسي"] === mainSys &&
+    (!cityF || r["المدينة الرئيسية"] === cityF) &&
+    (!sectorF || r["المحافظة"] === sectorF)
+  );
+
+  /* تجميع الأنظمة الفرعية */
+  const subMap = {};
+  data.forEach(r => {
+    const s = r["النظام الفرعي"];
+    const v = parseFloat(r["التقييم (1–5)"]);
+    if (!s || s === "6" || HIDDEN_SYSTEMS.includes(s)) return;
+    if (!subMap[s]) subMap[s] = { sum: 0, cnt: 0, schools: new Set() };
+    if (!isNaN(v) && v > 0) { subMap[s].sum += v; subMap[s].cnt++; }
+    r["رقم المدرسة"] && subMap[s].schools.add(r["رقم المدرسة"]);
+  });
+
+  const subList = Object.keys(subMap).sort();
+
+  /* رأس الـ Modal */
+  document.getElementById("sysBrowseTitle").textContent = mainSys;
+  document.getElementById("sysBrowseSub").textContent =
+    `${subList.length} نظام فرعي — اختر نظاماً لتصفية النتائج`;
+  document.getElementById("sysBrowseBack").style.display = "flex";
+
+  const body = document.getElementById("sysBrowseBody");
+  if (!subList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--tx-muted)">لا توجد أنظمة فرعية</div>';
+    return;
+  }
+
+  body.innerHTML = subList.map(s => {
+    const info = subMap[s];
+    const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
+    const avgNum = parseFloat(avg);
+    const clr = isNaN(avgNum) ? "#64748b" : avgNum >= 4 ? "#0891B2" : avgNum >= 3 ? "#059669" : avgNum >= 2 ? "#D97706" : "#DC2626";
+    const bar = info.cnt
+      ? Math.round((avgNum / 5) * 100)
+      : 0;
+    const barClr = clr;
+    const schoolsCnt = info.schools.size;
+    return `<div onclick="sysBrowseSelectSub('${mainSys.replace(/'/g,"\\'")}','${s.replace(/'/g,"\\'")}')" style="
+      display:flex;align-items:center;gap:12px;padding:12px 16px;
+      border:1px solid var(--bd-light,#dbe7ee);border-radius:12px;
+      cursor:pointer;margin-bottom:8px;background:var(--bg-2,#f7fafc);
+      transition:box-shadow .15s,border-color .15s;
+      " onmouseover="this.style.boxShadow='0 3px 14px rgba(13,132,156,.11)';this.style.borderColor='var(--teal)'"
+         onmouseout="this.style.boxShadow='';this.style.borderColor='var(--bd-light)'">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--tx-main)">${esc(s)}</div>
+        <div style="margin-top:6px;background:var(--bd-light,#dbe7ee);border-radius:6px;height:5px;overflow:hidden">
+          <div style="width:${bar}%;height:100%;background:${barClr};border-radius:6px;transition:width .3s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--tx-muted);margin-top:3px">${schoolsCnt.toLocaleString()} مدرسة</div>
+      </div>
+      <div style="text-align:center;flex-shrink:0;min-width:38px">
+        <div style="font-size:17px;font-weight:800;color:${clr}">${isNaN(avgNum) ? "—" : avg}</div>
+        <div style="font-size:9px;color:var(--tx-muted)">/ 5</div>
+      </div>
+      <div style="font-size:16px;color:var(--tx-muted)">‹</div>
+    </div>`;
+  }).join("");
+}
+
+/* عند اختيار نظام فرعي → تصفية تبويب الأنظمة التفصيلية وإغلاق الـ Modal */
+/* sysBrowseSelectSub — مُعرَّفة في قسم حصر الأصول أدناه */
+
+/* إغلاق الـ Modal عند النقر على الخلفية */
+document.addEventListener("DOMContentLoaded", function () {
+  const overlay = document.getElementById("sysBrowseOverlay");
+  if (!overlay) return;
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) sysBrowseClose();
+  });
+  /* مفتاح Escape */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && overlay.style.display !== "none") sysBrowseClose();
+  });
+});
+
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🔩  JS تبويب: الأنظمة التفصيلية
    ║  (tab-sys-detail) — الدوال الخاصة بهذا التبويب تبدأ هنا
@@ -11780,6 +11998,78 @@ function renderTajheezAllTable() {
       }
     } catch (e) {}
 
+
+    // ════════════════════════════════════════════════════════════════
+    // 📦 تبويب حصر الأصول (HASR) — ملخص للشاتبوت
+    // ════════════════════════════════════════════════════════════════
+    try {
+      if (window.HASR && window.HASR.loaded && window.HASR.data) {
+        const hs = window.HASR.data.summary || {};
+        const hsc = window.HASR.data.schools || [];
+        const tE = hsc.reduce((t,x)=>t+(x.excellent||0),0);
+        const tG = hsc.reduce((t,x)=>t+(x.good||0),0);
+        const tB = hsc.reduce((t,x)=>t+(x.bad||0),0);
+        const tD = hsc.reduce((t,x)=>t+(x.deteriorated||0),0);
+        const tBld = hsc.reduce((t,x)=>t+(x.buildings||0),0);
+        const tRm  = hsc.reduce((t,x)=>t+(x.rooms||0),0);
+        const n = hs.totalSchoolsSurveyed || 1;
+        // توزيع الأصول حسب المدينة (أعلى 10)
+        const cityMap = {};
+        hsc.forEach(sc => { cityMap[sc.city] = (cityMap[sc.city]||0) + (sc.totalAssets||0); });
+        const topCitiesByAssets = Object.entries(cityMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([city,total])=>({city,total}));
+        // توزيع الأنظمة (أعلى 10)
+        const topSystems = (window.HASR.data.systems||[]).slice(0,10).map(s=>({name:s.name,total:s.total,excellent:s.excellent,good:s.good,bad:s.bad,deteriorated:s.deteriorated}));
+        // المدارس العشر الأعلى أصولاً
+        const top10Schools = [...hsc].sort((a,b)=>b.totalAssets-a.totalAssets).slice(0,10).map(sc=>({name:sc.name,city:sc.city,code:sc.code,totalAssets:sc.totalAssets,excellent:sc.excellent,good:sc.good,bad:sc.bad,deteriorated:sc.deteriorated,buildings:sc.buildings,rooms:sc.rooms,reassessed:sc.reassessed}));
+        // المدارس المعادة
+        const reassessedList = hsc.filter(sc=>sc.reassessed==='نعم').map(sc=>({name:sc.name,city:sc.city,code:sc.code,totalAssets:sc.totalAssets}));
+        // ── استخراج بيانات التكييف من قائمة الأنظمة ──
+        const allSystems = window.HASR.data.systems || [];
+        const acSystem = allSystems.find(s => /تكييف|مكيف|cooling|تبريد|ac\b/i.test(s.name || ''));
+        // إجمالي التكييف من كل مدرسة عبر أنظمتها (مجموع دقيق)
+        let acTotalFromSchools = 0;
+        const acSchoolsBreakdown = [];
+        hsc.forEach(sc => {
+          const scAcSys = (sc.systems || []).find(s => /تكييف|مكيف|cooling|تبريد|ac\b/i.test(s.name || ''));
+          if (scAcSys && scAcSys.total > 0) {
+            acTotalFromSchools += scAcSys.total;
+            acSchoolsBreakdown.push({ name: sc.name, city: sc.city, code: sc.code, total: scAcSys.total, excellent: scAcSys.excellent, good: scAcSys.good, bad: scAcSys.bad, deteriorated: scAcSys.deteriorated });
+          }
+        });
+        acSchoolsBreakdown.sort((a, b) => b.total - a.total);
+        const acDataForChat = acSystem
+          ? { النظام: acSystem.name, إجمالي_وحدات_التكييف: acSystem.total, ممتاز: acSystem.excellent, جيد: acSystem.good, سيئ: acSystem.bad, متهالك: acSystem.deteriorated, مدارس_بها_تكييف: acSchoolsBreakdown.length, أعلى_10_مدارس_تكييفاً: acSchoolsBreakdown.slice(0, 10) }
+          : (acTotalFromSchools > 0
+              ? { ملاحظة: "لا يوجد نظام تكييف مستقل — مجموع محسوب من أنظمة المدارس", إجمالي_وحدات_التكييف: acTotalFromSchools, مدارس_بها_تكييف: acSchoolsBreakdown.length, أعلى_10_مدارس_تكييفاً: acSchoolsBreakdown.slice(0, 10) }
+              : { ملاحظة: "لم يُرصد نظام تكييف منفصل في بيانات حصر الأصول — راجع تبويب خطة استبدال المكيفات للأرقام الإجمالية" });
+
+        summary.حصر_الأصول = {
+          ملاحظة: "بيانات تبويب حصر الأصول — مسح ميداني شامل لأصول المدارس",
+          إجمالي_المدارس_المحصورة: hs.totalSchoolsSurveyed,
+          الهدف_الإجمالي: (typeof HASR_TOTAL_TARGET !== 'undefined' ? HASR_TOTAL_TARGET : 3742),
+          نسبة_التغطية: hs.coveragePct + "%",
+          إجمالي_الأصول: hs.totalAssets,
+          متوسط_الأصول_للمدرسة: Math.round(hs.totalAssets / n),
+          توزيع_حالة_الأصول: {
+            ممتاز: tE, ممتاز_نسبة: ((tE/(hs.totalAssets||1))*100).toFixed(1)+"%",
+            جيد:   tG, جيد_نسبة:   ((tG/(hs.totalAssets||1))*100).toFixed(1)+"%",
+            سيئ:   tB, سيئ_نسبة:   ((tB/(hs.totalAssets||1))*100).toFixed(1)+"%",
+            متهالك: tD, متهالك_نسبة: ((tD/(hs.totalAssets||1))*100).toFixed(1)+"%",
+          },
+          المباني: { إجمالي: tBld, متوسط_للمدرسة: (tBld/n).toFixed(1), أعلى_مدرسة: hsc.reduce((m,x)=>Math.max(m,x.buildings||0),0) },
+          الغرف:   { إجمالي: tRm,  متوسط_للمدرسة: (tRm/n).toFixed(1),  أعلى_مدرسة: hsc.reduce((m,x)=>Math.max(m,x.rooms||0),0) },
+          المعادة: { عدد: hs.totalReassessed, نسبة: hs.reassessedPct+"%" },
+          عدد_المدن: (window.HASR.data.cities||[]).length,
+          المدن: (window.HASR.data.cities||[]).map(c=>c.city).join(" · "),
+          أعلى_10_مدن_أصولاً: topCitiesByAssets,
+          أعلى_10_أنظمة_أصولاً: topSystems,
+          أعلى_10_مدارس_أصولاً: top10Schools,
+          المدارس_المعادة: reassessedList.slice(0,30),
+          التكييف_في_الحصر: acDataForChat,
+        };
+      }
+    } catch(e) { summary.حصر_الأصول = { تنبيه: "تعذّر تلخيص بيانات حصر الأصول: " + (e?.message||e) }; }
+
     return summary;
 
 
@@ -11838,6 +12128,7 @@ function renderTajheezAllTable() {
     { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nتشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
     { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب عقود عدا المجال يعرض عقود FM (مقاولون خارج نطاق المجال)، وتبويب المدفوعات يعرض عقود المجال بقيمتها والمدفوع والمتبقي." },
     { test: /صيان|بلاغ|عطل|إصلاح|maintenance|work order|أمر عمل|وقائية/i, reply: "الصيانة والبلاغات 🔧\n\nبلاغات الصيانة والأعطال موجودة في تبويب البلاغات مع كامل التفاصيل (الحالة، الأولوية، SLA، الفئة)." },
+    { test: /حصر.*أصول|حصر.*اصول|تبويب.*حصر|hasr|معادة.*مدرسة|مدرسة.*معادة|متهالك.*مدرسة|تغطية.*مدارس/i, reply: "تبويب حصر الأصول 📦\n\nيحصر أصول المدارس ميدانياً ويعرض:\n• إجمالي الأصول وتوزيعها حسب الحالة (ممتاز/جيد/سيئ/متهالك)\n• نسبة التغطية من الهدف الإجمالي\n• أبرز الأنظمة أصولاً\n• تفاصيل كل مدرسة (مباني + غرف + كود وزاري)\n• قائمة المدارس المعادة\n\nاسألني عن مدرسة أو مدينة بعينها للحصول على تفاصيلها من الحصر." },
     { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي — الفرق السالب يعني عجزاً يحتاج ميزانية." },
     { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\n• التكييف: العمر الافتراضي 10-15 سنة — يحتاج صيانة وقائية دورية.\n• الكهرباء: فحص دوري سنوي كحد أدنى.\n• السباكة: مراقبة الصرف وضغط المياه بشكل منتظم.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
     { test: /بواب|بوابين|حارس|gatekeeper/i, reply: "تبويب البوابين 🧍 — يعرض قائمة كاملة بجميع البوابين مع اسم المدرسة ورقم الجوال ورقم الهوية والمدينة. اسألني مباشرة عن بواب مدرسة معينة وسأخبرك." },
@@ -12518,6 +12809,7 @@ function renderTajheezAllTable() {
       طلاب:      /طالب|طلاب|عمر.*مبنى|مبنى.*قديم/i.test(t),
       قطع:       /قطع.*غيار|قطعة|spare/i.test(t),
       مصاعد:     /مصعد|مصاعد|elevator/i.test(t),
+      حصر:       /حصر.*أصول|حصر.*اصول|تبويب.*حصر|حصر.*مدارس|أصول.*مدرسة|اصول.*مدرسة|hasr|معادة|متهالك.*مدرسة|ممتاز.*أصل|جيد.*أصل|مبان.*مدرسة|غرف.*مدرسة|نسبة.*تغطية|تغطية.*مدارس|تكييف.*حصر|حصر.*تكييف|مكيف.*حصر|حصر.*مكيف|تكييفات.*حصر|وحدات.*حصر|حصر.*وحدات/i.test(t),
       كبير:      false, // يتحدد بعد كشف الباقي
     };
   }
@@ -12752,6 +13044,7 @@ function renderTajheezAllTable() {
       fca: ["ما متوسط قيمة FCA في العرض الحالي؟", "أعطني أسوأ 10 مدارس في FCA", "كم عدد المباني الحرجة؟"],
       env: ["ما متوسط درجة البيئة المدرسية؟", "أسوأ 10 مدارس في البيئة", "قارن البيئة بين المحافظات"],
       students: ["ما أكبر 10 مدارس بعدد الطلاب؟", "ما أقدم المباني؟", "متوسط عمر المبنى؟"],
+      hasr: ["ما إجمالي الأصول المحصورة وتوزيعها؟", "أعلى 10 مدارس أصولاً في الحصر", "كم عدد المدارس المعادة ونسبتها؟"],
     };
     return base[tab] || ["لخّص أهم المؤشرات في العرض الحالي", "ما أبرز الملاحظات من البيانات المفلترة؟"];
   }
@@ -12847,6 +13140,46 @@ function renderTajheezAllTable() {
         .slice(0, 20)
         .map(r => ({ مدرسة: r["اسم_المدرسة"]||r["اسم المدرسة"], مدينة: r["المدينة"]||"", عمر: r["عمر المصعد"] }));
       extraContext += `\n\nمصاعد متعطلة:\n${JSON.stringify(broken)}`;
+    }
+
+    // ── حصر الأصول: تفاصيل المدارس التي تطابق السؤال ──
+    if (topics.حصر && window.HASR && window.HASR.loaded && window.HASR.data) {
+      const hsc = window.HASR.data.schools || [];
+      const cityMatch = userText.match(/(?:في|ب|مدينة|مدينه)\s*([\u0600-\u06FF]+)/)?.[1];
+      const schoolMatch = userText.match(/مدرسة\s+([\u0600-\u06FF\s]{3,})/)?.[1]?.trim();
+      let subset = hsc;
+      if (schoolMatch) subset = hsc.filter(sc => sc.name.includes(schoolMatch) || sc.code.includes(schoolMatch));
+      else if (cityMatch) subset = hsc.filter(sc => sc.city && sc.city.includes(cityMatch));
+      const detail = subset.slice(0, 40).map(sc => ({
+        name: sc.name, code: sc.code, city: sc.city,
+        totalAssets: sc.totalAssets,
+        excellent: sc.excellent, good: sc.good, bad: sc.bad, deteriorated: sc.deteriorated,
+        buildings: sc.buildings, rooms: sc.rooms, reassessed: sc.reassessed,
+        systems: (sc.systems||[]).filter(s=>s.total>0).map(s=>s.name+':'+s.total).join(', ')
+      }));
+      extraContext += `\n\nتفاصيل مدارس حصر الأصول (${subset.length} مدرسة متاحة، أعرض أول ${Math.min(subset.length,40)}):\n${JSON.stringify(detail)}`;
+
+      // ── تكييف: حقن بيانات التكييف التفصيلية من حصر الأصول ──
+      const isAcQuestion = /تكييف|مكيف|تكييفات|وحدات.*تكييف|تكييف.*وحدات|cooling|ac\b/i.test(userText);
+      if (isAcQuestion) {
+        const allSysAC = window.HASR.data.systems || [];
+        const acSys = allSysAC.find(s => /تكييف|مكيف|cooling|تبريد|ac\b/i.test(s.name || ''));
+        // تفاصيل التكييف لكل مدرسة في المجموعة المعروضة
+        const acPerSchool = subset.slice(0, 50).map(sc => {
+          const sys = (sc.systems || []).find(s => /تكييف|مكيف|cooling|تبريد|ac\b/i.test(s.name || ''));
+          return sys && sys.total > 0
+            ? { name: sc.name, city: sc.city, code: sc.code, acTotal: sys.total, excellent: sys.excellent, good: sys.good, bad: sys.bad, deteriorated: sys.deteriorated }
+            : null;
+        }).filter(Boolean).sort((a, b) => b.acTotal - a.acTotal);
+        if (acSys) {
+          extraContext += `\n\nبيانات التكييف في حصر الأصول:\nالنظام: ${acSys.name}\nالإجمالي: ${acSys.total} وحدة\nممتاز: ${acSys.excellent} | جيد: ${acSys.good} | سيئ: ${acSys.bad} | متهالك: ${acSys.deteriorated}`;
+        }
+        if (acPerSchool.length > 0) {
+          extraContext += `\n\nتوزيع وحدات التكييف في حصر الأصول (${acPerSchool.length} مدرسة):\n${JSON.stringify(acPerSchool)}`;
+        } else if (!acSys) {
+          extraContext += `\n\nملاحظة: لم يُعثر على نظام تكييف مستقل في بيانات حصر الأصول. بيانات التكييف الإجمالية (شباك/سبلت) موجودة في تبويب "خطة استبدال المكيفات" ضمن مفتاح خطة_استبدال_المكيفات في ملخص اللوحة.`;
+        }
+      }
     }
 
     const systemPrompt = `أنت مساعد إدارة المرافق الذكي، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
@@ -12970,10 +13303,25 @@ function renderTajheezAllTable() {
 • المدفوعات              → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
 • خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
 • مؤشرات الأداء للمقاول  → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف)
+• حصر الأصول             → حصر_الأصول: إجمالي الأصول، توزيع الحالة (ممتاز/جيد/سيئ/متهالك)، المباني، الغرف، المعادة، أعلى 10 مدارس، توزيع الأنظمة، أعلى المدن أصولاً
 
 ══════════════════════════════════════════════════════
 تعليمات خاصة لكل نوع سؤال
 ══════════════════════════════════════════════════════
+▸ أسئلة عن حصر الأصول:
+  بيانات الحصر الكاملة محقونة تلقائياً في حصر_الأصول ضمن ملخص اللوحة.
+  لو ذكر اسم مدرسة أو مدينة → ابحث في تفاصيل_مدارس_حصر_الأصول الموجودة في extraContext.
+  الحقول: name (اسم)، code (كود وزاري)، city (مدينة)، totalAssets (إجمالي الأصول)، excellent/good/bad/deteriorated (توزيع الحالة)، buildings/rooms (مباني/غرف)، reassessed (معادة: نعم/لا)، systems (الأنظمة وإجمالياتها).
+  الحالات الأربع: ممتاز 🟢 / جيد 🔵 / سيئ 🟡 / متهالك 🔴 — استخدم نفس الألوان عند العرض.
+  نسبة التغطية = (المحصورة / الهدف_الإجمالي 3742) × 100.
+
+▸ أسئلة عن التكييف في حصر الأصول (مهم جداً — لا تخلط بين المصدرين):
+  ⚠️ حصر الأصول (HASR) وخطة استبدال المكيفات مصدران منفصلان تماماً:
+  • حصر_الأصول → التكييف_في_الحصر: بيانات التكييف من المسح الميداني لحصر الأصول (وحدات محصورة فعلياً في المدارس مع حالتها).
+  • خطة_استبدال_المكيفات: بيانات مختلفة من ملف المباني الرئيسي (وحدات شباك/سبلت + خطة الاستبدال السنوية).
+  لو السؤال عن "التكييف في حصر الأصول" أو "كم وحدة تكييف في الحصر" → اقرأ من حصر_الأصول → التكييف_في_الحصر + بيانات_التكييف_حصر_الأصول في extraContext.
+  لو بيانات التكييف_في_الحصر تحتوي على "لم يُرصد" → وضّح للمستخدم أن التكييف غير مدرج كنظام منفصل في بيانات الحصر، ووجّهه لتبويب خطة استبدال المكيفات للأرقام الإجمالية.
+
 ▸ أسئلة عن البوابين:
   قايمة البوابين الكاملة تُحقن تلقائياً في الـ context لما تُكشف كلمة "بواب" في السؤال.
   البيانات بصيغة: اسم المدرسة|الرقم الوزاري|المدينة|اسم البواب|الجوال|الهوية — اقرأها واعرضها مباشرة.
@@ -18247,3 +18595,1418 @@ function renderTrainingTab() {
     init();
   }
 })();
+
+/* ═══════════════════════════════════════════════════════════════════
+   📦  تبويب حصر الأصول — tab-hasr  (v5 — Single Source of Truth)
+   ───────────────────────────────────────────────────────────────────
+   المعمارية:
+   • HASR._ctx  = Single Source of Truth — يُبنى مرة واحدة بكل فلتر
+   • _hasrBuildCtx()  = يبني _ctx من HASR.data بعد تطبيق الفلاتر
+   • _hasrApplyFilters() = يستدعي BuildCtx ثم يعيد رسم كل شيء
+   • جميع الدوال تقرأ من HASR._ctx فقط — لا من HASR.data مباشرة
+   • استثناء وحيد مسموح: hasrOpenDetail و hasrOpenSchoolSystems
+     تقرأ من HASR.data.schools مباشرة لعرض تفاصيل مدرسة بعينها
+═══════════════════════════════════════════════════════════════════ */
+
+const HASR_SCRIPT_URL   = 'https://script.google.com/macros/s/AKfycbx8aut4MnraV5AjeLM6a00ur1WV0hVvI54PAfvNZoKjVVFV9ge2-wKt2AcOqhst65At/exec';
+/* ⚠️ FIX: كان هذا الرقم مكررًا هنا وفي Code.gs (3742 مقابل 3743) وقد يختلفان.
+   الآن Code.gs هو المصدر الوحيد لهذا الرقم عبر meta.totalTarget بعد وصول البيانات؛
+   القيمة هنا تُستخدم فقط كـ fallback مؤقت قبل التحميل أو إن غاب الحقل من الـ payload. */
+let HASR_TOTAL_TARGET   = 3742; /* fallback فقط */
+const HASR_PAGE_SIZE    = 25;
+
+/* ── State المركزي ── */
+const HASR = {
+  data:     null,       /* البيانات الخام من API — لا تتغير بعد التحميل */
+  loaded:   false,
+  _ctx:     null,       /* Single Source of Truth — يُحدَّث عند كل فلتر */
+  _activeK: null,       /* التاب النشط في البانيل */
+  _schoolCtx: null,     /* context مدرسة مفتوحة في البانيل */
+  filtered: [], page: 0,
+  sPage: 0, sFiltered: [],
+  charts: {}
+};
+
+/* ════════════════════════════════════════════════════════════════
+   CORE: بناء الـ Context المركزي
+   يُستدعى مرة واحدة فقط عند كل تغيير في الفلاتر
+   الفلاتر: city (من hasr-chart-city/hasr-filter-city), mainSys, subSys
+   يُخزّن النتيجة في HASR._ctx ويُرجعها
+════════════════════════════════════════════════════════════════ */
+function _hasrBuildCtx(mainSys, subSys, chartCity) {
+  if (!HASR.data) return null;
+
+  const rawSchools = HASR.data.schools || [];
+  const fMain = mainSys  || '';
+  const fSub  = subSys   || '';
+  const fCity = chartCity || '';
+
+  /* ── خطوة 1: فلترة المدارس حسب النظام الرئيسي والفرعي ── */
+  /* هذه الفلترة تحدد مجموعة المدارس المؤهلة للفلتر الحالي */
+  let baseSchools;
+  if (fMain && fSub) {
+    /* فلتر رئيسي + فرعي: مدرسة تحتوي subSys داخل mainSys بـ total > 0 */
+    baseSchools = rawSchools.filter(sc => {
+      const sysMatch = (sc.systems||[]).find(s => s.name === fMain);
+      if (!sysMatch) return false;
+      const subMatch = (sysMatch.subSystems||[]).find(s => s.name === fSub);
+      return subMatch && (subMatch.total||0) > 0;
+    });
+  } else if (fMain) {
+    /* فلتر رئيسي فقط */
+    baseSchools = rawSchools.filter(sc =>
+      (sc.systems||[]).some(s => s.name === fMain && (s.total||0) > 0)
+    );
+  } else {
+    baseSchools = rawSchools;
+  }
+
+  /* ── خطوة 2: حساب أرقام كل مدرسة حسب الفلتر النشط ── */
+  /* إذا فُعّل فلتر فرعي: الأرقام من النظام الفرعي فقط */
+  /* إذا فُعّل فلتر رئيسي فقط: الأرقام من النظام الرئيسي فقط */
+  /* إذا لا فلتر: الأرقام الإجمالية للمدرسة */
+  const schools = baseSchools.map(sc => {
+    if (fMain && fSub) {
+      const sysMatch = (sc.systems||[]).find(s => s.name === fMain);
+      const subMatch = sysMatch ? (sysMatch.subSystems||[]).find(s => s.name === fSub) : null;
+      if (!subMatch) return sc;
+      return {
+        ...sc,
+        totalAssets:  subMatch.total        || 0,
+        excellent:    subMatch.excellent    || 0,
+        good:         subMatch.good         || 0,
+        bad:          subMatch.bad          || 0,
+        deteriorated: subMatch.deteriorated || 0,
+        _filteredBySub: true
+      };
+    } else if (fMain) {
+      const sysMatch = (sc.systems||[]).find(s => s.name === fMain);
+      if (!sysMatch) return sc;
+      return {
+        ...sc,
+        totalAssets:  sysMatch.total        || 0,
+        excellent:    sysMatch.excellent    || 0,
+        good:         sysMatch.good         || 0,
+        bad:          sysMatch.bad          || 0,
+        deteriorated: sysMatch.deteriorated || 0,
+        _filteredByMain: true
+      };
+    }
+    return sc;
+  });
+
+  /* ── خطوة 3: حساب Summary من المدارس المفلترة ── */
+  const n        = schools.length || 1;
+  const totalAssets     = schools.reduce((t,x)=>t+(x.totalAssets||0),0);
+  const excellent       = schools.reduce((t,x)=>t+(x.excellent||0),0);
+  const good            = schools.reduce((t,x)=>t+(x.good||0),0);
+  const bad             = schools.reduce((t,x)=>t+(x.bad||0),0);
+  const deteriorated    = schools.reduce((t,x)=>t+(x.deteriorated||0),0);
+  const totalBuildings  = schools.reduce((t,x)=>t+(x.buildings||0),0);
+  const totalRooms      = schools.reduce((t,x)=>t+(x.rooms||0),0);
+  const totalReassessed = schools.filter(x=>x.reassessed==='نعم').length;
+  const coveragePct     = +((schools.length / HASR_TOTAL_TARGET)*100).toFixed(1);
+  const reassessedPct   = +((totalReassessed / n)*100).toFixed(1);
+
+  const summary = {
+    totalSchoolsSurveyed: schools.length,
+    totalAssets, excellent, good, bad, deteriorated,
+    totalBuildings, totalRooms,
+    totalReassessed, coveragePct, reassessedPct
+  };
+
+  /* ── خطوة 4: تجميع الأنظمة الرئيسية من المدارس المفلترة ── */
+  const sysMap = {};
+  schools.forEach(sc => {
+    (sc.systems||[]).forEach(sys => {
+      if (!sysMap[sys.name]) {
+        sysMap[sys.name] = {
+          name: sys.name, total:0,
+          excellent:0, good:0, bad:0, deteriorated:0,
+          subSystems: {}
+        };
+      }
+      const entry = sysMap[sys.name];
+      /* إذا فلتر فرعي نشط: نجمّع من النظام الفرعي المختار فقط */
+      if (fSub) {
+        const sub = (sys.subSystems||[]).find(s=>s.name===fSub);
+        if (sub) {
+          entry.total        += sub.total        || 0;
+          entry.excellent    += sub.excellent    || 0;
+          entry.good         += sub.good         || 0;
+          entry.bad          += sub.bad          || 0;
+          entry.deteriorated += sub.deteriorated || 0;
+        }
+      } else {
+        entry.total        += sys.total        || 0;
+        entry.excellent    += sys.excellent    || 0;
+        entry.good         += sys.good         || 0;
+        entry.bad          += sys.bad          || 0;
+        entry.deteriorated += sys.deteriorated || 0;
+      }
+      /* تجميع الأنظمة الفرعية */
+      (sys.subSystems||[]).forEach(sub => {
+        if (!entry.subSystems[sub.name]) {
+          entry.subSystems[sub.name] = {
+            name:sub.name, total:0, excellent:0, good:0, bad:0, deteriorated:0
+          };
+        }
+        const se = entry.subSystems[sub.name];
+        se.total        += sub.total        || 0;
+        se.excellent    += sub.excellent    || 0;
+        se.good         += sub.good         || 0;
+        se.bad          += sub.bad          || 0;
+        se.deteriorated += sub.deteriorated || 0;
+      });
+    });
+  });
+  const systems = Object.values(sysMap)
+    .map(s=>({...s, subSystems: Object.values(s.subSystems).sort((a,b)=>b.total-a.total)}))
+    .sort((a,b)=>b.total-a.total);
+
+  /* ── خطوة 5: تجميع كل الأنظمة الفرعية (للكارت الجديد) ──
+     ⚠️ FIX: كان المفتاح هنا اسم النظام الفرعي فقط (sub.name)، فإذا تكرر نفس
+     الاسم تحت نظامين رئيسيين مختلفين كانا يندمجان خطأً في سجل واحد وتُفقد
+     نسبة أحدهما. الآن نستخدم مفتاحًا مركبًا (النظام الرئيسي + الفرعي) داخليًا
+     فقط، بينما تبقى الواجهة تعرض اسم النظام الفرعي الطبيعي كما هو (sub.name)
+     مع اسم النظام الرئيسي التابع له (mainSys) كما كان تمامًا. */
+  const subSysMap = {};
+  schools.forEach(sc => {
+    (sc.systems||[]).forEach(sys => {
+      (sys.subSystems||[]).forEach(sub => {
+        const subKey = sys.name + '§§' + sub.name; /* مفتاح داخلي فقط، لا يظهر في الواجهة */
+        if (!subSysMap[subKey]) {
+          subSysMap[subKey] = {
+            name:sub.name, mainSys:sys.name,
+            total:0, excellent:0, good:0, bad:0, deteriorated:0
+          };
+        }
+        const se = subSysMap[subKey];
+        se.total        += sub.total        || 0;
+        se.excellent    += sub.excellent    || 0;
+        se.good         += sub.good         || 0;
+        se.bad          += sub.bad          || 0;
+        se.deteriorated += sub.deteriorated || 0;
+      });
+    });
+  });
+  const allSubSystems = Object.values(subSysMap).sort((a,b)=>b.total-a.total);
+
+  /* ── خطوة 6: تجميع المدن من المدارس المفلترة ── */
+  const citiesMap = {};
+  schools.forEach(sc => {
+    if (!sc.city) return;
+    if (!citiesMap[sc.city]) citiesMap[sc.city] = {city:sc.city, schools:0};
+    citiesMap[sc.city].schools++;
+  });
+  const cities = Object.values(citiesMap).sort((a,b)=>b.schools-a.schools);
+
+  /* ── خطوة 7: مدارس الرسوم (فلتر إضافي بالمدينة للرسوم فقط) ── */
+  const chartSchools = fCity
+    ? schools.filter(sc=>sc.city===fCity)
+    : schools;
+
+  /* ── تجميع الأنظمة للرسم (بعد فلتر المدينة) ── */
+  const chartSysMap = {};
+  chartSchools.forEach(sc => {
+    (sc.systems||[]).forEach(sys => {
+      if (!chartSysMap[sys.name]) chartSysMap[sys.name]={name:sys.name,total:0};
+      if (fSub) {
+        const sub=(sys.subSystems||[]).find(s=>s.name===fSub);
+        if(sub) chartSysMap[sys.name].total += sub.total||0;
+      } else {
+        chartSysMap[sys.name].total += sys.total||0;
+      }
+    });
+  });
+  const chartSystems = Object.values(chartSysMap).sort((a,b)=>b.total-a.total);
+
+  /* ── خطوة 8: تحديد نص الفلتر النشط ── */
+  let filterLabel = '';
+  if (fMain && fSub) filterLabel = `${fMain} ‹ ${fSub}`;
+  else if (fMain)    filterLabel = fMain;
+
+  return {
+    /* الفلاتر النشطة */
+    filter: { mainSys: fMain, subSys: fSub, city: fCity },
+    filterLabel,
+    /* البيانات المحسوبة */
+    schools,          /* المدارس المفلترة بأرقام صحيحة */
+    summary,          /* ملخص محسوب من schools المفلترة */
+    systems,          /* أنظمة رئيسية محسوبة */
+    allSubSystems,    /* كل الأنظمة الفرعية محسوبة */
+    cities,           /* مدن محسوبة من schools المفلترة */
+    chartSchools,     /* مدارس للرسوم (بعد فلتر المدينة) */
+    chartSystems      /* أنظمة للرسم (بعد فلتر المدينة) */
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   نقطة الدخول لكل تغيير في الفلاتر
+   تسلسل: بناء _ctx → رسم KPIs → رسم Charts → رسم Table
+   يُحدّث البانيل المفتوح إن وُجد
+════════════════════════════════════════════════════════════════ */
+function _hasrApplyFilters() {
+  if (!HASR.data) return;
+  /* قراءة الفلاتر من DOM */
+  const mainSys  = HASR._filterMain || '';
+  const subSys   = HASR._filterSub  || '';
+  const chartCity= document.getElementById('hasr-chart-city')?.value || '';
+  /* بناء الـ Context مرة واحدة */
+  HASR._ctx = _hasrBuildCtx(mainSys, subSys, chartCity);
+  /* رسم كل المكونات */
+  _hasrRenderKPIs();
+  _hasrChartCondition();
+  _hasrChartSystems();
+  _hasrChartCities();
+  renderHasrTable();
+  _hasrRenderFilterBanner();
+  /* تحديث البانيل المفتوح */
+  if (HASR._activeK && document.getElementById('hasr-sp')?.classList.contains('hasr-open')) {
+    const body = document.getElementById('hasr-sp-body');
+    if (body) {
+      const RENDERS = {
+        schools:_hPanelSchools, assets:_hPanelAssets, reassessed:_hPanelReassessed,
+        avg:_hPanelAvg, buildings:_hPanelBuildings, rooms:_hPanelRooms,
+        systems:_hPanelMainSystems, subsystems:_hPanelSubSystems
+      };
+      (RENDERS[HASR._activeK]||_hPanelSchools)(body);
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   شريط الفلتر النشط
+════════════════════════════════════════════════════════════════ */
+function _hasrRenderFilterBanner() {
+  const ctx = HASR._ctx;
+  if (!ctx) return;
+  let banner = document.getElementById('hasr-filter-banner');
+  if (ctx.filterLabel) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'hasr-filter-banner';
+      const tblCard = document.getElementById('hasr-tbl-body')?.closest('.card');
+      if (tblCard) tblCard.insertBefore(banner, tblCard.firstChild);
+    }
+    banner.style.display = 'block';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+                  padding:10px 14px;margin-bottom:12px;border-radius:10px;
+                  background:rgba(8,145,178,.08);border:1.5px solid rgba(8,145,178,.25)">
+        <span style="font-size:16px">🔍</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:2px">فلتر نشط</div>
+          <div style="font-size:13px;font-weight:800;color:var(--tx-main)">${_hE(ctx.filterLabel)}</div>
+          <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">${ctx.summary.totalSchoolsSurveyed.toLocaleString('ar')} مدرسة · ${ctx.summary.totalAssets.toLocaleString('ar')} أصل</div>
+        </div>
+        <button onclick="hasrClearSubFilter()"
+          style="font-size:11px;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;
+                 background:#EFF6FF;color:#1D4ED8;border:1.5px solid #BFDBFE;font-family:Tajawal;white-space:nowrap">
+          ✕ مسح الفلتر
+        </button>
+      </div>`;
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CSS (مرة واحدة)
+════════════════════════════════════════════════════════════════ */
+(function(){
+  if (document.getElementById('hasr-css')) return;
+  const s = document.createElement('style');
+  s.id = 'hasr-css';
+  s.textContent = `
+    #hasr-sp {
+      position:fixed; top:0; left:0; bottom:0; z-index:9100;
+      width:min(420px,94vw);
+      background:var(--bg-3);
+      box-shadow:4px 0 40px rgba(6,20,28,.22),12px 0 60px rgba(8,145,178,.08);
+      display:flex; flex-direction:column;
+      transform:translateX(-105%);
+      transition:transform .3s cubic-bezier(.22,.6,.34,1);
+      border-right:2px solid var(--bd-light);
+      overflow:hidden;
+    }
+    #hasr-sp.hasr-open { transform:translateX(0); }
+    #hasr-dp {
+      position:fixed; top:0; left:0; bottom:0; z-index:9200;
+      width:min(460px,96vw);
+      background:var(--bg-3);
+      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px rgba(8,145,178,.1);
+      display:flex; flex-direction:column;
+      transform:translateX(-105%);
+      transition:transform .28s cubic-bezier(.22,.6,.34,1);
+      border-right:2px solid var(--teal,#0891B2);
+      overflow:hidden;
+    }
+    #hasr-dp.hasr-open { transform:translateX(0); }
+    #hasr-ov {
+      position:fixed; inset:0; z-index:9050;
+      background:rgba(6,20,28,.45); backdrop-filter:blur(3px);
+      opacity:0; transition:opacity .28s; display:none;
+    }
+    #hasr-ov.hasr-open { display:block; opacity:1; }
+    .hasr-head {
+      padding:18px 22px 14px;
+      background:linear-gradient(135deg,#071C28 0%,#0A3043 100%);
+      color:#fff; flex-shrink:0;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      position:relative;
+    }
+    .hasr-head-close {
+      position:absolute; top:14px; left:16px;
+      width:30px; height:30px; border-radius:50%;
+      background:rgba(255,255,255,.1); border:none; color:#fff;
+      font-size:14px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .18s; font-family:Tajawal,sans-serif;
+    }
+    .hasr-head-close:hover { background:rgba(255,255,255,.25); }
+    .hasr-head-title { font-size:15px; font-weight:800; max-width:calc(100% - 44px); }
+    .hasr-head-sub   { font-size:11px; color:rgba(255,255,255,.5); margin-top:3px; }
+    .hasr-tabs {
+      display:flex; background:#071C28; overflow-x:auto; flex-shrink:0;
+      border-bottom:1px solid rgba(255,255,255,.08); scrollbar-width:none;
+    }
+    .hasr-tabs::-webkit-scrollbar { display:none; }
+    .hasr-tab {
+      padding:9px 14px; font-size:10px; font-weight:700; letter-spacing:.02em;
+      color:rgba(255,255,255,.45); cursor:pointer; white-space:nowrap;
+      border-bottom:2px solid transparent; transition:all .18s;
+      background:transparent; border-top:none; border-left:none; border-right:none;
+      font-family:Tajawal,sans-serif;
+    }
+    .hasr-tab:hover  { color:rgba(255,255,255,.8); }
+    .hasr-tab.active { color:#fff; border-bottom-color:#0891B2; }
+    .hasr-body { flex:1; overflow-y:auto; padding:16px 18px; }
+    .hasr-igrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .hasr-ic {
+      background:var(--bg-2); border:1px solid var(--bd-light);
+      border-radius:10px; padding:11px 13px; position:relative; overflow:hidden;
+    }
+    .hasr-ic::before {
+      content:''; position:absolute; top:0; right:0;
+      width:3px; height:100%; background:var(--hc,#94a3b8);
+    }
+    .hasr-ic.full { grid-column:1/-1; }
+    .hasr-ic-lbl  { font-size:10px; color:var(--tx-muted); font-weight:600; margin-bottom:3px; }
+    .hasr-ic-val  { font-size:18px; font-weight:900; color:var(--hc,var(--tx-main)); }
+    .hasr-ic-sub  { font-size:10px; color:var(--tx-muted); margin-top:2px; }
+    .hasr-prog    { height:6px; border-radius:4px; background:var(--bd-light); overflow:hidden; margin-top:7px; }
+    .hasr-pfill   { height:100%; border-radius:4px; transition:width .7s cubic-bezier(.22,.6,.34,1); }
+    .hasr-sec {
+      font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+      color:var(--tx-muted); margin:16px 0 8px; padding-bottom:6px;
+      border-bottom:1px solid var(--bd-light);
+    }
+    .hasr-sec:first-child { margin-top:0; }
+    .hasr-srow {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:9px 10px; border-radius:8px; cursor:pointer; transition:background .14s;
+      margin-bottom:2px;
+    }
+    .hasr-srow:hover { background:var(--bg-2); }
+    .hasr-sname { font-size:12px; font-weight:700; color:var(--tx-main); }
+    .hasr-smeta { font-size:10px; color:var(--tx-muted); margin-top:2px; }
+    .hasr-sbadge {
+      font-size:10px; font-weight:700; padding:2px 8px;
+      border-radius:999px; background:#EFF6FF; color:#1D4ED8;
+      flex-shrink:0; margin-right:6px; white-space:nowrap;
+    }
+    .hasr-cbar {
+      display:flex; border-radius:8px; overflow:hidden; height:28px;
+      border:1px solid var(--bd-light); margin-bottom:10px;
+    }
+    .hasr-cseg {
+      display:flex; align-items:center; justify-content:center;
+      font-size:10px; color:#fff; font-weight:700; min-width:0;
+    }
+    .hasr-clickable {
+      cursor:pointer !important;
+      transition:transform .18s,box-shadow .18s !important;
+      user-select:none;
+    }
+    .hasr-clickable:hover {
+      transform:translateY(-3px) !important;
+      box-shadow:0 6px 20px rgba(0,0,0,.1) !important;
+    }
+    .hasr-clickable.hasr-active {
+      box-shadow:0 0 0 2px var(--hac,#1D4ED8),0 4px 16px rgba(0,0,0,.1) !important;
+    }
+    .hasr-finp {
+      width:100%; box-sizing:border-box; padding:8px 12px; margin-bottom:8px;
+      background:var(--bg-2); border:1px solid var(--bd-light); border-radius:8px;
+      font-size:12px; font-family:Tajawal,sans-serif; color:var(--tx-main); outline:none;
+    }
+    .hasr-finp:focus { border-color:#0891B2; }
+    .hasr-back-btn {
+      display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+      padding:6px 14px;border-radius:8px;background:var(--bg-2);color:var(--teal,#0891B2);
+      border:1.5px solid rgba(8,145,178,.3);cursor:pointer;font-family:Tajawal;
+      margin-bottom:14px;transition:background .15s;
+    }
+    .hasr-back-btn:hover { background:rgba(8,145,178,.12); }
+  `;
+  document.head.appendChild(s);
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   حقن البانيلات في body
+════════════════════════════════════════════════════════════════ */
+function _hasrInjectDOM() {
+  if (!document.getElementById('hasr-ov')) {
+    const ov = document.createElement('div');
+    ov.id = 'hasr-ov';
+    ov.onclick = () => _hasrCloseAll();
+    document.body.appendChild(ov);
+  }
+  if (!document.getElementById('hasr-sp')) {
+    const sp = document.createElement('div');
+    sp.id = 'hasr-sp';
+    const TABS = [
+      {k:'schools',    i:'🏫', t:'المدارس'},
+      {k:'assets',     i:'📊', t:'الأصول'},
+      {k:'reassessed', i:'🔄', t:'المعادة'},
+      {k:'avg',        i:'📐', t:'المتوسطات'},
+      {k:'buildings',  i:'🏗️', t:'المباني'},
+      {k:'rooms',      i:'🚪', t:'الغرف'},
+    ];
+    sp.innerHTML = `
+      <div class="hasr-head">
+        <button class="hasr-head-close" onclick="_hasrCloseAll()">✕</button>
+        <div class="hasr-head-title" id="hasr-sp-title">📦 حصر الأصول</div>
+        <div class="hasr-head-sub"   id="hasr-sp-sub"></div>
+      </div>
+      <div class="hasr-tabs">
+        ${TABS.map(t=>`<button class="hasr-tab" data-k="${t.k}" onclick="hasrTab('${t.k}')">${t.i} ${t.t}</button>`).join('')}
+      </div>
+      <div class="hasr-body" id="hasr-sp-body"></div>
+    `;
+    document.body.appendChild(sp);
+  }
+  if (!document.getElementById('hasr-dp')) {
+    const dp = document.createElement('div');
+    dp.id = 'hasr-dp';
+    dp.innerHTML = `
+      <div class="hasr-head">
+        <button class="hasr-head-close" onclick="hasrCloseDetail()">✕</button>
+        <div class="hasr-head-title" id="hasr-dp-title">—</div>
+        <div class="hasr-head-sub"   id="hasr-dp-sub">—</div>
+      </div>
+      <div class="hasr-body" id="hasr-dp-body"></div>
+    `;
+    document.body.appendChild(dp);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   نقطة الدخول الرئيسية
+════════════════════════════════════════════════════════════════ */
+function renderHasrTab() {
+  _hasrInjectDOM();
+  if (HASR.loaded && HASR.data) { _hasrRenderAll(); return; }
+  loadHasrData();
+}
+
+async function loadHasrData() {
+  _hasrShowLoading(true);
+  try {
+    const r = await fetch(HASR_SCRIPT_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    HASR.data   = await r.json();
+    HASR.loaded = true;
+    /* مزامنة الهدف الإجمالي من الـ payload — Code.gs هو المصدر الوحيد للرقم */
+    const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
+    if (typeof targetFromApi === 'number' && targetFromApi > 0) {
+      HASR_TOTAL_TARGET = targetFromApi;
+    }
+    const el = document.getElementById('hasr-fetch-time');
+    if (el) el.textContent = 'آخر تحديث: ' + new Date().toLocaleString('ar-SA');
+    _hasrShowLoading(false);
+    _hasrRenderAll();
+  } catch(e) {
+    _hasrShowLoading(false);
+    _hasrShowError('فشل سحب البيانات: ' + e.message);
+  }
+}
+
+function _hasrRenderAll() {
+  /* بناء الـ Context أولاً بالفلاتر الحالية */
+  HASR._filterMain = HASR._filterMain || '';
+  HASR._filterSub  = HASR._filterSub  || '';
+  HASR._ctx = _hasrBuildCtx(
+    HASR._filterMain,
+    HASR._filterSub,
+    document.getElementById('hasr-chart-city')?.value || ''
+  );
+  /* ملء الفلاتر (مرة واحدة) */
+  _hasrFillFilters();
+  /* ربط الكروت (مرة واحدة) */
+  _hasrBindKPIs();
+  /* رسم كل المكونات */
+  _hasrRenderKPIs();
+  _hasrChartCondition();
+  _hasrChartSystems();
+  _hasrChartCities();
+  renderHasrTable();
+  _hasrRenderFilterBanner();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   كروت KPI — تقرأ من HASR._ctx فقط
+════════════════════════════════════════════════════════════════ */
+function _hasrRenderKPIs() {
+  const ctx = HASR._ctx;
+  if (!ctx) return;
+  const s = ctx.summary;
+  const n = s.totalSchoolsSurveyed || 1;
+
+  _hS('hasr-k-surveyed',  s.totalSchoolsSurveyed.toLocaleString('ar'));
+  _hS('hasr-k-target',    HASR_TOTAL_TARGET.toLocaleString('ar'));
+  _hS('hasr-k-coverage',  s.coveragePct + '%');
+  _hW('hasr-prog-schools', Math.min(s.coveragePct,100) + '%');
+
+  _hS('hasr-k-assets', s.totalAssets.toLocaleString('ar'));
+  const bk = document.getElementById('hasr-assets-breakdown');
+  if (bk) bk.innerHTML = `
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#D1FAE5;color:#065F46">ممتاز ${s.excellent.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#DBEAFE;color:#1E40AF">جيد ${s.good.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#FEF3C7;color:#92400E">سئ ${s.bad.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#FEE2E2;color:#991B1B">متهالك ${s.deteriorated.toLocaleString('ar')}</span>`;
+
+  _hS('hasr-k-reassessed',     s.totalReassessed.toLocaleString('ar'));
+  _hS('hasr-k-reassessed-pct', s.reassessedPct + '%');
+  _hW('hasr-prog-reassessed',  Math.min(s.reassessedPct,100) + '%');
+
+  _hS('hasr-k-avg-assets', Math.round(s.totalAssets/n).toLocaleString('ar'));
+
+  _hS('hasr-k-total-buildings', s.totalBuildings.toLocaleString('ar'));
+  _hS('hasr-k-avg-buildings',   'متوسط ' + (s.totalBuildings/n).toFixed(1) + ' مبنى / مدرسة');
+  _hS('hasr-k-total-rooms',     s.totalRooms.toLocaleString('ar'));
+  _hS('hasr-k-avg-rooms',       'متوسط ' + (s.totalRooms/n).toFixed(1) + ' غرفة / مدرسة');
+
+  _hS('hasr-k-main-systems', ctx.systems.length.toLocaleString('ar'));
+  _hS('hasr-k-sub-systems',  ctx.allSubSystems.length.toLocaleString('ar'));
+}
+
+/* ربط الكروت بالبانيل — مرة واحدة فقط */
+function _hasrBindKPIs() {
+  const MAP = [
+    {id:'hasr-k-surveyed',       k:'schools',    c:'#1D4ED8'},
+    {id:'hasr-k-assets',         k:'assets',     c:'#059669'},
+    {id:'hasr-k-reassessed',     k:'reassessed', c:'#7C3AED'},
+    {id:'hasr-k-avg-assets',     k:'avg',        c:'#0891B2'},
+    {id:'hasr-k-total-buildings',k:'buildings',  c:'#D97706'},
+    {id:'hasr-k-total-rooms',    k:'rooms',      c:'#DC2626'},
+    {id:'hasr-k-main-systems',   k:'systems',    c:'#1E3A8A'},
+    {id:'hasr-k-sub-systems',    k:'subsystems', c:'#0E7490'},
+  ];
+  MAP.forEach(({id, k, c}) => {
+    const card = document.getElementById(id)?.closest('.kpi');
+    if (!card || card._hasrBound) return;
+    card._hasrBound = true;
+    card.dataset.hasrK = k;
+    card.style.setProperty('--hac', c);
+    card.classList.add('hasr-clickable');
+    card.addEventListener('click', () => {
+      const isOpen = document.getElementById('hasr-sp')?.classList.contains('hasr-open');
+      const same   = HASR._activeK === k;
+      if (isOpen && same) { _hasrCloseAll(); }
+      else { _hasrOpenSP(k); }
+    });
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   فتح/إغلاق البانيل الجانبي
+════════════════════════════════════════════════════════════════ */
+function _hasrOpenSP(key) {
+  HASR._activeK = key;
+  const sp = document.getElementById('hasr-sp');
+  const ov = document.getElementById('hasr-ov');
+  sp.classList.add('hasr-open');
+  ov.classList.add('hasr-open');
+  const tabsEl = sp.querySelector('.hasr-tabs');
+  if (tabsEl) tabsEl.style.display = '';
+  _hS('hasr-sp-title', '📦 حصر الأصول');
+  if (!HASR._schoolCtx) {
+    document.querySelectorAll('[data-hasr-k]').forEach(el => {
+      el.closest('.kpi')?.classList.toggle('hasr-active', el.dataset.hasrK === key);
+    });
+  }
+  const spSub = document.getElementById('hasr-sp-sub');
+  if (spSub) spSub.textContent = HASR._schoolCtx ? ('🏫 ' + HASR._schoolCtx.name) : '';
+  hasrTab(key);
+}
+
+function _hasrCloseAll() {
+  document.getElementById('hasr-sp')?.classList.remove('hasr-open');
+  document.getElementById('hasr-dp')?.classList.remove('hasr-open');
+  document.getElementById('hasr-ov')?.classList.remove('hasr-open');
+  document.querySelectorAll('.hasr-clickable').forEach(el => el.classList.remove('hasr-active'));
+  HASR._activeK   = null;
+  HASR._schoolCtx = null;
+}
+
+function hasrCloseDetail() {
+  document.getElementById('hasr-dp')?.classList.remove('hasr-open');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   تبديل التاب داخل البانيل
+════════════════════════════════════════════════════════════════ */
+function hasrTab(key) {
+  document.querySelectorAll('.hasr-tab').forEach(b => b.classList.toggle('active', b.dataset.k === key));
+  const body = document.getElementById('hasr-sp-body');
+  if (!body || !HASR._ctx) return;
+  const TITLES = {
+    schools:'🏫 المدارس المحصورة', assets:'📊 إجمالي الأصول',
+    reassessed:'🔄 المدارس المعادة', avg:'📐 المتوسطات',
+    buildings:'🏗️ المباني', rooms:'🚪 الغرف',
+    systems:'⚙️ الأنظمة الرئيسية', subsystems:'🔩 الأنظمة الفرعية'
+  };
+  _hS('hasr-sp-title', TITLES[key] || 'حصر الأصول');
+  const RENDERS = {
+    schools:_hPanelSchools, assets:_hPanelAssets, reassessed:_hPanelReassessed,
+    avg:_hPanelAvg, buildings:_hPanelBuildings, rooms:_hPanelRooms,
+    systems:_hPanelMainSystems, subsystems:_hPanelSubSystems
+  };
+  (RENDERS[key] || _hPanelSchools)(body);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   محتوى التابات — كلها تقرأ من HASR._ctx فقط
+════════════════════════════════════════════════════════════════ */
+
+/* تاب 1: المدارس */
+function _hPanelSchools(body) {
+  const ctx = HASR._ctx;
+  const s   = ctx.summary;
+  const sc  = ctx.schools;
+  HASR.sFiltered = [...sc].sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  HASR.sPage = 0;
+  const cities = [...new Set(sc.map(x=>x.city).filter(Boolean))].sort();
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic" style="--hc:#1D4ED8">
+        <div class="hasr-ic-lbl">محصورة</div>
+        <div class="hasr-ic-val">${s.totalSchoolsSurveyed.toLocaleString('ar')}</div>
+        <div class="hasr-ic-sub">من ${HASR_TOTAL_TARGET.toLocaleString('ar')}</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.coveragePct}%;background:#1D4ED8"></div></div>
+      </div>
+      <div class="hasr-ic" style="--hc:#059669">
+        <div class="hasr-ic-lbl">نسبة التغطية</div>
+        <div class="hasr-ic-val">${s.coveragePct}%</div>
+        <div class="hasr-ic-sub">من الهدف</div>
+      </div>
+      <div class="hasr-ic full" style="--hc:#7C3AED">
+        <div class="hasr-ic-lbl">المدن المشمولة</div>
+        <div class="hasr-ic-val">${ctx.cities.length}</div>
+        <div class="hasr-ic-sub">${ctx.cities.map(c=>_hE(c.city)).join(' · ')}</div>
+      </div>
+    </div>
+    <div class="hasr-sec">قائمة المدارس</div>
+    <input class="hasr-finp" id="hasr-ps-q" placeholder="🔍 بحث بالاسم أو الكود...">
+    <select class="fsel" id="hasr-ps-c" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+      <option value="">— كل المدن —</option>
+      ${cities.map(c=>`<option>${_hE(c)}</option>`).join('')}
+    </select>
+    <div id="hasr-ps-list"></div>
+    <div id="hasr-ps-pag"></div>
+  `;
+  document.getElementById('hasr-ps-q').addEventListener('input', _hFilterSL);
+  document.getElementById('hasr-ps-c').addEventListener('change', _hFilterSL);
+  _hDrawSL();
+}
+
+function _hFilterSL() {
+  const q = (document.getElementById('hasr-ps-q')?.value||'').trim().toLowerCase();
+  const c = document.getElementById('hasr-ps-c')?.value||'';
+  HASR.sFiltered = (HASR._ctx?.schools||[]).filter(sc=>{
+    if(q && !sc.name.toLowerCase().includes(q) && !sc.code.toLowerCase().includes(q)) return false;
+    if(c && sc.city!==c) return false;
+    return true;
+  }).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  HASR.sPage=0; _hDrawSL();
+}
+
+function _hDrawSL() {
+  const PAGE=15, list=HASR.sFiltered;
+  const sl=document.getElementById('hasr-ps-list'); if(!sl) return;
+  const slice=list.slice(HASR.sPage*PAGE,(HASR.sPage+1)*PAGE);
+  sl.innerHTML = !list.length
+    ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد نتائج</div>'
+    : slice.map(sc=>`
+      <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(sc.code)}')">
+        <div>
+          <div class="hasr-sname">${_hE(sc.name)}</div>
+          <div class="hasr-smeta">${_hE(sc.city)} · ${_hE(sc.code)}</div>
+        </div>
+        <div class="hasr-sbadge">${(sc.totalAssets||0).toLocaleString('ar')} أصل</div>
+      </div>`).join('');
+  const pages=Math.ceil(list.length/PAGE);
+  const pg=document.getElementById('hasr-ps-pag'); if(!pg)return;
+  if(pages<=1){pg.innerHTML='';return;}
+  let h=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;justify-content:center">`;
+  h+=`<button class="pag-btn" ${HASR.sPage===0?'disabled':''} onclick="HASR.sPage--;_hDrawSL()">→</button>`;
+  for(let p=0;p<Math.min(pages,7);p++) h+=`<button class="pag-btn${p===HASR.sPage?' active':''}" onclick="HASR.sPage=${p};_hDrawSL()">${p+1}</button>`;
+  h+=`<button class="pag-btn" ${HASR.sPage===pages-1?'disabled':''} onclick="HASR.sPage++;_hDrawSL()">←</button></div>`;
+  pg.innerHTML=h;
+}
+
+/* تاب 2: الأصول */
+function _hPanelAssets(body) {
+  const ctx = HASR._ctx;
+  const s   = ctx.summary;
+  const tot = s.totalAssets || 1;
+  const p   = v=>((v/tot)*100).toFixed(1);
+  const topSys = ctx.systems.slice(0,8);
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#059669">
+        <div class="hasr-ic-lbl">إجمالي الأصول</div>
+        <div class="hasr-ic-val">${s.totalAssets.toLocaleString('ar')}</div>
+      </div>
+      <div class="hasr-ic" style="--hc:#10B981">
+        <div class="hasr-ic-lbl">ممتاز</div>
+        <div class="hasr-ic-val">${s.excellent.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.excellent)}%</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.excellent)}%;background:#10B981"></div></div>
+      </div>
+      <div class="hasr-ic" style="--hc:#3B82F6">
+        <div class="hasr-ic-lbl">جيد</div>
+        <div class="hasr-ic-val">${s.good.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.good)}%</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.good)}%;background:#3B82F6"></div></div>
+      </div>
+      <div class="hasr-ic" style="--hc:#F59E0B">
+        <div class="hasr-ic-lbl">سئ</div>
+        <div class="hasr-ic-val">${s.bad.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.bad)}%</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.bad)}%;background:#F59E0B"></div></div>
+      </div>
+      <div class="hasr-ic" style="--hc:#EF4444">
+        <div class="hasr-ic-lbl">متهالك</div>
+        <div class="hasr-ic-val">${s.deteriorated.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.deteriorated)}%</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.deteriorated)}%;background:#EF4444"></div></div>
+      </div>
+    </div>
+    <div class="hasr-cbar">
+      ${s.excellent>0?`<div class="hasr-cseg" style="flex:${s.excellent};background:#10B981">${p(s.excellent)}%</div>`:''}
+      ${s.good>0?`<div class="hasr-cseg" style="flex:${s.good};background:#3B82F6">${p(s.good)}%</div>`:''}
+      ${s.bad>0?`<div class="hasr-cseg" style="flex:${s.bad};background:#F59E0B">${p(s.bad)}%</div>`:''}
+      ${s.deteriorated>0?`<div class="hasr-cseg" style="flex:${s.deteriorated};background:#EF4444">${p(s.deteriorated)}%</div>`:''}
+    </div>
+    <div class="hasr-sec">أعلى الأنظمة أصولاً</div>
+    ${topSys.map(sys=>`
+      <div style="padding:7px 0;border-bottom:1px solid var(--bd-light)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:11px;font-weight:600;color:var(--tx-main)">${_hE(sys.name)}</span>
+          <span style="font-size:11px;font-weight:700;color:#1D4ED8">${sys.total}</span>
+        </div>
+        <div style="display:flex;border-radius:4px;overflow:hidden;height:6px;background:var(--bd-light)">
+          ${sys.excellent>0?`<div style="flex:${sys.excellent};background:#10B981"></div>`:''}
+          ${sys.good>0?`<div style="flex:${sys.good};background:#3B82F6"></div>`:''}
+          ${sys.bad>0?`<div style="flex:${sys.bad};background:#F59E0B"></div>`:''}
+          ${sys.deteriorated>0?`<div style="flex:${sys.deteriorated};background:#EF4444"></div>`:''}
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+/* تاب 3: المعادة */
+function _hPanelReassessed(body) {
+  const ctx  = HASR._ctx;
+  const s    = ctx.summary;
+  const list = ctx.schools.filter(sc=>sc.reassessed==='نعم');
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic" style="--hc:#7C3AED">
+        <div class="hasr-ic-lbl">معادة</div>
+        <div class="hasr-ic-val">${s.totalReassessed.toLocaleString('ar')}</div>
+        <div class="hasr-ic-sub">${s.reassessedPct}% من المحصورة</div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.reassessedPct}%;background:#7C3AED"></div></div>
+      </div>
+      <div class="hasr-ic" style="--hc:#94A3B8">
+        <div class="hasr-ic-lbl">غير معادة</div>
+        <div class="hasr-ic-val">${(s.totalSchoolsSurveyed-s.totalReassessed).toLocaleString('ar')}</div>
+        <div class="hasr-ic-sub">${(100-s.reassessedPct).toFixed(1)}%</div>
+      </div>
+    </div>
+    <div class="hasr-sec">المدارس المعادة (${list.length})</div>
+    ${!list.length
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد مدارس معادة</div>'
+      : list.map(sc=>`
+        <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(sc.code)}')">
+          <div>
+            <div class="hasr-sname">${_hE(sc.name)}</div>
+            <div class="hasr-smeta">${_hE(sc.city)} · ${sc.buildings||0} مبنى · ${sc.rooms||0} غرفة</div>
+          </div>
+          <span style="font-size:9px;padding:2px 8px;border-radius:999px;background:#EDE9FE;color:#6D28D9;font-weight:700">✓ معادة</span>
+        </div>`).join('')}
+  `;
+}
+
+/* تاب 4: المتوسطات */
+function _hPanelAvg(body) {
+  const ctx = HASR._ctx;
+  const s   = ctx.summary;
+  const sc  = ctx.schools;
+  const n   = s.totalSchoolsSurveyed || 1;
+  const top5 = [...sc].sort((a,b)=>b.totalAssets-a.totalAssets).slice(0,5);
+  const bot5 = [...sc].sort((a,b)=>a.totalAssets-b.totalAssets).filter(x=>x.totalAssets>0).slice(0,5);
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic" style="--hc:#0891B2"><div class="hasr-ic-lbl">متوسط الأصول</div><div class="hasr-ic-val">${Math.round(s.totalAssets/n).toLocaleString('ar')}</div><div class="hasr-ic-sub">أصل / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#D97706"><div class="hasr-ic-lbl">متوسط المباني</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#DC2626"><div class="hasr-ic-lbl">متوسط الغرف</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#10B981"><div class="hasr-ic-lbl">متوسط ممتاز</div><div class="hasr-ic-val">${Math.round(s.excellent/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#F59E0B"><div class="hasr-ic-lbl">متوسط سئ</div><div class="hasr-ic-val">${Math.round(s.bad/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#EF4444"><div class="hasr-ic-lbl">متوسط متهالك</div><div class="hasr-ic-val">${Math.round(s.deteriorated/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+    </div>
+    <div class="hasr-sec">أعلى 5 أصولاً</div>
+    ${top5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:13px;font-weight:900;color:#1D4ED8;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+    <div class="hasr-sec">أقل 5 أصولاً</div>
+    ${bot5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:13px;font-weight:900;color:#EF4444;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+  `;
+}
+
+/* تاب 5: المباني */
+function _hPanelBuildings(body) {
+  const ctx  = HASR._ctx;
+  const s    = ctx.summary;
+  const sc   = ctx.schools;
+  const n    = s.totalSchoolsSurveyed || 1;
+  const top10= [...sc].sort((a,b)=>(b.buildings||0)-(a.buildings||0)).slice(0,10);
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#D97706"><div class="hasr-ic-lbl">إجمالي المباني</div><div class="hasr-ic-val">${s.totalBuildings.toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#D97706"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.buildings||0),0)}</div><div class="hasr-ic-sub">مبنى</div></div>
+    </div>
+    <div class="hasr-sec">أعلى 10 مدارس مبانياً</div>
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:13px;font-weight:900;color:#D97706;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEF3C7;color:#92400E">${x.buildings||0} مبنى</div></div>`).join('')}
+  `;
+}
+
+/* تاب 6: الغرف */
+function _hPanelRooms(body) {
+  const ctx  = HASR._ctx;
+  const s    = ctx.summary;
+  const sc   = ctx.schools;
+  const n    = s.totalSchoolsSurveyed || 1;
+  const top10= [...sc].sort((a,b)=>(b.rooms||0)-(a.rooms||0)).slice(0,10);
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#DC2626"><div class="hasr-ic-lbl">إجمالي الغرف</div><div class="hasr-ic-val">${s.totalRooms.toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#DC2626"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.rooms||0),0)}</div><div class="hasr-ic-sub">غرفة</div></div>
+    </div>
+    <div class="hasr-sec">أعلى 10 مدارس غرفاً</div>
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:13px;font-weight:900;color:#DC2626;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.rooms||0} غرفة</div></div>`).join('')}
+  `;
+}
+
+/* تاب 7: الأنظمة الرئيسية (مع قائمة رئيسي → فرعي + فلترة) */
+function _hPanelMainSystems(body) {
+  const ctx = HASR._ctx;
+  /* إذا كان هناك context مدرسة واحدة: نعرض أنظمة تلك المدرسة فقط */
+  const sc = HASR._schoolCtx;
+  let sys;
+  if (sc) {
+    sys = [...(sc.systems||[])].filter(s=>s.total>0).sort((a,b)=>(b.total||0)-(a.total||0));
+  } else {
+    sys = ctx.systems;
+  }
+  const totAll = sys.reduce((t,x)=>t+(x.total||0),0) || 1;
+
+  const ctxBanner = sc
+    ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
+        <span style="font-size:11px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:10px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
+        <button onclick="HASR._schoolCtx=null;hasrTab('systems')" style="margin-right:auto;font-size:9px;padding:2px 8px;border-radius:999px;background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ عرض جميع المدارس</button>
+      </div>`
+    : '';
+
+  body.innerHTML = `
+    ${ctxBanner}
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#1E3A8A">
+        <div class="hasr-ic-lbl">عدد الأنظمة الرئيسية</div>
+        <div class="hasr-ic-val">${sys.length.toLocaleString('ar')}</div>
+      </div>
+    </div>
+    <div class="hasr-sec">الأنظمة الرئيسية — اضغط لعرض الفرعية وتطبيق الفلتر</div>
+    ${!sys.length
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد أنظمة</div>'
+      : sys.map(s=>{
+          const tot=s.total||1;
+          const isActive = ctx.filter.mainSys===s.name && !ctx.filter.subSys;
+          return `
+          <div class="hasr-srow" onclick="hasrSelectMainSystem('${_hE(s.name)}')"
+               style="border:1.5px solid ${isActive?'rgba(8,145,178,.4)':'transparent'};background:${isActive?'rgba(8,145,178,.06)':''}">
+            <div style="flex:1">
+              <div class="hasr-sname">${_hE(s.name)}</div>
+              <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
+                ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
+                ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
+                ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
+                ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
+              </div>
+              <div class="hasr-smeta" style="margin-top:4px">${((tot/totAll)*100).toFixed(1)}% من الإجمالي</div>
+            </div>
+            <div class="hasr-sbadge">${(s.total||0).toLocaleString('ar')} أصل</div>
+          </div>`;
+        }).join('')}
+  `;
+}
+
+/* تاب 8: الأنظمة الفرعية (كارت جديد) */
+function _hPanelSubSystems(body) {
+  const ctx  = HASR._ctx;
+  const subs = ctx.allSubSystems;
+  const totAll = subs.reduce((t,x)=>t+(x.total||0),0) || 1;
+  body.innerHTML = `
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#0E7490">
+        <div class="hasr-ic-lbl">إجمالي الأنظمة الفرعية</div>
+        <div class="hasr-ic-val">${subs.length.toLocaleString('ar')}</div>
+      </div>
+    </div>
+    <div class="hasr-sec">الأنظمة الفرعية — اضغط لتطبيق الفلتر</div>
+    ${!subs.length
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد أنظمة فرعية</div>'
+      : subs.map(sub=>{
+          const isActive = ctx.filter.subSys===sub.name && ctx.filter.mainSys===sub.mainSys;
+          return `
+          <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(sub.mainSys)}','${_hE(sub.name)}')"
+               style="border:1.5px solid ${isActive?'rgba(14,116,144,.4)':'transparent'};background:${isActive?'rgba(14,116,144,.06)':''}">
+            <div style="flex:1">
+              <div class="hasr-sname">${_hE(sub.name)}</div>
+              <div class="hasr-smeta">${_hE(sub.mainSys)}</div>
+              <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:4px">
+                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
+                ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
+                ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
+                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
+              </div>
+            </div>
+            <div class="hasr-sbadge">${(sub.total||0).toLocaleString('ar')} أصل</div>
+          </div>`;
+        }).join('')}
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   اختيار نظام رئيسي من البانيل → عرض الفرعية
+════════════════════════════════════════════════════════════════ */
+function hasrSelectMainSystem(mainSys) {
+  /* إذا ضُغط على نفس النظام النشط → مسح الفلتر */
+  if (HASR._filterMain === mainSys && !HASR._filterSub) {
+    HASR._filterMain = '';
+    HASR._filterSub  = '';
+    _hasrApplyFilters();
+    hasrTab('systems');
+    return;
+  }
+  /* عرض الأنظمة الفرعية التابعة له (بدون تطبيق فلتر بعد) */
+  const ctx = HASR._ctx;
+  const sysEntry = ctx.systems.find(s=>s.name===mainSys) ||
+                   (HASR.data?.systems||[]).find(s=>s.name===mainSys);
+  const subs = sysEntry ? (sysEntry.subSystems||[]) : [];
+  const body = document.getElementById('hasr-sp-body');
+  if (!body) return;
+
+  _hS('hasr-sp-title', '⚙️ ' + mainSys);
+  const spSub = document.getElementById('hasr-sp-sub');
+  if (spSub) spSub.textContent = subs.length + ' نظام فرعي';
+  const tabsEl = document.querySelector('#hasr-sp .hasr-tabs');
+  if (tabsEl) tabsEl.style.display = 'none';
+
+  const totAll = subs.reduce((t,s)=>t+(s.total||0),0) || 1;
+  body.innerHTML = `
+    <button class="hasr-back-btn" onclick="hasrBackToSystems()">← رجوع للأنظمة الرئيسية</button>
+    <div class="hasr-igrid">
+      <div class="hasr-ic full" style="--hc:#1E3A8A">
+        <div class="hasr-ic-lbl">${_hE(mainSys)}</div>
+        <div class="hasr-ic-val">${subs.length}</div>
+        <div class="hasr-ic-sub">نظام فرعي</div>
+      </div>
+    </div>
+    <div class="hasr-sec">اضغط على نظام فرعي لتطبيق الفلتر</div>
+    ${!subs.length
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:12px">لا توجد أنظمة فرعية</div>'
+      : subs.map(sub=>{
+          const tot=sub.total||1;
+          const isActive = HASR._filterSub===sub.name && HASR._filterMain===mainSys;
+          return `
+          <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(mainSys)}','${_hE(sub.name)}')"
+               style="border:1.5px solid ${isActive?'rgba(14,116,144,.4)':'transparent'};background:${isActive?'rgba(14,116,144,.06)':''}">
+            <div style="flex:1">
+              <div class="hasr-sname">${_hE(sub.name)}</div>
+              <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:5px">
+                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
+                ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
+                ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
+                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
+              </div>
+              <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${((sub.total/totAll)*100).toFixed(1)}%</div>
+            </div>
+            <div class="hasr-sbadge">${(sub.total||0).toLocaleString('ar')}</div>
+          </div>`;
+        }).join('')}
+  `;
+}
+
+/* اختيار نظام فرعي → تطبيق الفلتر وتحديث كل شيء */
+function hasrSelectSubSystem(mainSys, subSys) {
+  /* toggle: نفس الفلتر → مسح */
+  if (HASR._filterMain === mainSys && HASR._filterSub === subSys) {
+    HASR._filterMain = '';
+    HASR._filterSub  = '';
+  } else {
+    HASR._filterMain = mainSys;
+    HASR._filterSub  = subSys;
+  }
+  _hasrApplyFilters();
+  /* إغلاق البانيل بعد التطبيق */
+  _hasrCloseAll();
+}
+
+/* رجوع لقائمة الأنظمة الرئيسية */
+function hasrBackToSystems() {
+  const tabsEl = document.querySelector('#hasr-sp .hasr-tabs');
+  if (tabsEl) tabsEl.style.display = '';
+  _hS('hasr-sp-title', '📦 حصر الأصول');
+  const spSub = document.getElementById('hasr-sp-sub');
+  if (spSub) spSub.textContent = HASR._schoolCtx ? ('🏫 ' + HASR._schoolCtx.name) : '';
+  hasrTab('systems');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   بانيل تفاصيل نظام رئيسي (من داخل البانيل — للتصفح فقط)
+   لا يطبق فلتراً — فقط يعرض معلومات
+════════════════════════════════════════════════════════════════ */
+function hasrOpenSystemDetail(name) {
+  /* نبحث في ctx.systems أولاً ثم في HASR.data */
+  const ctx = HASR._ctx;
+  const schoolCtx = HASR._schoolCtx;
+  let sysObj, subSystems;
+
+  if (schoolCtx) {
+    const rawSc = (HASR.data?.schools||[]).find(s=>s.code===schoolCtx.code);
+    sysObj     = rawSc ? (rawSc.systems||[]).find(s=>s.name===name) : null;
+    subSystems = sysObj ? (sysObj.subSystems||[]) : [];
+  } else {
+    sysObj     = (ctx.systems||[]).find(s=>s.name===name);
+    subSystems = sysObj ? (sysObj.subSystems||[]) : [];
+  }
+
+  const totSys = sysObj?.total || 0;
+  const tE=sysObj?.excellent||0, tG=sysObj?.good||0, tB=sysObj?.bad||0, tD=sysObj?.deteriorated||0;
+  const tot = totSys || 1;
+  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
+
+  /* المدارس التي تحتوي هذا النظام */
+  const schoolsPool = schoolCtx
+    ? (HASR.data?.schools||[]).filter(s=>s.code===schoolCtx.code)
+    : ctx.schools;
+  const schoolRows = schoolsPool
+    .map(sc=>{ const s=(sc.systems||[]).find(x=>x.name===name); return s&&s.total>0?{school:sc,sys:s}:null; })
+    .filter(Boolean).sort((a,b)=>(b.sys.total||0)-(a.sys.total||0));
+
+  _hS('hasr-sp-title','⚙️ '+name);
+  const spSub=document.getElementById('hasr-sp-sub');
+  if(spSub) spSub.textContent=schoolCtx?('🏫 '+schoolCtx.name):(schoolRows.length+' مدرسة · '+totSys.toLocaleString('ar')+' أصل');
+  const tabsEl=document.querySelector('#hasr-sp .hasr-tabs');
+  if(tabsEl) tabsEl.style.display='none';
+  const body=document.getElementById('hasr-sp-body');
+
+  const subHtml = subSystems.length>0
+    ? `<div class="hasr-sec">الأنظمة الفرعية (${subSystems.length}) — اضغط لتطبيق الفلتر</div>
+       ${subSystems.map(sub=>`
+         <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(name)}','${_hE(sub.name)}')">
+           <div style="flex:1">
+             <div class="hasr-sname">${_hE(sub.name)}</div>
+             <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
+               ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
+               ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
+               ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
+               ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
+             </div>
+             <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${((sub.total/tot)*100).toFixed(1)}%</div>
+           </div>
+           <div class="hasr-sbadge">${sub.total.toLocaleString('ar')}</div>
+         </div>`).join('')}`
+    : `<div class="hasr-sec">الأنظمة الفرعية</div>
+       <div style="text-align:center;padding:18px;color:var(--tx-muted);font-size:12px;background:var(--bg-2);border-radius:8px;border:1px dashed var(--bd-light)">لا توجد أنظمة فرعية مسجّلة</div>`;
+
+  const schoolsHtml = schoolRows.length===0
+    ? '<div style="text-align:center;padding:16px;color:var(--tx-muted);font-size:12px">لا توجد مدارس لهذا النظام</div>'
+    : schoolRows.map(({school,sys:s})=>`
+        <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(school.code)}')" style="cursor:pointer">
+          <div style="flex:1">
+            <div class="hasr-sname">${_hE(school.name)}</div>
+            <div class="hasr-smeta">${_hE(school.city)} · ${_hE(school.code)}</div>
+            <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:4px">
+              ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
+              ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
+              ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
+              ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
+            </div>
+          </div>
+          <div class="hasr-sbadge">${(s.total||0).toLocaleString('ar')} أصل</div>
+        </div>`).join('');
+
+  body.innerHTML=`
+    <button class="hasr-back-btn" onclick="hasrBackToSystems()">← رجوع للأنظمة الرئيسية</button>
+    <div class="hasr-igrid">
+      <div class="hasr-ic" style="--hc:#1E3A8A"><div class="hasr-ic-lbl">إجمالي الأصول</div><div class="hasr-ic-val">${totSys.toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأنظمة الفرعية</div><div class="hasr-ic-val">${subSystems.length}</div></div>
+    </div>
+    <div class="hasr-sec">توزيع الحالة</div>
+    <div class="hasr-cbar" style="margin-bottom:8px">
+      ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/tot)*100).toFixed(0)}%</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      ${bars.map(x=>`<span style="font-size:10px;color:var(--tx-sec)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong></span>`).join('')}
+    </div>
+    ${subHtml}
+    <div class="hasr-sec" style="margin-top:14px">المدارس (${schoolRows.length})</div>
+    ${schoolsHtml}
+  `;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   بانيل تفاصيل مدرسة — يقرأ من HASR.data.schools مباشرة (الاستثناء الوحيد)
+   لأنه يعرض البيانات الكاملة للمدرسة بكل أنظمتها بغض النظر عن الفلتر
+════════════════════════════════════════════════════════════════ */
+function hasrOpenDetail(code) {
+  if (!HASR.data) return;
+  const sc = HASR.data.schools.find(x=>x.code===code);
+  if (!sc) return;
+  _hS('hasr-dp-title', sc.name);
+  _hS('hasr-dp-sub',   'كود: ' + sc.code + ' · ' + sc.city);
+  const tot=sc.totalAssets||1;
+  const bars=[{v:sc.excellent,c:'#10B981',l:'ممتاز'},{v:sc.good,c:'#3B82F6',l:'جيد'},{v:sc.bad,c:'#F59E0B',l:'سئ'},{v:sc.deteriorated,c:'#EF4444',l:'متهالك'}];
+  const active=(sc.systems||[]).filter(s=>s.total>0);
+  document.getElementById('hasr-dp-body').innerHTML=`
+    <div class="hasr-igrid">
+      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأصول</div><div class="hasr-ic-val">${(sc.totalAssets||0).toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#1D4ED8"><div class="hasr-ic-lbl">المباني</div><div class="hasr-ic-val">${sc.buildings||0}</div></div>
+      <div class="hasr-ic" style="--hc:#7C3AED"><div class="hasr-ic-lbl">الغرف</div><div class="hasr-ic-val">${sc.rooms||0}</div></div>
+      <div class="hasr-ic" style="--hc:${sc.reassessed==='نعم'?'#7C3AED':'#94A3B8'}"><div class="hasr-ic-lbl">معادة</div><div class="hasr-ic-val" style="font-size:14px">${sc.reassessed==='نعم'?'✓ نعم':'لا'}</div></div>
+    </div>
+    <div class="hasr-sec">توزيع الحالة</div>
+    <div class="hasr-cbar">
+      ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/tot)*100).toFixed(0)}%</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      ${bars.map(x=>`<span style="font-size:10px;color:var(--tx-sec)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong></span>`).join('')}
+    </div>
+    <div class="hasr-sec" style="display:flex;align-items:center;justify-content:space-between">
+      <span>الأنظمة الرئيسية</span>
+      ${active.length?`<button onclick="hasrOpenSchoolSystems('${_hE(sc.code)}')" style="font-size:9px;padding:3px 9px;border-radius:6px;background:#1E3A8A;color:#fff;border:none;cursor:pointer;font-family:Tajawal">⚙️ عرض الكل</button>`:''}
+    </div>
+    ${!active.length
+      ?'<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:16px">لا توجد أصول</div>'
+      :active.map(s=>`
+        <div class="hasr-srow" onclick="hasrOpenSchoolSystems('${_hE(sc.code)}','${_hE(s.name)}')" style="padding:9px 0;border-bottom:1px solid var(--bd-light)">
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+              <span style="font-size:12px;font-weight:700;color:var(--tx-main)">${_hE(s.name)}</span>
+              <span style="font-size:11px;font-weight:700;background:#EFF6FF;color:#1D4ED8;padding:2px 8px;border-radius:6px">${s.total}</span>
+            </div>
+            <div style="display:flex;border-radius:5px;overflow:hidden;height:9px;background:var(--bd-light)">
+              ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
+              ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
+              ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
+              ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--tx-muted);padding-right:6px">← تفاصيل</div>
+        </div>`).join('')}
+  `;
+  document.getElementById('hasr-dp').classList.add('hasr-open');
+}
+
+function hasrOpenSchoolSystems(code, sysName) {
+  if (!HASR.data) return;
+  const school=(HASR.data.schools||[]).find(s=>s.code===code);
+  if (!school) return;
+  HASR._schoolCtx={code:school.code,name:school.name,city:school.city,systems:school.systems||[]};
+  _hasrOpenSP('systems');
+  if (sysName) setTimeout(()=>hasrOpenSystemDetail(sysName),60);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   الرسوم البيانية — تقرأ من HASR._ctx فقط
+════════════════════════════════════════════════════════════════ */
+function _hasrFillFilters() {
+  /* نملأ من HASR.data.schools لضمان ظهور كل المدن دائماً */
+  const cities=[...new Set((HASR.data.schools||[]).map(sc=>sc.city).filter(Boolean))].sort();
+  const opts='<option value="">— الكل —</option>'+cities.map(c=>`<option value="${_hE(c)}">${_hE(c)}</option>`).join('');
+  ['hasr-filter-city','hasr-chart-city'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=opts;});
+}
+
+function hasrChartCityChanged() {
+  _hasrApplyFilters();
+}
+
+function _hasrChartCondition() {
+  const ctx=document.getElementById('hasr-ch-condition'); if(!ctx)return;
+  const s=HASR._ctx?.summary||{};
+  const E=s.excellent||0, G=s.good||0, B=s.bad||0, D=s.deteriorated||0;
+  if(HASR.charts?.cond){HASR.charts.cond.destroy();}
+  HASR.charts.cond=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:['ممتاز','جيد','سئ','متهالك'],datasets:[{data:[E,G,B,D],backgroundColor:['#10B981','#3B82F6','#F59E0B','#EF4444'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{position:'bottom',labels:{font:{family:'Tajawal',size:11},padding:14}},
+        tooltip:{callbacks:{label:c=>{const t=E+G+B+D;return ` ${c.raw.toLocaleString('ar')} أصل (${t>0?((c.raw/t)*100).toFixed(1):0}%)`;}}}}}}
+  );
+}
+
+function _hasrChartSystems() {
+  const ctx=document.getElementById('hasr-ch-systems'); if(!ctx)return;
+  const top=(HASR._ctx?.chartSystems||[]).slice(0,10);
+  if(HASR.charts?.sys){HASR.charts.sys.destroy();}
+  HASR.charts.sys=new Chart(ctx,{
+    type:'bar',
+    data:{labels:top.map(s=>s.name),datasets:[{label:'إجمالي الأصول',data:top.map(s=>s.total),backgroundColor:'#3B82F6CC',borderColor:'#1D4ED8',borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      layout:{padding:{right:8}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('ar')} أصل`}}},
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{family:'Tajawal',size:10}}},
+        y:{ticks:{font:{family:'Tajawal',size:10},autoSkip:false,maxRotation:0,callback:(v,i)=>top[i]?.name||''},
+           afterFit(scale){scale.width=Math.max(scale.width,220);}}
+      }}
+  });
+}
+
+function _hasrChartCities() {
+  const ctx=document.getElementById('hasr-ch-cities'); if(!ctx)return;
+  const cities=HASR._ctx?.cities||[];
+  if(HASR.charts?.cit){HASR.charts.cit.destroy();}
+  HASR.charts.cit=new Chart(ctx,{
+    type:'bar',
+    data:{labels:cities.map(c=>c.city),datasets:[{label:'عدد المدارس',data:cities.map(c=>c.schools),backgroundColor:'#6366F1CC',borderColor:'#4F46E5',borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('ar')} مدرسة`}}},
+      scales:{x:{ticks:{font:{family:'Tajawal',size:10}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{family:'Tajawal',size:10}}}}}
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   جدول المدارس — يقرأ من HASR._ctx.schools
+════════════════════════════════════════════════════════════════ */
+function renderHasrTable() {
+  if(!HASR._ctx)return;
+  const sc   = HASR._ctx.schools;
+  const q    =(document.getElementById('hasr-search')?.value||'').trim().toLowerCase();
+  const city = document.getElementById('hasr-filter-city')?.value||'';
+  const cond = document.getElementById('hasr-filter-condition')?.value||'';
+  const re   = document.getElementById('hasr-filter-reassessed')?.value||'';
+  const sort = document.getElementById('hasr-sort')?.value||'assets_desc';
+
+  let list=sc.filter(x=>{
+    if(q&&!x.name.toLowerCase().includes(q)&&!x.code.toLowerCase().includes(q))return false;
+    if(city&&x.city!==city)return false;
+    if(re&&x.reassessed!==re)return false;
+    if(cond){
+      const dom=Object.entries({excellent:x.excellent||0,good:x.good||0,bad:x.bad||0,deteriorated:x.deteriorated||0})
+        .sort((a,b)=>b[1]-a[1])[0]?.[0];
+      if(dom!==cond)return false;
+    }
+    return true;
+  });
+  list.sort((a,b)=>sort==='assets_desc'?b.totalAssets-a.totalAssets:sort==='assets_asc'?a.totalAssets-b.totalAssets:sort==='name'?a.name.localeCompare(b.name,'ar'):a.city.localeCompare(b.city,'ar'));
+  HASR.filtered=list; HASR.page=0;
+  _hS('hasr-tbl-count',list.length.toLocaleString('ar')+' مدرسة');
+  _hasrDrawTbl();
+}
+
+function _hasrDrawTbl(){
+  const list=HASR.filtered,st=HASR.page*HASR_PAGE_SIZE;
+  const tb=document.getElementById('hasr-tbl-body');if(!tb)return;
+  tb.innerHTML=list.slice(st,st+HASR_PAGE_SIZE).map(sc=>{
+    const r=sc.reassessed==='نعم';
+    return `<tr style="cursor:pointer" onclick="hasrOpenDetail('${_hE(sc.code)}')">
+      <td style="text-align:right;padding-right:14px;font-weight:600">${_hE(sc.name)}</td>
+      <td style="font-family:monospace;font-size:11px">${_hE(sc.code)}</td>
+      <td>${_hE(sc.city)}</td>
+      <td style="font-weight:700">${(sc.totalAssets||0).toLocaleString('ar')}</td>
+      <td style="color:#059669;font-weight:600">${sc.excellent||0}</td>
+      <td style="color:#1D4ED8;font-weight:600">${sc.good||0}</td>
+      <td style="color:#D97706;font-weight:600">${sc.bad||0}</td>
+      <td style="color:#DC2626;font-weight:600">${sc.deteriorated||0}</td>
+      <td>${sc.buildings||0}</td><td>${sc.rooms||0}</td>
+      <td><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${r?'#EDE9FE':'#F1F5F9'};color:${r?'#6D28D9':'#64748B'}">${r?'✓ معادة':'لا'}</span></td>
+      <td style="white-space:nowrap">
+        <button onclick="event.stopPropagation();hasrOpenDetail('${_hE(sc.code)}')"
+          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;font-family:Tajawal">عرض ←</button>
+        <button onclick="event.stopPropagation();hasrOpenSchoolSystems('${_hE(sc.code)}')"
+          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;font-family:Tajawal;margin-right:4px">⚙️ أنظمتها</button>
+      </td>
+    </tr>`;
+  }).join('');
+  const pag=document.getElementById('hasr-pag'),pages=Math.ceil(list.length/HASR_PAGE_SIZE);
+  if(!pag)return;if(pages<=1){pag.innerHTML='';return;}
+  let h=`<span class="pag-info">صفحة ${HASR.page+1} من ${pages}</span><div class="pag-btns">`;
+  h+=`<button class="pag-btn" ${HASR.page===0?'disabled':''} onclick="HASR.page--;_hasrDrawTbl()">→ السابق</button>`;
+  let s2=Math.max(0,HASR.page-3),e2=Math.min(pages-1,s2+6);if(e2-s2<6)s2=Math.max(0,e2-6);
+  for(let p=s2;p<=e2;p++)h+=`<button class="pag-btn${p===HASR.page?' active':''}" onclick="HASR.page=${p};_hasrDrawTbl()">${p+1}</button>`;
+  h+=`<button class="pag-btn" ${HASR.page===pages-1?'disabled':''} onclick="HASR.page++;_hasrDrawTbl()">← التالي</button></div>`;
+  pag.innerHTML=h;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   مسح الفلاتر
+════════════════════════════════════════════════════════════════ */
+function hasrClearSubFilter(){
+  HASR._filterMain=''; HASR._filterSub='';
+  _hasrApplyFilters();
+}
+
+function clearHasrFilters(){
+  ['hasr-search','hasr-filter-city','hasr-filter-condition','hasr-filter-reassessed']
+    .forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const so=document.getElementById('hasr-sort');if(so)so.value='assets_desc';
+  HASR._filterMain=''; HASR._filterSub='';
+  _hasrApplyFilters();
+}
+
+/* للاستدعاء من sysBrowseSelectSub */
+function sysBrowseSelectSub(mainSys, subSys) {
+  sysBrowseClose();
+  HASR._filterMain = mainSys;
+  HASR._filterSub  = subSys;
+  const tabBtn = document.querySelector('.tab[onclick*="hasr"]');
+  if (tabBtn) showTab('hasr', tabBtn);
+  else showTab('hasr');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   مساعدات
+════════════════════════════════════════════════════════════════ */
+function exportHasrCSV(){
+  if(!HASR._ctx){alert('لا توجد بيانات');return;}
+  const h=['اسم المدرسة','كود المدرسة','المدينة','إجمالي الأصول','ممتاز','جيد','سئ','متهالك','مباني','غرف','معادة'];
+  const src=HASR.filtered.length>0?HASR.filtered:HASR._ctx.schools;
+  const rows=src.map(sc=>[sc.name,sc.code,sc.city,sc.totalAssets,sc.excellent,sc.good,sc.bad,sc.deteriorated,sc.buildings,sc.rooms,sc.reassessed].map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob(['\uFEFF'+[h.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'})),download:'حصر_الأصول.csv'});
+  a.click();
+}
+function _hasrShowLoading(on){
+  const ld=document.getElementById('hasr-loading'),er=document.getElementById('hasr-error');
+  if(ld)ld.style.display=on?'block':'none';if(er)er.style.display='none';
+}
+function _hasrShowError(msg){
+  const ld=document.getElementById('hasr-loading');if(ld)ld.style.display='none';
+  const er=document.getElementById('hasr-error');if(er)er.style.display='block';
+  _hS('hasr-error-msg',msg);
+}
+function _hS(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function _hW(id,w){const e=document.getElementById(id);if(e)e.style.width=w;}
+function _hE(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}

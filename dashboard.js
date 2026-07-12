@@ -18842,19 +18842,19 @@ window.HASR = HASR;
    الفلاتر: city (من hasr-chart-city/hasr-filter-city), mainSys, subSys
    يُخزّن النتيجة في HASR._ctx ويُرجعها
 ════════════════════════════════════════════════════════════════ */
-function _hasrBuildCtx(mainSys, subSys, chartCity) {
+function _hasrBuildCtx(mainSys, subSys, city, condition, reassessed) {
   if (!HASR.data) return null;
 
   const rawSchools = HASR.data.schools || [];
-  const fMain = mainSys  || '';
-  const fSub  = subSys   || '';
-  const fCity = chartCity || '';
+  const fMain      = mainSys   || '';
+  const fSub       = subSys    || '';
+  const fCity      = city      || '';
+  const fCond      = condition || '';
+  const fRe        = reassessed|| '';
 
-  /* ── خطوة 1: فلترة المدارس حسب النظام الرئيسي والفرعي ── */
-  /* هذه الفلترة تحدد مجموعة المدارس المؤهلة للفلتر الحالي */
+  /* ── خطوة 1: فلترة المدارس حسب كل الفلاتر ── */
   let baseSchools;
   if (fMain && fSub) {
-    /* فلتر رئيسي + فرعي: مدرسة تحتوي subSys داخل mainSys بـ total > 0 */
     baseSchools = rawSchools.filter(sc => {
       const sysMatch = (sc.systems||[]).find(s => s.name === fMain);
       if (!sysMatch) return false;
@@ -18862,12 +18862,23 @@ function _hasrBuildCtx(mainSys, subSys, chartCity) {
       return subMatch && (subMatch.total||0) > 0;
     });
   } else if (fMain) {
-    /* فلتر رئيسي فقط */
     baseSchools = rawSchools.filter(sc =>
       (sc.systems||[]).some(s => s.name === fMain && (s.total||0) > 0)
     );
   } else {
     baseSchools = rawSchools;
+  }
+
+  /* ── فلتر المدينة يؤثر على الكل ── */
+  if (fCity) baseSchools = baseSchools.filter(sc => sc.city === fCity);
+
+  /* ── فلتر إعادة التقييم ── */
+  if (fRe) baseSchools = baseSchools.filter(sc => sc.reassessed === fRe);
+
+  /* ── فلتر الحالة: أي مدرسة عندها ولو أصل واحد من الحالة دي ── */
+  if (fCond) {
+    const condKey = { excellent:'excellent', good:'good', bad:'bad', deteriorated:'deteriorated' }[fCond];
+    if (condKey) baseSchools = baseSchools.filter(sc => (sc[condKey] || 0) > 0);
   }
 
   /* ── خطوة 2: حساب أرقام كل مدرسة حسب الفلتر النشط ── */
@@ -19010,12 +19021,10 @@ function _hasrBuildCtx(mainSys, subSys, chartCity) {
   });
   const cities = Object.values(citiesMap).sort((a,b)=>b.schools-a.schools);
 
-  /* ── خطوة 7: مدارس الرسوم (فلتر إضافي بالمدينة للرسوم فقط) ── */
-  const chartSchools = fCity
-    ? schools.filter(sc=>sc.city===fCity)
-    : schools;
+  /* ── خطوة 7: الرسوم تستخدم نفس المدارس المفلترة ── */
+  const chartSchools = schools; /* المدينة مطبّقة على الكل بالفعل */
 
-  /* ── تجميع الأنظمة للرسم (بعد فلتر المدينة) ── */
+  /* ── تجميع الأنظمة للرسم ── */
   const chartSysMap = {};
   chartSchools.forEach(sc => {
     (sc.systems||[]).forEach(sys => {
@@ -19036,17 +19045,15 @@ function _hasrBuildCtx(mainSys, subSys, chartCity) {
   else if (fMain)    filterLabel = fMain;
 
   return {
-    /* الفلاتر النشطة */
-    filter: { mainSys: fMain, subSys: fSub, city: fCity },
+    filter: { mainSys: fMain, subSys: fSub, city: fCity, condition: fCond, reassessed: fRe },
     filterLabel,
-    /* البيانات المحسوبة */
-    schools,          /* المدارس المفلترة بأرقام صحيحة */
-    summary,          /* ملخص محسوب من schools المفلترة */
-    systems,          /* أنظمة رئيسية محسوبة */
-    allSubSystems,    /* كل الأنظمة الفرعية محسوبة */
-    cities,           /* مدن محسوبة من schools المفلترة */
-    chartSchools,     /* مدارس للرسوم (بعد فلتر المدينة) */
-    chartSystems      /* أنظمة للرسم (بعد فلتر المدينة) */
+    schools,
+    summary,
+    systems,
+    allSubSystems,
+    cities,
+    chartSchools,
+    chartSystems
   };
 }
 
@@ -19057,12 +19064,14 @@ function _hasrBuildCtx(mainSys, subSys, chartCity) {
 ════════════════════════════════════════════════════════════════ */
 function _hasrApplyFilters() {
   if (!HASR.data) return;
-  /* قراءة الفلاتر من DOM */
-  const mainSys  = HASR._filterMain || '';
-  const subSys   = HASR._filterSub  || '';
-  const chartCity= document.getElementById('hasr-chart-city')?.value || '';
-  /* بناء الـ Context مرة واحدة */
-  HASR._ctx = _hasrBuildCtx(mainSys, subSys, chartCity);
+  /* قراءة الفلاتر الموحدة من DOM */
+  const mainSys   = HASR._filterMain || '';
+  const subSys    = HASR._filterSub  || '';
+  const city      = document.getElementById('hasr-global-city')?.value      || '';
+  const condition = document.getElementById('hasr-global-condition')?.value  || '';
+  const reassessed= document.getElementById('hasr-global-reassessed')?.value || '';
+  /* بناء الـ Context مرة واحدة بكل الفلاتر */
+  HASR._ctx = _hasrBuildCtx(mainSys, subSys, city, condition, reassessed);
   /* رسم كل المكونات */
   _hasrRenderKPIs();
   _hasrChartCondition();
@@ -19091,7 +19100,7 @@ function _hasrRenderFilterBanner() {
   const ctx = HASR._ctx;
   if (!ctx) return;
 
-  /* شريط إزالة الفلتر فوق الـ KPIs */
+  /* شريط فلتر النظام — يظهر فقط لو فيه فلتر نظام رئيسي/فرعي نشط */
   const filterBar   = document.getElementById('hasr-active-filter-bar');
   const filterLabel = document.getElementById('hasr-active-filter-label');
   if (filterBar && filterLabel) {
@@ -19103,9 +19112,9 @@ function _hasrRenderFilterBanner() {
     }
   }
 
-  /* زر إزالة الفلتر القديم في شريط الجدول (للتوافق) */
+  /* زر إزالة فلتر النظام في شريط الجدول */
   const clearSysBtn = document.getElementById('hasr-clear-sys-btn');
-  if (clearSysBtn) clearSysBtn.style.display = 'none';
+  if (clearSysBtn) clearSysBtn.style.display = ctx.filterLabel ? 'inline-flex' : 'none';
 
   let banner = document.getElementById('hasr-filter-banner');
   if (ctx.filterLabel) {
@@ -19438,7 +19447,9 @@ function _hasrRenderAll() {
   HASR._ctx = _hasrBuildCtx(
     HASR._filterMain,
     HASR._filterSub,
-    document.getElementById('hasr-chart-city')?.value || ''
+    document.getElementById('hasr-global-city')?.value      || '',
+    document.getElementById('hasr-global-condition')?.value  || '',
+    document.getElementById('hasr-global-reassessed')?.value || ''
   );
   /* ملء الفلاتر (مرة واحدة) */
   _hasrFillFilters();
@@ -20235,11 +20246,18 @@ function _hasrFillFilters() {
   /* نملأ من HASR.data.schools لضمان ظهور كل المدن دائماً */
   const cities=[...new Set((HASR.data.schools||[]).map(sc=>sc.city).filter(Boolean))].sort();
   const opts='<option value="">— الكل —</option>'+cities.map(c=>`<option value="${_hE(c)}">${_hE(c)}</option>`).join('');
-  ['hasr-filter-city','hasr-chart-city'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=opts;});
+  /* الآن في فلتر موحد واحد فقط */
+  const e=document.getElementById('hasr-global-city');
+  if(e)e.innerHTML=opts;
+}
+
+/* نقطة الدخول من شريط الفلاتر الموحد */
+function hasrGlobalFilterChanged() {
+  _hasrApplyFilters();
 }
 
 function hasrChartCityChanged() {
-  _hasrApplyFilters();
+  _hasrApplyFilters(); /* legacy — الآن hasrGlobalFilterChanged هو المستخدم */
 }
 
 function _hasrChartCondition() {
@@ -20292,22 +20310,13 @@ function _hasrChartCities() {
 ════════════════════════════════════════════════════════════════ */
 function renderHasrTable() {
   if(!HASR._ctx)return;
+  /* schools في _ctx مفلترة بالفعل بالمدينة/الحالة/معادة — هنا بس فلتر البحث */
   const sc   = HASR._ctx.schools;
-  const q    =(document.getElementById('hasr-search')?.value||'').trim().toLowerCase();
-  const city = document.getElementById('hasr-filter-city')?.value||'';
-  const cond = document.getElementById('hasr-filter-condition')?.value||'';
-  const re   = document.getElementById('hasr-filter-reassessed')?.value||'';
+  const q    =(document.getElementById('hasr-global-search')?.value||'').trim().toLowerCase();
   const sort = document.getElementById('hasr-sort')?.value||'assets_desc';
 
   let list=sc.filter(x=>{
-    if(q&&!x.name.toLowerCase().includes(q)&&!x.code.toLowerCase().includes(q))return false;
-    if(city&&x.city!==city)return false;
-    if(re&&x.reassessed!==re)return false;
-    if(cond){
-      const dom=Object.entries({excellent:x.excellent||0,good:x.good||0,bad:x.bad||0,deteriorated:x.deteriorated||0})
-        .sort((a,b)=>b[1]-a[1])[0]?.[0];
-      if(dom!==cond)return false;
-    }
+    if(q&&!x.name.toLowerCase().includes(q)&&!(x.code||'').toLowerCase().includes(q))return false;
     return true;
   });
   list.sort((a,b)=>sort==='assets_desc'?b.totalAssets-a.totalAssets:sort==='assets_asc'?a.totalAssets-b.totalAssets:sort==='name'?a.name.localeCompare(b.name,'ar'):a.city.localeCompare(b.city,'ar'));
@@ -20319,17 +20328,38 @@ function renderHasrTable() {
 function _hasrDrawTbl(){
   const list=HASR.filtered,st=HASR.page*HASR_PAGE_SIZE;
   const tb=document.getElementById('hasr-tbl-body');if(!tb)return;
+  /* الحالة المفلترة حالياً — عشان نبرز العمود المناسب */
+  const activeCond = document.getElementById('hasr-global-condition')?.value || '';
+  const condStyles = {
+    excellent:  { color:'#059669', bg:'#DCFCE7', border:'#86EFAC' },
+    good:       { color:'#1D4ED8', bg:'#DBEAFE', border:'#93C5FD' },
+    bad:        { color:'#D97706', bg:'#FEF3C7', border:'#FCD34D' },
+    deteriorated:{ color:'#DC2626', bg:'#FEE2E2', border:'#FCA5A5' }
+  };
+  const makeCell = (val, key) => {
+    const isActive = activeCond === key;
+    const s = condStyles[key];
+    if (isActive) {
+      return `<td style="font-weight:800;color:${s.color};background:${s.bg};
+        border:1.5px solid ${s.border};border-radius:6px;padding:4px 8px;text-align:center">
+        ${val||0}
+        <div style="font-size:9px;font-weight:700;opacity:.7;margin-top:1px">▲ نشط</div>
+      </td>`;
+    }
+    return `<td style="color:${s.color};font-weight:600;opacity:${activeCond?'.45':'1'}">${val||0}</td>`;
+  };
   tb.innerHTML=list.slice(st,st+HASR_PAGE_SIZE).map(sc=>{
     const r=sc.reassessed==='نعم';
-    return `<tr style="cursor:pointer" onclick="hasrOpenDetail('${_hE(sc.code)}')">
+    const rowHighlight = activeCond ? `background:rgba(${activeCond==='excellent'?'5,150,105':activeCond==='good'?'29,78,216':activeCond==='bad'?'217,119,6':'220,38,38'},.03)` : '';
+    return `<tr style="cursor:pointer;${rowHighlight}" onclick="hasrOpenDetail('${_hE(sc.code)}')">
       <td style="text-align:right;padding-right:14px;font-weight:600">${_hE(sc.name)}</td>
       <td style="font-family:monospace;font-size:11px">${_hE(sc.code)}</td>
       <td>${_hE(sc.city)}</td>
       <td style="font-weight:700">${(sc.totalAssets||0).toLocaleString('ar')}</td>
-      <td style="color:#059669;font-weight:600">${sc.excellent||0}</td>
-      <td style="color:#1D4ED8;font-weight:600">${sc.good||0}</td>
-      <td style="color:#D97706;font-weight:600">${sc.bad||0}</td>
-      <td style="color:#DC2626;font-weight:600">${sc.deteriorated||0}</td>
+      ${makeCell(sc.excellent,   'excellent')}
+      ${makeCell(sc.good,        'good')}
+      ${makeCell(sc.bad,         'bad')}
+      ${makeCell(sc.deteriorated,'deteriorated')}
       <td>${sc.buildings||0}</td><td>${sc.rooms||0}</td>
       <td><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${r?'#EDE9FE':'#F1F5F9'};color:${r?'#6D28D9':'#64748B'}">${r?'✓ معادة':'لا'}</span></td>
       <td style="white-space:nowrap">
@@ -20359,8 +20389,9 @@ function hasrClearSubFilter(){
 }
 
 function clearHasrFilters(){
-  ['hasr-search','hasr-filter-city','hasr-filter-condition','hasr-filter-reassessed']
+  ['hasr-global-city','hasr-global-condition','hasr-global-reassessed']
     .forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const sr=document.getElementById('hasr-global-search');if(sr)sr.value='';
   const so=document.getElementById('hasr-sort');if(so)so.value='assets_desc';
   HASR._filterMain=''; HASR._filterSub='';
   _hasrApplyFilters();

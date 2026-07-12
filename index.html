@@ -1289,7 +1289,7 @@
   <div id="hasr-content">
 
     <!-- شريط الإجراءات -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:22px">📦</span>
         <div>
@@ -1303,19 +1303,64 @@
       </div>
     </div>
 
-    <!-- ══ شريط إزالة الفلتر — يظهر فقط لما يكون فلتر نشط ══ -->
+    <!-- ══ شريط الفلاتر الموحد ══ -->
+    <div id="hasr-filters-bar" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+         padding:14px 16px;margin-bottom:14px;border-radius:14px;
+         background:var(--bg-2,#f8fafc);border:1.5px solid var(--bd-light,#e2e8f0)">
+
+      <!-- المدينة -->
+      <div class="fg" style="margin:0;min-width:140px">
+        <div class="fg-lbl">🏙️ المدينة</div>
+        <select class="fsel" id="hasr-global-city" onchange="hasrGlobalFilterChanged()">
+          <option value="">— الكل —</option>
+        </select>
+      </div>
+
+      <!-- الحالة -->
+      <div class="fg" style="margin:0">
+        <div class="fg-lbl">📊 الحالة</div>
+        <select class="fsel" id="hasr-global-condition" onchange="hasrGlobalFilterChanged()">
+          <option value="">— الكل —</option>
+          <option value="excellent">✅ بها أصول ممتازة</option>
+          <option value="good">🔵 بها أصول جيدة</option>
+          <option value="bad">🟡 بها أصول سيئة</option>
+          <option value="deteriorated">🔴 بها أصول متهالكة</option>
+        </select>
+      </div>
+
+      <!-- معادة -->
+      <div class="fg" style="margin:0">
+        <div class="fg-lbl">🔄 إعادة التقييم</div>
+        <select class="fsel" id="hasr-global-reassessed" onchange="hasrGlobalFilterChanged()">
+          <option value="">— الكل —</option>
+          <option value="نعم">معادة فقط</option>
+          <option value="لا">غير معادة</option>
+        </select>
+      </div>
+
+      <!-- بحث -->
+      <div class="fg" style="margin:0;flex:1;min-width:200px">
+        <div class="fg-lbl">🔍 بحث بالاسم أو الكود</div>
+        <input class="finp" id="hasr-global-search" placeholder="اسم المدرسة أو الكود..." oninput="hasrGlobalFilterChanged()">
+      </div>
+
+      <!-- زر المسح -->
+      <button class="f-clear" onclick="clearHasrFilters()" style="margin:0;align-self:flex-end">✕ مسح الكل</button>
+    </div>
+
+    <!-- ══ شريط الفلتر النشط (للنظام الرئيسي/الفرعي فقط) — يظهر لما يكون فلتر نظام نشط ══ -->
     <div id="hasr-active-filter-bar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;
          padding:10px 16px;margin-bottom:14px;border-radius:12px;
          background:rgba(8,145,178,.08);border:1.5px solid rgba(8,145,178,.3)">
       <span style="font-size:18px">🔩</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:1px">فلتر نشط</div>
+        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:1px">فلتر النظام النشط</div>
         <div id="hasr-active-filter-label" style="font-size:13px;font-weight:800;color:var(--tx-main)">—</div>
       </div>
       <button onclick="hasrClearSubFilter()"
         style="font-size:11px;font-weight:700;padding:6px 16px;border-radius:8px;cursor:pointer;
                background:#EFF6FF;color:#1D4ED8;border:1.5px solid #BFDBFE;font-family:Tajawal;white-space:nowrap">
-        ✕ إزالة الفلتر
+        ✕ إزالة فلتر النظام
       </button>
     </div>
 
@@ -1389,19 +1434,7 @@
 
     </div><!-- /kpi-grid -->
 
-    <!-- فلتر الرسوم -->
-    <div class="card mb14" style="padding:12px 16px">
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:700;color:var(--tx-sec)">🔍 فلتر الرسوم:</span>
-        <div class="fg" style="margin:0">
-          <div class="fg-lbl">المدينة</div>
-          <select class="fsel" id="hasr-chart-city" onchange="hasrChartCityChanged()" style="min-width:160px">
-            <option value="">— كل المدن —</option>
-          </select>
-        </div>
-        <div style="font-size:10px;color:var(--tx-muted)">الرسوم تتحدّث تلقائياً</div>
-      </div>
-    </div>
+    <!-- فلتر الرسوم أُزيل — الفلاتر الموحدة في الأعلى تتحكم في كل شيء -->
 
     <!-- الرسوم البيانية -->
     <div class="g2 mb14">
@@ -1426,34 +1459,9 @@
         جدول المدارس المحصورة
         <span class="sub" id="hasr-tbl-count"></span>
       </div>
+      <!-- فلاتر الجدول انتقلت للشريط الموحد في أعلى التبويب -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
-        <div class="fg" style="flex:1;min-width:200px">
-          <div class="fg-lbl">🔍 بحث بالاسم أو الكود</div>
-          <input class="finp" id="hasr-search" placeholder="اسم المدرسة أو الكود..." oninput="renderHasrTable()">
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">المدينة</div>
-          <select class="fsel" id="hasr-filter-city" onchange="renderHasrTable()"><option value="">— الكل —</option></select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">الحالة</div>
-          <select class="fsel" id="hasr-filter-condition" onchange="renderHasrTable()">
-            <option value="">— الكل —</option>
-            <option value="excellent">ممتاز</option>
-            <option value="good">جيد</option>
-            <option value="bad">سئ</option>
-            <option value="deteriorated">متهالك</option>
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">معادة؟</div>
-          <select class="fsel" id="hasr-filter-reassessed" onchange="renderHasrTable()">
-            <option value="">— الكل —</option>
-            <option value="نعم">معادة فقط</option>
-            <option value="لا">غير معادة</option>
-          </select>
-        </div>
-        <div class="fg">
+        <div class="fg" style="margin:0">
           <div class="fg-lbl">ترتيب</div>
           <select class="fsel" id="hasr-sort" onchange="renderHasrTable()">
             <option value="assets_desc">الأصول ↓</option>
@@ -1462,7 +1470,6 @@
             <option value="city">المدينة</option>
           </select>
         </div>
-        <button class="f-clear" onclick="clearHasrFilters()">✕ مسح</button>
         <button id="hasr-clear-sys-btn"
           onclick="hasrClearSubFilter()"
           style="display:none;font-size:11px;font-weight:700;padding:6px 14px;border-radius:8px;

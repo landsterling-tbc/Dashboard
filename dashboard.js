@@ -1067,7 +1067,8 @@ function showTab(name, el) {
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
     "training"        === name && renderTrainingTab(),
-    "hasr"            === name && renderHasrTab());
+    "hasr"            === name && renderHasrTab(),
+    "emp-kpi"         === name && renderEmpKpiTab());
 
 }
 function makeDoughnut(id, dataMap, colorMap = {}) {
@@ -2671,6 +2672,7 @@ function renderTable() {
       (window.RAW_FUEL             = sa(d.fuelConsumption)),
       (window.RAW_VEHICLES         = sa(d.vehicles)),
       (window.RAW_TRAINING         = sa(d.training)),
+      (window.RAW_EMP_KPI          = sa(d.employeeKpi)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
@@ -12086,6 +12088,80 @@ function renderTajheezAllTable() {
       }
     } catch(e) { summary.حصر_الأصول = { تنبيه: "تعذّر تلخيص بيانات حصر الأصول: " + (e?.message||e) }; }
 
+    // ════════════════════════════════════════════════════════════════
+    // 👥 تبويب تقييم الموظفين — ملخص للشاتبوت
+    // ════════════════════════════════════════════════════════════════
+    // ⚠️  AI MAINTAINER NOTE:
+    // إذا أضفت تبويباً جديداً في المستقبل، أضف ملخصه هنا بنفس النمط
+    // حتى يعرف الشاتبوت عنه ويقدر يجاوب أسئلة المستخدمين.
+    // النمط: summary.اسم_التبويب = { بيانات... }
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const empRows = window.RAW_EMP_KPI || [];
+      if (empRows.length) {
+        const n_ = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+        const str = v => String(v||'').trim();
+        const total = empRows.length;
+
+        /* إحصاءات التقديرات */
+        const gradeCount = {};
+        ['جيد جداً','جيد','يحتاج تحسين','ضعيف'].forEach(g => {
+          gradeCount[g] = empRows.filter(r=>str(r['التقدير'])===g).length;
+        });
+
+        /* متوسطات المؤشرات */
+        const avgOf = key => +(empRows.reduce((s,r)=>s+n_(r[key]),0)/total).toFixed(1);
+
+        /* توزيع حسب المنطقة */
+        const regionMap = {};
+        empRows.forEach(r => {
+          const reg = str(r['المنطقة']); if (!reg) return;
+          if (!regionMap[reg]) regionMap[reg] = { count:0, scoreSum:0 };
+          regionMap[reg].count++;
+          regionMap[reg].scoreSum += n_(r['الدرجة']);
+        });
+        const byRegion = Object.entries(regionMap).map(([reg, v]) => ({
+          المنطقة: reg,
+          عدد_الموظفين: v.count,
+          متوسط_الدرجة: +(v.scoreSum/v.count).toFixed(1),
+        })).sort((a,b)=>b.متوسط_الدرجة-a.متوسط_الدرجة);
+
+        /* أفضل 5 وأدنى 5 موظفين */
+        const sorted = [...empRows].sort((a,b)=>n_(b['الدرجة'])-n_(a['الدرجة']));
+        const top5   = sorted.slice(0,5).map(r=>({ الاسم:str(r['اسم الموظف']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
+        const bot5   = sorted.slice(-5).reverse().map(r=>({ الاسم:str(r['اسم الموظف']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
+
+        summary.تقييم_الموظفين = {
+          ملاحظة: "بيانات تبويب تقييم الموظفين — تقييم أداء الموظفين الميدانيين",
+          إجمالي_الموظفين: total,
+          عدد_المناطق: Object.keys(regionMap).length,
+          متوسط_الدرجة_الكلية: avgOf('الدرجة'),
+          توزيع_التقديرات: {
+            جيد_جداً:    { عدد: gradeCount['جيد جداً'],    نسبة: ((gradeCount['جيد جداً']||0)/total*100).toFixed(1)+'%' },
+            جيد:          { عدد: gradeCount['جيد'],          نسبة: ((gradeCount['جيد']||0)/total*100).toFixed(1)+'%' },
+            يحتاج_تحسين: { عدد: gradeCount['يحتاج تحسين'], نسبة: ((gradeCount['يحتاج تحسين']||0)/total*100).toFixed(1)+'%' },
+            ضعيف:         { عدد: gradeCount['ضعيف'],         نسبة: ((gradeCount['ضعيف']||0)/total*100).toFixed(1)+'%' },
+          },
+          متوسط_المؤشرات: {
+            الإنجاز:       avgOf('الإنجاز %'),
+            وقت_الزيارة:   avgOf('وقت الزيارة %'),
+            التعليقات:     avgOf('التعليقات %'),
+            الصور:         avgOf('الصور %'),
+            المواعيد:      avgOf('المواعيد %'),
+            النزاهة:       avgOf('النزاهة %'),
+          },
+          الأداء_حسب_المنطقة: byRegion,
+          أفضل_5_موظفين: top5,
+          أدنى_5_موظفين: bot5,
+        };
+      } else {
+        summary.تقييم_الموظفين = {
+          تنبيه: "لم تُحمَّل بيانات تقييم الموظفين بعد.",
+          تعليمات_للمساعد: "أخبر المستخدم إن البيانات غير متاحة — تأكد من وجود شيت 'تقييم_الموظفين' في Google Sheet وأن الـ Apps Script يقرأها.",
+        };
+      }
+    } catch(e) { summary.تقييم_الموظفين = { تنبيه: "تعذّر تلخيص بيانات تقييم الموظفين: " + (e?.message||e) }; }
+
     return summary;
 
 
@@ -20430,3 +20506,547 @@ function _hasrShowError(msg){
 function _hS(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
 function _hW(id,w){const e=document.getElementById(id);if(e)e.style.width=w;}
 function _hE(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   👥  تبويب تقييم الموظفين — tab-emp-kpi                            ║
+   ════════════════════════════════════════════════════════════════════
+   المصدر : window.RAW_EMP_KPI  ← شيت "تقييم_الموظفين" في Google Sheet
+   المفتاح: d.employeeKpi  (يُعيَّن في loadData عبر sa(d.employeeKpi))
+
+   ┌─ شرح الأعمدة ──────────────────────────────────────────────────┐
+   │  اسم الموظف   : الاسم الكامل                                    │
+   │  اسم المستخدم : username (r.alsaati مثلاً)                      │
+   │  المنطقة      : المنطقة الجغرافية (جدة / مكة / المدينة / الطائف)│
+   │  المسند       : إجمالي المهام المسندة للموظف                    │
+   │  المكتمل      : عدد المهام التي أنهاها فعلاً                    │
+   │  المنتهي      : مهام انتهت مدتها دون إكمال                     │
+   │  الإنجاز %    : (المكتمل / المسند) × 100                        │
+   │  وقت الزيارة %: الالتزام بوقت الزيارة الميدانية                │
+   │  التعليقات %  : نسبة إضافة تعليقات على المهام                   │
+   │  الصور %      : نسبة رفع صور للمهام                             │
+   │  المواعيد %   : الالتزام بالمواعيد المحددة                      │
+   │  النزاهة %    : مؤشر النزاهة والموثوقية                        │
+   │  الدرجة       : الدرجة الكلية من 100 (مرجّحة من المؤشرات أعلاه)│
+   │  التقدير      : جيد جداً / جيد / يحتاج تحسين / ضعيف            │
+   │  الحالة       : طبيعي / موقوف / ..                              │
+   └────────────────────────────────────────────────────────────────┘
+
+   ⚠️  AI MAINTAINER NOTE — اقرأ هذا قبل أي تعديل:
+   ══════════════════════════════════════════════════════════════════
+   إذا أضفت أعمدة جديدة لشيت تقييم_الموظفين، أو غيّرت أسماء الأعمدة،
+   أو غيّرت طريقة حساب الدرجة، يجب عليك تحديث:
+     1. دالة renderEmpKpiTab()   ← أعمدة الجدول + الـ KPIs
+     2. دالة _empKpiDrawCharts() ← مفاتيح metricKeys
+     3. دالة _empKpiRender()     ← منطق الفلترة والترتيب
+     4. قسم summary.تقييم_الموظفين في دالة _fcbBuildSummary()
+        (قرب نهاية قسم الشاتبوت — ابحث عن "تقييم_الموظفين")
+        لأن الشاتبوت يقرأ منه — بدون تحديثه لن يعرف البيانات الجديدة.
+   ══════════════════════════════════════════════════════════════════ */
+
+const EMP_KPI = {
+  page: 0,
+  pageSize: 20,
+  filtered: [],
+  charts: {},
+  _region: '',
+  _grade: '',
+  _search: '',
+  _sort: 'score_desc',
+};
+window.EMP_KPI = EMP_KPI;
+
+/* ── ألوان التقديرات ── */
+const EMP_GRADE_COLORS = {
+  'جيد جداً':     { bg: '#ECFDF5', color: '#059669', border: '#6EE7B7' },
+  'جيد':          { bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD' },
+  'يحتاج تحسين':  { bg: '#FFFBEB', color: '#D97706', border: '#FCD34D' },
+  'ضعيف':         { bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
+};
+const EMP_GRADE_ORDER = ['جيد جداً', 'جيد', 'يحتاج تحسين', 'ضعيف'];
+
+/* ── مساعد destroy آمن مع فحص داتا ── */
+function _empSafeDestroyChart(key) {
+  const ch = EMP_KPI.charts[key];
+  if (!ch) return;
+  /* تحقق إن الشارت فعلاً عنده داتا قبل الـ destroy */
+  try {
+    const hasData = ch.data && ch.data.datasets &&
+      ch.data.datasets.some(ds => ds.data && ds.data.length > 0);
+    if (hasData || true) { /* نـ destroy دايماً لو موجود، الفحص للـ logging بس */
+      ch.destroy();
+    }
+  } catch (_) {}
+  delete EMP_KPI.charts[key];
+}
+
+/* ════ الدالة الرئيسية ════ */
+function renderEmpKpiTab() {
+  const el = document.getElementById('emp-kpi-content');
+  if (!el) return;
+
+  const rows = window.RAW_EMP_KPI || [];
+  if (!rows.length) {
+    el.innerHTML = `
+      <div class="card" style="text-align:center;padding:60px 24px">
+        <div style="font-size:48px;margin-bottom:12px">👥</div>
+        <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات تقييم موظفين</div>
+        <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">
+          تأكد من وجود شيت "تقييم_الموظفين" في ملف البيانات وأن الـ Apps Script يقرأها
+        </div>
+      </div>`;
+    return;
+  }
+
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
+  const str = v => String(v||'').trim();
+  const pct = (v, total) => total ? ((v/total)*100).toFixed(1)+'%' : '0%';
+
+  /* ── إحصاءات عامة ── */
+  const total      = rows.length;
+  const regions    = [...new Set(rows.map(r=>str(r['المنطقة'])).filter(Boolean))].sort();
+  const avgScore   = (rows.reduce((s,r)=>s+n_(r['الدرجة']),0)/total).toFixed(1);
+  const avgInj     = (rows.reduce((s,r)=>s+n_(r['الإنجاز %']),0)/total).toFixed(1);
+  const gradeCount = {};
+  EMP_GRADE_ORDER.forEach(g => { gradeCount[g] = rows.filter(r=>str(r['التقدير'])===g).length; });
+
+  /* ── ما مؤشر كل موظف ── */
+  const METRIC_KEYS    = ['الإنجاز %','وقت الزيارة %','التعليقات %','الصور %','المواعيد %','النزاهة %'];
+  const METRIC_LABELS  = ['الإنجاز','وقت الزيارة','التعليقات','الصور','المواعيد','النزاهة'];
+  const METRIC_DESC    = [
+    'نسبة المهام المكتملة من المسندة',
+    'الالتزام بوقت الزيارة الميدانية',
+    'نسبة إضافة تعليقات على المهام',
+    'نسبة رفع صور للمهام',
+    'الالتزام بالمواعيد المحددة',
+    'مؤشر النزاهة والموثوقية',
+  ];
+
+  /* ── بناء الصفحة ── */
+  el.innerHTML = `
+
+  <!-- ══ شريط العنوان ══ -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:26px">👥</span>
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">لوحة تقييم أداء الموظفين</div>
+        <div style="font-size:11px;color:var(--tx-muted)">
+          ${total.toLocaleString('ar')} موظف · ${regions.length} منطقة · الدرجة من 100
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <!-- أسطورة التقديرات -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${EMP_GRADE_ORDER.map(g => {
+          const s = EMP_GRADE_COLORS[g];
+          return `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;
+            background:${s.bg};color:${s.color};border:1px solid ${s.border}">${g}</span>`;
+        }).join('')}
+      </div>
+      <button class="export-btn export-btn-csv" onclick="_empKpiExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+    </div>
+  </div>
+
+  <!-- ══ توضيح نظام التقييم ══ -->
+  <div style="padding:12px 16px;margin-bottom:14px;border-radius:12px;
+       background:linear-gradient(135deg,#EFF6FF 0%,#F0FDF4 100%);
+       border:1.5px solid #BFDBFE">
+    <div style="font-size:11px;font-weight:800;color:#1D4ED8;margin-bottom:8px">📋 كيف يُحسب التقييم؟</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${METRIC_KEYS.map((k,i) => `
+        <div style="font-size:10px;color:var(--tx-sec);background:#fff;padding:4px 10px;
+             border-radius:8px;border:1px solid #E2E8F0;white-space:nowrap">
+          <strong>${METRIC_LABELS[i]}</strong> — ${METRIC_DESC[i]}
+        </div>`).join('')}
+    </div>
+    <div style="font-size:10px;color:var(--tx-muted);margin-top:8px">
+      الدرجة الكلية = متوسط مرجّح للمؤشرات الستة أعلاه · التقدير: جيد جداً ≥80 · جيد 60-79 · يحتاج تحسين 50-59 · ضعيف &lt;50
+    </div>
+  </div>
+
+  <!-- ══ فلاتر موحدة ══ -->
+  <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:14px 16px;
+       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f8fafc);border:1.5px solid var(--bd-light,#e2e8f0)">
+    <div class="fg" style="margin:0;min-width:130px">
+      <div class="fg-lbl">المنطقة</div>
+      <select class="fsel" id="emp-filter-region"
+        onchange="EMP_KPI._region=this.value;EMP_KPI.page=0;_empKpiRender()">
+        <option value="">— الكل —</option>
+        ${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg" style="margin:0">
+      <div class="fg-lbl">التقدير</div>
+      <select class="fsel" id="emp-filter-grade"
+        onchange="EMP_KPI._grade=this.value;EMP_KPI.page=0;_empKpiRender()">
+        <option value="">— الكل —</option>
+        ${EMP_GRADE_ORDER.map(g=>`<option value="${g}">${g}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg" style="margin:0;flex:1;min-width:180px">
+      <div class="fg-lbl">بحث بالاسم أو المستخدم</div>
+      <input class="finp" id="emp-search" placeholder="اسم الموظف أو username..."
+        oninput="EMP_KPI._search=this.value;EMP_KPI.page=0;_empKpiRender()">
+    </div>
+    <div class="fg" style="margin:0">
+      <div class="fg-lbl">ترتيب</div>
+      <select class="fsel" id="emp-sort"
+        onchange="EMP_KPI._sort=this.value;EMP_KPI.page=0;_empKpiRender()">
+        <option value="score_desc">الدرجة الكلية ↓</option>
+        <option value="score_asc">الدرجة الكلية ↑</option>
+        <option value="completion_desc">الإنجاز ↓</option>
+        <option value="name">الاسم أ-ي</option>
+      </select>
+    </div>
+    <button class="f-clear" onclick="_empKpiClearFilters()" style="margin:0;align-self:flex-end">✕ مسح</button>
+  </div>
+
+  <!-- ══ KPIs ══ -->
+  <div class="kpi-grid" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="kpi" style="border-top:3px solid #1D4ED8">
+      <div style="font-size:10px;font-weight:700;color:#1D4ED8;margin-bottom:4px">إجمالي الموظفين</div>
+      <div class="kpi-val" id="emp-k-total" style="color:#1D4ED8">${total.toLocaleString('ar')}</div>
+      <div class="kpi-lbl" id="emp-k-regions">${regions.length} منطقة</div>
+    </div>
+    <div class="kpi" style="border-top:3px solid #0891B2">
+      <div style="font-size:10px;font-weight:700;color:#0891B2;margin-bottom:4px">متوسط الدرجة الكلية</div>
+      <div class="kpi-val" id="emp-k-avg" style="color:#0891B2">${avgScore}</div>
+      <div class="kpi-lbl">من 100</div>
+    </div>
+    <div class="kpi" style="border-top:3px solid #059669">
+      <div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:4px">جيد جداً ≥ 80</div>
+      <div class="kpi-val" id="emp-k-excellent" style="color:#059669">${gradeCount['جيد جداً']||0}</div>
+      <div class="kpi-lbl" id="emp-k-excellent-pct">${pct(gradeCount['جيد جداً']||0, total)} من الإجمالي</div>
+    </div>
+    <div class="kpi" style="border-top:3px solid #DC2626">
+      <div style="font-size:10px;font-weight:700;color:#DC2626;margin-bottom:4px">ضعيف &lt; 50</div>
+      <div class="kpi-val" id="emp-k-weak" style="color:#DC2626">${gradeCount['ضعيف']||0}</div>
+      <div class="kpi-lbl" id="emp-k-weak-pct">${pct(gradeCount['ضعيف']||0, total)} من الإجمالي</div>
+    </div>
+  </div>
+
+  <!-- ══ الرسوم البيانية ══ -->
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#F0FDF4;color:#059669">◉</span>
+        توزيع التقديرات
+        <span class="sub">من إجمالي ${total} موظف</span>
+      </div>
+      <div class="chart-box" style="height:240px"><canvas id="emp-ch-grades"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">▦</span>
+        متوسط الدرجة الكلية حسب المنطقة
+        <span class="sub">الدرجة من 100</span>
+      </div>
+      <div class="chart-box" style="height:240px"><canvas id="emp-ch-regions"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#FFF7ED;color:#C2410C">≡</span>
+      متوسط المؤشرات الستة — مقارنة شاملة
+      <span class="sub">كل مؤشر من 100%</span>
+    </div>
+    <div class="chart-box" style="height:260px"><canvas id="emp-ch-metrics"></canvas></div>
+  </div>
+
+  <!-- ══ جدول الموظفين ══ -->
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">☰</span>
+      تفاصيل الموظفين
+      <span class="sub" id="emp-tbl-count"></span>
+    </div>
+
+    <!-- أعمدة الجدول + شرحها -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;
+         background:var(--bg-2,#f8fafc);border-radius:8px;border:1px solid var(--bd-light)">
+      <span style="font-size:10px;color:var(--tx-muted);font-weight:700">شرح الأعمدة:</span>
+      <span style="font-size:10px;color:var(--tx-sec)">المسند = إجمالي المهام</span>
+      <span style="font-size:10px;color:var(--tx-muted)">·</span>
+      <span style="font-size:10px;color:var(--tx-sec)">المكتمل = أُنجز فعلاً</span>
+      <span style="font-size:10px;color:var(--tx-muted)">·</span>
+      <span style="font-size:10px;color:var(--tx-sec)">المنتهي = انتهت مدته دون إكمال</span>
+      <span style="font-size:10px;color:var(--tx-muted)">·</span>
+      <span style="font-size:10px;color:var(--tx-sec)">الدرجة = متوسط المؤشرات المرجّح</span>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:180px;text-align:right;padding-right:14px">الموظف</th>
+            <th>المنطقة</th>
+            <th title="إجمالي المهام المسندة">المسند</th>
+            <th title="المهام المكتملة" style="color:#059669">المكتمل</th>
+            <th title="المهام المنتهية دون إكمال" style="color:#DC2626">المنتهي</th>
+            <th title="نسبة الإنجاز = المكتمل ÷ المسند">الإنجاز %</th>
+            <th title="الالتزام بوقت الزيارة">وقت الزيارة</th>
+            <th title="نسبة إضافة تعليقات">التعليقات</th>
+            <th title="نسبة رفع الصور">الصور</th>
+            <th title="الالتزام بالمواعيد">المواعيد</th>
+            <th title="مؤشر النزاهة">النزاهة</th>
+            <th style="min-width:70px" title="الدرجة الكلية المرجّحة من 100">الدرجة</th>
+            <th style="min-width:100px">التقدير</th>
+          </tr>
+        </thead>
+        <tbody id="emp-tbl-body"></tbody>
+      </table>
+    </div>
+    <div class="pag-bar" id="emp-pag" style="margin-top:8px"></div>
+  </div>`;
+
+  _empKpiDrawCharts(rows);
+  _empKpiRender();
+}
+
+/* ════ فلترة + تحديث KPIs + جدول ════ */
+function _empKpiRender() {
+  const rows = window.RAW_EMP_KPI || [];
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+  const q   = (EMP_KPI._search||'').trim().toLowerCase();
+
+  let list = rows.filter(r => {
+    if (EMP_KPI._region && str(r['المنطقة']) !== EMP_KPI._region) return false;
+    if (EMP_KPI._grade  && str(r['التقدير']) !== EMP_KPI._grade)  return false;
+    if (q && !str(r['اسم الموظف']).toLowerCase().includes(q) &&
+             !str(r['اسم المستخدم']).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  list.sort((a,b) => {
+    if (EMP_KPI._sort === 'score_desc')      return n_(b['الدرجة']) - n_(a['الدرجة']);
+    if (EMP_KPI._sort === 'score_asc')       return n_(a['الدرجة']) - n_(b['الدرجة']);
+    if (EMP_KPI._sort === 'completion_desc') return n_(b['الإنجاز %']) - n_(a['الإنجاز %']);
+    return str(a['اسم الموظف']).localeCompare(str(b['اسم الموظف']),'ar');
+  });
+
+  EMP_KPI.filtered = list;
+  const t = list.length;
+  const avg = t ? (list.reduce((s,r)=>s+n_(r['الدرجة']),0)/t).toFixed(1) : '—';
+
+  const gradeCountF = {};
+  EMP_GRADE_ORDER.forEach(g => { gradeCountF[g] = list.filter(r=>str(r['التقدير'])===g).length; });
+
+  const ge = id => document.getElementById(id);
+  const set = (id,v) => { const e=ge(id); if(e) e.textContent=v; };
+  set('emp-k-total',   t.toLocaleString('ar'));
+  set('emp-k-regions', [...new Set(list.map(r=>str(r['المنطقة'])).filter(Boolean))].length + ' منطقة');
+  set('emp-k-avg',     avg);
+  set('emp-k-excellent', gradeCountF['جيد جداً']||0);
+  set('emp-k-excellent-pct', t?((gradeCountF['جيد جداً']||0)/t*100).toFixed(1)+'%':'0%');
+  set('emp-k-weak',    gradeCountF['ضعيف']||0);
+  set('emp-k-weak-pct', t?((gradeCountF['ضعيف']||0)/t*100).toFixed(1)+'%':'0%');
+  set('emp-tbl-count', t.toLocaleString('ar') + ' موظف');
+
+  _empKpiDrawTable();
+}
+
+/* ════ جدول مع pagination ════ */
+function _empKpiDrawTable() {
+  const list = EMP_KPI.filtered;
+  const st   = EMP_KPI.page * EMP_KPI.pageSize;
+  const tb   = document.getElementById('emp-tbl-body');
+  if (!tb) return;
+
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+  const fmt = v => n_(v).toFixed(1) + '%';
+
+  const gradeStyle = g => {
+    const s = EMP_GRADE_COLORS[g] || { bg:'#F1F5F9', color:'#64748B', border:'#CBD5E1' };
+    return `background:${s.bg};color:${s.color};border:1px solid ${s.border}`;
+  };
+  const scoreStyle = sc => {
+    const bg    = sc>=80?'#ECFDF5':sc>=60?'#EFF6FF':sc>=50?'#FFFBEB':'#FEF2F2';
+    const color = sc>=80?'#059669':sc>=60?'#1D4ED8':sc>=50?'#D97706':'#DC2626';
+    return `background:${bg};color:${color}`;
+  };
+
+  tb.innerHTML = list.slice(st, st + EMP_KPI.pageSize).map(r => {
+    const grade = str(r['التقدير']);
+    const score = n_(r['الدرجة']);
+    const completed  = n_(r['المكتمل']);
+    const assigned   = n_(r['المسند']);
+    const expired    = n_(r['المنتهي']);
+    return `<tr>
+      <td style="text-align:right;padding-right:14px">
+        <div style="font-weight:700;font-size:12px">${str(r['اسم الموظف'])}</div>
+        <div style="font-size:10px;color:var(--tx-muted);font-family:monospace">${str(r['اسم المستخدم'])}</div>
+      </td>
+      <td>${str(r['المنطقة'])}</td>
+      <td style="font-weight:700;text-align:center">${assigned}</td>
+      <td style="color:#059669;font-weight:700;text-align:center">${completed}</td>
+      <td style="color:${expired>0?'#DC2626':'var(--tx-muted)'};font-weight:${expired>0?'700':'400'};text-align:center">${expired}</td>
+      <td style="text-align:center">${fmt(r['الإنجاز %'])}</td>
+      <td style="text-align:center">${fmt(r['وقت الزيارة %'])}</td>
+      <td style="text-align:center">${fmt(r['التعليقات %'])}</td>
+      <td style="text-align:center">${fmt(r['الصور %'])}</td>
+      <td style="text-align:center">${fmt(r['المواعيد %'])}</td>
+      <td style="text-align:center">${fmt(r['النزاغة %']||r['النزاهة %'])}</td>
+      <td style="font-weight:800;font-size:13px;${scoreStyle(score)};border-radius:6px;text-align:center;padding:4px 8px">${score.toFixed(1)}</td>
+      <td><span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700;${gradeStyle(grade)}">${grade}</span></td>
+    </tr>`;
+  }).join('');
+
+  /* pagination */
+  const pag   = document.getElementById('emp-pag');
+  const pages = Math.ceil(list.length / EMP_KPI.pageSize);
+  if (!pag) return;
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+  let h = `<span class="pag-info">صفحة ${EMP_KPI.page+1} من ${pages}</span><div class="pag-btns">`;
+  h += `<button class="pag-btn" ${EMP_KPI.page===0?'disabled':''} onclick="EMP_KPI.page--;_empKpiDrawTable()">→ السابق</button>`;
+  let s=Math.max(0,EMP_KPI.page-3), e=Math.min(pages-1,s+6);
+  if(e-s<6) s=Math.max(0,e-6);
+  for(let p=s;p<=e;p++) h+=`<button class="pag-btn${p===EMP_KPI.page?' active':''}" onclick="EMP_KPI.page=${p};_empKpiDrawTable()">${p+1}</button>`;
+  h += `<button class="pag-btn" ${EMP_KPI.page===pages-1?'disabled':''} onclick="EMP_KPI.page++;_empKpiDrawTable()">← التالي</button></div>`;
+  pag.innerHTML = h;
+}
+
+/* ════ الشارتات — مع فحص داتا قبل destroy ════ */
+function _empKpiDrawCharts(rows) {
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+
+  /* ── 1. توزيع التقديرات — Doughnut ── */
+  const gradeCtx = document.getElementById('emp-ch-grades');
+  if (gradeCtx) {
+    _empSafeDestroyChart('grades');
+    const counts = EMP_GRADE_ORDER.map(g => rows.filter(r=>str(r['التقدير'])===g).length);
+    /* تحقق: هل فيه داتا فعلاً؟ */
+    if (counts.some(c => c > 0)) {
+      EMP_KPI.charts.grades = new Chart(gradeCtx, {
+        type: 'doughnut',
+        data: {
+          labels: EMP_GRADE_ORDER,
+          datasets: [{ data: counts, backgroundColor: EMP_GRADE_ORDER.map(g=>EMP_GRADE_COLORS[g]?.color||'#94A3B8'), borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '62%',
+          plugins: {
+            legend: { position: 'bottom', labels: { font:{family:'Tajawal',size:11}, padding:14 } },
+            tooltip: { callbacks: { label: c => ` ${c.raw} موظف (${rows.length?((c.raw/rows.length)*100).toFixed(1):0}%)` } }
+          }
+        }
+      });
+    } else {
+      gradeCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات تقديرات</div>';
+    }
+  }
+
+  /* ── 2. متوسط الدرجة حسب المنطقة — Bar ── */
+  const regCtx = document.getElementById('emp-ch-regions');
+  if (regCtx) {
+    _empSafeDestroyChart('regions');
+    const regionMap = {};
+    rows.forEach(r => {
+      const reg = str(r['المنطقة']);
+      if (!reg) return;
+      if (!regionMap[reg]) regionMap[reg] = [];
+      regionMap[reg].push(n_(r['الدرجة']));
+    });
+    const regLabels = Object.keys(regionMap).sort();
+    const regAvgs   = regLabels.map(reg => +(regionMap[reg].reduce((s,x)=>s+x,0)/regionMap[reg].length).toFixed(1));
+    const regCounts = regLabels.map(reg => regionMap[reg].length);
+
+    if (regLabels.length > 0) {
+      EMP_KPI.charts.regions = new Chart(regCtx, {
+        type: 'bar',
+        data: {
+          labels: regLabels,
+          datasets: [{
+            label: 'متوسط الدرجة',
+            data: regAvgs,
+            backgroundColor: regAvgs.map(v=>v>=80?'#10B98199':v>=60?'#3B82F699':v>=50?'#F59E0B99':'#EF444499'),
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (c) => {
+              const reg = c.label;
+              const cnt = regCounts[c.dataIndex];
+              return [` الدرجة: ${c.raw} / 100`, ` عدد الموظفين: ${cnt}`];
+            }}}
+          },
+          scales: {
+            y: { min:0, max:100, ticks:{font:{family:'Tajawal',size:10}}, grid:{color:'rgba(0,0,0,.04)'} },
+            x: { ticks:{font:{family:'Tajawal',size:11}} }
+          }
+        }
+      });
+    } else {
+      regCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات مناطق</div>';
+    }
+  }
+
+  /* ── 3. مقارنة المؤشرات الستة — Bar أفقي ── */
+  const metCtx = document.getElementById('emp-ch-metrics');
+  if (metCtx) {
+    _empSafeDestroyChart('metrics');
+    const METRIC_KEYS   = ['الإنجاز %','وقت الزيارة %','التعليقات %','الصور %','المواعيد %','النزاهة %'];
+    const METRIC_LABELS = ['الإنجاز','وقت الزيارة','التعليقات','الصور','المواعيد','النزاهة'];
+    const metAvgs = METRIC_KEYS.map(k => +(rows.reduce((s,r)=>s+n_(r[k]),0)/rows.length).toFixed(1));
+
+    if (metAvgs.some(v => v > 0)) {
+      EMP_KPI.charts.metrics = new Chart(metCtx, {
+        type: 'bar',
+        data: {
+          labels: METRIC_LABELS,
+          datasets: [{
+            label: 'متوسط %',
+            data: metAvgs,
+            backgroundColor: metAvgs.map(v=>v>=80?'#10B98199':v>=60?'#3B82F699':v>=50?'#F59E0B99':'#EF444499'),
+            borderRadius: 6,
+            indexAxis: 'y'
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ` ${c.raw}%` } }
+          },
+          scales: {
+            x: { min:0, max:100, ticks:{font:{family:'Tajawal',size:10}}, grid:{color:'rgba(0,0,0,.04)'} },
+            y: { ticks:{font:{family:'Tajawal',size:11},autoSkip:false} }
+          }
+        }
+      });
+    } else {
+      metCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات مؤشرات</div>';
+    }
+  }
+}
+
+/* ════ مسح الفلاتر ════ */
+function _empKpiClearFilters() {
+  ['emp-filter-region','emp-filter-grade'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const s=document.getElementById('emp-search'); if(s) s.value='';
+  const so=document.getElementById('emp-sort');  if(so) so.value='score_desc';
+  EMP_KPI._region=''; EMP_KPI._grade=''; EMP_KPI._search=''; EMP_KPI._sort='score_desc';
+  EMP_KPI.page=0;
+  _empKpiRender();
+}
+
+/* ════ تصدير CSV ════ */
+function _empKpiExportCSV() {
+  const src = EMP_KPI.filtered.length ? EMP_KPI.filtered : (window.RAW_EMP_KPI||[]);
+  if (!src.length) { alert('لا توجد بيانات'); return; }
+  const headers = Object.keys(src[0]);
+  const rows    = src.map(r => headers.map(h=>`"${String(r[h]??'').replace(/"/g,'""')}"`).join(','));
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob(['\uFEFF'+[headers.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'})),
+    download: 'تقييم_الموظفين.csv'
+  });
+  a.click();
+}

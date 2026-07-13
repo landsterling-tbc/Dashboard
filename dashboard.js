@@ -1,3 +1,6 @@
+/* ════════════════════════════════════════════════════════════
+   القسم 1: الإعدادات والحالة وخدمة البيانات والفلاتر والـ KPIs
+   ════════════════════════════════════════════════════════════ */
 /* dashboard.js — updated 2026-06-24 07:40 */
 
 /* ════════════════════════════════════════════════════════════════
@@ -524,7 +527,19 @@ function killChart(id) {
       CHARTS[id].destroy();
     } catch (_) {}
     delete CHARTS[id];
+    delete CHART_SIGS[id];
   }
+}
+
+/* Task 2: منع إعادة إنشاء الرسم إذا لم تتغير بياناته فعلياً.
+   نخزّن بصمة JSON لبيانات كل رسم؛ لو البصمة مطابقة والرسم موجود نتخطى إعادة الرسم. */
+const CHART_SIGS = {};
+function chartUnchanged(id, sigParts) {
+  let sig;
+  try { sig = JSON.stringify(sigParts); } catch (_) { return false; }
+  if (CHARTS[id] && CHART_SIGS[id] === sig) return true;
+  CHART_SIGS[id] = sig;
+  return false;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1144,7 +1159,12 @@ function showTab(name, el) {
     "emp-kpi"         === name && renderEmpKpiTab());
 
 }
+
+/* ════════════════════════════════════════════════════════════
+   القسم 2: مصانع الرسوم البيانية والجداول والتبويبات الأساسية
+   ════════════════════════════════════════════════════════════ */
 function makeDoughnut(id, dataMap, colorMap = {}) {
+  if (chartUnchanged(id, ["doughnut", dataMap, colorMap])) return; // Task 2: البيانات لم تتغير
   const entries = Object.entries(dataMap)
     .filter((x) => x[1] > 0)
     .sort((a, b) => b[1] - a[1]);
@@ -1209,6 +1229,7 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
   });
 }
 function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) {
+  if (chartUnchanged(id, ["hbar", labels, values, colors, maxVal, fullLabels])) return; // Task 2
   // نتحقق من البيانات أولاً — لا نحذف الشارت القديم إلا لو فيه داتا جديدة
   const safeValues = Array.isArray(values) ? values.filter((v) => v != null && v !== "") : [];
   const safeLabels = Array.isArray(labels) ? labels : [];
@@ -1273,6 +1294,7 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
   });
 }
 function makeVBar(id, labels, datasets) {
+  if (chartUnchanged(id, ["vbar", labels, datasets])) return; // Task 2
   const { labels: cleanLabels, datasets: cleanDatasets } = normalizeChartData(labels, datasets);
   if (!cleanLabels.length || !cleanDatasets.length) {
     renderEmptyState(document.getElementById(id)?.closest(".chart-box") || document.getElementById(id), "لا توجد بيانات متاحة");
@@ -3104,6 +3126,10 @@ function renderTable() {
             : `◷ كل ${CFG.AUTO_INTERVAL_MS / 6e4} دقائق`),
         btn.classList.add("on"));
   }));
+
+/* ════════════════════════════════════════════════════════════
+   القسم 3: الخريطة والطلاب ومؤشرات KPI والأمن والسلامة
+   ════════════════════════════════════════════════════════════ */
 let _map = null,
   _mapLayer = null,
   _mapMode = "fca";
@@ -5606,6 +5632,10 @@ function renderAllContractsBody() {
     (Chart.defaults.plugins.tooltip.cornerRadius = 8),
     (Chart.defaults.scale.grid.color = "rgba(0,0,0,.04)"),
     (Chart.defaults.elements.bar.borderSkipped = !1)));
+
+/* ════════════════════════════════════════════════════════════
+   القسم 4: الأنظمة الرئيسية والتفصيلية
+   ════════════════════════════════════════════════════════════ */
 const SYS_TIER = {
   حرج: { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), border: "#DC262644" },
   متوسط: { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), border: "#D9770644" },
@@ -8029,6 +8059,9 @@ window.exportSysDetailExcel = function () {
   );
 };
 
+/* ════════════════════════════════════════════════════════════
+   القسم 5: جدولة تحميل البيانات والتصدير
+   ════════════════════════════════════════════════════════════ */
 const HIDDEN_SYSTEMS = ["سؤال الوزارة: هل توجد مبانٍ فرعية عشوائية / غير نظامية داخل الموقع؟"];
 window.LANG = window.LANG || "ar";
 var LANG = window.LANG;
@@ -10091,6 +10124,10 @@ window.renderElevatorStatusTab = function () {
    ║  🌊  JS تبويب: خنادق الصرف
    ║  (tab-khanadeq) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
+
+/* ════════════════════════════════════════════════════════════
+   القسم 6: التجهيز والخنادق وملحقاتها
+   ════════════════════════════════════════════════════════════ */
 function renderKhanadeqTab() {
   const el = document.getElementById("khanadeq-content");
   if (!el) return;
@@ -14160,6 +14197,10 @@ ${(() => {
       typeof renderGatekeepersTab   → يجب أن تكون "function"
       window.RAW_GATEKEEPERS        → يجب أن تكون مصفوفة فيها بيانات
 ══════════════════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════
+   القسم 7: بقية التبويبات والمساعد الذكي
+   ════════════════════════════════════════════════════════════ */
 (function () {
   "use strict";
 
@@ -21875,3 +21916,212 @@ function _empKpiExportCSV() {
   });
   a.click();
 }
+
+/* ════════════════════════════════════════════════════════════
+   القسم 8: معالجات الأحداث المنقولة من HTML (Task 5)
+   ════════════════════════════════════════════════════════════ */
+/* Task 5: جميع معالجات الأحداث المنقولة من index.html (كانت Inline) */
+document.addEventListener('DOMContentLoaded', function () {
+  function bind(n, ev, fn) {
+    document.querySelectorAll('[data-evt="' + n + '"]').forEach(function (el) { el.addEventListener(ev, fn); });
+  }
+  bind(1, 'error', function (event) { this.style.display='none' });
+  bind(2, 'error', function (event) { this.style.display='none' });
+  bind(3, 'click', function (event) { loadData() });
+  bind(4, 'click', function (event) { toggleAuto() });
+  bind(5, 'click', function (event) { downloadCurrentTab() });
+  bind(6, 'click', function (event) { togglePresentationMode() });
+  bind(7, 'change', function (event) { updateSectorByCity();updateDistrictBySector();applyFilters() });
+  bind(8, 'change', function (event) { updateDistrictBySector();applyFilters() });
+  bind(9, 'change', function (event) { applyFilters() });
+  bind(10, 'change', function (event) { applyFilters() });
+  bind(11, 'change', function (event) { applyFilters() });
+  bind(12, 'change', function (event) { applyFilters() });
+  bind(13, 'change', function (event) { applyFilters() });
+  bind(14, 'change', function (event) { applyFilters() });
+  bind(15, 'change', function (event) { applyFilters() });
+  bind(16, 'input', function (event) { debounceFilter() });
+  bind(17, 'click', function (event) { clearFilters() });
+  bind(18, 'click', function (event) { showTab('overview',this) });
+  bind(19, 'click', function (event) { showTab('fca',this) });
+  bind(20, 'click', function (event) { showTab('stage-compare',this) });
+  bind(21, 'click', function (event) { showTab('fca-ref',this) });
+  bind(22, 'click', function (event) { showTab('env',this) });
+  bind(23, 'click', function (event) { showTab('students',this) });
+  bind(24, 'click', function (event) { showTab('stages',this) });
+  bind(25, 'click', function (event) { showTab('ayen',this) });
+  bind(26, 'click', function (event) { showTab('sys-main',this) });
+  bind(27, 'click', function (event) { showTab('sys-detail',this) });
+  bind(28, 'click', function (event) { showTab('elevators',this) });
+  bind(29, 'click', function (event) { showTab('elevator-status',this) });
+  bind(30, 'click', function (event) { showTab('khanadeq',this) });
+  bind(31, 'click', function (event) { showTab('ac-plan',this) });
+  bind(32, 'click', function (event) { showTab('balagh',this) });
+  bind(33, 'click', function (event) { showTab('security-safety',this) });
+  bind(34, 'click', function (event) { showTab('tajheez',this) });
+  bind(35, 'click', function (event) { showTab('spare',this) });
+  bind(36, 'click', function (event) { showTab('gatekeepers',this) });
+  bind(37, 'click', function (event) { showTab('recruitment',this) });
+  bind(38, 'click', function (event) { showTab('all-contracts',this) });
+  bind(39, 'click', function (event) { showTab('payments',this);paymentsInitTab() });
+  bind(40, 'click', function (event) { showTab('cost',this) });
+  bind(41, 'click', function (event) { showTab('map',this) });
+  bind(42, 'click', function (event) { showTab('table',this) });
+  bind(43, 'click', function (event) { showTab('mag-kpi',this) });
+  bind(44, 'click', function (event) { showTab('consultant-kpi',this) });
+  bind(45, 'click', function (event) { showTab('fuel',this) });
+  bind(46, 'click', function (event) { showTab('vehicles',this) });
+  bind(47, 'click', function (event) { showTab('training',this) });
+  bind(48, 'click', function (event) { showTab('emp-kpi',this) });
+  bind(49, 'click', function (event) { showTab('hasr',this) });
+  bind(50, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(51, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(52, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(53, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(54, 'input', function (event) { smartSearchRerender(this, renderStageCompareTab) });
+  bind(55, 'change', function (event) { renderStageCompareTab() });
+  bind(56, 'change', function (event) { renderStageCompareTab() });
+  bind(57, 'change', function (event) { renderStageCompareTab() });
+  bind(58, 'input', function (event) { smartSearchRerender(this, renderFcaRefTab) });
+  bind(59, 'change', function (event) { renderFcaRefTab() });
+  bind(60, 'change', function (event) { renderFcaRefTab() });
+  bind(61, 'change', function (event) { renderFcaRefTab() });
+  bind(62, 'change', function (event) { renderFcaRefTab() });
+  bind(63, 'change', function (event) { renderFcaRefTab() });
+  bind(64, 'change', function (event) { setFcaRefPageSize(this.value) });
+  bind(65, 'click', function (event) { exportFcaRefCSV() });
+  bind(66, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(67, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(68, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(69, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(70, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(71, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(72, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(73, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(74, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(75, 'click', function (event) { setMapMode('fca') });
+  bind(76, 'click', function (event) { setMapMode('env') });
+  bind(77, 'click', function (event) { setMapMode('gender') });
+  bind(78, 'click', function (event) { setMapMode('owner') });
+  bind(79, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(80, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(81, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(82, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(83, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(84, 'input', function (event) { TBL.cur=0;smartSearchRerender(this, renderTable) });
+  bind(85, 'change', function (event) { renderTable() });
+  bind(86, 'change', function (event) { TBL.PAGE=parseInt(this.value);TBL.cur=0;renderTable() });
+  bind(87, 'click', function (event) { document.getElementById('tbl-search').value='';TBL.cur=0;renderTable() });
+  bind(88, 'click', function (event) { exportTableCSV() });
+  bind(89, 'click', function (event) { exportTableExcel() });
+  bind(90, 'click', function (event) { loadHasrData() });
+  bind(91, 'click', function (event) { exportHasrCSV() });
+  bind(92, 'change', function (event) { hasrGlobalFilterChanged() });
+  bind(93, 'change', function (event) { hasrGlobalFilterChanged() });
+  bind(94, 'change', function (event) { hasrGlobalFilterChanged() });
+  bind(95, 'input', function (event) { hasrDebounceFilter() });
+  bind(96, 'click', function (event) { clearHasrFilters() });
+  bind(97, 'click', function (event) { hasrClearSubFilter() });
+  bind(98, 'change', function (event) { renderHasrTable() });
+  bind(99, 'click', function (event) { hasrClearSubFilter() });
+  bind(100, 'click', function (event) { loadHasrData() });
+  bind(101, 'error', function (event) { this.style.display='none' });
+  bind(102, 'error', function (event) { this.style.display='none' });
+  bind(103, 'click', function (event) { fcbOpenSettings() });
+  bind(104, 'click', function (event) { fcbToggle() });
+  bind(105, 'click', function (event) { fcbCloseSettings() });
+  bind(106, 'click', function (event) { fcbSaveSettings() });
+  bind(107, 'click', function (event) { fcbClearSettings() });
+  bind(108, 'keydown', function (event) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fcbSend();} });
+  bind(108, 'input', function (event) { fcbAutoGrow(this) });
+  bind(109, 'click', function (event) { fcbSend() });
+  bind(110, 'click', function (event) { sysBrowseGoBack() });
+  bind(111, 'click', function (event) { sysBrowseClose() });
+});
+
+/* ════════════════════════════════════════════════════════════
+   القسم 9: التشغيل — معالج الأخطاء، قياس الأداء، إتاحة الكيبورد
+   ════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   dashboard.js — نقطة التشغيل (Bootstrap) فقط
+   المنطق الفعلي موزّع على وحدات داخل مجلد modules/ وتُحمَّل بالترتيب
+   من index.html قبل هذا الملف:
+     01-core-data-filters.js  → الإعدادات، الحالة، خدمة البيانات، الفلاتر، الـ KPIs
+     02-charts-tables.js      → مصانع الرسوم البيانية والجداول والتبويبات الأساسية
+     03-tabs-map-students-kpi → الخريطة، الطلاب، الخطط، مؤشرات KPI، الأمن والسلامة
+     04-systems.js            → الأنظمة الرئيسية والتفصيلية
+     05-loaders-exports.js    → جدولة تحميل البيانات والتصدير
+     06-tabs-tajheez.js       → التجهيز والخنادق وملحقاتها
+     07-tabs-misc-ai.js       → بقية التبويبات والمساعد الذكي
+     08-dom-events.js         → معالجات الأحداث المنقولة من HTML (Task 5)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Task 13: معالج أخطاء مركزي ── */
+(function () {
+  function reportError(msg, err) {
+    try { console.error("[Dashboard Error]", msg, err || ""); } catch (_) {}
+    try {
+      if (typeof showToast === "function") {
+        showToast("⚠️ حدث خطأ غير متوقع — تم تسجيله في وحدة التحكم", "error");
+      }
+    } catch (_) {}
+  }
+  window.addEventListener("error", function (e) {
+    reportError(e.message, e.error);
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    reportError("Unhandled promise rejection", e.reason);
+  });
+  window.__reportDashboardError = reportError;
+})();
+
+/* ── Task 16: قياس الأداء عبر Performance API ──
+   perfWrap(name, fn): يغلّف دالة عامة بعلامات performance.mark/measure */
+(function () {
+  function perfWrap(name, fnName) {
+    const original = window[fnName];
+    if (typeof original !== "function") return;
+    window[fnName] = function () {
+      const m0 = name + ":start", m1 = name + ":end";
+      try { performance.mark(m0); } catch (_) {}
+      const out = original.apply(this, arguments);
+      const done = function () {
+        try { performance.mark(m1); performance.measure(name, m0, m1); } catch (_) {}
+      };
+      if (out && typeof out.finally === "function") { out.finally(done); } else { done(); }
+      return out;
+    };
+  }
+  // وقت تطبيق الفلاتر / وقت الرسم / وقت تحميل البيانات
+  perfWrap("filters.apply",   "applyFilters");
+  perfWrap("charts.overview", "renderOverviewCharts");
+  perfWrap("table.render",    "renderTable");
+  perfWrap("data.load",       "__startDashboardLoad");
+})();
+
+/* ── Task 6 (جزئي): تحسين الوصول — تبويبات قابلة للتنقل بالكيبورد + aria ── */
+document.addEventListener("DOMContentLoaded", function () {
+  const toast = document.getElementById("toast-area");
+  if (toast) { toast.setAttribute("aria-live", "polite"); toast.setAttribute("role", "status"); }
+
+  document.querySelectorAll(".tabs").forEach(function (bar) {
+    bar.setAttribute("role", "tablist");
+    const tabs = bar.querySelectorAll(".tab");
+    tabs.forEach(function (t, i) {
+      t.setAttribute("role", "tab");
+      t.setAttribute("tabindex", t.classList.contains("active") ? "0" : "-1");
+      if (!t.getAttribute("aria-label")) t.setAttribute("aria-label", t.textContent.trim());
+      t.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); t.click(); }
+        else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          const dir = e.key === "ArrowRight" ? 1 : -1;
+          const list = Array.from(tabs);
+          const next = list[(list.indexOf(t) + dir + list.length) % list.length];
+          next.focus();
+        }
+      });
+    });
+  });
+});
+

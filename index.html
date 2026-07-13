@@ -65,13 +65,13 @@
          src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png"
          alt="Land Sterling"
          style="height:21px;filter:brightness(0) invert(1);opacity:.94;display:block"
-         onerror="this.style.display='none'">
+         data-evt="1">
   </div>
   <div class="tb-divider"></div>
 
   <div class="tb-tbc">
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183"
-         alt="TBC" style="height:26px;opacity:.94;filter:brightness(0) invert(1);display:block" onerror="this.style.display='none'">
+         alt="TBC" style="height:26px;opacity:.94;filter:brightness(0) invert(1);display:block" data-evt="2">
     <div class="tb-divider"></div>
     <div>
       <div class="tb-title" id="topTitle">لوحة بيانات إدارة المرافق التعليمية</div>
@@ -82,10 +82,10 @@
   <div class="tb-right">
     <div class="dot loading" id="dot"></div>
     <span id="lastTime" style="font-size:10px;color:rgba(255,255,255,.35);font-weight:500"></span>
-    <button class="tb-btn" id="btnReload" onclick="loadData()">↻ <span data-ar="تحديث" data-en="Refresh">تحديث</span></button>
-    <button class="tb-btn" id="btnAuto"   onclick="toggleAuto()">◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">تلقائي</span></button>
-    <button class="tb-btn" id="btnDownloadTab" onclick="downloadCurrentTab()">⬇ <span data-ar="تنزيل التبويب" data-en="Download Tab">تنزيل التبويب</span></button>
-    <button class="tb-btn" id="btnPresentationMode" onclick="togglePresentationMode()" title="Presentation Mode" aria-pressed="true" style="padding:4px 8px;min-width:30px;opacity:.12;font-size:10px;line-height:1">◌</button>
+    <button class="tb-btn" id="btnReload" data-evt="3">↻ <span data-ar="تحديث" data-en="Refresh">تحديث</span></button>
+    <button class="tb-btn" id="btnAuto"   data-evt="4">◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">تلقائي</span></button>
+    <button class="tb-btn" id="btnDownloadTab" data-evt="5">⬇ <span data-ar="تنزيل التبويب" data-en="Download Tab">تنزيل التبويب</span></button>
+    <button class="tb-btn" id="btnPresentationMode" title="Presentation Mode" aria-pressed="true" style="padding:4px 8px;min-width:30px;opacity:.12;font-size:10px;line-height:1" data-evt="6">◌</button>
   </div>
 </div>
 <div class="prog-bar"><div class="prog-fill" id="prog"></div></div>
@@ -98,49 +98,49 @@
 
     <div class="fg" id="fg-city">
       <div class="fg-lbl" data-ar="المنطقة الرئيسية" data-en="Main Region">المنطقة الرئيسية</div>
-      <select class="fsel" id="fCity" onchange="updateSectorByCity();updateDistrictBySector();applyFilters()">
+      <select class="fsel" id="fCity" data-evt="7">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg" id="fg-sector" style="display:none">
       <div class="fg-lbl" data-ar="المحافظة" data-en="Governorate">المحافظة</div>
-      <select class="fsel" id="fSector" onchange="updateDistrictBySector();applyFilters()">
+      <select class="fsel" id="fSector" data-evt="8">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="المرحلة" data-en="Stage">المرحلة</div>
-      <select class="fsel" id="fStage" onchange="applyFilters()">
+      <select class="fsel" id="fStage" data-evt="9">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الجنس" data-en="Gender">الجنس</div>
-      <select class="fsel" id="fGender" onchange="applyFilters()">
+      <select class="fsel" id="fGender" data-evt="10">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="حجم المدرسة" data-en="School Size">حجم المدرسة</div>
-      <select class="fsel" id="fSize" onchange="applyFilters()">
+      <select class="fsel" id="fSize" data-evt="11">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الملكية" data-en="Ownership">الملكية</div>
-      <select class="fsel" id="fOwner" onchange="applyFilters()">
+      <select class="fsel" id="fOwner" data-evt="12">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl">FCA ≥</div>
-      <select class="fsel" id="fFcaMin" onchange="applyFilters()">
+      <select class="fsel" id="fFcaMin" data-evt="13">
         <option value="0" data-ar="الكل" data-en="All">الكل</option>
         <option value="25">25%</option>
         <option value="50">50%</option>
@@ -151,24 +151,24 @@
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الحي / المنطقة" data-en="District / Area">الحي / المنطقة</div>
-      <select class="fsel" id="fDistrict" onchange="applyFilters()" style="min-width:140px">
+      <select class="fsel" id="fDistrict" style="min-width:140px" data-evt="14">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="حالة الاشتراك" data-en="Subscription Status">حالة الاشتراك</div>
-      <select class="fsel" id="fSubStatus" onchange="applyFilters()">
+      <select class="fsel" id="fSubStatus" data-evt="15">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="بحث" data-en="Search">بحث بالاسم أو الرقم الوزاري</div>
-      <input class="finp" id="fSearch" placeholder="🔍 اسم المدرسة أو الرقم الوزاري..." oninput="debounceFilter()">
+      <input class="finp" id="fSearch" placeholder="🔍 اسم المدرسة أو الرقم الوزاري..." data-evt="16">
     </div>
 
-    <button class="f-clear" onclick="clearFilters()"><span data-ar="✕ مسح الكل" data-en="✕ Clear All">✕ مسح الكل</span></button>
+    <button class="f-clear" data-evt="17"><span data-ar="✕ مسح الكل" data-en="✕ Clear All">✕ مسح الكل</span></button>
   </div>
 
   <div class="kpi-grid">
@@ -266,38 +266,38 @@
   </div>
 
   <div class="tabs">
-    <div class="tab active" id="tabbtn-overview" onclick="showTab('overview',this)">نظرة عامة</div>
-    <div class="tab" onclick="showTab('fca',this)">تحليل FCA</div>
-    <div class="tab" onclick="showTab('stage-compare',this)">مقارنة مراحل FCA</div>
-    <div class="tab" onclick="showTab('fca-ref',this)">FCA المرجعي</div>
-    <div class="tab" onclick="showTab('env',this)">البيئة المدرسية</div>
-    <div class="tab" id="tabbtn-students" onclick="showTab('students',this)">الطلاب وعمر المبنى</div>
-    <div class="tab" onclick="showTab('stages',this)">المرحلة الدراسية</div>
-    <div class="tab" onclick="showTab('ayen',this)">تقييم عاين</div>
-    <div class="tab" onclick="showTab('sys-main',this)">الأنظمة الرئيسية</div>
-    <div class="tab" onclick="showTab('sys-detail',this)">الأنظمة التفصيلية</div>
-    <div class="tab" onclick="showTab('elevators',this)">المصاعد</div>
-    <div class="tab" onclick="showTab('elevator-status',this)">حالة المصاعد</div>
-    <div class="tab" onclick="showTab('khanadeq',this)">خنادق الصرف</div>
-    <div class="tab" onclick="showTab('ac-plan',this)">خطة استبدال المكيفات</div>
-    <div class="tab" onclick="showTab('balagh',this)">البلاغات</div>
-    <div class="tab" onclick="showTab('security-safety',this)">الأمن والسلامة</div>
-    <div class="tab" onclick="showTab('tajheez',this)">التجهيزات</div>
-    <div class="tab" onclick="showTab('spare',this)">قطع الغيار</div>
-    <div class="tab" onclick="showTab('gatekeepers',this)">البوابين</div>
-    <div class="tab" onclick="showTab('recruitment',this)">التوظيف</div>
-    <div class="tab" onclick="showTab('all-contracts',this)">عقود عدا المجال</div>
-    <div class="tab" onclick="showTab('payments',this);paymentsInitTab()">المدفوعات</div>
-    <div class="tab tab-premium" onclick="showTab('cost',this)">التكلفة</div>
-    <div class="tab" onclick="showTab('map',this)">الخريطة</div>
-    <div class="tab" onclick="showTab('table',this)">الجدول التفصيلي</div>
-    <div class="tab" onclick="showTab('mag-kpi',this)">مؤشرات الأداء للمقاول</div>
-    <div class="tab" onclick="showTab('consultant-kpi',this)">مؤشرات أداء الاستشاري</div>
-    <div class="tab" onclick="showTab('fuel',this)">استهلاك الوقود</div>
-    <div class="tab" onclick="showTab('vehicles',this)">السيارات</div>
-    <div class="tab" onclick="showTab('training',this)">برامج التدريب</div>
-    <div class="tab" onclick="showTab('emp-kpi',this)">تقييم الموظفين</div>
-    <div class="tab" onclick="showTab('hasr',this)">📦 حصر الأصول</div>
+    <div class="tab active" id="tabbtn-overview" data-evt="18">نظرة عامة</div>
+    <div class="tab" data-evt="19">تحليل FCA</div>
+    <div class="tab" data-evt="20">مقارنة مراحل FCA</div>
+    <div class="tab" data-evt="21">FCA المرجعي</div>
+    <div class="tab" data-evt="22">البيئة المدرسية</div>
+    <div class="tab" id="tabbtn-students" data-evt="23">الطلاب وعمر المبنى</div>
+    <div class="tab" data-evt="24">المرحلة الدراسية</div>
+    <div class="tab" data-evt="25">تقييم عاين</div>
+    <div class="tab" data-evt="26">الأنظمة الرئيسية</div>
+    <div class="tab" data-evt="27">الأنظمة التفصيلية</div>
+    <div class="tab" data-evt="28">المصاعد</div>
+    <div class="tab" data-evt="29">حالة المصاعد</div>
+    <div class="tab" data-evt="30">خنادق الصرف</div>
+    <div class="tab" data-evt="31">خطة استبدال المكيفات</div>
+    <div class="tab" data-evt="32">البلاغات</div>
+    <div class="tab" data-evt="33">الأمن والسلامة</div>
+    <div class="tab" data-evt="34">التجهيزات</div>
+    <div class="tab" data-evt="35">قطع الغيار</div>
+    <div class="tab" data-evt="36">البوابين</div>
+    <div class="tab" data-evt="37">التوظيف</div>
+    <div class="tab" data-evt="38">عقود عدا المجال</div>
+    <div class="tab" data-evt="39">المدفوعات</div>
+    <div class="tab tab-premium" data-evt="40">التكلفة</div>
+    <div class="tab" data-evt="41">الخريطة</div>
+    <div class="tab" data-evt="42">الجدول التفصيلي</div>
+    <div class="tab" data-evt="43">مؤشرات الأداء للمقاول</div>
+    <div class="tab" data-evt="44">مؤشرات أداء الاستشاري</div>
+    <div class="tab" data-evt="45">استهلاك الوقود</div>
+    <div class="tab" data-evt="46">السيارات</div>
+    <div class="tab" data-evt="47">برامج التدريب</div>
+    <div class="tab" data-evt="48">تقييم الموظفين</div>
+    <div class="tab" data-evt="49">📦 حصر الأصول</div>
   </div>
 
 <!--
@@ -308,7 +308,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="50">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -356,7 +356,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="51">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -399,7 +399,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="52">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -451,7 +451,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="53">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -497,23 +497,23 @@
           <div class="fg-lbl">بحث بالاسم أو الرقم الوزاري</div>
           <input class="finp" id="stageCompareSearch" type="text"
             placeholder="اكتب اسم المدرسة أو الرقم الوزاري..."
-            oninput="smartSearchRerender(this, renderStageCompareTab)" />
+            / data-evt="54">
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
-          <select class="fsel" id="stageCompareCity" onchange="renderStageCompareTab()">
+          <select class="fsel" id="stageCompareCity" data-evt="55">
             <option value="">— كل المناطق —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">المرحلة (فلتر)</div>
-          <select class="fsel" id="stageCompareStageFilter" onchange="renderStageCompareTab()">
+          <select class="fsel" id="stageCompareStageFilter" data-evt="56">
             <option value="">— كل المراحل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">الترتيب</div>
-          <select class="fsel" id="stageCompareSort" onchange="renderStageCompareTab()">
+          <select class="fsel" id="stageCompareSort" data-evt="57">
             <option value="avg_asc">الأدنى FCA أولاً</option>
             <option value="avg_desc">الأعلى FCA أولاً</option>
             <option value="name">الاسم</option>
@@ -610,29 +610,29 @@
           <div class="fg-lbl">بحث</div>
           <input class="finp" id="fcaRefSearch" type="text"
             placeholder="🔍 اسم المدرسة أو الرقم الوزاري..."
-            oninput="smartSearchRerender(this, renderFcaRefTab)" />
+            / data-evt="58">
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
-          <select class="fsel" id="fcaRefCity" onchange="renderFcaRefTab()">
+          <select class="fsel" id="fcaRefCity" data-evt="59">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">المحافظة</div>
-          <select class="fsel" id="fcaRefSector" onchange="renderFcaRefTab()">
+          <select class="fsel" id="fcaRefSector" data-evt="60">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">آخر شهر تقييم</div>
-          <select class="fsel" id="fcaRefDate" onchange="renderFcaRefTab()">
+          <select class="fsel" id="fcaRefDate" data-evt="61">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">التصنيف</div>
-          <select class="fsel" id="fcaRefTier" onchange="renderFcaRefTab()">
+          <select class="fsel" id="fcaRefTier" data-evt="62">
             <option value="">— كل —</option>
             <option value="critical">🔴 حرج (&lt;25%)</option>
             <option value="fair">🟡 متوسط (25–50%)</option>
@@ -643,7 +643,7 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">الترتيب</div>
-          <select class="fsel" id="fcaRefSort" onchange="renderFcaRefTab()">
+          <select class="fsel" id="fcaRefSort" data-evt="63">
             <option value="fca_asc">الأدنى FCA أولاً</option>
             <option value="fca_desc">الأعلى FCA أولاً</option>
             <option value="name">اسم المدرسة</option>
@@ -652,7 +652,7 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">عدد الصفوف</div>
-          <select class="fsel" id="fcaRefPageSize" onchange="setFcaRefPageSize(this.value)">
+          <select class="fsel" id="fcaRefPageSize" data-evt="64">
             <option value="25">25 مدرسة</option>
             <option value="50" selected>50 مدرسة</option>
             <option value="100">100 مدرسة</option>
@@ -661,7 +661,7 @@
           </select>
         </div>
         <div class="fg" style="align-self:flex-end">
-          <button class="export-btn export-btn-csv" onclick="exportFcaRefCSV()" style="margin-top:0">
+          <button class="export-btn export-btn-csv" style="margin-top:0" data-evt="65">
             ⬇ تصدير CSV
           </button>
         </div>
@@ -700,7 +700,7 @@
 ║  (كل المقاولين — بدون فلترة مسبقة على مقاول واحد)
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="66">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -725,7 +725,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="67">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -761,7 +761,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="68">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -823,7 +823,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="69">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -843,7 +843,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="70">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -863,7 +863,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="71">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -883,7 +883,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="72">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -925,7 +925,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="73">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -945,7 +945,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="74">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -995,10 +995,10 @@
 
     <div class="map-controls">
       <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">عرض حسب:</span>
-      <button class="map-ctrl-btn active" id="mctrl-fca"   onclick="setMapMode('fca')">درجة FCA</button>
-      <button class="map-ctrl-btn"        id="mctrl-env"   onclick="setMapMode('env')">البيئة المدرسية</button>
-      <button class="map-ctrl-btn"        id="mctrl-gender" onclick="setMapMode('gender')">الجنس</button>
-      <button class="map-ctrl-btn"        id="mctrl-owner" onclick="setMapMode('owner')">الملكية</button>
+      <button class="map-ctrl-btn active" id="mctrl-fca"   data-evt="75">درجة FCA</button>
+      <button class="map-ctrl-btn"        id="mctrl-env"   data-evt="76">البيئة المدرسية</button>
+      <button class="map-ctrl-btn"        id="mctrl-gender" data-evt="77">الجنس</button>
+      <button class="map-ctrl-btn"        id="mctrl-owner" data-evt="78">الملكية</button>
     </div>
 
     <div id="map-container"></div>
@@ -1012,7 +1012,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="79">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -1032,7 +1032,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="80">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -1052,7 +1052,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="81">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -1074,7 +1074,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="82">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -1153,7 +1153,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" onclick="showTab('NEW_ID',this)">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="83">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -1174,10 +1174,10 @@
           <div style="position:relative">
             <input class="finp" id="tbl-search"
               placeholder="🔍 بحث بالاسم أو الرقم الوزاري..."
-              oninput="TBL.cur=0;smartSearchRerender(this, renderTable)"
-              style="min-width:240px;padding-right:14px">
+             
+              style="min-width:240px;padding-right:14px" data-evt="84">
           </div>
-          <select class="fsel" id="tbl-sort" onchange="renderTable()" style="font-size:11px">
+          <select class="fsel" id="tbl-sort" style="font-size:11px" data-evt="85">
             <option value="fca_asc"         data-ar="FCA ↑ تصاعدي"              data-en="FCA ↑ Asc">FCA ↑ تصاعدي</option>
             <option value="fca_desc"        data-ar="FCA ↓ تنازلي"              data-en="FCA ↓ Desc">FCA ↓ تنازلي</option>
             <option value="env_desc"        data-ar="البيئة ↓ تنازلي"           data-en="Env ↓ Desc">البيئة ↓ تنازلي</option>
@@ -1188,17 +1188,17 @@
             <option value="age_desc"        data-ar="عمر المبنى ↓ تنازلي"       data-en="Building Age ↓ Desc">عمر المبنى ↓ تنازلي</option>
             <option value="name"            data-ar="الاسم أ-ي"                 data-en="Name A-Z">الاسم أ-ي</option>
           </select>
-          <select class="fsel" id="tbl-page-size" onchange="TBL.PAGE=parseInt(this.value);TBL.cur=0;renderTable()" style="font-size:11px">
+          <select class="fsel" id="tbl-page-size" style="font-size:11px" data-evt="86">
             <option value="25"    data-ar="25 صف"  data-en="25 rows">25 صف</option>
             <option value="50" selected data-ar="50 صف"  data-en="50 rows">50 صف</option>
             <option value="100"   data-ar="100 صف" data-en="100 rows">100 صف</option>
             <option value="200"   data-ar="200 صف" data-en="200 rows">200 صف</option>
             <option value="99999" data-ar="الكل"   data-en="All">الكل</option>
           </select>
-          <button class="f-clear" onclick="document.getElementById('tbl-search').value='';TBL.cur=0;renderTable()" style="font-size:10px"><span data-ar="✕ مسح البحث" data-en="✕ Clear Search">✕ مسح البحث</span></button>
+          <button class="f-clear" style="font-size:10px" data-evt="87"><span data-ar="✕ مسح البحث" data-en="✕ Clear Search">✕ مسح البحث</span></button>
 
-          <button class="export-btn export-btn-csv" onclick="exportTableCSV()">⬇ CSV</button>
-          <button class="export-btn export-btn-excel" onclick="exportTableExcel()">⬇ Excel</button>
+          <button class="export-btn export-btn-csv" data-evt="88">⬇ CSV</button>
+          <button class="export-btn export-btn-excel" data-evt="89">⬇ Excel</button>
         </div>
       </div>
 
@@ -1314,8 +1314,8 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="tb-btn" onclick="loadHasrData()" style="font-size:11px">↻ تحديث</button>
-        <button class="export-btn export-btn-csv" onclick="exportHasrCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+        <button class="tb-btn" style="font-size:11px" data-evt="90">↻ تحديث</button>
+        <button class="export-btn export-btn-csv" style="font-size:11px" data-evt="91">⬇ تصدير CSV</button>
       </div>
     </div>
 
@@ -1327,7 +1327,7 @@
       <!-- المدينة -->
       <div class="fg" style="margin:0;min-width:140px">
         <div class="fg-lbl">🏙️ المدينة</div>
-        <select class="fsel" id="hasr-global-city" onchange="hasrGlobalFilterChanged()">
+        <select class="fsel" id="hasr-global-city" data-evt="92">
           <option value="">— الكل —</option>
         </select>
       </div>
@@ -1335,7 +1335,7 @@
       <!-- الحالة -->
       <div class="fg" style="margin:0">
         <div class="fg-lbl">📊 الحالة</div>
-        <select class="fsel" id="hasr-global-condition" onchange="hasrGlobalFilterChanged()">
+        <select class="fsel" id="hasr-global-condition" data-evt="93">
           <option value="">— الكل —</option>
           <option value="excellent">✅ بها أصول ممتازة</option>
           <option value="good">🔵 بها أصول جيدة</option>
@@ -1347,7 +1347,7 @@
       <!-- معادة -->
       <div class="fg" style="margin:0">
         <div class="fg-lbl">🔄 إعادة التقييم</div>
-        <select class="fsel" id="hasr-global-reassessed" onchange="hasrGlobalFilterChanged()">
+        <select class="fsel" id="hasr-global-reassessed" data-evt="94">
           <option value="">— الكل —</option>
           <option value="نعم">معادة فقط</option>
           <option value="لا">غير معادة</option>
@@ -1357,11 +1357,11 @@
       <!-- بحث -->
       <div class="fg" style="margin:0;flex:1;min-width:200px">
         <div class="fg-lbl">🔍 بحث بالاسم أو الكود</div>
-        <input class="finp" id="hasr-global-search" placeholder="🔍 اسم المدرسة أو الكود..." oninput="hasrDebounceFilter()">
+        <input class="finp" id="hasr-global-search" placeholder="🔍 اسم المدرسة أو الكود..." data-evt="95">
       </div>
 
       <!-- زر المسح -->
-      <button class="f-clear" onclick="clearHasrFilters()" style="margin:0;align-self:flex-end">✕ مسح الكل</button>
+      <button class="f-clear" style="margin:0;align-self:flex-end" data-evt="96">✕ مسح الكل</button>
     </div>
 
     <!-- ══ شريط الفلتر النشط (للنظام الرئيسي/الفرعي فقط) — يظهر لما يكون فلتر نظام نشط ══ -->
@@ -1373,9 +1373,9 @@
         <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:1px">فلتر النظام النشط</div>
         <div id="hasr-active-filter-label" style="font-size:13px;font-weight:800;color:var(--tx-main)">—</div>
       </div>
-      <button onclick="hasrClearSubFilter()"
+      <button
         style="font-size:11px;font-weight:700;padding:6px 16px;border-radius:8px;cursor:pointer;
-               background:var(--bg-info);color:var(--c-info);border:1.5px solid var(--bd-info);font-family:Tajawal;white-space:nowrap">
+               background:var(--bg-info);color:var(--c-info);border:1.5px solid var(--bd-info);font-family:Tajawal;white-space:nowrap" data-evt="97">
         ✕ إزالة فلتر النظام
       </button>
     </div>
@@ -1479,7 +1479,7 @@
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
         <div class="fg" style="margin:0">
           <div class="fg-lbl">ترتيب</div>
-          <select class="fsel" id="hasr-sort" onchange="renderHasrTable()">
+          <select class="fsel" id="hasr-sort" data-evt="98">
             <option value="assets_desc">الأصول ↓</option>
             <option value="assets_asc">الأصول ↑</option>
             <option value="name">الاسم</option>
@@ -1487,10 +1487,10 @@
           </select>
         </div>
         <button id="hasr-clear-sys-btn"
-          onclick="hasrClearSubFilter()"
+         
           style="display:none;font-size:11px;font-weight:700;padding:6px 14px;border-radius:8px;
                  cursor:pointer;background:#FEF3C7;color:#92400E;border:1.5px solid #FDE68A;
-                 font-family:Tajawal;white-space:nowrap;transition:.15s">
+                 font-family:Tajawal;white-space:nowrap;transition:.15s" data-evt="99">
           🔩 ✕ إزالة فلتر النظام
         </button>
       </div>
@@ -1525,7 +1525,7 @@
     <div id="hasr-error" style="display:none;text-align:center;padding:60px 20px">
       <div style="font-size:32px;margin-bottom:12px">❌</div>
       <div style="font-size:14px;color:var(--c-danger)" id="hasr-error-msg">حدث خطأ</div>
-      <button class="tb-btn" onclick="loadHasrData()" style="margin-top:12px">↻ إعادة المحاولة</button>
+      <button class="tb-btn" style="margin-top:12px" data-evt="100">↻ إعادة المحاولة</button>
     </div>
 
   </div>
@@ -1551,10 +1551,10 @@
 <footer style="margin-top:36px;padding:16px 28px;background:#071E28;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid rgba(255,255,255,.06)">
   <div style="display:flex;align-items:center;gap:18px">
     <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling"
-         style="height:21px;filter:brightness(0) invert(1);opacity:.94;display:block" onerror="this.style.display='none'">
+         style="height:21px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="101">
     <div style="width:1px;height:20px;background:rgba(255,255,255,.1)"></div>
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC"
-         style="height:26px;filter:brightness(0) invert(1);opacity:.94;display:block" onerror="this.style.display='none'">
+         style="height:26px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="102">
   </div>
   <div style="font-size:10px;color:rgba(255,255,255,.25);text-align:center;letter-spacing:.04em">
     FACILITIES MANAGEMENT DASHBOARD
@@ -1620,14 +1620,14 @@
       <div class="fcb-head-title">مساعد إدارة المرافق الذكي 🏫</div>
       <div class="fcb-head-sub"><span class="dot"></span> متخصص في المرافق التعليمية</div>
     </div>
-    <div class="fcb-head-close" id="fcbSettingsBtn" onclick="fcbOpenSettings()" title="إعدادات المساعد" style="margin-left:4px;">⚙️</div>
-    <div class="fcb-head-close" onclick="fcbToggle()">✕</div>
+    <div class="fcb-head-close" id="fcbSettingsBtn" title="إعدادات المساعد" style="margin-left:4px;" data-evt="103">⚙️</div>
+    <div class="fcb-head-close" data-evt="104">✕</div>
   </div>
 
   <div class="fcb-settings" id="fcbSettingsPanel" style="display:none;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div class="fcb-settings-title">⚙️ إعدادات المساعد الذكي</div>
-      <div class="fcb-head-close" onclick="fcbCloseSettings()" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);">✕</div>
+      <div class="fcb-head-close" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);" data-evt="105">✕</div>
     </div>
     <div class="fcb-settings-note" style="margin:0 0 10px;">✅ المساعد الذكي مفعّل بالكامل عبر خادم آمن — لا حاجة لإدخال أي مفتاح API.</div>
     <div id="fcbProxyOverride" style="display:none;">
@@ -1636,8 +1636,8 @@
       <label class="fcb-settings-lbl">اسم الموديل</label>
       <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-4o-mini">
       <div class="fcb-settings-actions">
-        <button type="button" class="fcb-settings-save" onclick="fcbSaveSettings()">💾 حفظ</button>
-        <button type="button" class="fcb-settings-clear" onclick="fcbClearSettings()">🗑️ مسح المخزّن محلياً</button>
+        <button type="button" class="fcb-settings-save" data-evt="106">💾 حفظ</button>
+        <button type="button" class="fcb-settings-clear" data-evt="107">🗑️ مسح المخزّن محلياً</button>
       </div>
       <div class="fcb-settings-note">المفتاح يُخزَّن في متصفحك فقط (localStorage) ولا يُرسل لأي مكان عدا OpenAI مباشرة.</div>
     </div>
@@ -1657,8 +1657,8 @@
   </div>
 
   <div class="fcb-foot">
-    <textarea class="fcb-input" id="fcbInput" rows="1" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fcbSend();}" oninput="fcbAutoGrow(this)"></textarea>
-    <button class="fcb-send" id="fcbSendBtn" type="button" onclick="fcbSend()">
+    <textarea class="fcb-input" id="fcbInput" rows="1" placeholder="اكتب رسالتك هنا..." data-evt="108"></textarea>
+    <button class="fcb-send" id="fcbSendBtn" type="button" data-evt="109">
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
     </button>
   </div>
@@ -1689,19 +1689,19 @@
       border-bottom:1px solid var(--bd-light,#dbe7ee);
       background:linear-gradient(135deg,#071e28 0%,#0b3040 100%);
       border-radius:18px 18px 0 0;">
-      <button id="sysBrowseBack" onclick="sysBrowseGoBack()" style="
+      <button id="sysBrowseBack" style="
         display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
         color:#fff;border-radius:10px;width:34px;height:34px;cursor:pointer;
         font-size:18px;line-height:1;flex-shrink:0;transition:.15s"
-        title="رجوع">‹</button>
+        title="رجوع" data-evt="110">‹</button>
       <div style="flex:1;min-width:0">
         <div id="sysBrowseTitle" style="font-size:15px;font-weight:800;color:#fff;line-height:1.3">الأنظمة الرئيسية</div>
         <div id="sysBrowseSub"   style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">اختر نظاماً لعرض أنظمته الفرعية</div>
       </div>
-      <button onclick="sysBrowseClose()" style="
+      <button style="
         background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
         color:rgba(255,255,255,.7);border-radius:10px;width:34px;height:34px;
-        cursor:pointer;font-size:16px;line-height:1;flex-shrink:0">✕</button>
+        cursor:pointer;font-size:16px;line-height:1;flex-shrink:0" data-evt="111">✕</button>
     </div>
     <!-- جسم القائمة -->
     <div id="sysBrowseBody" style="overflow-y:auto;padding:14px 16px;flex:1;"></div>

@@ -405,7 +405,7 @@ b, strong { font-weight: 700; }
    7. CONTENT AREA
    ══════════════════════════════════════════════════════════════ */
 .content {
-  padding: 22px 26px 32px;
+  padding: 4px 26px 32px;
   max-width: 1820px;
   margin: 0 auto;
 }
@@ -477,13 +477,13 @@ b, strong { font-weight: 700; }
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: 8px;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-xl);
-  padding: 16px 18px;
+  padding: 10px 14px;
   margin-bottom: 16px;
   box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7);
 }
@@ -491,11 +491,11 @@ b, strong { font-weight: 700; }
 .fg {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .fg-lbl {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -505,11 +505,11 @@ b, strong { font-weight: 700; }
 .finp,
 .fsel {
   font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
-  font-size: 13px;
-  min-height: 40px;
-  padding: 8px 12px 8px 30px;
+  font-size: 12.5px;
+  min-height: 32px;
+  padding: 5px 10px 5px 26px;
   border: 1px solid var(--bd-light);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   color: var(--tx-main);
   direction: rtl;
@@ -517,22 +517,22 @@ b, strong { font-weight: 700; }
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235f7d95' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: left 10px center;
+  background-position: left 8px center;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 
 html[dir="ltr"] .finp,
 html[dir="ltr"] .fsel {
   direction: ltr;
-  padding: 8px 30px 8px 12px;
-  background-position: right 10px center;
+  padding: 5px 26px 5px 10px;
+  background-position: right 8px center;
 }
 
-.fsel { min-width: 120px; cursor: pointer; }
+.fsel { min-width: 96px; cursor: pointer; }
 .finp {
-  min-width: 180px;
+  min-width: 150px;
   background-image: none;
-  padding: 8px 12px;
+  padding: 5px 10px;
 }
 
 .finp:hover,
@@ -584,7 +584,7 @@ html[dir="ltr"] .fsel {
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-xl);
-  margin-bottom: 18px;
+  margin-bottom: 6px;
   box-shadow: var(--sh-card), inset 0 1px 0 rgba(255,255,255,.7);
   position: sticky;
   top: 60px;
@@ -2268,29 +2268,14 @@ tbody tr:last-child td { border-bottom: none; }
   50%       { opacity: .9; transform: translateY(-26px) scale(1); }
 }
 
-/* توهج دوري تلقائي — يتكرر كل بضع ثواني حتى بدون أي تفاعل من المستخدم */
-@keyframes fwIdleGlow {
-  0%, 100% {
-    box-shadow: 0 14px 34px -8px rgba(8,45,60,.28), inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px rgba(13,132,156,.06);
-  }
-  50% {
-    box-shadow: 0 16px 38px -6px rgba(13,132,156,.42), inset 0 1px 0 rgba(255,255,255,.7), 0 0 30px 6px rgba(20,160,186,.4);
-  }
+/* توهج القاعدة الزجاجية — مستمر طوال الوقت: يشتد تدريجياً ثم يهدأ ببطء ويتكرر */
+@keyframes fwGlowCycle {
+  0%   { box-shadow: 0 14px 34px -8px rgba(8,45,60,.3),  inset 0 1px 0 rgba(255,255,255,.6), 0 0 6px 1px rgba(20,160,186,.18); }
+  55%  { box-shadow: 0 18px 42px -6px rgba(13,132,156,.5), inset 0 1px 0 rgba(255,255,255,.78), 0 0 34px 8px rgba(20,160,186,.55); }
+  100% { box-shadow: 0 14px 34px -8px rgba(8,45,60,.3),  inset 0 1px 0 rgba(255,255,255,.6), 0 0 6px 1px rgba(20,160,186,.18); }
 }
-#fmbotWalker.fw-idle-glow::before {
-  animation: fwIdleGlow 1.8s ease-in-out;
-}
-
-/* نبضة/اهتزاز عند الضغط على الروبوت قبل فتح الشات */
-@keyframes fwClickPulse {
-  0%   { transform: scale(1)     rotate(0deg); }
-  25%  { transform: scale(.93)   rotate(-4deg); }
-  55%  { transform: scale(1.08)  rotate(3deg); }
-  80%  { transform: scale(.98)   rotate(-1deg); }
-  100% { transform: scale(1)     rotate(0deg); }
-}
-#fmbotWalker.fw-click-pulse {
-  animation: fwClickPulse .48s cubic-bezier(.36,1.6,.64,1);
+#fmbotWalker::before {
+  animation: fwGlowCycle 9s ease-in-out infinite;
 }
 
 .fcb-panel.open ~ #fmbotWalker,

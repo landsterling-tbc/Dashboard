@@ -15841,7 +15841,7 @@ window.addEventListener('load', function(){
   robot.position.y = -0.35;
 
   /* ═══════════ الحالات — تُقرأ من DOM دون تعديل أي منطق ═══════════ */
-  const S = { NEAR:false, LISTEN:false, THINK:false, SPEAK:0 };
+  const S = { NEAR:false, LISTEN:false, THINK:false, SPEAK:0, NOD:0 };
   const mouse = { x:0, y:0, active:false };
 
   document.addEventListener('mousemove', e=>{
@@ -15894,14 +15894,14 @@ window.addEventListener('load', function(){
     const e6 = Math.min(1, dt*6), e4 = Math.min(1, dt*4);
 
     if (!reduced){
-      /* ── تنفّس 1→1.03 + طفو ±4px (≈0.11 وحدة) ── */
-      const br = 1 + Math.sin(t*1.4)*0.015 + 0.015;
+      /* ── تنفّس أنعم وأهدأ + طفو أخف ── */
+      const br = 1 + Math.sin(t*1.0)*0.009 + 0.009;
       torso.scale.set(br, br, br);
-      robot.position.y = -0.35 + Math.sin(t*0.9)*0.11;
+      robot.position.y = -0.35 + Math.sin(t*0.6)*0.065;
 
-      /* ── تمايل يمين/يسار خامل ── */
-      const swayTarget = (S.LISTEN || S.THINK) ? 0 : Math.sin(t * 0.9) * 0.18;
-      robot.position.x = lerp(robot.position.x, swayTarget, Math.min(1, dt * 1.8));
+      /* ── تمايل يمين/يسار خامل أهدأ ── */
+      const swayTarget = (S.LISTEN || S.THINK) ? 0 : Math.sin(t * 0.55) * 0.1;
+      robot.position.x = lerp(robot.position.x, swayTarget, Math.min(1, dt * 1.4));
 
       /* ── حركة الرأس ── */
       if (S.LISTEN || S.THINK){
@@ -15923,6 +15923,13 @@ window.addEventListener('load', function(){
       /* إيماءة رأس أثناء التحدث */
       if (S.SPEAK > 0) headG.rotation.x += Math.sin(t*7)*0.03;
 
+      /* إيماءة ترحيب (هزة رأس) عند الضغط على الروبوت — أبطأ وأخف */
+      if (S.NOD > 0){
+        S.NOD -= dt;
+        const p = Math.max(0, 1 - S.NOD/1.3);
+        headG.rotation.x += Math.sin(p*Math.PI) * 0.09;
+      }
+
       /* ── العيون: تتبع + توسّع عند الاستماع ── */
       const eyeScale = S.LISTEN ? 1.22 : (S.NEAR ? 1.08 : 1);
       const ex = (S.NEAR && !S.LISTEN) ? mouse.x*0.05 : 0;
@@ -15939,8 +15946,8 @@ window.addEventListener('load', function(){
       if (nextBlink <= 0 && !S.LISTEN){ blink = 0.14; nextBlink = 4 + Math.random()*4; }
       if (blink > 0) blink -= dt;
 
-      /* ── الابتسامة: أعرض قليلاً عند الاقتراب ── */
-      const smile = S.NEAR ? 1.25 : 1;
+      /* ── الابتسامة: أعرض قليلاً عند الاقتراب، وأوسع عند الضغط (ترحيب) ── */
+      const smile = S.NOD > 0 ? 1.32 : (S.NEAR ? 1.25 : 1);
       mouthG.scale.x = lerp(mouthG.scale.x, smile, e4);
       /* حركة فم بسيطة أثناء التحدث */
       if (S.SPEAK > 0){
@@ -16019,22 +16026,10 @@ window.addEventListener('load', function(){
   /* Also disable on wallet click (they opened the chat) */
   holder.addEventListener('click', ()=>{
     bubble.classList.remove('show');
-    /* نبضة سريعة عند الضغط على الروبوت قبل فتح الشات */
-    holder.classList.remove('fw-click-pulse');
-    void holder.offsetWidth; /* إعادة تشغيل الـ animation */
-    holder.classList.add('fw-click-pulse');
-    setTimeout(()=> holder.classList.remove('fw-click-pulse'), 480);
+    /* إيماءة ترحيب (هزة رأس) + ابتسامة أوسع بدل التكبير/الاهتزاز */
+    S.NOD = 1.3;
     if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
   });
-
-  /* ══ توهج دوري تلقائي للروبوت كل بضع ثواني حتى بدون تفاعل ══ */
-  if (!reduced) {
-    setInterval(()=>{
-      if (holder.classList.contains('listening') || holder.classList.contains('thinking')) return;
-      holder.classList.add('fw-idle-glow');
-      setTimeout(()=> holder.classList.remove('fw-idle-glow'), 1800);
-    }, 7000);
-  }
 
   /* ══ ربط موضع الـ Bubble بالجزء العلوي من الـ Walker تلقائياً ══
      الـ bubble يظهر فوق رأس الروبوت مباشرة، ويتتبع حركته frame by frame ══ */
@@ -19433,7 +19428,7 @@ window.HASR = HASR;
    الفلاتر: city (من hasr-chart-city/hasr-filter-city), mainSys, subSys
    يُخزّن النتيجة في HASR._ctx ويُرجعها
 ════════════════════════════════════════════════════════════════ */
-function _hasrBuildCtx(mainSys, subSys, city, condition, reassessed) {
+function _hasrBuildCtx(mainSys, subSys, city, condition, reassessed, search) {
   if (!HASR.data) return null;
 
   const rawSchools = HASR.data.schools || [];
@@ -19442,6 +19437,7 @@ function _hasrBuildCtx(mainSys, subSys, city, condition, reassessed) {
   const fCity      = city      || '';
   const fCond      = condition || '';
   const fRe        = reassessed|| '';
+  const fSearch    = (search   || '').trim().toLowerCase();
 
   /* ── خطوة 1: فلترة المدارس حسب كل الفلاتر ── */
   let baseSchools;
@@ -19462,6 +19458,14 @@ function _hasrBuildCtx(mainSys, subSys, city, condition, reassessed) {
 
   /* ── فلتر المدينة يؤثر على الكل ── */
   if (fCity) baseSchools = baseSchools.filter(sc => sc.city === fCity);
+
+  /* ── فلتر البحث: الاسم أو الكود — يؤثر على الشارتات والـ KPIs والجدول ── */
+  if (fSearch) {
+    baseSchools = baseSchools.filter(sc =>
+      (sc.name  || '').toLowerCase().includes(fSearch) ||
+      (sc.code  || '').toLowerCase().includes(fSearch)
+    );
+  }
 
   /* ── فلتر إعادة التقييم ── */
   if (fRe) baseSchools = baseSchools.filter(sc => sc.reassessed === fRe);
@@ -19661,8 +19665,9 @@ function _hasrApplyFilters() {
   const city      = document.getElementById('hasr-global-city')?.value      || '';
   const condition = document.getElementById('hasr-global-condition')?.value  || '';
   const reassessed= document.getElementById('hasr-global-reassessed')?.value || '';
+  const search    = (document.getElementById('hasr-global-search')?.value || '').trim().toLowerCase();
   /* بناء الـ Context مرة واحدة بكل الفلاتر */
-  HASR._ctx = _hasrBuildCtx(mainSys, subSys, city, condition, reassessed);
+  HASR._ctx = _hasrBuildCtx(mainSys, subSys, city, condition, reassessed, search);
   /* رسم كل المكونات */
   _hasrRenderKPIs();
   _hasrChartCondition();
@@ -19966,6 +19971,122 @@ function hasrCloseSubPanel() {
 /* ════════════════════════════════════════════════════════════════
    نقطة الدخول الرئيسية
 ════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   🔍 Hasr Smart Search — اقتراحات ذكية لحقل البحث في حصر الأصول
+   نفس آلية setupSmartSearch في الداشبورد الرئيسي لكن تعمل على
+   HASR.data.schools وعند اختيار مدرسة تفتح hasrOpenDetail
+════════════════════════════════════════════════════════════════ */
+function _setupHasrSmartSearch() {
+  const input = document.getElementById('hasr-global-search');
+  if (!input || input._hasrSugAttached) return;
+  input._hasrSugAttached = true;
+
+  /* إزالة أي dropdown قديم */
+  const oldDrop = document.getElementById('hasr-sug-dropdown');
+  if (oldDrop) oldDrop.remove();
+
+  /* إنشاء حاوية الاقتراحات وإلحاقها بـ body (لتجاوز overflow:hidden) */
+  const dropdown = document.createElement('div');
+  dropdown.id = 'hasr-sug-dropdown';
+  dropdown.className = 'ix-search-suggestions';
+  document.body.appendChild(dropdown);
+
+  function positionDropdown() {
+    const r = input.getBoundingClientRect();
+    dropdown.style.top   = (r.bottom + 4) + 'px';
+    dropdown.style.left  = r.left + 'px';
+    dropdown.style.width = r.width + 'px';
+  }
+
+  let _sugTimer = null;
+
+  input.addEventListener('input', function () {
+    clearTimeout(_sugTimer);
+    /* نشغّل الفلتر الكامل بعد 300ms + نعرض الاقتراحات فوراً بعد 150ms */
+    _sugTimer = setTimeout(() => _showHasrSuggestions(this.value), 150);
+    /* الفلتر الكامل (KPIs + شارتات) بنفس debounce السابق */
+    clearTimeout(_hasrSearchTimer);
+    _hasrSearchTimer = setTimeout(_hasrApplyFilters, 300);
+  });
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const first = dropdown.querySelector('.ix-suggestion-item');
+      if (first) first.focus();
+    }
+    if (e.key === 'Escape') {
+      dropdown.classList.remove('ix-open');
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target !== input && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('ix-open');
+    }
+  });
+
+  window.addEventListener('scroll', function () {
+    if (dropdown.classList.contains('ix-open')) positionDropdown();
+  }, true);
+  window.addEventListener('resize', function () {
+    if (dropdown.classList.contains('ix-open')) positionDropdown();
+  });
+
+  function _hEsc(str) {
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function _showHasrSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q || q.length < 2) { dropdown.classList.remove('ix-open'); return; }
+
+    const schools = (HASR.data && HASR.data.schools) || [];
+    const matches = schools.filter(sc =>
+      (sc.name || '').toLowerCase().includes(q) ||
+      (sc.code || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+
+    if (!matches.length) { dropdown.classList.remove('ix-open'); return; }
+
+    /* نتيجة واحدة → افتح التفاصيل مباشرة */
+    if (matches.length === 1) {
+      dropdown.classList.remove('ix-open');
+      hasrOpenDetail(matches[0].code);
+      return;
+    }
+
+    const highlight = (str) => {
+      if (!str) return '—';
+      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      return _hEsc(str).replace(re, '<mark class="ix-sug-mark">$1</mark>');
+    };
+
+    const totalMatches = schools.filter(sc => (sc.name||'').toLowerCase().includes(q)).length;
+
+    dropdown.innerHTML = matches.map((sc, i) =>
+      `<div class="ix-suggestion-item" tabindex="0" data-hasr-idx="${i}"
+        role="option"
+        onkeydown="if(event.key==='Enter')this.click()"
+        onclick="window.__hasrSugClick(${i})">
+        <div class="ix-sug-name">${highlight(sc.name)}</div>
+        <div class="ix-sug-meta">${_hEsc(sc.city||'')} · ${_hEsc(sc.district||'')} · رقم: ${_hEsc(sc.code||'')}</div>
+      </div>`
+    ).join('') + (totalMatches > 10
+      ? `<div style="padding:8px 14px;font-size:10px;color:var(--tx-muted);text-align:center">وغيرها... دقّق البحث لنتائج أفضل</div>`
+      : '');
+
+    window.__hasrSugMatches = matches;
+    window.__hasrSugClick = function (idx) {
+      dropdown.classList.remove('ix-open');
+      hasrOpenDetail(window.__hasrSugMatches[idx].code);
+    };
+
+    positionDropdown();
+    dropdown.classList.add('ix-open');
+  }
+}
+
 function renderHasrTab() {
   _hasrInjectDOM();
   if (HASR.loaded && HASR.data) { _hasrRenderAll(); return; }
@@ -20040,7 +20161,8 @@ function _hasrRenderAll() {
     HASR._filterSub,
     document.getElementById('hasr-global-city')?.value      || '',
     document.getElementById('hasr-global-condition')?.value  || '',
-    document.getElementById('hasr-global-reassessed')?.value || ''
+    document.getElementById('hasr-global-reassessed')?.value || '',
+    (document.getElementById('hasr-global-search')?.value   || '').trim().toLowerCase()
   );
   /* ملء الفلاتر (مرة واحدة) */
   _hasrFillFilters();
@@ -20053,6 +20175,8 @@ function _hasrRenderAll() {
   _hasrChartCities();
   renderHasrTable();
   _hasrRenderFilterBanner();
+  /* تفعيل الاقتراحات الذكية على حقل البحث (مرة واحدة) */
+  _setupHasrSmartSearch();
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -20843,6 +20967,13 @@ function _hasrFillFilters() {
 }
 
 /* نقطة الدخول من شريط الفلاتر الموحد */
+/* debounce للبحث في حصر الأصول — مثل debounceFilter في الداشبورد الرئيسي */
+let _hasrSearchTimer = null;
+function hasrDebounceFilter() {
+  clearTimeout(_hasrSearchTimer);
+  _hasrSearchTimer = setTimeout(_hasrApplyFilters, 300);
+}
+
 function hasrGlobalFilterChanged() {
   _hasrApplyFilters();
 }
@@ -20901,15 +21032,11 @@ function _hasrChartCities() {
 ════════════════════════════════════════════════════════════════ */
 function renderHasrTable() {
   if(!HASR._ctx)return;
-  /* schools في _ctx مفلترة بالفعل بالمدينة/الحالة/معادة — هنا بس فلتر البحث */
+  /* schools في _ctx مفلترة بالفعل بكل الفلاتر بما فيها البحث */
   const sc   = HASR._ctx.schools;
-  const q    =(document.getElementById('hasr-global-search')?.value||'').trim().toLowerCase();
   const sort = document.getElementById('hasr-sort')?.value||'assets_desc';
 
-  let list=sc.filter(x=>{
-    if(q&&!x.name.toLowerCase().includes(q)&&!(x.code||'').toLowerCase().includes(q))return false;
-    return true;
-  });
+  let list=sc.slice();
   list.sort((a,b)=>sort==='assets_desc'?b.totalAssets-a.totalAssets:sort==='assets_asc'?a.totalAssets-b.totalAssets:sort==='name'?a.name.localeCompare(b.name,'ar'):a.city.localeCompare(b.city,'ar'));
   HASR.filtered=list; HASR.page=0;
   _hS('hasr-tbl-count',list.length.toLocaleString('ar')+' مدرسة');

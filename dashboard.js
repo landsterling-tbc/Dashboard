@@ -4266,7 +4266,6 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
   const allRows = window.RAW_SECURITY_SAFETY || [];
   if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
-      <div style="font-size:48px;margin-bottom:12px">🛡️</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات أمن وسلامة</div>
       <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "بلاغات_أمن_وسلامة" وأن الـ Apps Script يقرأها</div>
     </div>`;
@@ -4294,6 +4293,7 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
   });
 
   const n_    = (v) => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+  const pct2  = (n, t) => t ? ((n / t) * 100).toFixed(1) + "%" : "0.0%";
   const total      = rows.length;
   const totalDeaths = rows.reduce((s,r) => s + n_(r["وفيات"]), 0);
   const totalInj    = rows.reduce((s,r) => s + n_(r["إصابات"]), 0);
@@ -4328,54 +4328,72 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
   const recent = [...rows].reverse().slice(0,20);
 
   el.innerHTML = `
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
-    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
-    <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
-      <label style="font-size:11px;color:var(--tx-muted)">من</label>
-      <input type="date" id="sec-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
-        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-        onchange="renderSecuritySafetyTab(this.value, document.getElementById('sec-date-to').value)">
-      <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
-      <input type="date" id="sec-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
-        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-        onchange="renderSecuritySafetyTab(document.getElementById('sec-date-from').value, this.value)">
-      <button onclick="renderSecuritySafetyTab('${minDate}','${maxDate}')"
-        style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+  <div class="card mb14">
+    <div class="card-title">
+      <span>لوحة الأمن والسلامة</span>
+      <span class="sub">${total.toLocaleString()} بلاغ</span>
     </div>
-    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} بلاغ</span>
-  </div>
 
-  <div class="sec-kpi-grid">
-    <div class="sec-kpi-card" style="--sec-accent:#7d1f2c;--sec-bg:#fdf0f2">
-      <div class="sec-kpi-icon">🛡️</div>
-      <div class="sec-kpi-body">
-        <div class="sec-kpi-val" style="color:#7d1f2c">${total.toLocaleString()}</div>
-        <div class="sec-kpi-lbl">إجمالي البلاغات</div>
-        <div class="sec-kpi-sub">${duplicates} مكرر محتمل</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:16px">
+      <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">فلتر التاريخ</span>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+        <label style="font-size:11px;color:var(--tx-muted)">من</label>
+        <input type="date" id="sec-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
+          style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+          onchange="renderSecuritySafetyTab(this.value, document.getElementById('sec-date-to').value)">
+        <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
+        <input type="date" id="sec-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
+          style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+          onchange="renderSecuritySafetyTab(document.getElementById('sec-date-from').value, this.value)">
+        <button onclick="renderSecuritySafetyTab('${minDate}','${maxDate}')"
+          style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} بلاغ بعد الفلترة</span>
+    </div>
+
+    <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
+      <div class="kpi kc-amber">
+        <div class="kpi-val" style="color:#D97706">${total.toLocaleString()}</div>
+        <div class="kpi-lbl">إجمالي البلاغات</div>
+        <div class="kpi-sub">${duplicates} مكرر محتمل</div>
+      </div>
+      <div class="kpi kc-purple">
+        <div class="kpi-val" style="color:#6D28D9">${totalInj.toLocaleString()}</div>
+        <div class="kpi-lbl">إجمالي الإصابات</div>
+        <div class="kpi-sub">وفيات: ${totalDeaths}</div>
+      </div>
+      <div class="kpi kc-red">
+        <div class="kpi-val" style="color:#991b1b">${critical.toLocaleString()}</div>
+        <div class="kpi-lbl">حالات حرجة</div>
+        <div class="kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val" style="color:#059669">${doneInv.toLocaleString()}</div>
+        <div class="kpi-lbl">التحقيقات المكتملة</div>
+        <div class="kpi-sub">من ${needInv} مطلوبة</div>
       </div>
     </div>
-    <div class="sec-kpi-card" style="--sec-accent:#6c2bd9;--sec-bg:#f3eefe">
-      <div class="sec-kpi-icon">🤕</div>
-      <div class="sec-kpi-body">
-        <div class="sec-kpi-val" style="color:#6c2bd9">${totalInj.toLocaleString()}</div>
-        <div class="sec-kpi-lbl">إجمالي الإصابات</div>
-        <div class="sec-kpi-sub">وفيات: ${totalDeaths}</div>
+
+    <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px">
+      <div class="kpi kc-navy">
+        <div class="kpi-val" style="color:#083D4F">${needInv.toLocaleString()}</div>
+        <div class="kpi-lbl">تحتاج تحقيق</div>
+        <div class="kpi-sub">${pct2(needInv,total)} من الإجمالي</div>
       </div>
-    </div>
-    <div class="sec-kpi-card" style="--sec-accent:#c07a14;--sec-bg:#fdf6ec">
-      <div class="sec-kpi-icon">⚠️</div>
-      <div class="sec-kpi-body">
-        <div class="sec-kpi-val" style="color:#c07a14">${critical.toLocaleString()}</div>
-        <div class="sec-kpi-lbl">حالات حرجة</div>
-        <div class="sec-kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+      <div class="kpi kc-teal">
+        <div class="kpi-val" style="color:#0E7490">${withReply.toLocaleString()}</div>
+        <div class="kpi-lbl">استجابة بإفادة</div>
+        <div class="kpi-sub">${pct2(withReply,total)} من الإجمالي</div>
       </div>
-    </div>
-    <div class="sec-kpi-card" style="--sec-accent:#066a52;--sec-bg:#edfaf5">
-      <div class="sec-kpi-icon">🔍</div>
-      <div class="sec-kpi-body">
-        <div class="sec-kpi-val" style="color:#066a52">${doneInv.toLocaleString()}</div>
-        <div class="sec-kpi-lbl">التحقيقات المكتملة</div>
-        <div class="sec-kpi-sub">من ${needInv} مطلوبة · ${withReply} إفادة</div>
+      <div class="kpi kc-blue">
+        <div class="kpi-val" style="color:#0891B2">${duplicates.toLocaleString()}</div>
+        <div class="kpi-lbl">مكرر محتمل</div>
+        <div class="kpi-sub">${pct2(duplicates,total)} من الإجمالي</div>
+      </div>
+      <div class="kpi kc-red" style="border-top-color:#DC2626">
+        <div class="kpi-val" style="color:#DC2626;font-size:28px">${totalDeaths.toLocaleString()}</div>
+        <div class="kpi-lbl">إجمالي الوفيات</div>
+        <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
       </div>
     </div>
   </div>
@@ -4424,7 +4442,7 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
             const isCritical = r["حرج"] === "نعم";
             const d = n_(r["وفيات"]), inj = n_(r["إصابات"]);
             const invStatus = r["اكتمل التحقيق"]==="نعم"
-              ? `<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>`
+              ? `<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">مكتمل</span>`
               : r["يجب التحقيق"]==="نعم"
                 ? `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">معلق</span>`
                 : `<span style="color:var(--tx-muted)">—</span>`;
@@ -16001,8 +16019,22 @@ window.addEventListener('load', function(){
   /* Also disable on wallet click (they opened the chat) */
   holder.addEventListener('click', ()=>{
     bubble.classList.remove('show');
+    /* نبضة سريعة عند الضغط على الروبوت قبل فتح الشات */
+    holder.classList.remove('fw-click-pulse');
+    void holder.offsetWidth; /* إعادة تشغيل الـ animation */
+    holder.classList.add('fw-click-pulse');
+    setTimeout(()=> holder.classList.remove('fw-click-pulse'), 480);
     if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
   });
+
+  /* ══ توهج دوري تلقائي للروبوت كل بضع ثواني حتى بدون تفاعل ══ */
+  if (!reduced) {
+    setInterval(()=>{
+      if (holder.classList.contains('listening') || holder.classList.contains('thinking')) return;
+      holder.classList.add('fw-idle-glow');
+      setTimeout(()=> holder.classList.remove('fw-idle-glow'), 1800);
+    }, 7000);
+  }
 
   /* ══ ربط موضع الـ Bubble بالجزء العلوي من الـ Walker تلقائياً ══
      الـ bubble يظهر فوق رأس الروبوت مباشرة، ويتتبع حركته frame by frame ══ */
@@ -16010,7 +16042,7 @@ window.addEventListener('load', function(){
   function syncBubblePos(){
     const rect = holder.getBoundingClientRect();
     /* نضع الـ bubble فوق أعلى نقطة في الروبوت + 12px فراغ */
-    const bBottom = Math.round(window.innerHeight - rect.top + 12);
+    const bBottom = Math.round(window.innerHeight - rect.top + 2);
     /* نمركز الـ bubble أفقياً على الروبوت */
     const bLeft   = Math.round(rect.left + rect.width / 2 - 95);
     /* نحدّث فقط لو تغيرت القيمة بأكثر من pixel واحد (توفير performance) */

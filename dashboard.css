@@ -2268,6 +2268,31 @@ tbody tr:last-child td { border-bottom: none; }
   50%       { opacity: .9; transform: translateY(-26px) scale(1); }
 }
 
+/* توهج دوري تلقائي — يتكرر كل بضع ثواني حتى بدون أي تفاعل من المستخدم */
+@keyframes fwIdleGlow {
+  0%, 100% {
+    box-shadow: 0 14px 34px -8px rgba(8,45,60,.28), inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px rgba(13,132,156,.06);
+  }
+  50% {
+    box-shadow: 0 16px 38px -6px rgba(13,132,156,.42), inset 0 1px 0 rgba(255,255,255,.7), 0 0 30px 6px rgba(20,160,186,.4);
+  }
+}
+#fmbotWalker.fw-idle-glow::before {
+  animation: fwIdleGlow 1.8s ease-in-out;
+}
+
+/* نبضة/اهتزاز عند الضغط على الروبوت قبل فتح الشات */
+@keyframes fwClickPulse {
+  0%   { transform: scale(1)     rotate(0deg); }
+  25%  { transform: scale(.93)   rotate(-4deg); }
+  55%  { transform: scale(1.08)  rotate(3deg); }
+  80%  { transform: scale(.98)   rotate(-1deg); }
+  100% { transform: scale(1)     rotate(0deg); }
+}
+#fmbotWalker.fw-click-pulse {
+  animation: fwClickPulse .48s cubic-bezier(.36,1.6,.64,1);
+}
+
 .fcb-panel.open ~ #fmbotWalker,
 #fmbotWalker.over-panel {
   bottom: calc(22px + 560px - 80px);

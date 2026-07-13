@@ -10185,13 +10185,21 @@ function renderKhanadeqTab() {
 
   <!-- ── جدول المدن ── -->
   <div class="card" style="margin-bottom:16px">
-    <div class="card-title">
-      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED">🕳️</span>
-      ملخص خنادق الصرف حسب المدينة
-      <span class="sub">${cityData.length} مدينة · ${totalSchools.toLocaleString()} مدرسة</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <div class="card-title" style="margin:0;padding:0;border:0">
+        <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED">🕳️</span>
+        ملخص خنادق الصرف حسب المدينة
+        <span class="sub">${cityData.length} مدينة · ${totalSchools.toLocaleString()} مدرسة</span>
+      </div>
+      <select class="fsel" id="kh-sort" onchange="window.__renderKhanadeqSort && window.__renderKhanadeqSort()" style="font-size:11px">
+        <option value="city">المدينة (أبجدي)</option>
+        <option value="schools_desc">عدد المدارس ↓</option>
+        <option value="khanadeq_desc" selected>عدد الخنادق ↓</option>
+        <option value="ratio_desc">الخندق/مدرسة ↓</option>
+      </select>
     </div>
     <div class="tbl-wrap">
-      <table>
+      <table id="kh-table">
         <thead>
           <tr>
             <th style="text-align:right;padding-right:18px">المدينة</th>
@@ -10202,7 +10210,7 @@ function renderKhanadeqTab() {
             <th>التوزيع</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="kh-tbody">
           ${cityData
             .map((r, i) => {
               const ratio = r.schools > 0 ? (r.khanadeq / r.schools).toFixed(2) : "—";
@@ -10417,6 +10425,30 @@ function renderKhanadeqTab() {
       });
     }
   });
+
+  // ── فلتر الترتيب للجدول ──
+  window.__renderKhanadeqSort = function() {
+    var sort = document.getElementById('kh-sort') ? document.getElementById('kh-sort').value : 'khanadeq_desc';
+    var tbody = document.getElementById('kh-tbody');
+    if (!tbody) return;
+    var data = window.RAW_KHANADEQ_CITY_DATA || [];
+    var totalKhanadeq = data.reduce(function(s,r){return s+r.khanadeq;},0);
+    var sorted = data.slice().sort(function(a,b){
+      if (sort==='city') return a.city.localeCompare(b.city,'ar');
+      if (sort==='schools_desc') return b.schools - a.schools;
+      if (sort==='khanadeq_desc') return b.khanadeq - a.khanadeq;
+      if (sort==='ratio_desc') return (b.khanadeq/Math.max(b.schools,1)) - (a.khanadeq/Math.max(a.schools,1));
+      return 0;
+    });
+    var COLORS=['#7C3AED','#0891B2','#059669','#D97706','#6366F1','#0891B2','#DC2626','#D97706','#0891B2'];
+    tbody.innerHTML = sorted.map(function(r,i){
+      var ratio = r.schools>0?(r.khanadeq/r.schools).toFixed(2):'—';
+      var pct = totalKhanadeq>0?((r.khanadeq/totalKhanadeq)*100).toFixed(1):0;
+      var barW = totalKhanadeq>0?Math.round((r.khanadeq/totalKhanadeq)*100):0;
+      var color = COLORS[i%COLORS.length];
+      return '<tr><td style="text-align:right;padding-right:18px;font-weight:700">'+r.city+'</td><td style="font-weight:700;color:#083D4F">'+r.schools.toLocaleString()+'</td><td style="font-weight:800;color:'+color+';font-size:15px">'+(r.khanadeq>0?r.khanadeq.toLocaleString():'—')+'</td><td style="font-weight:700;color:#059669">'+(r.khanadeq>0?ratio:'—')+'</td><td style="font-size:11px;color:var(--tx-muted)">'+(r.khanadeq>0?pct+'%':'—')+'</td><td style="min-width:120px"><div style="background:#F3F4F6;border-radius:999px;height:8px;overflow:hidden;width:100%"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:999px"></div></div></td></tr>';
+    }).join('');
+  };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -18734,9 +18766,28 @@ function renderFuelTab(_fromDate, _toDate) {
   </div>
 
   <div class="card">
-    <div class="card-title">آخر 30 سجل وقود <span class="sub">من الأحدث للأقدم</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">سجلات الوقود <span class="sub" id="fuel-tbl-cnt"></span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="fuel-sort" onchange="window.__fuelSort && window.__fuelSort()" style="font-size:11px">
+          <option value="date_desc" selected>التاريخ ↓ الأحدث</option>
+          <option value="date_asc">التاريخ ↑ الأقدم</option>
+          <option value="cost_desc">التكلفة ↓</option>
+          <option value="cost_asc">التكلفة ↑</option>
+          <option value="liters_desc">اللترات ↓</option>
+          <option value="driver">السائق (أبجدي)</option>
+          <option value="region">المنطقة (أبجدي)</option>
+        </select>
+        <select class="fsel" id="fuel-limit" onchange="window.__fuelSort && window.__fuelSort()" style="font-size:11px">
+          <option value="30">آخر 30</option>
+          <option value="50">50 سجل</option>
+          <option value="100">100 سجل</option>
+          <option value="99999">الكل</option>
+        </select>
+      </div>
+    </div>
     <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px" id="fuel-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">التاريخ</th>
           <th style="padding:8px 10px;text-align:right">لوحة السيارة</th>
@@ -18746,7 +18797,7 @@ function renderFuelTab(_fromDate, _toDate) {
           <th style="padding:8px 10px;text-align:center">اللترات</th>
           <th style="padding:8px 10px;text-align:center">التكلفة (ر.س)</th>
         </tr></thead>
-        <tbody>
+        <tbody id="fuel-tbody">
           ${[...rows].reverse().slice(0,30).map(r=>`<tr style="border-bottom:1px solid var(--brd)">
             <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(r["التاريخ"])||"—"}</td>
             <td style="padding:6px 10px;font-weight:600;color:#0891B2">${esc(r["لوحة_السيارة"])||"—"}</td>
@@ -18815,6 +18866,41 @@ function renderFuelTab(_fromDate, _toDate) {
       });
     }
   });
+
+  // ── فلتر الترتيب لجدول الوقود ──
+  window.__fuelSort = function() {
+    var sort = document.getElementById('fuel-sort') ? document.getElementById('fuel-sort').value : 'date_desc';
+    var limit = parseInt(document.getElementById('fuel-limit') ? document.getElementById('fuel-limit').value : '30') || 30;
+    var tbody = document.getElementById('fuel-tbody');
+    var cntEl = document.getElementById('fuel-tbl-cnt');
+    if (!tbody) return;
+    var rows = window.RAW_FUEL ? [...window.RAW_FUEL] : [];
+    rows.sort(function(a,b){
+      if (sort==='date_desc') return String(b['التاريخ']||'').localeCompare(String(a['التاريخ']||''));
+      if (sort==='date_asc')  return String(a['التاريخ']||'').localeCompare(String(b['التاريخ']||''));
+      if (sort==='cost_desc') return Number(b['التكلفة']||0) - Number(a['التكلفة']||0);
+      if (sort==='cost_asc')  return Number(a['التكلفة']||0) - Number(b['التكلفة']||0);
+      if (sort==='liters_desc') return Number(b['اللترات']||0) - Number(a['اللترات']||0);
+      if (sort==='driver') return String(a['اسم_السائق']||'').localeCompare(String(b['اسم_السائق']||''),'ar');
+      if (sort==='region') return String(a['المنطقة']||a['المجموعة']||'').localeCompare(String(b['المنطقة']||b['المجموعة']||''),'ar');
+      return 0;
+    });
+    var limited = limit >= 99999 ? rows : rows.slice(0, limit);
+    if (cntEl) cntEl.textContent = limited.length + ' من ' + rows.length + ' سجل';
+    function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
+    tbody.innerHTML = limited.map(function(r){
+      return '<tr style="border-bottom:1px solid var(--brd)">'+
+        '<td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">'+esc(r['التاريخ']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-weight:600;color:#0891B2">'+esc(r['لوحة_السيارة']||'—')+'</td>'+
+        '<td style="padding:6px 10px">'+esc(r['الطراز']||'—')+'</td>'+
+        '<td style="padding:6px 10px">'+esc(r['اسم_السائق']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px">'+esc(r['المنطقة']||r['المجموعة']||'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:600">'+n_(r['اللترات']).toFixed(1)+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:600;color:#059669">'+n_(r['التكلفة']).toLocaleString()+'</td>'+
+        '</tr>';
+    }).join('');
+  };
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -18903,10 +18989,20 @@ function renderVehiclesTab() {
   </div>
 
   <div class="card">
-    <div class="card-title">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
+      <select class="fsel" id="veh-sort" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
+        <option value="plate">رقم اللوحة (أبجدي)</option>
+        <option value="make">الماركة (أبجدي)</option>
+        <option value="year_desc" selected>السنة ↓ الأحدث</option>
+        <option value="year_asc">السنة ↑ الأقدم</option>
+        <option value="loc">الموقع (أبجدي)</option>
+        <option value="fault">الأعطال أولاً</option>
+      </select>
+    </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
     <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="veh-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
           <th style="padding:8px 10px;text-align:right">الماركة</th>
@@ -18917,7 +19013,7 @@ function renderVehiclesTab() {
           <th style="padding:8px 10px;text-align:center">أعطال/حوادث</th>
           <th style="padding:8px 10px;text-align:right">ملاحظات</th>
         </tr></thead>
-        <tbody>
+        <tbody id="veh-tbody">
           ${rows.map(r => {
             const hasFault = r["اعطال/حوادث"] && r["اعطال/حوادث"] !== "لا يوجد";
             return `<tr style="border-bottom:1px solid var(--brd);${hasFault?'background:#FEF2F2':''}">
@@ -18971,6 +19067,39 @@ function renderVehiclesTab() {
       });
     }
   });
+
+  // ── فلتر الترتيب لجدول السيارات ──
+  window.__vehSort = function() {
+    var sort = document.getElementById('veh-sort') ? document.getElementById('veh-sort').value : 'year_desc';
+    var tbody = document.getElementById('veh-tbody');
+    if (!tbody) return;
+    var rows = window.RAW_VEHICLES ? [...window.RAW_VEHICLES] : [];
+    rows.sort(function(a,b){
+      if (sort==='plate') return String(a['رقم اللوحة']||'').localeCompare(String(b['رقم اللوحة']||''),'ar');
+      if (sort==='make') return String(a['الماركة']||'').localeCompare(String(b['الماركة']||''),'ar');
+      if (sort==='year_desc') return Number(b['سنة الصنع']||0) - Number(a['سنة الصنع']||0);
+      if (sort==='year_asc') return Number(a['سنة الصنع']||0) - Number(b['سنة الصنع']||0);
+      if (sort==='loc') return String(a['موقع السيارة']||'').localeCompare(String(b['موقع السيارة']||''),'ar');
+      if (sort==='fault') { var fa=a['اعطال/حوادث']&&a['اعطال/حوادث']!=='لا يوجد'?0:1; var fb=b['اعطال/حوادث']&&b['اعطال/حوادث']!=='لا يوجد'?0:1; return fa-fb; }
+      return 0;
+    });
+    function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    tbody.innerHTML = rows.map(function(r){
+      var hasFault = r['اعطال/حوادث'] && r['اعطال/حوادث'] !== 'لا يوجد';
+      return '<tr style="border-bottom:1px solid var(--brd);'+(hasFault?'background:#FEF2F2':'')+'">'+
+        '<td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">'+esc(r['رقم اللوحة']||'—')+'</td>'+
+        '<td style="padding:6px 10px">'+esc(r['الماركة']||'—')+'</td>'+
+        '<td style="padding:6px 10px">'+esc(r['الطراز']||'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center">'+esc(r['سنة الصنع']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px">'+esc(r['اسم المستخدم']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px">'+esc(r['موقع السيارة']||'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center">'+(hasFault
+          ?'<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ '+esc(r['اعطال/حوادث'])+'</span>'
+          :'<span style="color:var(--tx-muted);font-size:11px">—</span>')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">'+esc(r['ملاحظات']||'—')+'</td>'+
+        '</tr>';
+    }).join('');
+  };
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -19111,10 +19240,20 @@ function renderTrainingTab(_fromDate, _toDate) {
   </div>
 
   <div class="card">
-    <div class="card-title">قائمة المتدربين <span class="sub">${total} متدرب</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المتدربين <span class="sub">${total} متدرب</span></div>
+      <select class="fsel" id="train-sort" onchange="window.__trainSort && window.__trainSort()" style="font-size:11px">
+        <option value="name" selected>الاسم (أبجدي)</option>
+        <option value="units12_desc">وحدات النظافة ↓</option>
+        <option value="score_desc">الدرجة ↓ الأعلى</option>
+        <option value="score_asc">الدرجة ↑ الأقل</option>
+        <option value="units24_desc">وحدات المشرفين ↓</option>
+        <option value="never_in">لم يدخل المنصة أولاً</option>
+      </select>
+    </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
     <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="train-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">الاسم</th>
           <th style="padding:8px 10px;text-align:right">آخر دخول</th>
@@ -19125,7 +19264,7 @@ function renderTrainingTab(_fromDate, _toDate) {
           <th style="padding:8px 10px;text-align:center">وحدات (24)</th>
           <th style="padding:8px 10px;text-align:right">ملاحظات</th>
         </tr></thead>
-        <tbody>
+        <tbody id="train-tbody">
           ${rows.map(r => {
             const cleanDone = (r["حالة دورة النظافة"]||"").includes("مكتمل");
             const supDone   = (r["حالة برنامج المشرفين"]||"").includes("مكتمل");
@@ -19188,6 +19327,50 @@ function renderTrainingTab(_fromDate, _toDate) {
       });
     }
   });
+
+  // ── فلتر الترتيب لجدول المتدربين ──
+  window.__trainSort = function() {
+    var sort = document.getElementById('train-sort') ? document.getElementById('train-sort').value : 'name';
+    var tbody = document.getElementById('train-tbody');
+    if (!tbody) return;
+    var rows = window.RAW_TRAINING ? [...window.RAW_TRAINING] : [];
+    function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
+    rows.sort(function(a,b){
+      if (sort==='name') return String(a['الاسم']||'').localeCompare(String(b['الاسم']||''),'ar');
+      if (sort==='units12_desc') return n_(b['وحدات مكتملة (من 12)']) - n_(a['وحدات مكتملة (من 12)']);
+      if (sort==='score_desc')   return n_(b['متوسط الدرجة %']) - n_(a['متوسط الدرجة %']);
+      if (sort==='score_asc')    return n_(a['متوسط الدرجة %']) - n_(b['متوسط الدرجة %']);
+      if (sort==='units24_desc') return n_(b['وحدات مكتملة (من 24)']) - n_(a['وحدات مكتملة (من 24)']);
+      if (sort==='never_in') {
+        var fa = String(a['آخر دخول للمنصة']||'').includes('لم يدخل')?0:1;
+        var fb = String(b['آخر دخول للمنصة']||'').includes('لم يدخل')?0:1;
+        return fa - fb;
+      }
+      return 0;
+    });
+    function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    tbody.innerHTML = rows.map(function(r){
+      var cleanDone = String(r['حالة دورة النظافة']||'').includes('مكتمل');
+      var supDone   = String(r['حالة برنامج المشرفين']||'').includes('مكتمل');
+      var neverIn   = String(r['آخر دخول للمنصة']||'').includes('لم يدخل');
+      var score     = n_(r['متوسط الدرجة %']);
+      var scoreColor = score>=80?'#16A34A':score>=60?'#D97706':'#DC2626';
+      return '<tr style="border-bottom:1px solid var(--brd)'+(neverIn?';background:#FFFBEB':'')+'">'+
+        '<td style="padding:6px 10px;font-weight:600">'+esc(r['الاسم']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px;color:'+(neverIn?'#DC2626':'var(--tx-muted)')+'">'+esc(r['آخر دخول للمنصة']||'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center">'+(cleanDone
+          ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
+          :'<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r['حالة دورة النظافة']||'—')+'</span>')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r['وحدات مكتملة (من 12)']||'0')+' / 12</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+scoreColor+'">'+(score?score+'%':'—')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center">'+(supDone
+          ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
+          :'<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r['حالة برنامج المشرفين']||'—')+'</span>')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r['وحدات مكتملة (من 24)']||'0')+' / 24</td>'+
+        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">'+esc(r['ملاحظات التنظيف']||'—')+'</td>'+
+        '</tr>';
+    }).join('');
+  };
 }
 
 /* ══════════════════════════════════════════════════════════════════

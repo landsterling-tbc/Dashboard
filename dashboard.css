@@ -2279,33 +2279,71 @@ tbody tr:last-child td { border-bottom: none; }
 /* ══════════════════════════════════════════════════════════════
    34. HINT BUBBLE
    ══════════════════════════════════════════════════════════════ */
+
+/* حركة الطفو المتزامنة مع الروبوت (نفس sin(t*0.9)*0.11 ~ 9.9px) */
+/* ══ الـ bubble يطفو مع الروبوت بدون animation CSS — الـ JS يتحكم في bottom مباشرة ══ */
+
+/* توهج انتباه متكرر */
+@keyframes bubbleGlow {
+  0%, 100% {
+    box-shadow: 0 8px 24px -4px rgba(8,45,60,.35),
+                0 0 0 1px rgba(20,160,186,.15);
+  }
+  50% {
+    box-shadow: 0 8px 24px -4px rgba(8,45,60,.35),
+                0 0 0 3px rgba(20,160,186,.55),
+                0 0 22px 6px rgba(20,160,186,.28);
+  }
+}
+
+/* تأثير الضغط */
+@keyframes bubblePop {
+  0%   { transform: scale(1);    filter: brightness(1); }
+  30%  { transform: scale(0.88); filter: brightness(1.3); }
+  65%  { transform: scale(1.08); filter: brightness(1.15); }
+  100% { transform: scale(1);    filter: brightness(1); }
+}
+
 #fmbotBubble {
   position: fixed;
-  bottom: 150px;
   left: 20px;
-  background: rgba(6,30,42,.85);
+  bottom: 220px; /* يُحدَّث بالـ JS */
+  background: rgba(6,30,42,.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid rgba(20,160,186,.35);
   color: #e6f7fc;
   font-family: 'Tajawal','IBM Plex Sans Arabic',sans-serif;
   padding: 10px 16px 10px 14px;
   border-radius: 14px 14px 14px 4px;
-  box-shadow: 0 12px 32px -8px rgba(8,45,60,.4), 0 0 0 1px rgba(20,160,186,.1);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   direction: rtl;
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity .55s var(--ease-std), transform .55s var(--ease-std);
   z-index: 1215;
   min-width: 180px;
   max-width: 240px;
+  transition: opacity .45s ease;
+  /* توهج انتباه */
+  animation: bubbleGlow 2.8s ease-in-out 4s infinite;
+}
+
+#fmbotBubble.show { opacity: 1; }
+
+/* تأثير الضغط يلغي الـ glow مؤقتاً */
+#fmbotBubble.popped {
+  animation: bubblePop .38s cubic-bezier(.36,1.6,.64,1) forwards;
+}
+
+#fmbotBubble:hover {
+  border-color: rgba(20,160,186,.6);
+  background: rgba(8,40,56,.92);
 }
 
 #fmbotBubble .bbl-line1 { font-size: 12px; font-weight: 700; letter-spacing: .15px; color: #e6f7fc; line-height: 1.4; display: block; }
 #fmbotBubble .bbl-line2 { font-size: 11px; font-weight: 500; color: rgba(156,217,236,.8); display: block; margin-top: 2px; line-height: 1.3; }
-#fmbotBubble.show { opacity: 1; transform: translateY(0); }
-#fmbotBubble::after { content: ''; position: absolute; bottom: -8px; left: 18px; border: 8px solid transparent; border-top-color: rgba(6,30,42,.85); border-bottom: 0; }
+/* السهم لأسفل نحو الروبوت */
+#fmbotBubble::after { content: ''; position: absolute; bottom: -8px; left: 22px; border: 8px solid transparent; border-top-color: rgba(6,30,42,.88); border-bottom: 0; }
 
 /* ══════════════════════════════════════════════════════════════
    35. HIDE / SHOW BOT BUTTONS
@@ -2377,6 +2415,83 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 .card[style*="border-top"]:hover {
   transform: translateY(-3px) !important;
   box-shadow: 0 2px 4px rgba(8,45,60,.06), 0 10px 28px rgba(8,45,60,.13), inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   36-A. كروت تبويب الأمن والسلامة
+   ══════════════════════════════════════════════════════════════ */
+.sec-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sec-kpi-card {
+  background: var(--bg-3);
+  border-radius: var(--r-lg);
+  padding: 20px 18px 16px;
+  box-shadow: var(--sh-card);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--bd-light);
+  transition: transform .22s cubic-bezier(.34,1.3,.64,1), box-shadow .22s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 90px;
+}
+
+.sec-kpi-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+  background: var(--sec-accent, var(--teal));
+}
+
+.sec-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sh-hover);
+}
+
+.sec-kpi-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sec-bg, var(--bg-info));
+}
+
+.sec-kpi-body { flex: 1; min-width: 0; }
+
+.sec-kpi-val {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--sec-accent, var(--teal));
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.sec-kpi-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tx-sec);
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+
+.sec-kpi-sub {
+  font-size: 10px;
+  color: var(--tx-muted);
+  line-height: 1.3;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2467,6 +2582,11 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     max-height: 72vh;
   }
 
+  /* كروت الأمن والسلامة على الجوال */
+  .sec-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .sec-kpi-card { padding: 14px 12px; min-height: 76px; }
+  .sec-kpi-val  { font-size: 22px; }
+
   /* الروبوت على الجوال */
   #fmbotWalker {
     width: 90px;
@@ -2480,8 +2600,7 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     font-size: 11px;
     min-width: 160px;
     max-width: 210px;
-    bottom: 128px;
-    left: 6px;
+    /* left يُضبط من JS ليتتبع الروبوت */
   }
 
   /* foot input on mobile */
@@ -2506,6 +2625,8 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .fcb-head-title { font-size: 13px; }
 
   /* الروبوت يصغر أكثر */
+  .sec-kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sec-kpi-icon { width: 40px; height: 40px; font-size: 20px; }
   #fmbotWalker { width: 76px; height: 100px; left: 8px; bottom: 8px; }
   #fmbotBubble { display: none; } /* يُخفى Bubble على الشاشات الصغيرة */
 }

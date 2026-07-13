@@ -4345,30 +4345,38 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
     <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} بلاغ</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="kpi kc-red" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
-      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🛡️</div>
-      <div class="kpi-val" style="font-size:26px;font-weight:900">${total.toLocaleString()}</div>
-      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">إجمالي البلاغات</div>
-      <div class="kpi-sub" style="font-size:10px;margin-top:2px">${duplicates} مكرر محتمل</div>
+  <div class="sec-kpi-grid">
+    <div class="sec-kpi-card" style="--sec-accent:#7d1f2c;--sec-bg:#fdf0f2">
+      <div class="sec-kpi-icon">🛡️</div>
+      <div class="sec-kpi-body">
+        <div class="sec-kpi-val" style="color:#7d1f2c">${total.toLocaleString()}</div>
+        <div class="sec-kpi-lbl">إجمالي البلاغات</div>
+        <div class="sec-kpi-sub">${duplicates} مكرر محتمل</div>
+      </div>
     </div>
-    <div class="kpi kc-purple" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
-      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🤕</div>
-      <div class="kpi-val" style="font-size:26px;font-weight:900">${totalInj.toLocaleString()}</div>
-      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">إجمالي الإصابات</div>
-      <div class="kpi-sub" style="font-size:10px;margin-top:2px">وفيات: ${totalDeaths}</div>
+    <div class="sec-kpi-card" style="--sec-accent:#6c2bd9;--sec-bg:#f3eefe">
+      <div class="sec-kpi-icon">🤕</div>
+      <div class="sec-kpi-body">
+        <div class="sec-kpi-val" style="color:#6c2bd9">${totalInj.toLocaleString()}</div>
+        <div class="sec-kpi-lbl">إجمالي الإصابات</div>
+        <div class="sec-kpi-sub">وفيات: ${totalDeaths}</div>
+      </div>
     </div>
-    <div class="kpi kc-blue" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
-      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">⚠️</div>
-      <div class="kpi-val" style="font-size:26px;font-weight:900">${critical.toLocaleString()}</div>
-      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">حالات حرجة</div>
-      <div class="kpi-sub" style="font-size:10px;margin-top:2px">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+    <div class="sec-kpi-card" style="--sec-accent:#c07a14;--sec-bg:#fdf6ec">
+      <div class="sec-kpi-icon">⚠️</div>
+      <div class="sec-kpi-body">
+        <div class="sec-kpi-val" style="color:#c07a14">${critical.toLocaleString()}</div>
+        <div class="sec-kpi-lbl">حالات حرجة</div>
+        <div class="sec-kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+      </div>
     </div>
-    <div class="kpi kc-amber" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
-      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🔍</div>
-      <div class="kpi-val" style="font-size:26px;font-weight:900">${doneInv.toLocaleString()}</div>
-      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">التحقيقات المكتملة</div>
-      <div class="kpi-sub" style="font-size:10px;margin-top:2px">من ${needInv} مطلوبة · ${withReply} إفادة</div>
+    <div class="sec-kpi-card" style="--sec-accent:#066a52;--sec-bg:#edfaf5">
+      <div class="sec-kpi-icon">🔍</div>
+      <div class="sec-kpi-body">
+        <div class="sec-kpi-val" style="color:#066a52">${doneInv.toLocaleString()}</div>
+        <div class="sec-kpi-lbl">التحقيقات المكتملة</div>
+        <div class="sec-kpi-sub">من ${needInv} مطلوبة · ${withReply} إفادة</div>
+      </div>
     </div>
   </div>
 
@@ -15994,6 +16002,68 @@ window.addEventListener('load', function(){
   holder.addEventListener('click', ()=>{
     bubble.classList.remove('show');
     if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
+  });
+
+  /* ══ ربط موضع الـ Bubble بالجزء العلوي من الـ Walker تلقائياً ══
+     الـ bubble يظهر فوق رأس الروبوت مباشرة، ويتتبع حركته frame by frame ══ */
+  let _bubblePrevBottom = 0, _bubblePrevLeft = 0;
+  function syncBubblePos(){
+    const rect = holder.getBoundingClientRect();
+    /* نضع الـ bubble فوق أعلى نقطة في الروبوت + 12px فراغ */
+    const bBottom = Math.round(window.innerHeight - rect.top + 12);
+    /* نمركز الـ bubble أفقياً على الروبوت */
+    const bLeft   = Math.round(rect.left + rect.width / 2 - 95);
+    /* نحدّث فقط لو تغيرت القيمة بأكثر من pixel واحد (توفير performance) */
+    if (Math.abs(bBottom - _bubblePrevBottom) > 0.5){
+      bubble.style.bottom = bBottom + 'px';
+      _bubblePrevBottom = bBottom;
+    }
+    if (Math.abs(bLeft - _bubblePrevLeft) > 0.5){
+      bubble.style.left = bLeft + 'px';
+      _bubblePrevLeft = bLeft;
+    }
+    requestAnimationFrame(syncBubblePos);
+  }
+  syncBubblePos(); /* ابدأ الـ loop */
+
+  /* ══ صوت ping عند الضغط ══ */
+  function playBubbleSound(){
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      /* نبضتان: أولى عالية ثم أخفض */
+      [[900, 0, 0.18, 0.2], [600, 0.1, 0.13, 0.18]].forEach(([freq, delay, vol, dur]) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+        gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + dur);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + dur + 0.02);
+      });
+    } catch(e){}
+  }
+
+  /* ══ الضغط على الـ bubble ══ */
+  bubble.addEventListener('pointerdown', (e)=>{
+    e.stopPropagation();
+    /* 1) صوت */
+    playBubbleSound();
+    /* 2) تأثير pop بصري */
+    bubble.classList.remove('popped');
+    void bubble.offsetWidth; /* force reflow عشان تشتغل الـ animation من جديد */
+    bubble.classList.add('popped');
+    setTimeout(()=> bubble.classList.remove('popped'), 420);
+    /* 3) فتح الشات بعد تأخير بسيط يخلي الـ animation تظهر */
+    setTimeout(()=>{
+      if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
+      bubble.classList.remove('show');
+      disableHintPermanently();
+    }, 180);
   });
 
   /* Manage walker position relative to panel */

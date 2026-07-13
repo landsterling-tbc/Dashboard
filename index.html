@@ -277,6 +277,7 @@
     <div class="tab" onclick="showTab('sys-main',this)">الأنظمة الرئيسية</div>
     <div class="tab" onclick="showTab('sys-detail',this)">الأنظمة التفصيلية</div>
     <div class="tab" onclick="showTab('elevators',this)">المصاعد</div>
+    <div class="tab" onclick="showTab('elevator-status',this)">حالة المصاعد</div>
     <div class="tab" onclick="showTab('khanadeq',this)">خنادق الصرف</div>
     <div class="tab" onclick="showTab('ac-plan',this)">خطة استبدال المكيفات</div>
     <div class="tab" onclick="showTab('balagh',this)">البلاغات</div>
@@ -895,6 +896,21 @@
     <div id="elevators-content">
       <div class="card loading-placeholder">
         <div class="loading-placeholder-icon">🛗</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🚦  تبويب: حالة المصاعد (تجميعي حسب المنطقة)
+║  ID: tab-elevator-status
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-elevator-status">
+    <div id="elevator-status-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🚦</div>
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>

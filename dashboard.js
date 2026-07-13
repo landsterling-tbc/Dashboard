@@ -1126,6 +1126,7 @@ function showTab(name, el) {
 
     "khanadeq" === name && renderKhanadeqTab(),
     "elevators" === name && renderElevatorsTab(),
+    "elevator-status" === name && renderElevatorStatusTab(),
     "cost" === name && renderCostTab(),
     "map" === name && renderMap(),
     "spare" === name && renderSpareTab(),
@@ -2765,6 +2766,7 @@ function renderTable() {
       (fmContracts                 = sa(d.fmContracts)),
       (allSystems                  = sa(d.allSystems)),
       (elevators                   = sa(d.elevators)),
+      (window.RAW_ELEVATOR_STATUS  = sa(d.elevatorStatus)),
       (window.RAW_TAJHEEZ_INV      = sa(d.tajheezInventory)),
       (window.RAW_BALAGH           = []),   // يُحمَّل بشكل منفصل
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
@@ -4257,12 +4259,12 @@ function renderConsultantKpiTab() {
    ║               حرج، يجب التحقيق، اكتمل التحقيق، استجابة بإفادة،
    ║               وصف البلاغ، مكرر محتمل
    ╚════════════════════════════════════════════════════════════╝ */
-function renderSecuritySafetyTab() {
+function renderSecuritySafetyTab(_fromDate, _toDate) {
   const el = document.getElementById("security-safety-content");
   if (!el) return;
 
-  const rows = window.RAW_SECURITY_SAFETY || [];
-  if (!rows.length) {
+  const allRows = window.RAW_SECURITY_SAFETY || [];
+  if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">🛡️</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات أمن وسلامة</div>
@@ -4270,6 +4272,26 @@ function renderSecuritySafetyTab() {
     </div>`;
     return;
   }
+
+  // ── استخراج نطاق التواريخ المتاح ──
+  const allDates = allRows.map(r => String(r["التاريخ"]||"").slice(0,10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const minDate  = allDates[0] || "";
+  const maxDate  = allDates[allDates.length-1] || "";
+
+  // ── قراءة قيم الفلتر (من الـ inputs إن وُجدت، أو من المعاملات) ──
+  const fromEl = document.getElementById("sec-date-from");
+  const toEl   = document.getElementById("sec-date-to");
+  const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
+  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+
+  // ── تصفية الصفوف ──
+  const rows = allRows.filter(r => {
+    const d = String(r["التاريخ"]||"").slice(0,10);
+    if (!d) return true;
+    if (fromDate && d < fromDate) return false;
+    if (toDate   && d > toDate)   return false;
+    return true;
+  });
 
   const n_    = (v) => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
   const total      = rows.length;
@@ -4306,30 +4328,47 @@ function renderSecuritySafetyTab() {
   const recent = [...rows].reverse().slice(0,20);
 
   el.innerHTML = `
-  <div class="kpi-row" style="margin-bottom:16px">
-    <div class="kpi kc-red">
-      <div class="kpi-icon">🛡️</div>
-      <div class="kpi-val">${total.toLocaleString()}</div>
-      <div class="kpi-lbl">إجمالي البلاغات</div>
-      <div class="kpi-sub">${duplicates} مكرر محتمل</div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
+    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
+    <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+      <label style="font-size:11px;color:var(--tx-muted)">من</label>
+      <input type="date" id="sec-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderSecuritySafetyTab(this.value, document.getElementById('sec-date-to').value)">
+      <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
+      <input type="date" id="sec-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderSecuritySafetyTab(document.getElementById('sec-date-from').value, this.value)">
+      <button onclick="renderSecuritySafetyTab('${minDate}','${maxDate}')"
+        style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
     </div>
-    <div class="kpi kc-purple">
-      <div class="kpi-icon">🤕</div>
-      <div class="kpi-val">${totalInj.toLocaleString()}</div>
-      <div class="kpi-lbl">إجمالي الإصابات</div>
-      <div class="kpi-sub">وفيات: ${totalDeaths}</div>
+    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} بلاغ</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
+    <div class="kpi kc-red" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
+      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🛡️</div>
+      <div class="kpi-val" style="font-size:26px;font-weight:900">${total.toLocaleString()}</div>
+      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">إجمالي البلاغات</div>
+      <div class="kpi-sub" style="font-size:10px;margin-top:2px">${duplicates} مكرر محتمل</div>
     </div>
-    <div class="kpi kc-blue">
-      <div class="kpi-icon">⚠️</div>
-      <div class="kpi-val">${critical.toLocaleString()}</div>
-      <div class="kpi-lbl">حالات حرجة</div>
-      <div class="kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+    <div class="kpi kc-purple" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
+      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🤕</div>
+      <div class="kpi-val" style="font-size:26px;font-weight:900">${totalInj.toLocaleString()}</div>
+      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">إجمالي الإصابات</div>
+      <div class="kpi-sub" style="font-size:10px;margin-top:2px">وفيات: ${totalDeaths}</div>
     </div>
-    <div class="kpi kc-amber">
-      <div class="kpi-icon">🔍</div>
-      <div class="kpi-val">${doneInv.toLocaleString()}</div>
-      <div class="kpi-lbl">التحقيقات المكتملة</div>
-      <div class="kpi-sub">من ${needInv} مطلوبة · ${withReply} استجابة بإفادة</div>
+    <div class="kpi kc-blue" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
+      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">⚠️</div>
+      <div class="kpi-val" style="font-size:26px;font-weight:900">${critical.toLocaleString()}</div>
+      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">حالات حرجة</div>
+      <div class="kpi-sub" style="font-size:10px;margin-top:2px">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-amber" style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 10px">
+      <div class="kpi-icon" style="font-size:22px;margin-bottom:6px">🔍</div>
+      <div class="kpi-val" style="font-size:26px;font-weight:900">${doneInv.toLocaleString()}</div>
+      <div class="kpi-lbl" style="font-size:11px;margin-top:4px">التحقيقات المكتملة</div>
+      <div class="kpi-sub" style="font-size:10px;margin-top:2px">من ${needInv} مطلوبة · ${withReply} إفادة</div>
     </div>
   </div>
 
@@ -4357,8 +4396,8 @@ function renderSecuritySafetyTab() {
 
   <div class="card">
     <div class="card-title">آخر 20 بلاغ <span class="sub">من الأحدث للأقدم</span></div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right;white-space:nowrap">التاريخ</th>
           <th style="padding:8px 10px;text-align:right;white-space:nowrap">رقم البلاغ</th>
@@ -5311,7 +5350,8 @@ function renderAllContractsBody() {
       <div class="card-title">📋 كل العقود
         <span class="sub">${total} عقد</span>
       </div>
-      <div style="overflow-x:auto">
+      <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
+      <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead>
             <tr style="text-align:right">
@@ -7976,6 +8016,11 @@ function __startDashboardLoad() {
 }
 function __scheduleDashboardLoad() {
   setTimeout(__startDashboardLoad, 0);
+  // 📦 تحميل تبويب "حصر الأصول" تلقائياً مع فتح الداشبورد، من غير ما يحتاج
+  // المستخدم يضغط على التبويب نفسه أولاً.
+  setTimeout(() => {
+    if (typeof renderHasrTab === "function") renderHasrTab();
+  }, 0);
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", __scheduleDashboardLoad, { once: true });
@@ -8538,6 +8583,188 @@ window.renderElevatorsTab = function () {
       </div>
     </div>
   `;
+};
+
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🚦  JS تبويب: حالة المصاعد (تجميعي حسب المنطقة)
+   ║  (tab-elevator-status) — يقرأ من شيت "حالة_المصاعد"
+   ║  الأعمدة: المنطقة | اجمالي عدد المصاعد | حالة العمل | حالة الصيانة
+   ╚════════════════════════════════════════════════════════════╝ */
+window.renderElevatorStatusTab = function () {
+  const el = document.getElementById("elevator-status-content");
+  if (!el) return;
+
+  const rows = window.RAW_ELEVATOR_STATUS || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🚦</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات حالة مصاعد</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "حالة_المصاعد" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const gv = (r, keys) => {
+    for (const k of keys) {
+      const v = r[k];
+      if (v != null && v !== "" && v !== "—") return v;
+    }
+    return "—";
+  };
+  const num = (v) => {
+    const x = parseFloat(String(v ?? "").replace(/,/g, ""));
+    return isNaN(x) ? 0 : x;
+  };
+
+  const getRegion  = (r) => gv(r, ["المنطقة"]);
+  const getTotal   = (r) => num(gv(r, ["اجمالي عدد المصاعد", "إجمالي عدد المصاعد"]));
+  const getWorking = (r) => num(gv(r, ["حالة العمل"]));
+  const getMaint   = (r) => num(gv(r, ["حالة الصيانة"]));
+
+  const data = rows
+    .filter((r) => String(getRegion(r) || "").trim() && getRegion(r) !== "—")
+    .map((r) => ({
+      region: String(getRegion(r)).trim(),
+      total: getTotal(r),
+      working: getWorking(r),
+      maint: getMaint(r),
+    }));
+
+  const totalElevators = data.reduce((s, r) => s + r.total, 0);
+  const totalWorking   = data.reduce((s, r) => s + r.working, 0);
+  const totalMaint     = data.reduce((s, r) => s + r.maint, 0);
+  const workingPct     = totalElevators ? (totalWorking / totalElevators) * 100 : 0;
+
+  const sorted = [...data].sort((a, b) => b.total - a.total);
+
+  el.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi kc-navy">
+        <div class="kpi-val">${totalElevators.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">إجمالي المصاعد</div>
+        <div class="kpi-sub">${data.length.toLocaleString("en-US")} منطقة</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${totalWorking.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">حالة العمل</div>
+        <div class="kpi-sub">${workingPct.toFixed(1)}% من الإجمالي</div>
+      </div>
+      <div class="kpi kc-red">
+        <div class="kpi-val">${totalMaint.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">حالة الصيانة</div>
+        <div class="kpi-sub">${totalElevators ? ((totalMaint / totalElevators) * 100).toFixed(1) : "0"}% من الإجمالي</div>
+      </div>
+      <div class="kpi kc-blue">
+        <div class="kpi-val">${sorted[0] ? sorted[0].region : "—"}</div>
+        <div class="kpi-lbl">أعلى منطقة عدداً</div>
+        <div class="kpi-sub">${sorted[0] ? sorted[0].total.toLocaleString("en-US") + " مصعد" : ""}</div>
+      </div>
+    </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">توزيع المصاعد حسب المنطقة <span class="sub">عامل / صيانة</span></div>
+        <div class="chart-box" style="height:320px"><canvas id="ch-elev-status-region"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">نسبة الجاهزية <span class="sub">حسب المنطقة</span></div>
+        <div class="chart-box" style="height:320px"><canvas id="ch-elev-status-ready"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        تفاصيل حالة المصاعد حسب المنطقة
+        <span class="sub">${data.length.toLocaleString("en-US")} صف</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>المنطقة</th>
+              <th>إجمالي عدد المصاعد</th>
+              <th>حالة العمل</th>
+              <th>حالة الصيانة</th>
+              <th>نسبة الجاهزية</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted
+              .map((r) => {
+                const pct = r.total ? ((r.working / r.total) * 100).toFixed(1) : "0.0";
+                const color = pct >= 90 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+                return `
+              <tr>
+                <td style="text-align:right;font-weight:600">${esc(r.region)}</td>
+                <td>${r.total.toLocaleString("en-US")}</td>
+                <td>${r.working.toLocaleString("en-US")}</td>
+                <td>${r.maint.toLocaleString("en-US")}</td>
+                <td><span class="badge" style="background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>
+              </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => {
+    const cRegion = document.getElementById("ch-elev-status-region");
+    if (cRegion && typeof Chart !== "undefined") {
+      killChart("ch-elev-status-region");
+      CHARTS["ch-elev-status-region"] = new Chart(cRegion, {
+        type: "bar",
+        data: {
+          labels: sorted.map((r) => r.region),
+          datasets: [
+            { label: "حالة العمل", data: sorted.map((r) => r.working), backgroundColor: CSS_TOKENS.α(CSS_TOKENS.positive(), 0.75), borderColor: CSS_TOKENS.positive(), borderWidth: 1, borderRadius: 4 },
+            { label: "حالة الصيانة", data: sorted.map((r) => r.maint), backgroundColor: CSS_TOKENS.α(CSS_TOKENS.danger(), 0.75), borderColor: CSS_TOKENS.danger(), borderWidth: 1, borderRadius: 4 },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { position: "top", labels: { font: { family: "Tajawal,sans-serif", size: 10 } } } },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
+            y: { stacked: true, beginAtZero: true, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
+          },
+        },
+      });
+    }
+
+    const cReady = document.getElementById("ch-elev-status-ready");
+    if (cReady && typeof Chart !== "undefined") {
+      killChart("ch-elev-status-ready");
+      const readyPct = sorted.map((r) => (r.total ? +((r.working / r.total) * 100).toFixed(1) : 0));
+      CHARTS["ch-elev-status-ready"] = new Chart(cReady, {
+        type: "bar",
+        data: {
+          labels: sorted.map((r) => r.region),
+          datasets: [{
+            label: "نسبة الجاهزية %",
+            data: readyPct,
+            backgroundColor: readyPct.map((p) => CSS_TOKENS.α(p >= 90 ? CSS_TOKENS.positive() : p >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(), 0.75)),
+            borderColor: readyPct.map((p) => (p >= 90 ? CSS_TOKENS.positive() : p >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger())),
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `  ${ctx.raw}%` } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
+            y: { beginAtZero: true, max: 100, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, callback: (v) => v + "%" } },
+          },
+        },
+      });
+    }
+  });
 };
 
 
@@ -15736,7 +15963,7 @@ window.addEventListener('load', function(){
 
   function scheduleNextHint(){
     if (hintDisabled) return;
-    const delay = 8000 + Math.random() * 2000;
+    const delay = 16000 + Math.random() * 4000; // ⏱️ ضوعف التأخير بناءً على طلب المستخدم (كان 8000-10000)
     hintTimer = setTimeout(()=>{
       showBubble();
       scheduleNextHint();
@@ -15829,7 +16056,7 @@ window.addEventListener('load', function(){
     document.body.classList.remove('bot-hidden');
   });
 
-  setTimeout(()=>{ showBubble(); scheduleNextHint(); }, 2000);
+  setTimeout(()=>{ showBubble(); scheduleNextHint(); }, 4000); // ⏱️ ضوعف التأخير الأول بناءً على طلب المستخدم (كان 2000)
 });
 
 
@@ -18264,12 +18491,12 @@ ${dataCtx}
    ║  أعمدة الشيت: التاريخ، الشهر، لوحة_السيارة، مفتاح_اللوحة،
    ║               الطراز، التكلفة، اللترات، المنطقة، المجموعة، اسم_السائق
    ╚════════════════════════════════════════════════════════════╝ */
-function renderFuelTab() {
+function renderFuelTab(_fromDate, _toDate) {
   const el = document.getElementById("fuel-content");
   if (!el) return;
 
-  const rows = window.RAW_FUEL || [];
-  if (!rows.length) {
+  const allRows = window.RAW_FUEL || [];
+  if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">⛽</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات استهلاك وقود</div>
@@ -18277,6 +18504,24 @@ function renderFuelTab() {
     </div>`;
     return;
   }
+
+  // ── استخراج نطاق التواريخ ──
+  const allDates = allRows.map(r => String(r["التاريخ"]||r["الشهر"]||"").slice(0,10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const minDate  = allDates[0] || "";
+  const maxDate  = allDates[allDates.length-1] || "";
+
+  const fromEl = document.getElementById("fuel-date-from");
+  const toEl   = document.getElementById("fuel-date-to");
+  const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
+  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+
+  const rows = allRows.filter(r => {
+    const d = String(r["التاريخ"]||r["الشهر"]||"").slice(0,10);
+    if (!d) return true;
+    if (fromDate && d < fromDate) return false;
+    if (toDate   && d > toDate)   return false;
+    return true;
+  });
 
   const n_ = (v) => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
   const totalLiters   = rows.reduce((s,r) => s + n_(r["اللترات"]),0);
@@ -18329,6 +18574,23 @@ function renderFuelTab() {
   const topDrivers = Object.entries(byDriver).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
 
   el.innerHTML = `
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
+    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
+    <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+      <label style="font-size:11px;color:var(--tx-muted)">من</label>
+      <input type="date" id="fuel-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderFuelTab(this.value, document.getElementById('fuel-date-to').value)">
+      <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
+      <input type="date" id="fuel-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderFuelTab(document.getElementById('fuel-date-from').value, this.value)">
+      <button onclick="renderFuelTab('${minDate}','${maxDate}')"
+        style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+    </div>
+    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} سجل</span>
+  </div>
+
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
     <div class="card" style="border-top:3px solid #0891B2">
       <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي الاستهلاك</div>
@@ -18465,6 +18727,10 @@ function renderFuelTab() {
    ║               اللون، اسم المستخدم، رقم الهوية، رقم الجوال،
    ║               موقع السيارة، اعطال/حوادث، ملاحظات، المستخدم البديل
    ╚════════════════════════════════════════════════════════════╝ */
+/* 📏 ملاحظة/برومبت ثابت: أي جدول بيانات (table) داخل أي تبويب لازم يكون
+   بحجم صغير ومحدود الارتفاع (overflow:auto + max-height ~420px) زي باقي
+   التبويبات (مثال: .tbl-wrap max-height:580px) — ما نسيبش أي جدول ياخد
+   ارتفاع غير محدود على الصفحة. لو ضفت تبويب/جدول جديد التزم بنفس النمط. */
 function renderVehiclesTab() {
   const el = document.getElementById("vehicles-content");
   if (!el) return;
@@ -18541,8 +18807,9 @@ function renderVehiclesTab() {
 
   <div class="card">
     <div class="card-title">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
           <th style="padding:8px 10px;text-align:right">الماركة</th>
@@ -18618,12 +18885,12 @@ function renderVehiclesTab() {
    ║               متوسط الدرجة %، حالة برنامج المشرفين،
    ║               وحدات مكتملة (من 24)، نسبة الإنجاز، ملاحظات التنظيف
    ╚════════════════════════════════════════════════════════════╝ */
-function renderTrainingTab() {
+function renderTrainingTab(_fromDate, _toDate) {
   const el = document.getElementById("training-content");
   if (!el) return;
 
-  const rows = window.RAW_TRAINING || [];
-  if (!rows.length) {
+  const allRows = window.RAW_TRAINING || [];
+  if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">🎓</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات تدريب</div>
@@ -18631,6 +18898,25 @@ function renderTrainingTab() {
     </div>`;
     return;
   }
+
+  // ── استخراج نطاق التواريخ (حسب آخر دخول للمنصة أو تاريخ التسجيل) ──
+  const dateCol = (r) => String(r["آخر دخول للمنصة"]||r["تاريخ التسجيل"]||r["التاريخ"]||"").slice(0,10);
+  const allDates = allRows.map(dateCol).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const minDate  = allDates[0] || "";
+  const maxDate  = allDates[allDates.length-1] || "";
+
+  const fromEl = document.getElementById("tr-date-from");
+  const toEl   = document.getElementById("tr-date-to");
+  const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
+  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+
+  const rows = allRows.filter(r => {
+    const d = dateCol(r);
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return true;
+    if (fromDate && d < fromDate) return false;
+    if (toDate   && d > toDate)   return false;
+    return true;
+  });
 
   const n_ = (v) => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
 
@@ -18671,6 +18957,23 @@ function renderTrainingTab() {
   const statsSupVals   = Object.values(supStatusMap);
 
   el.innerHTML = `
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
+    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
+    <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+      <label style="font-size:11px;color:var(--tx-muted)">من</label>
+      <input type="date" id="tr-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderTrainingTab(this.value, document.getElementById('tr-date-to').value)">
+      <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
+      <input type="date" id="tr-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
+        onchange="renderTrainingTab(document.getElementById('tr-date-from').value, this.value)">
+      <button onclick="renderTrainingTab('${minDate}','${maxDate}')"
+        style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+    </div>
+    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} متدرب</span>
+  </div>
+
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
     <div class="card" style="border-top:3px solid #0891B2">
       <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المتدربين</div>
@@ -18712,8 +19015,9 @@ function renderTrainingTab() {
 
   <div class="card">
     <div class="card-title">قائمة المتدربين <span class="sub">${total} متدرب</span></div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">الاسم</th>
           <th style="padding:8px 10px;text-align:right">آخر دخول</th>

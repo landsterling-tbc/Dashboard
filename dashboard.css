@@ -761,6 +761,36 @@ html[dir="ltr"] .fsel {
 /* ══════════════════════════════════════════════════════════════
    15. KPI TILES
    ══════════════════════════════════════════════════════════════ */
+/* 🔽 نسخة مصغّرة من كروت الـ KPI — تُستخدم في التبويبات اللي كروتها كبيرة
+   زيادة عن باقي التبويبات (مثل: الأمن والسلامة) بدون التأثير على باقي
+   التبويبات اللي بتستخدم .kpi العادية */
+.kpi-row.kpi-sm .kpi,
+.kpi-grid.kpi-sm .kpi {
+  padding: 12px 12px 10px;
+}
+.kpi-row.kpi-sm .kpi-icon,
+.kpi-grid.kpi-sm .kpi-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  top: 10px;
+  left: 10px;
+}
+.kpi-row.kpi-sm .kpi-val,
+.kpi-grid.kpi-sm .kpi-val {
+  font-size: 19px;
+}
+.kpi-row.kpi-sm .kpi-lbl,
+.kpi-grid.kpi-sm .kpi-lbl {
+  font-size: 10.5px;
+  margin-top: 5px;
+}
+.kpi-row.kpi-sm .kpi-sub,
+.kpi-grid.kpi-sm .kpi-sub {
+  font-size: 9.5px;
+  margin-top: 2px;
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1730,13 +1760,13 @@ tbody tr:last-child td { border-bottom: none; }
   position: fixed;
   bottom: 22px;
   left: 24px;
-  width: 370px;
+  width: 390px;
   max-width: calc(100vw - 32px);
-  height: min(580px, 82vh);
+  height: min(535px, 80vh);
   background: var(--bg-3);
   border: 1px solid var(--bd-light);
-  border-radius: 20px;
-  box-shadow: 0 24px 64px rgba(8,45,60,.22), 0 4px 18px rgba(8,45,60,.1);
+  border-radius: 22px;
+  box-shadow: 0 32px 80px rgba(8,45,60,.26), 0 8px 24px rgba(8,45,60,.12), 0 0 0 1px rgba(13,132,156,.07);
   z-index: 599;
   overflow: visible;
   opacity: 0;
@@ -1749,7 +1779,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .fcb-panel.open {
-  height: min(580px, 82vh);
+  height: min(535px, 80vh);
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -1761,10 +1791,11 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px 17px;
-  background: linear-gradient(120deg, #06141c 0%, #0a2a36 45%, var(--teal-3) 130%);
+  padding: 16px 18px 16px;
+  background: linear-gradient(135deg, #05111a 0%, #082332 55%, #0b3d52 100%);
   overflow: hidden;
-  border-radius: 18px 18px 0 0;
+  border-radius: 20px 20px 0 0;
+  border-bottom: 1px solid rgba(13,132,156,.22);
 }
 
 .fcb-head::before {
@@ -1772,81 +1803,84 @@ tbody tr:last-child td { border-bottom: none; }
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(180px 90px at 88% -20%, rgba(13,132,156,.35), transparent 60%),
-    radial-gradient(140px 70px at 10% 120%, rgba(108,43,217,.12), transparent 60%);
+    radial-gradient(220px 110px at 90% -30%, rgba(13,132,156,.28), transparent 65%),
+    radial-gradient(160px 80px at -10% 110%, rgba(176,138,78,.10), transparent 60%);
   pointer-events: none;
 }
 
+/* خط teal متوهج في الأعلى */
 .fcb-head::after {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(to left, transparent, var(--teal-2), rgba(255,255,255,.5), var(--teal-2), transparent);
-  opacity: .9;
+  height: 1.5px;
+  background: linear-gradient(to left, transparent 5%, rgba(20,164,191,.7) 35%, rgba(255,255,255,.55) 50%, rgba(20,164,191,.7) 65%, transparent 95%);
 }
 
 .fcb-avatar {
   position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   flex-shrink: 0;
-  background: var(--grad-teal);
+  background: linear-gradient(135deg, var(--teal-3) 0%, var(--teal-2) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 19px;
-  box-shadow: 0 6px 14px rgba(13,132,156,.4), inset 0 1px 0 rgba(255,255,255,.3);
+  box-shadow: 0 4px 16px rgba(13,132,156,.45), inset 0 1px 0 rgba(255,255,255,.25);
   z-index: 1;
 }
 
 .fcb-head-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
-.fcb-head-title { color: #fff; font-size: 14px; font-weight: 800; letter-spacing: .01em; }
+.fcb-head-title { color: #fff; font-size: 13.5px; font-weight: 800; letter-spacing: .015em; }
 .fcb-head-sub {
   margin-top: 3px;
   display: flex;
   align-items: center;
   gap: 5px;
-  color: rgba(255,255,255,.6);
-  font-size: 10.5px;
+  color: rgba(255,255,255,.52);
+  font-size: 10px;
   font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
 }
 
-.fcb-head-sub .dot { background: var(--good-2); box-shadow: 0 0 0 2px rgba(14,148,136,.25); }
+.fcb-head-sub .dot { background: var(--good-2); box-shadow: 0 0 0 2px rgba(14,148,136,.28); width: 6px; height: 6px; }
 
 .fcb-head-close {
   position: relative;
   z-index: 1;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.78);
-  font-size: 13px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.65);
+  font-size: 12px;
   cursor: pointer;
-  transition: all .18s ease;
+  transition: all .16s ease;
 }
 
-.fcb-head-close:hover { background: rgba(255,255,255,.18); color: #fff; transform: scale(1.06); }
+.fcb-head-close:hover { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.22); }
 
 .fcb-body {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 14px 6px;
+  padding: 16px 14px 6px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   position: relative;
   background:
-    radial-gradient(460px 220px at 100% 0%, rgba(13,132,156,.06), transparent 55%),
-    radial-gradient(360px 200px at 0% 100%, rgba(108,43,217,.03), transparent 55%),
+    radial-gradient(500px 260px at 100% 0%, rgba(13,132,156,.05), transparent 60%),
+    radial-gradient(400px 200px at 0% 100%, rgba(108,43,217,.025), transparent 60%),
     var(--bg-2);
+  scroll-behavior: smooth;
 }
 
 .fcb-row {
@@ -2055,49 +2089,53 @@ tbody tr:last-child td { border-bottom: none; }
   flex-shrink: 0;
   display: flex;
   align-items: flex-end;
-  gap: 9px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--bd-light);
-  background: var(--bg-3);
-  border-radius: 0 0 18px 18px;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(13,132,156,.10);
+  background: linear-gradient(to bottom, var(--bg-2), var(--bg-3));
+  border-radius: 0 0 20px 20px;
 }
 
 .fcb-input {
   flex: 1;
   min-width: 0;
-  max-height: 92px;
+  max-height: 88px;
   border: 1.5px solid var(--bd-light);
-  background: var(--bg-2);
-  border-radius: 18px;
-  padding: 10px 16px;
+  background: var(--bg-3);
+  border-radius: 16px;
+  padding: 9px 14px;
   font-size: 12.5px;
   font-family: inherit;
   color: var(--tx-main);
   outline: none;
-  line-height: 1.5;
+  line-height: 1.55;
   resize: none;
   transition: border-color .18s ease, box-shadow .18s ease;
+  box-shadow: 0 1px 4px rgba(8,45,60,.06);
 }
 
-.fcb-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); }
+.fcb-input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(13,132,156,.12), 0 1px 4px rgba(8,45,60,.06);
+}
 .fcb-input::placeholder { color: var(--tx-muted); }
 
 .fcb-send {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   flex-shrink: 0;
   border: none;
-  background: var(--grad-teal);
+  background: linear-gradient(135deg, var(--teal-2) 0%, var(--teal-3) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(13,132,156,.32);
+  box-shadow: 0 3px 10px rgba(13,132,156,.35);
   cursor: pointer;
   transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease, opacity .18s ease;
 }
 
-.fcb-send:hover { transform: scale(1.08); box-shadow: 0 6px 16px rgba(13,132,156,.4); }
+.fcb-send:hover { transform: scale(1.07) translateY(-1px); box-shadow: 0 6px 16px rgba(13,132,156,.42); }
 .fcb-send:active { transform: scale(.94); }
 .fcb-send:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .fcb-send svg { width: 17px; height: 17px; transform: scaleX(-1); }
@@ -2232,9 +2270,10 @@ tbody tr:last-child td { border-bottom: none; }
 
 .fcb-panel.open ~ #fmbotWalker,
 #fmbotWalker.over-panel {
-  bottom: calc(22px + 540px - 8px);
+  bottom: calc(22px + 560px - 80px);
   left: 198px;
   z-index: 1220;
+  transition: bottom .32s var(--ease-std), left .32s var(--ease-std), transform .6s cubic-bezier(.22,1,.36,1);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2242,7 +2281,7 @@ tbody tr:last-child td { border-bottom: none; }
    ══════════════════════════════════════════════════════════════ */
 #fmbotBubble {
   position: fixed;
-  bottom: 196px;
+  bottom: 150px;
   left: 20px;
   background: rgba(6,30,42,.85);
   backdrop-filter: blur(14px);

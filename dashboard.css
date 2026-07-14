@@ -2022,13 +2022,13 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* مؤشر الكتابة — الهيكل: [نقطة نقطة نقطة] [نص] في سطر أفقي واحد */
 .fcb-typing {
-  display: inline-flex;        /* inline-flex: يأخذ حجم محتواه فقط */
+  display: inline-flex;
   align-items: center;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 5px;
+  gap: 8px;            /* مسافة أكبر بين النقاط والنص */
   padding: 12px 16px;
-  min-width: 160px;            /* يضمن مساحة للنص الأطول */
+  min-width: 160px;
   box-sizing: border-box;
   overflow: visible;
 }
@@ -2748,13 +2748,12 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 
 /* Task 6: نص مؤشر الكتابة */
 .fcb-typing-txt {
-  /* 🛠️ إصلاح نهائي: display:inline داخل inline-flex يجعل العنصر
-     يأخذ حجم نصه فقط، في سطر واحد، بجانب النقاط مباشرة */
   display: inline;
   font: 600 12px/1 Tajawal, sans-serif;
   color: var(--tx-muted);
   white-space: nowrap;
   flex-shrink: 0;
+  margin-right: 6px;  /* مسافة إضافية بين النقاط والنص */
 }
 
 /* Task 5: وضع التكبير — هنا الارتفاع الكبير مقصود (وضع ملء الشاشة) */

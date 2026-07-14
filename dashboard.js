@@ -13242,18 +13242,8 @@ function renderTajheezAllTable() {
     row.className = "fcb-row bot";
     row.id = "fcbTyping";
     row.innerHTML =
-      FCB_AVATAR_HTML + '<div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span><span class="fcb-typing-txt">يحلّل البيانات…</span></div></div>';
+      FCB_AVATAR_HTML + '<div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
     wrap.appendChild(row);
-    /* 🛠️ تدوير رسائل الحالة الأربع بدل تبديل واحد فقط — الارتفاع ثابت
-       (min-height في CSS) فلا يحدث أي Layout Shift أثناء التبديل. */
-    const FCB_TYPING_MSGS = ["يبحث داخل البيانات…", "يفكر…", "يجهّز الرد…"];
-    let msgIdx = 0;
-    window.__FCB_TYPING_TIMER = setInterval(() => {
-      const txt = row.querySelector(".fcb-typing-txt");
-      if (!txt) return;
-      txt.textContent = FCB_TYPING_MSGS[msgIdx % FCB_TYPING_MSGS.length];
-      msgIdx++;
-    }, 2500);
     const body = document.getElementById("fcbBody");
     body.scrollTop = body.scrollHeight;
   }
@@ -18687,76 +18677,7 @@ ${dataCtx}
     }, 400);
   })();
 
-  /* ════════════════════════════════════════════════════════════════
-     💬 أضف زر اختصار "تقرير الأداء" داخل الشات بوت
-  ════════════════════════════════════════════════════════════════ */
-  (function addImpactShortcutBtn() {
-    document.addEventListener("DOMContentLoaded", function () {
-      var foot = document.querySelector(".fcb-foot");
-      if (!foot) return;
-
-      /* شريط الاختصارات السريعة */
-      var shortcuts = document.createElement("div");
-      shortcuts.id = "fcb-shortcuts-bar";
-      shortcuts.style.cssText = [
-        "display:flex",
-        "align-items:center",
-        "gap:6px",
-        "padding:6px 10px 0",
-        "flex-wrap:wrap",
-      ].join(";");
-
-      var btns = [
-        { label: "📊 تقرير الأداء", msg: "تقرير الأداء" },
-        { label: "🔴 المدارس الحرجة", msg: "أعطني قائمة المدارس الحرجة FCA أقل من 25 مرتبة من الأسوأ للأفضل" },
-        { label: "⚠️ SLA المخترق", msg: "كم عدد البلاغات التي تجاوزت SLA وما أبرزها؟" },
-        { label: "📋 العقود المنتهية", msg: "أي العقود انتهت ولم تُجدَّد؟" },
-      ];
-
-      btns.forEach(function (b) {
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = b.label;
-        btn.style.cssText = [
-          "padding:5px 10px",
-          "border:1px solid var(--bd-light,rgba(255,255,255,.15))",
-          "border-radius:16px",
-          "background:var(--bg-2,rgba(255,255,255,.06))",
-          "color:var(--tx-sec,rgba(255,255,255,.7))",
-          "font-size:11px",
-          "font-family:inherit",
-          "cursor:pointer",
-          "white-space:nowrap",
-          "transition:background .15s",
-        ].join(";");
-
-        btn.addEventListener("mouseover", function () {
-          btn.style.background = "var(--accent-dim," + CSS_TOKENS.α(CSS_TOKENS.info(),.25) + ")";
-          btn.style.color = "#fff";
-        });
-        btn.addEventListener("mouseout", function () {
-          btn.style.background = "var(--bg-2,rgba(255,255,255,.06))";
-          btn.style.color = "var(--tx-sec,rgba(255,255,255,.7))";
-        });
-
-        btn.addEventListener("click", function () {
-          var inputEl = document.getElementById("fcbInput");
-          if (!inputEl) return;
-          inputEl.value = b.msg;
-          /* نحاكي Enter */
-          if (typeof window.fcbSend === "function") {
-            window.fcbSend();
-          } else {
-            document.getElementById("fcbSendBtn") && document.getElementById("fcbSendBtn").click();
-          }
-        });
-
-        shortcuts.appendChild(btn);
-      });
-
-      foot.parentNode.insertBefore(shortcuts, foot);
-    });
-  })();
+  /* 🛠️ شريط الاختصارات السريعة حُذف بناءً على طلب صاحب المشروع */
 
 })();
 

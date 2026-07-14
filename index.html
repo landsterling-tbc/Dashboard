@@ -1583,10 +1583,6 @@
 
 <div id="fcbFab" style="display:none" aria-hidden="true"></div><!-- عنصر وهمي حتى لا يتعطل fcbToggle -->
 
-<!-- أزرار المساعد مخفية -->
-<button id="fcbHideBtn" style="display:none!important" aria-hidden="true"></button>
-<button id="fcbShowBtn" style="display:none!important" aria-hidden="true"></button>
-
 <div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
   <div id="fmbotBubble">
     <span class="bbl-line1">أنا مساعد إدارة المرافق الذكي</span>
@@ -1620,28 +1616,11 @@
       <div class="fcb-head-title">مساعد إدارة المرافق الذكي 🏫</div>
       <div class="fcb-head-sub"><span class="dot"></span> متخصص في المرافق التعليمية</div>
     </div>
-    <div class="fcb-head-close" id="fcbSettingsBtn" title="إعدادات المساعد" style="margin-left:4px;" data-evt="103">⚙️</div>
+    <div class="fcb-head-close" id="fcbMaxBtn" title="تكبير/تصغير النافذة" style="margin-left:4px;font-size:13px;">⛶</div>
     <div class="fcb-head-close" data-evt="104">✕</div>
   </div>
-
-  <div class="fcb-settings" id="fcbSettingsPanel" style="display:none;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div class="fcb-settings-title">⚙️ إعدادات المساعد الذكي</div>
-      <div class="fcb-head-close" style="position:static;background:var(--bg-2);border-color:var(--bd-light);color:var(--tx-sec);" data-evt="105">✕</div>
-    </div>
-    <div class="fcb-settings-note" style="margin:0 0 10px;">✅ المساعد الذكي مفعّل بالكامل عبر خادم آمن — لا حاجة لإدخال أي مفتاح API.</div>
-    <div id="fcbProxyOverride" style="display:none;">
-      <label class="fcb-settings-lbl">مفتاح OpenAI API (اختياري — للاستخدام الشخصي فقط)</label>
-      <input type="password" id="fcbApiKeyInput" class="fcb-settings-input" placeholder="sk-...">
-      <label class="fcb-settings-lbl">اسم الموديل</label>
-      <input type="text" id="fcbModelInput" class="fcb-settings-input" placeholder="gpt-4o-mini">
-      <div class="fcb-settings-actions">
-        <button type="button" class="fcb-settings-save" data-evt="106">💾 حفظ</button>
-        <button type="button" class="fcb-settings-clear" data-evt="107">🗑️ مسح المخزّن محلياً</button>
-      </div>
-      <div class="fcb-settings-note">المفتاح يُخزَّن في متصفحك فقط (localStorage) ولا يُرسل لأي مكان عدا OpenAI مباشرة.</div>
-    </div>
-  </div>
+  <!-- 🛠️ حُذف زر ⚙️ إعدادات API ولوحته بالكامل بناءً على طلب صاحب المشروع
+       (المساعد يعمل عبر خادم آمن ولا يحتاج أي إعداد من المستخدم) -->
 
   <div class="fcb-body" id="fcbBody">
     <div id="fcbMessages">
@@ -1651,6 +1630,12 @@
           <div class="fcb-bubble">مرحباً 👋 أنا <strong>مساعد إدارة المرافق الذكي</strong> المتخصص في تحليل بيانات المرافق ....</div>
           <div class="fcb-time">10:24 ص</div>
         </div>
+      </div>
+      <div id="fcbQuickReplies" class="fcb-quick-replies">
+        <button type="button" class="fcb-qr-pill">أعطني أسوأ 10 مدارس في FCA</button>
+        <button type="button" class="fcb-qr-pill">كم عدد المدارس حسب المحافظة؟</button>
+        <button type="button" class="fcb-qr-pill">ما متوسط درجة البيئة المدرسية؟</button>
+        <button type="button" class="fcb-qr-pill">لخّص أهم المؤشرات في العرض الحالي</button>
       </div>
     </div>
 
@@ -1711,34 +1696,69 @@
 <script src="dashboard.js" defer></script>
 
 <script>
-/* ══════════════════════════════════════════════════════
-   إخفاء/إظهار المساعد الذكي مؤقتاً
-   ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   🛠️ إصلاح شامل لموضع وفتح المساعد الذكي — لا يعتمد على أي ملف خارجي
 
-function fcbHideBot() {
-  document.body.classList.add('chatbot-hidden');
-  // إخفاء زر الإخفاء نفسه
-  const btn = document.getElementById('fcbHideBtn');
-  if (btn) { btn.classList.remove('show'); }
-}
+   المشكلة 1 (الموضع): بسبب وسوم <div> غير مغلقة في أماكن أخرى من
+   الصفحة، كانت عناصر الشات بوت تنتهي متداخلة داخل قسم تبويب مخفي،
+   فتظهر المحادثة كجزء من تدفق الصفحة (أسفل الداشبورد/الفوتر) بدل
+   نافذة عائمة ثابتة. → الحل: نقل العنصرين ليكونا أبناء مباشرين
+   لـ <body>، مع حقن CSS حرج هنا مباشرة يضمن position:fixed حتى لو
+   كانت نسخة dashboard.css على الخادم قديمة (Cache).
 
-function fcbShowBot() {
-  document.body.classList.remove('chatbot-hidden');
-}
+   المشكلة 2 (الفتح بالنقر): ربط النقر على الروبوت كان يعيش داخل
+   موديول Three.js في dashboard.js الذي ينسحب مبكراً إذا فشل تحميل
+   مكتبة three.js من الـ CDN — فيصبح النقر بلا تأثير. → الحل: ربط
+   احتياطي هنا يفتح/يغلق اللوحة دائماً مهما حدث للـ CDN.
+   ══════════════════════════════════════════════════════════════ */
+(function fixChatbot() {
 
-/* إظهار زر الإخفاء لما الروبوت يكون مرئي وقريب من أسفل الشاشة */
-function updateHideBtn() {
-  const btn = document.getElementById('fcbHideBtn');
-  if (!btn) return;
-  const hidden = document.body.classList.contains('chatbot-hidden');
-  if (hidden) { btn.classList.remove('show'); return; }
+  /* CSS حرج — يضمن أن اللوحة نافذة عائمة ثابتة بحجم متوسط موحّد
+     مهما كانت حالة dashboard.css على الخادم (حماية من الكاش القديم). */
+  var critical = document.createElement('style');
+  critical.textContent =
+    '.fcb-panel{position:fixed !important;bottom:22px !important;left:24px !important;' +
+    'top:auto !important;right:auto !important;width:390px !important;' +
+    'max-width:calc(100vw - 32px) !important;' +
+    'height:min(480px,75vh) !important;max-height:min(480px,75vh) !important;}' +
+    '.fcb-panel.maximized{height:min(85vh,900px) !important;max-height:min(85vh,900px) !important;' +
+    'width:min(620px,calc(100vw - 32px)) !important;}' +
+    '.fcb-panel:not(.open){opacity:0 !important;pointer-events:none !important;}' +
+    '.fcb-panel.open{opacity:1 !important;pointer-events:auto !important;}' +
+    '@media (max-width:640px){.fcb-panel{width:100vw !important;max-width:100vw !important;' +
+    'left:0 !important;bottom:0 !important;height:70vh !important;max-height:70vh !important;}}';
+  document.head.appendChild(critical);
 
-  // نظهر الزر لما المستخدم ينزل تحت الـ 300px من أعلى الصفحة
-  const scrolled = window.scrollY > 300;
-  btn.classList.toggle('show', scrolled);
-}
+  function run() {
+    var walker = document.getElementById('fmbotWalker');
+    var panel = document.getElementById('fcbPanel');
 
-window.addEventListener('scroll', updateHideBtn, { passive: true });
-window.addEventListener('load', updateHideBtn);
+    /* 1) النقل إلى body مباشرة — يصلح التموضع نهائياً */
+    if (walker && walker.parentElement !== document.body) {
+      document.body.appendChild(walker);
+    }
+    if (panel && panel.parentElement !== document.body) {
+      document.body.appendChild(panel);
+    }
+
+    /* 2) ربط احتياطي للنقر — يعمل حتى لو فشل موديول Three.js */
+    if (walker && panel && !walker.__fcbClickBound) {
+      walker.__fcbClickBound = true;
+      walker.addEventListener('click', function () {
+        if (typeof window.fcbToggle === 'function') {
+          if (!panel.classList.contains('open')) window.fcbToggle();
+        } else {
+          panel.classList.toggle('open');
+        }
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+})();
 </script>
 </body></html>

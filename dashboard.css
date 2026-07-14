@@ -1762,7 +1762,11 @@ tbody tr:last-child td { border-bottom: none; }
   left: 24px;
   width: 390px;
   max-width: calc(100vw - 32px);
-  height: min(535px, 80vh);
+  /* 🛠️ حجم واحد متوسط ثابت للوحة (طلب صاحب المشروع):
+     البنية أصبحت سليمة (الجسم والفوتر داخل اللوحة)، فالارتفاع الثابت
+     الآن خيار تصميمي نظيف — الجسم يملؤه والرسائل تتمرر داخلياً. */
+  height: min(480px, 75vh);
+  max-height: min(480px, 75vh);
   background: var(--bg-3);
   border: 1px solid var(--bd-light);
   border-radius: 22px;
@@ -1772,14 +1776,13 @@ tbody tr:last-child td { border-bottom: none; }
   opacity: 0;
   transform: translateY(20px) scale(.95);
   transform-origin: bottom left;
-  transition: opacity .28s var(--ease-std), transform .32s var(--ease-std), height .32s var(--ease-std);
+  transition: opacity .28s var(--ease-std), transform .32s var(--ease-std), height .32s var(--ease-std), width .32s var(--ease-std);
   display: flex;
   flex-direction: column;
   pointer-events: none;
 }
 
 .fcb-panel.open {
-  height: min(535px, 80vh);
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -1869,7 +1872,13 @@ tbody tr:last-child td { border-bottom: none; }
 .fcb-head-close:hover { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.22); }
 
 .fcb-body {
-  flex: 1;
+  /* 🛠️ إصلاح الفراغ الأبيض (الجزء الثاني):
+     flex:1 1 auto → الجسم يأخذ حجم محتواه الطبيعي عندما يكون البانل
+     أصغر من السقف (لا تمدد قسري)، ويتقلص عند بلوغ السقف.
+     min-height:0 → النمط القياسي في Flexbox للسماح للعنصر بالانكماش
+     دون هذا السطر يتجاهل المتصفح overflow ويمدد الحاوية. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 14px 6px;
   display: flex;
@@ -2011,8 +2020,22 @@ tbody tr:last-child td { border-bottom: none; }
 
 .fcb-chip:hover { background: var(--grad-teal); border-color: transparent; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(13,132,156,.3); }
 
-.fcb-typing { display: flex; align-items: center; gap: 4px; padding: 14px 16px; }
-.fcb-typing span { width: 6.5px; height: 6.5px; border-radius: 50%; background: var(--teal); opacity: .55; animation: fcb-bounce 1.2s infinite ease-in-out; }
+/* 🛠️ إصلاح صندوق حالة المساعد (يحلّل/يفكر/يجهّز الرد):
+   ١) كان النص white-space:nowrap → يخرج خارج الفقاعة. الآن يلتف لسطر جديد.
+   ٢) min-height ثابت للفقاعة → تبديل الرسائل لا يسبب أي Layout Shift.
+   ٣) max-width مرن → Responsive على كل المقاسات، بلا قصّ وبلا Overflow. */
+.fcb-typing {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 12px 14px;
+  min-height: 44px;          /* ارتفاع محجوز ثابت */
+  max-width: min(300px, 78vw);
+  box-sizing: border-box;
+  overflow: hidden;          /* حزام أمان: لا شيء يتسرب خارج الفقاعة */
+}
+.fcb-typing span { flex: 0 0 auto; width: 6.5px; height: 6.5px; border-radius: 50%; background: var(--teal); opacity: .55; animation: fcb-bounce 1.2s infinite ease-in-out; }
 .fcb-typing span:nth-child(2) { animation-delay: .15s; }
 .fcb-typing span:nth-child(3) { animation-delay: .3s; }
 
@@ -2571,7 +2594,7 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .map-stat { min-width: calc(50% - 6px); }
   #map-container { height: 440px; }
 
-  /* ── الشات بوت على الجوال — يملأ الشاشة من الأسفل ── */
+  /* ── الشات بوت على الجوال — ملتصق بالأسفل، يكبر مع المحتوى حتى السقف ── */
   .fcb-panel {
     width: 100vw;
     max-width: 100vw;
@@ -2582,14 +2605,11 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     border-left: none;
     border-right: none;
     border-bottom: none;
-    height: 72vh;
-    max-height: 72vh;
+    /* 🛠️ حجم ثابت موحّد على الجوال أيضاً */
+    height: 70vh;
+    max-height: 70vh;
     transform-origin: bottom center;
     box-shadow: 0 -8px 40px rgba(8,45,60,.18);
-  }
-  .fcb-panel.open {
-    height: 72vh;
-    max-height: 72vh;
   }
 
   /* كروت الأمن والسلامة على الجوال */
@@ -2629,9 +2649,8 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .map-stat    { min-width: 100%; }
   .ix-kpi-modal { width: 96vw; max-height: 88vh; }
 
-  /* الشات بوت على الشاشات الصغيرة جداً */
-  .fcb-panel { height: 80vh; max-height: 80vh; }
-  .fcb-panel.open { height: 80vh; }
+  /* الشات بوت على الشاشات الصغيرة جداً — حجم ثابت موحّد */
+  .fcb-panel { height: 75vh; max-height: 75vh; }
   .fcb-head-title { font-size: 13px; }
 
   /* الروبوت يصغر أكثر */
@@ -2681,3 +2700,212 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     scroll-behavior: auto !important;
   }
 }
+
+
+/* ════════════════════════════════════════════════
+   تحسينات المساعد الذكي (Tasks 2,3,5,6)
+   ════════════════════════════════════════════════ */
+
+/* Task 2: أزرار الاقتراحات السريعة */
+.fcb-quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 6px 4px 6px;
+}
+.fcb-qr-pill {
+  border: 1px solid var(--bd-light);
+  background: var(--bg-2);
+  color: var(--tx-sec);
+  font: 600 12px Tajawal, sans-serif;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .2s var(--ease-std), color .2s var(--ease-std), border-color .2s var(--ease-std);
+}
+.fcb-qr-pill:hover {
+  background: var(--grad-teal);
+  border-color: transparent;
+  color: #fff;
+}
+.fcb-qr-pill:active { transform: scale(.96); }
+
+/* Task 3: زر الإيقاف (نفس موضع وحجم زر الإرسال) */
+.fcb-send.fcb-send-stop { background: #b3392f; }
+.fcb-send.fcb-send-stop:hover { box-shadow: 0 6px 16px rgba(179,57,47,.4); }
+.fcb-send.fcb-send-stop svg { transform: none; }
+
+/* Task 6: نص مؤشر الكتابة */
+.fcb-typing-txt {
+  font: 600 11.5px Tajawal, sans-serif;
+  color: var(--tx-muted);
+  margin-right: 7px;
+  /* 🛠️ كان white-space:nowrap → النص يخرج خارج الفقاعة.
+     الآن: يلتف طبيعياً، وينكمش صح داخل الـ flex (min-width:0). */
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.5;
+}
+
+/* Task 5: وضع التكبير — هنا الارتفاع الكبير مقصود (وضع ملء الشاشة) */
+.fcb-panel.maximized,
+.fcb-panel.maximized.open {
+  width: min(620px, calc(100vw - 32px));
+  height: min(85vh, 900px);
+  max-height: min(85vh, 900px);
+}
+@media (max-width: 640px) {
+  .fcb-panel.maximized,
+  .fcb-panel.maximized.open {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    bottom: 0;
+    left: 0;
+    border-radius: 0;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   🛠️ Performance & UX Fixes — Enterprise-Grade Dashboard Patches
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 1) منع Layout Shift في Chart-box وCard أثناء التحميل ──────── */
+.chart-box {
+  /* يحجز مساحة ثابتة دائماً فلا يقفز المحتوى عند ظهور الرسم البياني */
+  min-height: 180px;
+  contain: layout style;    /* يمنع التأثير على العناصر الخارجية (no Reflow) */
+  position: relative;
+}
+
+/* ── 2) Loading placeholder: منع layout shift أثناء الشيمر ──────── */
+.loading-placeholder {
+  contain: strict;
+  min-height: 120px;
+}
+
+/* ── 3) Skeleton shimmer animation: GPU فقط ──────────────────────── */
+@keyframes ixshimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+@keyframes ixspin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 4) Chart Empty / Error / Loading: تصميم موحد لجميع التبويبات ── */
+.chart-empty-state,
+.chart-loading-state,
+.chart-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 160px;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  /* يمنع أي عنصر داخلي من الخروج خارج الحاوية */
+  overflow: hidden;
+}
+.chart-empty-state   { color: var(--tx-muted); }
+.chart-loading-state { color: var(--tx-muted); }
+.chart-error-state   { color: #DC2626; }
+
+/* ── 5) KPI Cards: ارتفاع موحد يمنع القفز عند اختلاف طول النص ─── */
+.kpi-card {
+  min-height: 88px;
+  contain: layout style;
+}
+
+/* ── 6) Scroll داخلي للجداول الكبيرة فقط — بلا Horizontal Overflow */
+.table-wrap, .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  /* يمنع أن يمتد الجدول خارج بطاقته */
+  max-width: 100%;
+}
+
+/* ── 7) Panel overflow — منع خروج أي محتوى خارج أي بطاقة ──────── */
+.card {
+  overflow: hidden;
+}
+
+/* ── 8) Chart canvas: لا تخترق حاويتها ───────────────────────────── */
+canvas {
+  display: block;
+  max-width: 100%;
+  /* GPU layer فقط للرسوم المتحركة داخل canvas */
+  will-change: auto;
+}
+
+/* ── 9) Tab panels: منع الـ Horizontal Scroll الناتج من أي chart ── */
+.panel {
+  overflow-x: hidden;
+}
+
+/* ── 10) Responsive: شارتات تتكيف مع الجوال ───────────────────── */
+@media (max-width: 640px) {
+  .chart-box { min-height: 140px; }
+  .kpi-card  { min-height: 72px; }
+}
+
+/* ── 11) Reduced Motion — احترام إعداد المستخدم ────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .fcb-panel,
+  .fcb-typing span {
+    animation: none !important;
+    transition: opacity .1s linear !important;
+  }
+}
+
+/* ── 12) Focus States — Keyboard Navigation مرئية ───────────────── */
+:focus-visible {
+  outline: 2.5px solid var(--teal, #0891B2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── 13) chat typing bubble: نص مسبق‐حجز الارتفاع ─────────────── */
+/* (تكملة للإصلاح في .fcb-typing بالأعلى — ثبّت حجم النقاط الثلاثة) */
+.fcb-typing > span:not(.fcb-typing-txt) {
+  flex: 0 0 6.5px;
+}
+
+/* ── 14) منع Overflow في Tooltip الشارتات على الجوال ──────────── */
+.chartjs-tooltip,
+[id^="chartjs-tooltip"] {
+  max-width: min(260px, 90vw) !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+}
+
+/* ── 15) Skeleton خاص بعناصر داخل القائمة الكبيرة ─────────────── */
+.ix-skeleton > div {
+  animation: ixshimmer 1.4s ease infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(168,195,214,.18) 25%,
+    rgba(168,195,214,.34) 37%,
+    rgba(168,195,214,.18) 63%
+  );
+  background-size: 400% 100%;
+}
+

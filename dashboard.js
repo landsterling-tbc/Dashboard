@@ -616,7 +616,7 @@ function renderLoadingState(container, message = "جاري التحميل…") {
   const el = typeof container === "string" ? document.getElementById(container) : container;
   if (!el) return;
   el.innerHTML = `<div class="chart-loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:var(--tx-muted);gap:10px">
-    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid CSS_TOKENS.α(CSS_TOKENS.info(),.15);border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
+    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.15)};border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
     <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
   </div>`;
 }
@@ -1688,7 +1688,7 @@ function renderEnvCharts() {
     /* --- Tooltip تفاعلي --- */
     const tooltip = document.createElement("div");
     tooltip.style.cssText =
-      "position:fixed;background:rgba(7,24,33,.94);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;padding:10px 14px;border-radius:10px;pointer-events:none;display:none;z-index:9999;direction:rtl;max-width:220px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.3);line-height:1.6";
+      "position:fixed;background:rgba(7,24,33,.94);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;padding:10px 14px;border-radius:10px;pointer-events:none;display:none;z-index:9999;direction:rtl;max-width:220px;border:1px solid " + CSS_TOKENS.α(CSS_TOKENS.info(),.3) + ";line-height:1.6";
     document.body.appendChild(tooltip);
 
     canvas.addEventListener("mousemove", (e) => {
@@ -2032,14 +2032,14 @@ function renderStageCompareTab() {
 
   // ألوان ديناميكية لأي عدد من المراحل
   const STAGE_PALETTE = [
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.info(),0.55)",  bd:CSS_TOKENS.info(), kc:"kc-blue"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.special(),0.55)", bd:CSS_TOKENS.special(), kc:"kc-purple"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.positive(),0.55)",  bd:CSS_TOKENS.positive(), kc:"kc-green"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.warning(),0.55)", bd:CSS_TOKENS.warning(), kc:"kc-amber"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.danger(),0.55)",  bd:CSS_TOKENS.danger(), kc:"kc-red"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.special(),0.55)", bd:CSS_TOKENS.special(), kc:"kc-blue"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.info2(),0.55)", bd:CSS_TOKENS.info2(), kc:"kc-teal"},
-    {bg:"CSS_TOKENS.α(CSS_TOKENS.warning(),0.55)", bd:CSS_TOKENS.warning(), kc:"kc-amber"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.info(),0.55),  bd:CSS_TOKENS.info(), kc:"kc-blue"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.special(),0.55), bd:CSS_TOKENS.special(), kc:"kc-purple"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.positive(),0.55),  bd:CSS_TOKENS.positive(), kc:"kc-green"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.warning(),0.55), bd:CSS_TOKENS.warning(), kc:"kc-amber"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.danger(),0.55),  bd:CSS_TOKENS.danger(), kc:"kc-red"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.special(),0.55), bd:CSS_TOKENS.special(), kc:"kc-blue"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.info2(),0.55), bd:CSS_TOKENS.info2(), kc:"kc-teal"},
+    {bg:CSS_TOKENS.α(CSS_TOKENS.warning(),0.55), bd:CSS_TOKENS.warning(), kc:"kc-amber"},
   ];
 
   /* ── مصدر البيانات ── */
@@ -6168,8 +6168,19 @@ function sysBrowseSelectMain(mainSys) {
   }).join("");
 }
 
-/* عند اختيار نظام فرعي → تصفية تبويب الأنظمة التفصيلية وإغلاق الـ Modal */
-/* sysBrowseSelectSub — مُعرَّفة في قسم حصر الأصول أدناه */
+/* عند اختيار نظام فرعي من Modal الأنظمة الرئيسية:
+   🛠️ إصلاح: كانت الدالة تفتح تبويب حصر الأصول (hasr) وهو تبويب
+   مختلف تمامًا لا علاقة له بالأنظمة. الصحيح هو الانتقال لتبويب
+   الأنظمة التفصيلية (sys-detail) مع تطبيق الفلتر المختار. */
+function sysBrowseSelectSub(mainSys, subSys) {
+  sysBrowseClose();
+  /* طبّق الفلتر على الأنظمة التفصيلية */
+  window._sdActiveSection = mainSys || '';
+  window._sdActiveSubSys  = subSys  || '';
+  /* انتقل لتبويب الأنظمة التفصيلية */
+  const btn = document.querySelector('[data-evt="27"]');
+  showTab('sys-detail', btn || null);
+}
 
 /* إغلاق الـ Modal عند النقر على الخلفية */
 document.addEventListener("DOMContentLoaded", function () {
@@ -6209,7 +6220,12 @@ function renderSysDetail() {
   ].sort();
   window._sdActiveSection || (window._sdActiveSection = "");
   const selMain = window._sdActiveSection;
+  /* 🛠️ إصلاح: دعم الفلتر بالنظام الفرعي القادم من Modal الأنظمة الرئيسية */
+  const selSub = window._sdActiveSubSys || "";
+  /* نمسح الفلتر الفرعي بعد الاستخدام (one-shot deep-link) */
+  window._sdActiveSubSys = "";
   let data = selMain ? base.filter((r) => r["القسم الرئيسي"] === selMain) : base;
+  if (selSub) data = data.filter((r) => r["النظام الفرعي"] === selSub);
   const subSum = {},
     subCnt = {},
     subMainMap = {};
@@ -6316,7 +6332,7 @@ function renderSysDetail() {
           `<option value="${n}" ${n === showN ? "selected" : ""}>${n === hmSchools.length ? "الكل (" + n + ")" : n + " مدرسة"}</option>`,
       )
       .join("");
-  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:CSS_TOKENS.α(CSS_TOKENS.info(),.1);color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
+  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
     .map((row, i) => {
       const cats = subTiers[row.name] || {},
         total = row.cnt,
@@ -6334,7 +6350,7 @@ function renderSysDetail() {
     })
     .join(
       "",
-    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:CSS_TOKENS.α(CSS_TOKENS.info(),.1);color:var(--teal);border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
+    )}\n        </tbody>\n      </table>\n    </div>\n  </div>\n\n  \n  <div class="card">\n    <div class="card-title">\n      🏫 المدارس المقيّمة حسب النظام الفرعي\n      ${selMain ? `<span style="background:${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};color:var(--teal);border:1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.2)};border-radius:20px;padding:3px 12px;font-size:10px;font-weight:700;margin-right:8px">📌 ${esc(selMain)}</span>` : ""}\n      <span class="sub">${subCols.length} نظام · ${hmSchools.length} مدرسة</span>\n    </div>\n\n    \n    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عدد المدارس:</span>\n        <select onchange="window._hmSdState.showN=parseInt(this.value);renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          ${nOptsHtml}\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:6px">\n        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ترتيب:</span>\n        <select onchange="window._hmSdState.sortBy=this.value;renderSysDetail()"\n          style="font-family:inherit;font-size:11px;padding:6px 12px;border:1px solid var(--bd-light);border-radius:10px;background:var(--bg-2);cursor:pointer">\n          <option value="score"      ${"score" === hmSt.sortBy ? "selected" : ""}>الأقل درجة أولاً</option>\n          <option value="score_desc" ${"score_desc" === hmSt.sortBy ? "selected" : ""}>الأعلى درجة أولاً</option>\n          <option value="name"       ${"name" === hmSt.sortBy ? "selected" : ""}>أبجدي</option>\n        </select>\n      </div>\n      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">\n        <button class="export-btn export-btn-csv" onclick="exportSysDetailCSV()">⬇ CSV</button>\n        <button class="export-btn export-btn-excel" onclick="exportSysDetailExcel()">⬇ Excel</button>\n      </div>\n    </div>\n\n    \n    <div class="tbl-wrap" style="max-height:680px">\n      <table>\n        <thead>\n          <tr>\n            <th style="white-space:nowrap">رقم المدرسة</th>\n            <th style="text-align:right">اسم المدرسة</th>\n            <th style="text-align:center;white-space:nowrap">الدرجة</th>\n            ${thCells}\n          </tr>\n        </thead>\n        <tbody>${bodyRows}</tbody>\n      </table>\n    </div>\n  </div>\n  `),
     requestAnimationFrame(() => {
       const subLabels = subAvg.map((s) =>
           s.name,
@@ -9827,7 +9843,7 @@ window.renderElevatorStatusTab = function () {
     if (!PAY_TIP_EL) {
       PAY_TIP_EL = document.createElement("div");
       PAY_TIP_EL.style.cssText =
-        "position:fixed;background:rgba(7,28,38,.96);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;padding:8px 14px;border-radius:10px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.35);box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;display:none;z-index:99999;direction:ltr";
+        "position:fixed;background:rgba(7,28,38,.96);color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;padding:8px 14px;border-radius:10px;border:1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.35)};box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none;display:none;z-index:99999;direction:ltr";
       document.body.appendChild(PAY_TIP_EL);
     }
     const root = scopeEl || document;
@@ -11369,7 +11385,9 @@ function renderTajheezAllTable() {
 
   function fcbToggle() {
     document.getElementById("fcbPanel").classList.toggle("open");
-    document.getElementById("fcbFab").classList.toggle("active");
+    /* 🛠️ fcbFab عنصر وهمي قديم أُزيل من HTML — حماية من غيابه */
+    const fab = document.getElementById("fcbFab");
+    if (fab) fab.classList.toggle("active");
     fcbCloseSettings();
   }
 
@@ -11399,28 +11417,13 @@ function renderTajheezAllTable() {
        تعديل لأنها لا تتحدث مباشرة مع OpenAI، بل فقط مع AIService.
   ════════════════════════════════════════════════════════════════ */
   const AIService = {
-    /** المفتاح المحفوظ محلياً في متصفح هذا المستخدم فقط، أو "" لو غير موجود */
-    getApiKey() {
-      return (localStorage.getItem("fcb_openai_key") || "").trim();
-    },
-    /** هل يوجد مفتاح صالح حالياً؟ (دائماً "نعم" في وضع الوسيط) */
+    /** هل الخدمة متاحة؟ المساعد يعمل عبر خادم آمن (Proxy) بدون أي مفتاح في المتصفح */
     hasKey() {
-      if (CFG.PROXY_URL && CFG.PROXY_URL.trim()) return true;
-      return this.getApiKey().length > 0;
+      return !!(CFG.PROXY_URL && CFG.PROXY_URL.trim());
     },
     /** اسم الموديل: ثابت بالكود دايماً (CFG.OPENAI_MODEL)، بدون اعتماد على أي إعداد محلي */
     getModel() {
       return CFG.OPENAI_MODEL || "gpt-5.6-sol";
-    },
-    saveSettings(key, model) {
-      if (key) localStorage.setItem("fcb_openai_key", key);
-      else localStorage.removeItem("fcb_openai_key");
-      if (model) localStorage.setItem("fcb_openai_model", model);
-      else localStorage.removeItem("fcb_openai_model");
-    },
-    clearSettings() {
-      localStorage.removeItem("fcb_openai_key");
-      localStorage.removeItem("fcb_openai_model");
     },
     /**
      * يرسل محادثة كاملة (system + history + رسالة المستخدم) إلى OpenAI
@@ -11436,8 +11439,7 @@ function renderTajheezAllTable() {
       // بمفتاح OpenAI بأمان في الباك إند). في هذا الوضع لا نستخدم
       // مفتاح المستخدم المحلي إطلاقاً حتى لو كان مدخلاً من قبل.
       const useProxy = !!(CFG.PROXY_URL && CFG.PROXY_URL.trim());
-      const apiKey = useProxy ? null : this.getApiKey();
-      if (!useProxy && !apiKey) {
+      if (!useProxy) {
         const err = new Error("NO_API_KEY");
         err.code = "NO_API_KEY";
         throw err;
@@ -11448,7 +11450,6 @@ function renderTajheezAllTable() {
       // عدد الطلبات المستهلكة من الحد الشهري إلى النصف تقريباً.
       // الوسيط (main.ts) مصمم ليقبل الصيغتين، فلا حاجة لتغيير أي شيء هناك.
       const headers = useProxy ? { "Content-Type": "text/plain" } : { "Content-Type": "application/json" };
-      if (!useProxy) headers.Authorization = "Bearer " + apiKey;
 
       // ── 📚 وضع "الدليل الوطني" (file_search) ──
       // لو VECTOR_STORE_ID معبأ، نستخدم Responses API بدل chat/completions
@@ -11479,6 +11480,7 @@ function renderTajheezAllTable() {
         method: "POST",
         headers: headers,
         body: JSON.stringify(payload),
+        signal: window.__FCB_ABORT ? window.__FCB_ABORT.signal : undefined, // Task 3
       });
       if (!resp.ok) {
         let errMsg = "HTTP " + resp.status;
@@ -11513,29 +11515,14 @@ function renderTajheezAllTable() {
       return reply;
     },
   };
+  /* 🛠️ لوحة الإعدادات حُذفت من الواجهة — حماية من غياب العنصر */
   function fcbOpenSettings() {
-    document.getElementById("fcbApiKeyInput").value = AIService.getApiKey();
-    document.getElementById("fcbModelInput").value = AIService.getModel();
-    document.getElementById("fcbSettingsPanel").style.display = "flex";
+    const el = document.getElementById("fcbSettingsPanel");
+    if (el) el.style.display = "flex";
   }
   function fcbCloseSettings() {
-    document.getElementById("fcbSettingsPanel").style.display = "none";
-  }
-  function fcbSaveSettings() {
-    const key = document.getElementById("fcbApiKeyInput").value.trim();
-    const model = document.getElementById("fcbModelInput").value.trim();
-    AIService.saveSettings(key, model);
-    fcbCloseSettings();
-    showToast(
-      key ? "تم حفظ إعدادات المساعد ✅" : "تم الحفظ — لكن لم تُدخل مفتاح API، سيستخدم المساعد الردود المبرمجة فقط ⚠️",
-      key ? "ok" : "info",
-    );
-  }
-  function fcbClearSettings() {
-    AIService.clearSettings();
-    document.getElementById("fcbApiKeyInput").value = "";
-    document.getElementById("fcbModelInput").value = "";
-    showToast("تم مسح الإعدادات المحلية 🗑️", "ok");
+    const el = document.getElementById("fcbSettingsPanel");
+    if (el) el.style.display = "none";
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -13210,13 +13197,16 @@ function renderTajheezAllTable() {
     return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "ص" : "م"}`;
   }
 
+  /* Task 8: أفاتار الروبوت SVG معرّف مرة واحدة فقط ويُعاد استخدامه في كل الأماكن */
+  const FCB_AVATAR_HTML = '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill=CSS_TOKENS.primary()/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>';
+
   function fcbAppendMsg(text, who) {
     const wrap = document.getElementById("fcbMessages");
     const row = document.createElement("div");
     row.className = "fcb-row " + who;
     const bubbleId = who === "bot" ? "fcbBubble_" + (++FCB_MSG_SEQ) : "";
     row.innerHTML =
-      (who === "bot" ? '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill=CSS_TOKENS.primary()/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>' : "") +
+      (who === "bot" ? FCB_AVATAR_HTML : "") +
       `<div class="fcb-col"><div class="fcb-bubble"${bubbleId ? ` id="${bubbleId}"` : ""}></div><div class="fcb-time"></div></div>`;
     const bubble = row.querySelector(".fcb-bubble");
     if (who === "bot") {
@@ -13229,7 +13219,8 @@ function renderTajheezAllTable() {
         exportRow.className = "fcb-export-row fcb-export-row-msg";
         exportRow.innerHTML =
           `<button type="button" class="fcb-export-btn" onclick="fcbCopyBubble('${bubbleId}')">📋 نسخ</button>` +
-          `<button type="button" class="fcb-export-btn" onclick="fcbExportBubble('${bubbleId}')">📄 PDF</button>`;
+          `<button type="button" class="fcb-export-btn" onclick="fcbExportBubble('${bubbleId}')">📄 PDF</button>` +
+          `<button type="button" class="fcb-export-btn" onclick="fcbRegenerate()">🔄 إعادة توليد</button>`;
         bubble.appendChild(exportRow);
       }
     } else {
@@ -13248,13 +13239,24 @@ function renderTajheezAllTable() {
     row.className = "fcb-row bot";
     row.id = "fcbTyping";
     row.innerHTML =
-      '<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill=CSS_TOKENS.primary()/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div><div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
+      FCB_AVATAR_HTML + '<div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span><span class="fcb-typing-txt">يحلّل البيانات…</span></div></div>';
     wrap.appendChild(row);
+    /* 🛠️ تدوير رسائل الحالة الأربع بدل تبديل واحد فقط — الارتفاع ثابت
+       (min-height في CSS) فلا يحدث أي Layout Shift أثناء التبديل. */
+    const FCB_TYPING_MSGS = ["يبحث داخل البيانات…", "يفكر…", "يجهّز الرد…"];
+    let msgIdx = 0;
+    window.__FCB_TYPING_TIMER = setInterval(() => {
+      const txt = row.querySelector(".fcb-typing-txt");
+      if (!txt) return;
+      txt.textContent = FCB_TYPING_MSGS[msgIdx % FCB_TYPING_MSGS.length];
+      msgIdx++;
+    }, 2500);
     const body = document.getElementById("fcbBody");
     body.scrollTop = body.scrollHeight;
   }
 
   function fcbHideTyping() {
+    if (window.__FCB_TYPING_TIMER) { clearInterval(window.__FCB_TYPING_TIMER); window.__FCB_TYPING_TIMER = null; }
     const t = document.getElementById("fcbTyping");
     if (t) t.remove();
   }
@@ -13262,6 +13264,13 @@ function renderTajheezAllTable() {
   /* ════════════════════════════════════════════════════════════════
      💬 سجل المحادثة (للحفاظ على سياق الحوار مع OpenAI)
   ════════════════════════════════════════════════════════════════ */
+  /* Task 7: كائن موحّد للتخزين المحلي الخاص بالمساعد — try/catch في مكان واحد */
+  const FcbStorage = {
+    get(key)        { try { return localStorage.getItem(key); } catch (_) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); return true; } catch (_) { return false; } },
+    remove(key)     { try { localStorage.removeItem(key); return true; } catch (_) { return false; } },
+  };
+
   const FCB_HISTORY_KEY = "fcb_chat_history_v1";
   const FCB_MEMORY_KEY  = "fcb_memory_facts_v1";
   const FCB_HISTORY_MAX = 12; // آخر 12 رسالة (6 أسئلة + 6 ردود) كسياق
@@ -13275,20 +13284,18 @@ function renderTajheezAllTable() {
   //     (مثلاً: "تذكر إني مهتم بمدارس جدة") — بتفضل متاحة للموديل
   //     في كل محادثة جديدة حتى بعد إغلاق المتصفح.
   function fcbLoadHistory() {
-    try { return JSON.parse(localStorage.getItem(FCB_HISTORY_KEY) || "[]"); }
+    try { return JSON.parse(FcbStorage.get(FCB_HISTORY_KEY) || "[]"); }
     catch (_) { return []; }
   }
   function fcbSaveHistory(h) {
-    try { localStorage.setItem(FCB_HISTORY_KEY, JSON.stringify(h.slice(-FCB_HISTORY_MAX))); }
-    catch (_) {}
+    FcbStorage.set(FCB_HISTORY_KEY, JSON.stringify(h.slice(-FCB_HISTORY_MAX)));
   }
   function fcbLoadMemory() {
-    try { return JSON.parse(localStorage.getItem(FCB_MEMORY_KEY) || "[]"); }
+    try { return JSON.parse(FcbStorage.get(FCB_MEMORY_KEY) || "[]"); }
     catch (_) { return []; }
   }
   function fcbSaveMemory(facts) {
-    try { localStorage.setItem(FCB_MEMORY_KEY, JSON.stringify(facts.slice(-FCB_MEMORY_MAX))); }
-    catch (_) {}
+    FcbStorage.set(FCB_MEMORY_KEY, JSON.stringify(facts.slice(-FCB_MEMORY_MAX)));
   }
   /** يكتشف طلب حفظ صريح زي "تذكر إن..." أو "احفظ إن..." ويضيفه للذاكرة */
   function fcbMaybeLearnFact(userText) {
@@ -13302,8 +13309,8 @@ function renderTajheezAllTable() {
     return fact;
   }
   function fcbForgetAll() {
-    localStorage.removeItem(FCB_HISTORY_KEY);
-    localStorage.removeItem(FCB_MEMORY_KEY);
+    FcbStorage.remove(FCB_HISTORY_KEY);
+    FcbStorage.remove(FCB_MEMORY_KEY);
   }
 
   const FCB_HISTORY = fcbLoadHistory();
@@ -14128,12 +14135,16 @@ ${(() => {
   async function fcbSend(presetText) {
     const inputEl = document.getElementById("fcbInput");
     const sendBtn = document.getElementById("fcbSendBtn");
+    // Task 3: لو فيه توليد جارٍ، الضغطة الحالية تعني "إيقاف"
+    if (window.__FCB_GENERATING) { fcbAbortGeneration(); return; }
     const val = (typeof presetText === "string" ? presetText : inputEl.value).trim();
     if (!val) return;
+    fcbHideQuickReplies(); // Task 2: إخفاء الاقتراحات بعد أول رسالة
+    window.__FCB_LAST_USER = val; // Task 4: لإعادة التوليد
     fcbAppendMsg(val, "user");
     inputEl.value = "";
     inputEl.style.height = "auto";
-    sendBtn.disabled = true;
+    fcbSetSendMode("stop"); // Task 3: تحويل زر الإرسال إلى إيقاف
     fcbShowTyping();
 
     // 🧠 أمر مسح الذاكرة والمحادثة المحفوظة
@@ -14142,7 +14153,7 @@ ${(() => {
       FCB_HISTORY.length = 0;
       fcbHideTyping();
       fcbAppendMsg("🗑️ تم مسح كل الذاكرة والمحادثات المحفوظة.", "bot");
-      sendBtn.disabled = false;
+      fcbSetSendMode("send");
       inputEl.focus();
       return;
     }
@@ -14152,18 +14163,20 @@ ${(() => {
     if (learned) {
       fcbHideTyping();
       fcbAppendMsg("✅ تم الحفظ في الذاكرة، هستخدمها في كل ردودي القادمة: \"" + learned + "\"", "bot");
-      sendBtn.disabled = false;
+      fcbSetSendMode("send");
       inputEl.focus();
       return;
     }
 
+    window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    window.__FCB_GENERATING = true;
     try {
       if (!AIService.hasKey()) {
         // لا يوجد مفتاح API محفوظ — نوضّح ذلك بصراحة للمستخدم، ثم نكمل
         // بالردود المبرمجة (Rule-based) كحل احتياطي مفيد بدل توقف كامل
         fcbHideTyping();
         fcbAppendMsg(
-          "⚠️ لم تُدخل مفتاح OpenAI API بعد، فالردود الحالية مبرمجة (محدودة) وليست من الذكاء الاصطناعي الكامل.\n\nلتفعيل المساعد الذكي الكامل: اضغط ⚙️ بالأعلى وأدخل مفتاحك الخاص — يُخزَّن في متصفحك فقط ولا يُرسل لأي مكان عدا OpenAI مباشرة.\n\nوإليك إجابة مبدئية:\n\n" + fcbReplyFor(val),
+          "⚠️ خدمة الذكاء الاصطناعي غير متاحة حالياً، فالردود التالية مبرمجة (محدودة).\n\nوإليك إجابة مبدئية:\n\n" + fcbReplyFor(val),
           "bot",
         );
         return;
@@ -14172,8 +14185,13 @@ ${(() => {
       fcbHideTyping();
       fcbAppendMsg(reply, "bot");
     } catch (err) {
-      console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       fcbHideTyping();
+      // Task 3: المستخدم أوقف التوليد بنفسه
+      if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
+        fcbAppendMsg("⏹️ تم إيقاف التوليد بواسطة المستخدم.", "bot");
+        return;
+      }
+      console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       const prefix = err?.code === "INVALID_KEY"
         ? "⚠️ مفتاح API غير صحيح أو منتهي — راجعه من ⚙️ الإعدادات.\n\n"
         : err?.code === "REQUEST_FAILED"
@@ -14183,10 +14201,89 @@ ${(() => {
             : "";
       fcbAppendMsg(prefix + fcbReplyFor(val), "bot");
     } finally {
-      sendBtn.disabled = false;
+      window.__FCB_GENERATING = false;
+      window.__FCB_ABORT = null;
+      fcbSetSendMode("send");
       inputEl.focus();
     }
   }
+
+  /* 🛠️ إصلاح: تعريض الدالتين عالمياً — وحدات أخرى في الملف تنتظر
+     window.fcbSend / window.fcbToggle قبل تفعيل نفسها (أزرار التنقل
+     بين التبويبات داخل الردود، تحديث رسالة الترحيب...). بدونه كانت
+     تلك التحسينات معطّلة صامتاً. */
+  window.fcbSend = fcbSend;
+  window.fcbToggle = fcbToggle;
+
+  /* ════════════════════════════════════════════════════════════════
+     🧩 تحسينات المساعد الذكي (Tasks 2–5)
+  ════════════════════════════════════════════════════════════════ */
+  // Task 3: إيقاف التوليد الجاري
+  function fcbAbortGeneration() {
+    try { if (window.__FCB_ABORT) window.__FCB_ABORT.abort(); } catch (_) {}
+  }
+  // Task 3: تبديل زر الإرسال بين وضعي الإرسال والإيقاف (نفس الموضع والحجم)
+  const FCB_SEND_ICON = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>';
+  const FCB_STOP_ICON = '<svg viewBox="0 0 24 24" fill="#fff"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  function fcbSetSendMode(mode) {
+    const btn = document.getElementById("fcbSendBtn");
+    if (!btn) return;
+    if (mode === "stop") {
+      btn.innerHTML = FCB_STOP_ICON;
+      btn.title = "إيقاف التوليد";
+      btn.classList.add("fcb-send-stop");
+    } else {
+      btn.innerHTML = FCB_SEND_ICON;
+      btn.title = "";
+      btn.classList.remove("fcb-send-stop");
+    }
+  }
+  // Task 2: إخفاء الاقتراحات نهائياً لبقية الجلسة بعد أول رسالة
+  function fcbHideQuickReplies() {
+    const qr = document.getElementById("fcbQuickReplies");
+    if (qr) qr.remove();
+  }
+  // Task 4: إعادة توليد آخر رد — يرسل آخر رسالة مستخدم من جديد ويضيف الرد الجديد أسفل القديم
+  async function fcbRegenerate() {
+    if (window.__FCB_GENERATING) return;
+    const last = window.__FCB_LAST_USER;
+    if (!last) { showToast("لا توجد رسالة سابقة لإعادة توليد ردها", "info"); return; }
+    fcbSetSendMode("stop");
+    fcbShowTyping();
+    window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    window.__FCB_GENERATING = true;
+    try {
+      const reply = await fcbAskOpenAI(last);
+      fcbHideTyping();
+      fcbAppendMsg(reply, "bot");
+    } catch (err) {
+      fcbHideTyping();
+      if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
+        fcbAppendMsg("⏹️ تم إيقاف التوليد بواسطة المستخدم.", "bot");
+      } else {
+        console.warn("[fcb] regenerate error:", err);
+        fcbAppendMsg("⚠️ تعذّرت إعادة التوليد — جرّب مرة أخرى.", "bot");
+      }
+    } finally {
+      window.__FCB_GENERATING = false;
+      window.__FCB_ABORT = null;
+      fcbSetSendMode("send");
+    }
+  }
+  window.fcbRegenerate = fcbRegenerate;
+  // Task 5: تكبير/تصغير نافذة المحادثة
+  function fcbToggleMaximize() {
+    const panel = document.querySelector(".fcb-panel");
+    if (panel) panel.classList.toggle("maximized");
+  }
+  // ربط أزرار التحسينات بعد جاهزية الصفحة
+  document.addEventListener("DOMContentLoaded", function () {
+    const maxBtn = document.getElementById("fcbMaxBtn");
+    if (maxBtn) maxBtn.addEventListener("click", fcbToggleMaximize);
+    document.querySelectorAll("#fcbQuickReplies .fcb-qr-pill").forEach(function (b) {
+      b.addEventListener("click", function () { fcbSend(b.textContent.trim()); });
+    });
+  });
 
 /* ══════════════════════════════════════════════════════════════════════
    تبويب البوابين
@@ -16108,6 +16205,8 @@ window.addEventListener('load', function(){
      الـ bubble يظهر فوق رأس الروبوت مباشرة، ويتتبع حركته frame by frame ══ */
   let _bubblePrevBottom = 0, _bubblePrevLeft = 0;
   function syncBubblePos(){
+    /* 🛠️ أداء: لا داعي لقياسات DOM كل إطار والتبويب غير مرئي */
+    if (document.hidden) { requestAnimationFrame(syncBubblePos); return; }
     const rect = holder.getBoundingClientRect();
     /* نضع الـ bubble فوق أعلى نقطة في الروبوت + 12px فراغ */
     const bBottom = Math.round(window.innerHeight - rect.top + 2);
@@ -16286,8 +16385,8 @@ window.addEventListener('load', function(){
       .ix-filter-bar {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
         padding: 8px 16px; margin: 0 0 12px;
-        background: linear-gradient(135deg, CSS_TOKENS.α(CSS_TOKENS.info(),.08), CSS_TOKENS.α(CSS_TOKENS.info(),.04));
-        border: 1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);
+        background: linear-gradient(135deg, ${CSS_TOKENS.α(CSS_TOKENS.info(),.08)}, ${CSS_TOKENS.α(CSS_TOKENS.info(),.04)});
+        border: 1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.2)};
         border-radius: 12px; font-size: 12px; font-weight: 700;
         color: var(--teal-3); animation: ixFadeIn .25s ease;
       }
@@ -16351,7 +16450,7 @@ window.addEventListener('load', function(){
         position: fixed; top: 0; left: 0; bottom: 0; z-index: 9001;
         width: min(580px, 94vw);
         background: var(--bg-3);
-        box-shadow: 4px 0 40px rgba(6,20,28,.18), 12px 0 64px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
+        box-shadow: 4px 0 40px rgba(6,20,28,.18), 12px 0 64px ${CSS_TOKENS.α(CSS_TOKENS.info(),.08)};
         display: flex; flex-direction: column;
         transform: translateX(-100%); transition: transform .3s cubic-bezier(.22,.6,.34,1);
         border-right: 2px solid var(--bd-light);
@@ -16441,7 +16540,7 @@ window.addEventListener('load', function(){
 
       .ix-kpi-modal {
         background: var(--bg-3); border-radius: 20px;
-        box-shadow: 0 24px 64px rgba(6,20,28,.24), 0 6px 24px CSS_TOKENS.α(CSS_TOKENS.info(),.1);
+        box-shadow: 0 24px 64px rgba(6,20,28,.24), 0 6px 24px ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};
         width: min(780px, 95vw); max-height: 85vh;
         display: flex; flex-direction: column; overflow: hidden;
         animation: ixSlideUp .26s cubic-bezier(.22,.6,.34,1);
@@ -16511,11 +16610,11 @@ window.addEventListener('load', function(){
       .ix-suggestion-item:hover, .ix-suggestion-item:focus { background: var(--bg-2); outline: none; }
       .ix-sug-name { font-size: 12px; font-weight: 700; color: var(--tx-main); }
       .ix-sug-meta { font-size: 10px; color: var(--tx-muted); margin-top: 2px; }
-      .ix-sug-mark { background: CSS_TOKENS.α(CSS_TOKENS.info(),.15); color: var(--teal-3); border-radius: 2px; }
+      .ix-sug-mark { background: ${CSS_TOKENS.α(CSS_TOKENS.info(),.15)}; color: var(--teal-3); border-radius: 2px; }
 
       /* ── Loading Spinner ── */
       .ix-spinner {
-        width: 20px; height: 20px; border: 2.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.2);
+        width: 20px; height: 20px; border: 2.5px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.2)};
         border-top-color: var(--teal); border-radius: 50%;
         animation: ixSpin .7s linear infinite; flex-shrink: 0;
       }
@@ -18091,7 +18190,7 @@ ${dataCtx}
   style.textContent = `
     /* Panel refinements */
     .fcb-panel {
-      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px CSS_TOKENS.α(CSS_TOKENS.info(),.06) !important;
+      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px ${CSS_TOKENS.α(CSS_TOKENS.info(),.06)} !important;
     }
     .fcb-panel.open {
       /* Panel is open — no special override needed, walker JS handles position */
@@ -18142,11 +18241,12 @@ ${dataCtx}
     function updateWalkerPos() {
       const isOpen = panel.classList.contains('open');
       if (isOpen) {
-        // Panel open: walker stands fully on top of the panel's top edge
-        // Panel: bottom=22px, height=540px → panel top = 22+540 = 562px from bottom
-        // Walker feet rest right on that edge (small 8px grounding overlap only)
-        walker.style.bottom = '554px';
-        walker.style.left   = '138px'; // horizontally centered over panel (panel left=24, width=355 → center=201; walker width=130 → left=201-65=136)
+        /* 🛠️ قياسات التخطيط (offset*) بدل getBoundingClientRect لأن
+           الأخير يتشوه أثناء أنيميشن الفتح (scale/translate)، بينما
+           offsetHeight/offsetLeft محصّنة ضد الـ transform. */
+        const panelBottomPx = parseFloat(getComputedStyle(panel).bottom) || 22;
+        walker.style.bottom = Math.round(panelBottomPx + panel.offsetHeight - 8) + 'px';
+        walker.style.left   = Math.round(panel.offsetLeft + panel.offsetWidth / 2 - walker.offsetWidth / 2) + 'px';
         walker.style.zIndex = '1220';
       } else {
         // Panel closed: walker bottom-left corner
@@ -18158,6 +18258,8 @@ ${dataCtx}
 
     // Observe panel class changes
     new MutationObserver(updateWalkerPos).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    if (typeof ResizeObserver === 'function') new ResizeObserver(updateWalkerPos).observe(panel);
+    window.addEventListener('resize', updateWalkerPos);
     updateWalkerPos();
   });
 })();
@@ -18626,7 +18728,7 @@ ${dataCtx}
         ].join(";");
 
         btn.addEventListener("mouseover", function () {
-          btn.style.background = "var(--accent-dim,CSS_TOKENS.α(CSS_TOKENS.info(),.25))";
+          btn.style.background = "var(--accent-dim," + CSS_TOKENS.α(CSS_TOKENS.info(),.25) + ")";
           btn.style.color = "#fff";
         });
         btn.addEventListener("mouseout", function () {
@@ -19566,6 +19668,14 @@ function renderTrainingTab(_fromDate, _toDate) {
           return { destroy: () => {}, __skipped: true };
         }
 
+        /* 🛠️ منع تسريب Chart.js وخطأ "Canvas is already in use":
+           لو فيه رسم قديم على نفس الـ canvas نفكّكه قبل الإنشاء —
+           يغطي كل مواقع new Chart المباشرة (غير المسجلة في CHARTS). */
+        try {
+          const prev = OrigChart.getChart ? OrigChart.getChart(el) : null;
+          if (prev) prev.destroy();
+        } catch (_) {}
+
         return new OrigChart(el, config);
       } catch(e) {
         console.warn('[ChartGuard] تجاوز خطأ chart:', e.message);
@@ -19948,7 +20058,7 @@ function _hasrRenderFilterBanner() {
     banner.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;
                   padding:10px 14px;margin-bottom:12px;border-radius:10px;
-                  background:CSS_TOKENS.α(CSS_TOKENS.info(),.08);border:1.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.25)">
+                  background:${CSS_TOKENS.α(CSS_TOKENS.info(),.08)};border:1.5px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.25)}">
         <span style="font-size:16px">🔍</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:2px">فلتر نشط</div>
@@ -19978,7 +20088,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; left:0; bottom:0; z-index:9100;
       width:min(420px,94vw);
       background:var(--bg-3);
-      box-shadow:4px 0 40px rgba(6,20,28,.22),12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
+      box-shadow:4px 0 40px rgba(6,20,28,.22),12px 0 60px ${CSS_TOKENS.α(CSS_TOKENS.info(),.08)};
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .3s cubic-bezier(.22,.6,.34,1);
@@ -19990,7 +20100,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; left:0; bottom:0; z-index:9200;
       width:min(460px,96vw);
       background:var(--bg-3);
-      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.1);
+      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .28s cubic-bezier(.22,.6,.34,1);
@@ -20002,7 +20112,7 @@ function _hasrRenderFilterBanner() {
       position:fixed; top:0; right:0; bottom:0; z-index:9150;
       width:min(420px,94vw);
       background:var(--bg-3);
-      box-shadow:-4px 0 40px rgba(6,20,28,.22),-12px 0 60px CSS_TOKENS.α(CSS_TOKENS.info(),.08);
+      box-shadow:-4px 0 40px rgba(6,20,28,.22),-12px 0 60px ${CSS_TOKENS.α(CSS_TOKENS.info(),.08)};
       display:flex; flex-direction:column;
       transform:translateX(105%);
       transition:transform .3s cubic-bezier(.22,.6,.34,1);
@@ -20112,10 +20222,10 @@ function _hasrRenderFilterBanner() {
     .hasr-back-btn {
       display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
       padding:6px 14px;border-radius:8px;background:var(--bg-2);color:var(--teal,#0891B2);
-      border:1.5px solid CSS_TOKENS.α(CSS_TOKENS.info(),.3);cursor:pointer;font-family:Tajawal;
+      border:1.5px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.3)};cursor:pointer;font-family:Tajawal;
       margin-bottom:14px;transition:background .15s;
     }
-    .hasr-back-btn:hover { background:CSS_TOKENS.α(CSS_TOKENS.info(),.12); }
+    .hasr-back-btn:hover { background:${CSS_TOKENS.α(CSS_TOKENS.info(),.12)}; }
   `;
   document.head.appendChild(s);
 })();
@@ -20794,7 +20904,7 @@ function _hPanelMainSystems(body) {
           const isActive = ctx.filter.mainSys===s.name && !ctx.filter.subSys;
           return `
           <div class="hasr-srow" onclick="hasrSelectMainSystem('${_hE(s.name)}')"
-               style="border:1.5px solid ${isActive?'CSS_TOKENS.α(CSS_TOKENS.info(),.4)':'transparent'};background:${isActive?'CSS_TOKENS.α(CSS_TOKENS.info(),.06)':''}">
+               style="border:1.5px solid ${isActive?CSS_TOKENS.α(CSS_TOKENS.info(),.4):'transparent'};background:${isActive?CSS_TOKENS.α(CSS_TOKENS.info(),.06):''}">
             <div style="flex:1">
               <div class="hasr-sname">${_hE(s.name)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
@@ -21000,7 +21110,7 @@ function hasrShowSubDetail(mainSys, subSys) {
     </div>
     ${sc ? `
     <div class="hasr-sec" style="margin-top:12px">المدرسة</div>
-    <div style="padding:10px 12px;background:CSS_TOKENS.α(CSS_TOKENS.info(),.06);border-radius:8px;border:1px solid CSS_TOKENS.α(CSS_TOKENS.info(),.18)">
+    <div style="padding:10px 12px;background:${CSS_TOKENS.α(CSS_TOKENS.info(),.06)};border-radius:8px;border:1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.18)}">
       <div style="font-size:12px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
       <div style="font-size:10px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
     </div>` : ''}
@@ -21339,15 +21449,9 @@ function clearHasrFilters(){
   _hasrApplyFilters();
 }
 
-/* للاستدعاء من sysBrowseSelectSub */
-function sysBrowseSelectSub(mainSys, subSys) {
-  sysBrowseClose();
-  HASR._filterMain = mainSys;
-  HASR._filterSub  = subSys;
-  const tabBtn = document.querySelector('.tab[onclick*="hasr"]');
-  if (tabBtn) showTab('hasr', tabBtn);
-  else showTab('hasr');
-}
+/* للاستدعاء من sysBrowseSelectSub في قسم الأنظمة الرئيسية — تمت إزالة
+   النسخة الخاطئة هنا (كانت تربط الأنظمة الرئيسية بتبويب حصر الأصول
+   وهما تبويبان مستقلان لا علاقة بينهما) */
 
 /* ════════════════════════════════════════════════════════════════
    مساعدات
@@ -22027,11 +22131,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(100, 'click', function (event) { loadHasrData() });
   bind(101, 'error', function (event) { this.style.display='none' });
   bind(102, 'error', function (event) { this.style.display='none' });
-  bind(103, 'click', function (event) { fcbOpenSettings() });
   bind(104, 'click', function (event) { fcbToggle() });
-  bind(105, 'click', function (event) { fcbCloseSettings() });
-  bind(106, 'click', function (event) { fcbSaveSettings() });
-  bind(107, 'click', function (event) { fcbClearSettings() });
   bind(108, 'keydown', function (event) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fcbSend();} });
   bind(108, 'input', function (event) { fcbAutoGrow(this) });
   bind(109, 'click', function (event) { fcbSend() });
@@ -22125,3 +22225,120 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
+
+/* ════════════════════════════════════════════════════════════════
+   🚀 TabWarmup — تحميل التبويبات في الخلفية (Progressive Preload)
+   ────────────────────────────────────────────────────────────────
+   الفكرة (بنود 3 و5 و15 من متطلبات الأداء):
+   • بعد اكتمال تحميل الصفحة وجاهزية البيانات (RAW)، نمرّر على كل
+     تبويب ونستدعي دالة الرسم الخاصة به في الخلفية — تبويب واحد فقط
+     في كل شريحة خمول (requestIdleCallback) حتى لا تتجمد الواجهة.
+   • ChartGuard الموجود أصلاً يتخطى رسم أي canvas داخل تبويب مخفي،
+     فالإحماء يبني DOM + الجداول + يجهّز البيانات فقط (الجزء الثقيل)،
+     وعند فتح التبويب يرسم showTab الرسوم فوراً على بيانات جاهزة.
+   • خريطة Leaflet مستثناة (تحتاج حاوية مرئية لقياس أبعادها).
+   • كل استدعاء داخل try/catch — فشل تبويب لا يوقف البقية، ولا يغيّر
+     هذا الموديول أي Business Logic (استدعاءات إضافية فقط).
+   ════════════════════════════════════════════════════════════════ */
+(function TabWarmup() {
+  var WARM_LIST = [
+    ["overview",        function(){ renderOverviewCharts(); }],
+    ["fca",             function(){ renderFcaCharts(); }],
+    ["env",             function(){ renderEnvCharts(); }],
+    ["stages",          function(){ renderStageCharts(); }],
+    ["stage-compare",   function(){ renderStageCompareTab(); }],
+    ["fca-ref",         function(){ renderFcaRefTab(); }],
+    ["all-contracts",   function(){ renderAllContracts(); }],
+    ["sys-main",        function(){ renderSysMain(); }],
+    ["sys-detail",      function(){ renderSysDetail(); }],
+    ["balagh",          function(){ renderBalaghTab(); }],
+    ["tajheez",         function(){ renderTajheezInventoryTab(); }],
+    ["gatekeepers",     function(){ if (typeof renderGatekeepersTab === "function") renderGatekeepersTab(); }],
+    ["recruitment",     function(){ if (typeof renderRecruitmentTab === "function") renderRecruitmentTab(); }],
+    ["khanadeq",        function(){ renderKhanadeqTab(); }],
+    ["elevators",       function(){ renderElevatorsTab(); }],
+    ["elevator-status", function(){ renderElevatorStatusTab(); }],
+    ["cost",            function(){ renderCostTab(); }],
+    ["spare",           function(){ renderSpareTab(); }],
+    ["students",        function(){ renderStudentsTab(); }],
+    ["ayen",            function(){ renderAyenTab(); }],
+    ["ac-plan",         function(){ renderAcPlanTab(); }],
+    ["mag-kpi",         function(){ renderMagKpiTab(); }],
+    ["consultant-kpi",  function(){ renderConsultantKpiTab(); }],
+    ["security-safety", function(){ renderSecuritySafetyTab(); }],
+    ["fuel",            function(){ renderFuelTab(); }],
+    ["vehicles",        function(){ renderVehiclesTab(); }],
+    ["training",        function(){ renderTrainingTab(); }],
+    ["hasr",            function(){ renderHasrTab(); }],
+    ["emp-kpi",         function(){ renderEmpKpiTab(); }]
+    /* "map" مستثناة: Leaflet يحتاج حاوية مرئية · "table" تُرسم عند الفتح (Virtualized) */
+  ];
+
+  var idle = window.requestIdleCallback
+    ? function (fn) { window.requestIdleCallback(fn, { timeout: 1500 }); }
+    : function (fn) { setTimeout(fn, 180); };
+
+  var warmed = Object.create(null);
+  window.__TAB_WARMED__ = warmed;
+
+  function warmNext(queue, stats) {
+    if (!queue.length) {
+      try { console.info("[TabWarmup] اكتمل الإحماء الخلفي:", stats.ok + " تبويب جاهز، " + stats.fail + " تخطّي"); } catch (_) {}
+      return;
+    }
+    var item = queue.shift();
+    idle(function () {
+      /* لا نُحمي التبويب المفتوح حالياً (مرسوم أصلاً) */
+      if (window.__ACTIVE_TAB__ !== item[0] && !warmed[item[0]]) {
+        try { item[1](); warmed[item[0]] = true; stats.ok++; }
+        catch (e) { stats.fail++; try { console.warn("[TabWarmup] تخطّي", item[0], "-", e && e.message); } catch (_) {} }
+      }
+      warmNext(queue, stats);
+    });
+  }
+
+  function whenReady() {
+    /* بوابة الجاهزية: البيانات الرئيسية محمّلة + مرّت لحظة على أول رسم */
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      var dataReady = (typeof RAW !== "undefined" && Array.isArray(RAW) && RAW.length > 0);
+      if (dataReady || tries > 120) {          /* مهلة قصوى ~60 ثانية */
+        clearInterval(t);
+        if (dataReady) warmNext(WARM_LIST.slice(), { ok: 0, fail: 0 });
+      }
+    }, 500);
+  }
+
+  if (document.readyState === "complete") whenReady();
+  else window.addEventListener("load", whenReady);
+})();
+
+/* ── بند 6: renderErrorState بسبب الخطأ الحقيقي (إضافة اختيارية متوافقة) ── */
+(function upgradeErrorState() {
+  var orig = (window.IXStates && window.IXStates.renderErrorState) || (typeof renderErrorState === "function" ? renderErrorState : null);
+  if (!orig) return;
+  function withDetail(container, message, detail) {
+    var el = typeof container === "string" ? document.getElementById(container) : container;
+    if (!el) return;
+    orig(el, message);
+    if (detail) {
+      var box = el.querySelector(".chart-error-state");
+      if (box) {
+        var d = document.createElement("div");
+        d.style.cssText = "font-size:10.5px;font-weight:600;color:var(--tx-muted);max-width:90%;text-align:center;direction:ltr;word-break:break-word";
+        d.textContent = "تفاصيل: " + String(detail).slice(0, 220);
+        box.appendChild(d);
+      }
+    }
+  }
+  window.IXStates.renderErrorState = withDetail;
+})();
+
+/* ── بند 14 (تكملة صغيرة): تسميات ARIA لعناصر المساعد التفاعلية ── */
+document.addEventListener("DOMContentLoaded", function () {
+  var send = document.getElementById("fcbSendBtn");
+  if (send && !send.getAttribute("aria-label")) send.setAttribute("aria-label", "إرسال الرسالة");
+  var inp = document.getElementById("fcbInput");
+  if (inp && !inp.getAttribute("aria-label")) inp.setAttribute("aria-label", "اكتب رسالتك للمساعد الذكي");
+});

@@ -2020,21 +2020,32 @@ tbody tr:last-child td { border-bottom: none; }
 
 .fcb-chip:hover { background: var(--grad-teal); border-color: transparent; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(13,132,156,.3); }
 
-/* 🛠️ إصلاح صندوق حالة المساعد (يحلّل/يفكر/يجهّز الرد):
-   ١) كان النص white-space:nowrap → يخرج خارج الفقاعة. الآن يلتف لسطر جديد.
-   ٢) min-height ثابت للفقاعة → تبديل الرسائل لا يسبب أي Layout Shift.
-   ٣) max-width مرن → Responsive على كل المقاسات، بلا قصّ وبلا Overflow. */
+/* مؤشر الكتابة — الهيكل: [نقطة نقطة نقطة] [نص] في سطر أفقي واحد */
 .fcb-typing {
-  display: flex;
+  display: inline-flex;        /* inline-flex: يأخذ حجم محتواه فقط */
   align-items: center;
+  flex-direction: row;
   flex-wrap: nowrap;
-  gap: 4px;
-  padding: 12px 14px;
-  min-height: 44px;          /* ارتفاع محجوز ثابت */
-  max-width: min(300px, 78vw);
+  gap: 5px;
+  padding: 12px 16px;
+  min-width: 160px;            /* يضمن مساحة للنص الأطول */
   box-sizing: border-box;
-  overflow: hidden;          /* حزام أمان: لا شيء يتسرب خارج الفقاعة */
+  overflow: visible;
 }
+
+.fcb-typing span:not(.fcb-typing-txt) {
+  flex: 0 0 7px;
+  width: 7px !important;
+  height: 7px !important;
+  min-width: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  opacity: .55;
+  display: block;
+  animation: fcb-bounce 1.2s infinite ease-in-out;
+}
+.fcb-typing span:nth-child(2) { animation-delay: .15s; }
+.fcb-typing span:nth-child(3) { animation-delay: .3s; }
 .fcb-typing span { flex: 0 0 auto; width: 6.5px; height: 6.5px; border-radius: 50%; background: var(--teal); opacity: .55; animation: fcb-bounce 1.2s infinite ease-in-out; }
 .fcb-typing span:nth-child(2) { animation-delay: .15s; }
 .fcb-typing span:nth-child(3) { animation-delay: .3s; }
@@ -2737,17 +2748,13 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 
 /* Task 6: نص مؤشر الكتابة */
 .fcb-typing-txt {
-  font: 600 11.5px Tajawal, sans-serif;
+  /* 🛠️ إصلاح نهائي: display:inline داخل inline-flex يجعل العنصر
+     يأخذ حجم نصه فقط، في سطر واحد، بجانب النقاط مباشرة */
+  display: inline;
+  font: 600 12px/1 Tajawal, sans-serif;
   color: var(--tx-muted);
-  margin-right: 7px;
-  /* 🛠️ كان white-space:nowrap → النص يخرج خارج الفقاعة.
-     الآن: يلتف طبيعياً، وينكمش صح داخل الـ flex (min-width:0). */
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  min-width: 0;
-  flex: 1 1 auto;
-  line-height: 1.5;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Task 5: وضع التكبير — هنا الارتفاع الكبير مقصود (وضع ملء الشاشة) */
@@ -2883,9 +2890,9 @@ canvas {
 }
 
 /* ── 13) chat typing bubble: نص مسبق‐حجز الارتفاع ─────────────── */
-/* (تكملة للإصلاح في .fcb-typing بالأعلى — ثبّت حجم النقاط الثلاثة) */
-.fcb-typing > span:not(.fcb-typing-txt) {
-  flex: 0 0 6.5px;
+/* 🛠️ عرض أدنى يضمن سعة النص + النقاط في صف واحد مريح */
+.fcb-row.bot .fcb-bubble.fcb-typing {
+  min-width: 180px;
 }
 
 /* ── 14) منع Overflow في Tooltip الشارتات على الجوال ──────────── */

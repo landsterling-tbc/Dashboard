@@ -760,177 +760,12 @@ html[dir="ltr"] .fsel {
 
 /* ══════════════════════════════════════════════════════════════
    15. KPI TILES
+   النظام البصري الكامل لبطاقات KPI موحّد الآن في قسم واحد:
+   "KPI CARDS — UNIFIED ENTERPRISE DESIGN SYSTEM" في نهاية هذا الملف.
+   (تم دمج كل النسخ المتكررة/المتضاربة التي كانت هنا سابقاً في مكان واحد
+   فقط، بدون أي تغيير على أي HTML أو JS — نفس الكلاسات والـ IDs تماماً:
+   .kpi > .kpi-icon? + .kpi-val + .kpi-lbl + .kpi-sub* مع تمايز kc-*)
    ══════════════════════════════════════════════════════════════ */
-/* 🔽 نسخة مصغّرة من كروت الـ KPI — تُستخدم في التبويبات اللي كروتها كبيرة
-   زيادة عن باقي التبويبات (مثل: الأمن والسلامة) بدون التأثير على باقي
-   التبويبات اللي بتستخدم .kpi العادية */
-.kpi-row.kpi-sm .kpi,
-.kpi-grid.kpi-sm .kpi {
-  padding: 12px 12px 10px;
-}
-.kpi-row.kpi-sm .kpi-icon,
-.kpi-grid.kpi-sm .kpi-icon {
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
-  top: 10px;
-  left: 10px;
-}
-.kpi-row.kpi-sm .kpi-val,
-.kpi-grid.kpi-sm .kpi-val {
-  font-size: 19px;
-}
-.kpi-row.kpi-sm .kpi-lbl,
-.kpi-grid.kpi-sm .kpi-lbl {
-  font-size: 10.5px;
-  margin-top: 5px;
-}
-.kpi-row.kpi-sm .kpi-sub,
-.kpi-grid.kpi-sm .kpi-sub {
-  font-size: 9.5px;
-  margin-top: 2px;
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.kpi {
-  background: #fff;
-  border: 1px solid var(--bd-light);
-  border-radius: var(--r-xl);
-  padding: 19px 18px 17px;
-  box-shadow:
-    0 1px 2px rgba(8,45,60,.04),
-    0 4px 12px rgba(8,45,60,.08),
-    inset 0 1px 0 rgba(255,255,255,.9);
-  position: relative;
-  overflow: hidden;
-  transition: transform .22s var(--ease-std), box-shadow .22s ease, border-color .22s ease;
-}
-
-.kpi::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
-}
-
-.kpi::after {
-  content: "";
-  position: absolute;
-  inset: auto -18px -18px auto;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  opacity: .06;
-  pointer-events: none;
-}
-
-.kpi:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 2px 4px rgba(8,45,60,.06),
-    0 10px 28px rgba(8,45,60,.13),
-    inset 0 1px 0 rgba(255,255,255,.95);
-  border-color: #b8d4e0;
-}
-
-.kpi-icon {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  opacity: .13;
-}
-
-.kpi-val {
-  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif;
-  font-size: 29px;
-  font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: -.03em;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpi-lbl {
-  margin-top: 8px;
-  color: var(--tx-main);
-  font-size: 12.5px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.kpi-sub {
-  margin-top: 4px;
-  color: var(--tx-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-/* ألوان KPI */
-.kpi.kc-blue::before  { background: linear-gradient(90deg, var(--teal-3), var(--teal-2)); }
-.kpi.kc-blue::after   { background: var(--teal); }
-.kpi.kc-blue .kpi-icon { background: var(--teal); }
-.kpi.kc-blue .kpi-val  { color: var(--teal-3); }
-
-.kpi.kc-teal::before  { background: linear-gradient(90deg, #0b6b7e, #16a4bf); }
-.kpi.kc-teal::after   { background: var(--teal); }
-.kpi.kc-teal .kpi-icon { background: var(--teal); }
-.kpi.kc-teal .kpi-val  { color: var(--teal); }
-
-.kpi.kc-navy::before  { background: linear-gradient(90deg, #062f3d, var(--navy-2)); }
-.kpi.kc-navy::after   { background: var(--navy); }
-.kpi.kc-navy .kpi-icon { background: var(--navy); }
-.kpi.kc-navy .kpi-val  { color: var(--navy); }
-
-.kpi.kc-green::before  { background: linear-gradient(90deg, #044d3b, var(--c-positive)); }
-.kpi.kc-green::after   { background: var(--c-positive); }
-.kpi.kc-green .kpi-icon { background: var(--c-positive); }
-.kpi.kc-green .kpi-val  { color: var(--c-positive); }
-
-/* kc-info — للمعلومات المحايدة (مرادف kc-teal) */
-.kpi.kc-info::before  { background: linear-gradient(90deg, var(--teal-3), var(--teal-2)); }
-.kpi.kc-info::after   { background: var(--c-info); }
-.kpi.kc-info .kpi-icon { background: var(--c-info); }
-.kpi.kc-info .kpi-val  { color: var(--c-info-2); }
-
-.kpi.kc-amber::before  { background: linear-gradient(90deg, #b45309, #f59e0b); }
-.kpi.kc-amber::after   { background: var(--warn); }
-.kpi.kc-amber .kpi-icon { background: var(--warn); }
-.kpi.kc-amber .kpi-val  { color: #92400e; }
-
-.kpi.kc-red::before  { background: linear-gradient(90deg, #991b1b, #f87171); }
-.kpi.kc-red::after   { background: #dc2626; }
-.kpi.kc-red .kpi-icon { background: #dc2626; }
-.kpi.kc-red .kpi-val  { color: #991b1b; }
-
-.kpi.kc-purple::before  { background: linear-gradient(90deg, #5b21b6, #a78bfa); }
-.kpi.kc-purple::after   { background: var(--purple); }
-.kpi.kc-purple .kpi-icon { background: var(--purple); }
-.kpi.kc-purple .kpi-val  { color: #4c1d95; }
-
-/* دخول متتالي لـ KPI */
-@keyframes mxFadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
-}
-.panel.active .kpi { animation: mxFadeUp .35s var(--ease-std) both; }
-.kpi-grid .kpi:nth-child(2) { animation-delay: .04s; }
-.kpi-grid .kpi:nth-child(3) { animation-delay: .08s; }
-.kpi-grid .kpi:nth-child(4) { animation-delay: .12s; }
-.kpi-grid .kpi:nth-child(5) { animation-delay: .16s; }
-.kpi-grid .kpi:nth-child(6) { animation-delay: .20s; }
 
 /* ══════════════════════════════════════════════════════════════
    16. TIER STRIP
@@ -1771,7 +1606,7 @@ tbody tr:last-child td { border-bottom: none; }
   border: 1px solid var(--bd-light);
   border-radius: 22px;
   box-shadow: 0 32px 80px rgba(8,45,60,.26), 0 8px 24px rgba(8,45,60,.12), 0 0 0 1px rgba(13,132,156,.07);
-  z-index: 599;
+  z-index: 1500;
   overflow: visible;
   opacity: 0;
   transform: translateY(20px) scale(.95);
@@ -2226,12 +2061,16 @@ tbody tr:last-child td { border-bottom: none; }
   left: 198px;
   width: 130px;
   height: 165px;
-  z-index: 1210;
+  z-index: 2147483647;
   cursor: pointer;
   transform: scale(1);
-  transition: transform .6s cubic-bezier(.22,1,.36,1);
+  transition: transform .6s cubic-bezier(.22,1,.36,1), opacity .5s ease;
   will-change: transform;
+  opacity: 0;
+  pointer-events: none;
 }
+
+#fmbotWalker.bot-ready { opacity: 1; pointer-events: auto; }
 
 #fmbotWalker.panel-closed { left: 20px; bottom: 14px; }
 #fmbotWalker.near { transform: scale(1.05); }
@@ -2316,7 +2155,7 @@ tbody tr:last-child td { border-bottom: none; }
 #fmbotWalker.over-panel {
   bottom: calc(22px + 560px - 80px);
   left: 198px;
-  z-index: 1220;
+  z-index: 2147483646;
   transition: bottom .32s var(--ease-std), left .32s var(--ease-std), transform .6s cubic-bezier(.22,1,.36,1);
 }
 
@@ -2364,7 +2203,7 @@ tbody tr:last-child td { border-bottom: none; }
   cursor: pointer;
   direction: rtl;
   opacity: 0;
-  z-index: 1215;
+  z-index: 2147483645;
   min-width: 180px;
   max-width: 240px;
   transition: opacity .45s ease;
@@ -2394,7 +2233,7 @@ tbody tr:last-child td { border-bottom: none; }
    ══════════════════════════════════════════════════════════════ */
 #fcbHideWalkerBtn {
   position: fixed;
-  z-index: 1230;
+  z-index: 2147483646;
   background: rgba(6,20,28,.78);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -2826,12 +2665,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 .chart-loading-state { color: var(--tx-muted); }
 .chart-error-state   { color: #DC2626; }
 
-/* ── 5) KPI Cards: ارتفاع موحد يمنع القفز عند اختلاف طول النص ─── */
-.kpi-card {
-  min-height: 88px;
-  contain: layout style;
-}
-
 /* ── 6) Scroll داخلي للجداول الكبيرة فقط — بلا Horizontal Overflow */
 .table-wrap, .table-responsive {
   overflow-x: auto;
@@ -2862,7 +2695,6 @@ canvas {
 /* ── 10) Responsive: شارتات تتكيف مع الجوال ───────────────────── */
 @media (max-width: 640px) {
   .chart-box { min-height: 140px; }
-  .kpi-card  { min-height: 72px; }
 }
 
 /* ── 11) Reduced Motion — احترام إعداد المستخدم ────────────────── */
@@ -2915,3 +2747,2704 @@ canvas {
   background-size: 400% 100%;
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   16) PORTAL HOME — Enterprise Portal (المرحلة 2 — Portal Layout)
+   قسم جديد بالكامل — إضافة فقط، لا يعدّل أي قاعدة سابقة.
+   ══════════════════════════════════════════════════════════════ */
+.portal-home {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 4px 2px 24px;
+}
+
+.portal-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: linear-gradient(135deg, #0d2f40 0%, #123b52 100%);
+  border-radius: 14px;
+  padding: 12px 20px;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(13,47,64,.18);
+}
+
+.portal-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-logo {
+  height: 20px;
+  filter: brightness(0) invert(1);
+  opacity: .95;
+  display: block;
+}
+
+.portal-logo-tbc {
+  height: 26px;
+}
+
+.portal-hero-divider {
+  width: 1px;
+  height: 20px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.28) 25%, rgba(255,255,255,.28) 75%, transparent);
+  flex-shrink: 0;
+}
+
+.portal-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.portal-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.portal-sub {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 9.5px;
+  letter-spacing: .04em;
+  color: rgba(255,255,255,.6);
+}
+
+.portal-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+}
+
+.portal-updated-lbl {
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+}
+
+.portal-updated-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+.portal-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) 240px;
+  grid-auto-rows: 1fr;
+  gap: 16px;
+}
+
+/* الكارت بيتحط صراحة في العمود الأخير (= أقصى اليسار في صفحة RTL)
+   ويمتد على ارتفاع الصفين مع بعض */
+.portal-favorites-card {
+  grid-column: 4;
+  grid-row: 1 / span 2;
+}
+
+.portal-card {
+  background: #fff;
+  border: 1px solid rgba(13,47,64,.08);
+  border-radius: 14px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  box-shadow: 0 1px 3px rgba(13,47,64,.06);
+}
+
+.portal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(13,47,64,.12);
+  border-color: rgba(13,47,64,.16);
+}
+
+.portal-card-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.portal-card-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #0d2f40;
+}
+
+.portal-card-desc {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: #5b7684;
+}
+
+@media (max-width: 900px) {
+  .portal-cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .portal-favorites-card { grid-column: 1 / -1; grid-row: auto; }
+}
+
+@media (max-width: 640px) {
+  .portal-hero { padding: 18px; }
+  .portal-title { font-size: 16px; }
+  .portal-cards-grid { grid-template-columns: 1fr; }
+  .portal-favorites-card { grid-column: 1; grid-row: auto; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   17) CATEGORY SIDEBAR & LAYOUT (المرحلة 3 و 4 — Navigation + Sidebar)
+   قسم جديد بالكامل — إضافة فقط.
+   ══════════════════════════════════════════════════════════════ */
+.cat-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+}
+
+.cat-sidebar {
+  flex: 0 0 240px;
+  align-self: stretch;
+  position: static;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(13,47,64,.08);
+  border-radius: 12px;
+  padding: 10px;
+  gap: 4px;
+  height: fit-content;
+  max-height: none;
+  overflow-y: visible;
+}
+
+.cat-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(13,47,64,.08);
+}
+
+.cat-back-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: #0d7490;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.cat-back-btn:hover { text-decoration: underline; }
+
+.cat-sidebar-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: #0d2f40;
+}
+
+.cat-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cat-sidebar-item {
+  text-align: right;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px;
+  color: #345;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+
+.cat-sidebar-item:hover {
+  background: rgba(13,47,64,.06);
+}
+
+.cat-sidebar-item.active {
+  background: #0d2f40;
+  color: #fff;
+  font-weight: 700;
+}
+
+.cat-main {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .cat-layout { flex-direction: column; }
+  .cat-sidebar {
+    flex: none;
+    width: 100%;
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .cat-sidebar-head { width: 100%; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   18) LOADING SCREEN (المرحلة 6) + SMART CARDS FOOTER (المرحلة 8)
+   قسم جديد بالكامل — إضافة فقط.
+   ══════════════════════════════════════════════════════════════ */
+.app-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: linear-gradient(160deg, #0a2530 0%, #123b52 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity .4s ease, visibility .4s ease;
+}
+
+.app-loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.app-loading-box {
+  width: min(420px, 88vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.app-loading-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-loading-logo img {
+  height: 24px;
+  filter: brightness(0) invert(1);
+  opacity: .95;
+}
+.app-loading-logo-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(255,255,255,.2);
+}
+.app-loading-logo img[alt="TBC"] {
+  height: 30px;
+}
+
+.app-loading-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+
+.app-loading-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.app-loading-progress-fill {
+  height: 100%;
+  width: 6%;
+  background: linear-gradient(90deg, #0d7490, #16b3c9);
+  border-radius: 999px;
+  transition: width .32s linear;
+}
+
+.app-loading-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,.65);
+}
+
+.app-loading-skeleton {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.app-skel-line {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255,255,255,.06) 25%, rgba(255,255,255,.14) 37%, rgba(255,255,255,.06) 63%);
+  background-size: 400% 100%;
+  animation: ixshimmer 1.4s ease infinite;
+}
+.app-skel-line.short { width: 60%; }
+
+.app-loading-stats {
+  display: flex;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.app-loading-stat-val {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  color: #fff;
+}
+
+.app-loading-stat-lbl {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 10px;
+  color: rgba(255,255,255,.5);
+}
+
+.app-loading-updated {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 10.5px;
+  color: rgba(255,255,255,.4);
+}
+
+/* Smart Cards footer (المرحلة 8) */
+.portal-card-footer {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.portal-card-status {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.portal-card-status.pending { background: rgba(148,163,184,.15); color: #64748b; }
+.portal-card-status.loading { background: rgba(245,158,11,.14); color: #b45309; }
+.portal-card-status.ready   { background: rgba(16,185,129,.14); color: #047857; }
+
+.portal-card-count {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 10.5px;
+  color: #7c93a1;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   19) OPTIMIZATION PASS (المرحلة 10 — Optimization)
+   تحسينات CSS غير-هدّامة فقط: تسريع الرسم وتقليل إعادة الحساب
+   دون تغيير أي شكل أو سلوك ظاهر للمستخدم.
+   ══════════════════════════════════════════════════════════════ */
+.portal-card { contain: layout style paint; will-change: transform; }
+.cat-sidebar { contain: layout style; }
+.app-loading-progress-fill { will-change: width; }
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-card,
+  .app-loading-progress-fill,
+  .app-skel-line {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   20) DEBUG FIX — legacy-hidden (إصلاح جذري لمشكلة الرسوم البيانية
+   الفارغة في "نظرة عامة")
+   ──────────────────────────────────────────────────────────────
+   السبب الجذري: tab-overview يحمل class="active" أصلاً في HTML
+   القديم، وكود ChartGuard الأصلي (dashboard.js) يفترض أن أي عنصر
+   بصنف .panel.active هو مرئي دائماً، فيرسم الرسوم البيانية عليه
+   فوراً. عندما كانت الحاوية الجديدة legacyDashboardArea تُخفى بـ
+   display:none، كانت الرسوم تُنشأ بمقاس صفر ثم تُخزَّن كـ"لم
+   تتغيّر" (chartUnchanged) فتبقى فارغة للأبد حتى بعد فتح القسم.
+
+   الحل: بدل display:none نستخدم position:absolute + visibility:hidden
+   — هذا يُبقي العنصر "مُقاساً" فعلياً (له عرض وارتفاع حقيقيين، ولا
+   يُعتبر offsetParent=null) فترسم Chart.js بأبعاد صحيحة من أول مرة،
+   بينما يبقى غير مرئي تماماً للمستخدم ولا يستقبل أي تفاعل
+   (pointer-events:none) ولا يؤثر على تخطيط Portal Home (position:absolute
+   يُخرجه من التدفق الطبيعي تماماً).
+   لا تعديل على أي كود أو ID أو دالة قديمة — فقط طريقة الإخفاء لعنصر
+   Wrapper من صنعنا نحن في المرحلة 3.
+   ══════════════════════════════════════════════════════════════ */
+#legacyDashboardArea.legacy-hidden {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   21) إخفاء شريط التبويبات القديم بالكامل (كل الـ 30 تبويب)
+   بعد اعتماد Sidebar كطريقة التنقل الوحيدة داخل كل قسم — بناءً
+   على طلب صريح. الشريط لا يزال موجوداً في DOM (لم يُحذف أي كود)
+   لكنه مخفي بصرياً فقط، فلا يوجد أي كسر لأي دالة قديمة تعتمد عليه.
+   ══════════════════════════════════════════════════════════════ */
+#legacyDashboardArea .tabs {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   22) إخفاء التوست القديم العائم داخل الأقسام
+   بناءً على طلبك: بدل ما يظهر معلّقاً في أعلى القسم بشكل منفصل
+   عن باقي المحتوى، تم إخفاؤه لأن شاشة التحميل الاحترافية الجديدة
+   أصبحت تغطي هذه الوظيفة بالكامل. العنصر لا يزال موجوداً في DOM
+   ولا يزال الكود القديم يملأه بنفس الطريقة (لا كسر لأي منطق) —
+   فقط إخفاء بصري.
+   ══════════════════════════════════════════════════════════════ */
+#legacyDashboardArea #toast-area {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   23) تقييد بطاقات KPI العامة + شريط FCA لتظهر فقط في "نظرة عامة"
+   بناءً على طلب صريح — بدل ما تتكرر فوق كل تبويب داخل القسم.
+   ══════════════════════════════════════════════════════════════ */
+#globalOverviewKpis { display: none; }
+#legacyDashboardArea.viewing-overview #globalOverviewKpis { display: block; }
+
+#filtersRow { display: none !important; }
+#legacyDashboardArea.viewing-overview #filtersRow { display: flex !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   24) إخفاء الهيدر العلوي القديم (topbar) أثناء عرض Portal Home
+   لتفادي ظهور شعار/عنوان/آخر تحديث مرتين (مرة في الهيدر القديم
+   ومرة في بطاقة Portal) — بناءً على طلب صريح. يظهر الهيدر القديم
+   تلقائياً بمجرد فتح أي قسم لأنه مفيد هناك (تحديث/تلقائي/تنزيل).
+   ══════════════════════════════════════════════════════════════ */
+body.portal-active .topbar,
+body.portal-active .prog-bar {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   25) إزالة أي فراغ غير مبرر أعلى محتوى التبويب داخل كل قسم
+   (بعد إخفاء شريط التبويبات والفلاتر العامة، أحياناً يبقى هامش
+   علوي زائد بسبب Margin Collapsing بين العناصر المخفية والمحتوى) —
+   بناءً على طلب صريح.
+   ══════════════════════════════════════════════════════════════ */
+#legacyDashboardArea .cat-main .panel.active {
+  margin-top: 0 !important;
+}
+#legacyDashboardArea .cat-main {
+  padding-top: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   26) شكل ألطف لقائمة التبويبات تحت اسم كل قسم في Portal Home —
+   عمودين، كل عنصر معه نقطة ملونة، بناءً على طلب صريح.
+   ══════════════════════════════════════════════════════════════ */
+.portal-card-tabs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  margin-top: 2px;
+}
+
+.portal-card-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11px;
+  color: #5b7684;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-card-tab-dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #0d7490;
+  opacity: .6;
+}
+
+@media (max-width: 480px) {
+  .portal-card-tabs-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   27) إصلاح قوي لفراغ عرضي دائم داخل بعض التبويبات (حالة المصاعد،
+   خنادق الصرف، خطة استبدال المكيفات، الطلاب وعمر المبنى، استهلاك
+   الوقود، السيارات، المدفوعات، مؤشرات أداء الاستشاري، برامج
+   التدريب، البوابين، الخريطة) — بناءً على تأكيدك إن الفراغ دائم
+   وليس مؤقت. نفرض صراحة إن المحتوى ياخد العرض الكامل المتاح، مهما
+   كان السبب الدقيق، كحل جذري وليس ترقيع جزئي.
+   ══════════════════════════════════════════════════════════════ */
+#legacyDashboardArea:not(.legacy-hidden) {
+  width: 100%;
+  display: block;
+}
+#legacyDashboardArea .cat-layout,
+#legacyDashboardArea .cat-main,
+#legacyDashboardArea .panel.active {
+  width: 100% !important;
+  max-width: none !important;
+}
+#legacyDashboardArea .panel.active > div {
+  width: 100%;
+  box-sizing: border-box;
+}
+#legacyDashboardArea .kpi-grid,
+#legacyDashboardArea .g2,
+#legacyDashboardArea .g3,
+#legacyDashboardArea .card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   28) Sidebar قابل للطي — أقصى مساحة للمحتوى والرسوم البيانية
+   بناءً على طلب صريح. مقفول افتراضياً، والحالة محفوظة عبر
+   localStorage فتفضل زي ما سابها المستخدم.
+   ══════════════════════════════════════════════════════════════ */
+.cat-sidebar {
+  position: relative;
+  transition: flex-basis .2s ease, width .2s ease;
+}
+
+.cat-sidebar-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 4px;
+  margin-bottom: 8px;
+  color: #0d2f40;
+  cursor: pointer;
+  text-align: center;
+}
+.cat-sidebar-toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.cat-sidebar-toggle-label {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cat-sidebar-toggle:hover {
+  background: rgba(13,47,64,.06);
+}
+
+.cat-sidebar.collapsed {
+  flex: 0 0 64px;
+  width: 64px;
+  padding: 10px 4px;
+  overflow: hidden;
+}
+.cat-sidebar.collapsed .cat-sidebar-head,
+.cat-sidebar.collapsed .cat-sidebar-list {
+  display: none;
+}
+.cat-sidebar.collapsed .cat-sidebar-toggle {
+  margin-bottom: 0;
+}
+
+/* لما يقفل الـ Sidebar، المحتوى ياخد المساحة الإضافية تلقائياً
+   لأن cat-main flex:1 1 0% أصلاً */
+
+/* ══════════════════════════════════════════════════════════════
+   29) كارت المفضلة / الاختصارات + نافذة الاختيار — بناءً على طلب صريح
+   ══════════════════════════════════════════════════════════════ */
+.portal-favorites-card {
+  position: relative;
+  z-index: auto;
+  background: #fff;
+  border: 1px solid rgba(13,47,64,.08);
+  border-radius: 14px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-favorites-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 1;
+  gap: 14px;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 4px;
+  transition: background .12s ease;
+}
+.portal-favorites-empty:hover {
+  background: rgba(13,47,64,.03);
+}
+
+.portal-favorites-empty-text {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 13px;
+  color: #345;
+  flex: 1 1 300px;
+}
+
+.portal-favorites-cta-btn,
+.portal-favorites-edit-btn,
+.portal-favorites-save-btn {
+  background: #0d2f40;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.portal-favorites-cta-btn:hover,
+.portal-favorites-edit-btn:hover,
+.portal-favorites-save-btn:hover {
+  background: #123b52;
+}
+
+.portal-favorites-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.portal-favorites-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: #0d2f40;
+}
+
+.portal-favorites-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.portal-favorites-chip {
+  width: 100%;
+  text-align: right;
+  background: #f0f6f8;
+  border: 1px solid rgba(13,47,64,.1);
+  color: #0d2f40;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.portal-favorites-chip:hover {
+  background: #0d2f40;
+  color: #fff;
+}
+
+/* Modal */
+.portal-favorites-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13,47,64,.45);
+  z-index: 9998;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.portal-favorites-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: min(640px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.portal-favorites-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(13,47,64,.08);
+}
+
+.portal-favorites-modal-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #0d2f40;
+}
+
+.portal-favorites-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #5b7684;
+}
+
+.portal-favorites-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.portal-favorites-group-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: #0d2f40;
+  margin-bottom: 6px;
+}
+
+.portal-favorites-check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px;
+  color: #345;
+  cursor: pointer;
+}
+.portal-favorites-check-item input {
+  cursor: pointer;
+}
+
+.portal-favorites-modal-foot {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(13,47,64,.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.portal-favorites-clear-btn {
+  background: transparent;
+  color: #b3453a;
+  border: 1px solid rgba(179,69,58,.35);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.portal-favorites-clear-btn:hover {
+  background: rgba(179,69,58,.08);
+}
+
+@media (max-width: 640px) {
+  .portal-favorites-modal-body { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   30) قسم "⭐ اختصاراتك" داخل الـ Sidebar الخاص بأي قسم — بناءً
+   على طلب صريح، عشان يقدر يقفز بين اختصاراته من غير ما يرجع
+   للـ Portal Home في كل مرة.
+   ══════════════════════════════════════════════════════════════ */
+.cat-sidebar-favs {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(13,47,64,.08);
+}
+
+.cat-sidebar-favs-title {
+  font-family: Tajawal, sans-serif;
+  font-weight: 700;
+  font-size: 11.5px;
+  color: #b45309;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.cat-sidebar-fav-cat {
+  font-size: 9.5px;
+  color: #93a5b1;
+  font-weight: 400;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 2 — SPACING SYSTEM REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة: المسافات غير متسقة عبر الداشبورد — بعض الأقسام مضغوطة جداً
+   (مثل content padding 4px أعلى) وبعضها متباعد عشوائياً. النتيجة هي
+   تسلسل بصري ضعيف وهيراركية غير واضحة.
+
+   الحل: تطبيق نظام مسافات موحّد يعتمد على 8px كوحدة أساسية،
+   مع تمييز واضح بين المسافات الداخلية والخارجية وبين مستويات
+   التسلسل البصري (section gap > card gap > element gap).
+
+   القاعدة: لا يُمسّ أي ID أو class يستخدمه JS — تعديل بصري فقط.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 2-A: Content Area ──────────────────────────────────────────
+   السبب: padding: 4px من الأعلى يضغط المحتوى مباشرة على شريط التبويبات
+   بدون أي تنفس. رفعناه إلى 16px (مضاعف 8) لإعطاء فضاء بصري واضح
+   بين التبويبات والبطاقات.
+   ──────────────────────────────────────────────────────────────── */
+.content {
+  padding: 16px 28px 40px;    /* ↑ كان: 4px 26px 32px — رفعنا الأعلى لـ 16px وسوّينا الجانبين */
+}
+
+/* ── 2-B: Tabs Container ────────────────────────────────────────
+   السبب: الـ tabs لازقة على الـ topbar بدون فراغ. كذلك margin-bottom: 6px
+   ضيّق جداً بين الـ tabs وأول بطاقة.
+   الحل: نضيف margin-top فوق الـ tabs ونكبّر margin-bottom.
+   ──────────────────────────────────────────────────────────────── */
+.tabs {
+  margin-top: 8px;            /* ↑ كان: لا يوجد — أضفنا فراغاً فوق الـ tabs */
+  margin-bottom: 14px;        /* ↑ كان: 6px — رفعنا للفصل بين الـ tabs والمحتوى */
+  padding: 10px 12px;         /* ↑ كان: 10px — زدنا الجانبين قليلاً للتوازن */
+  gap: 5px;                   /* ↑ كان: 6px — تصغير طفيف لجعل الـ tabs أكثر تماسكاً */
+}
+
+/* ── 2-C: Filter Row ────────────────────────────────────────────
+   السبب: padding: 10px 14px لا يتناسب مع التأثير الزجاجي و border-radius: 22px.
+   المحتوى يبدو مضغوطاً داخل الحاوية.
+   الحل: زيادة padding الجانبي والعمودي بشكل متناسق.
+   ──────────────────────────────────────────────────────────────── */
+.filters-row {
+  padding: 12px 18px;         /* ↑ كان: 10px 14px — زدنا لتناسب border-radius الكبير */
+  margin-bottom: 18px;        /* ↑ كان: 16px — فراغ أوضح بعد قسم الفلاتر */
+  gap: 10px;                  /* ↑ كان: 8px — مسافة أوسح بين عناصر الفلاتر */
+}
+
+/* ── 2-E: Card & Card Title ─────────────────────────────────────
+   السبب: card-title له padding-bottom: 13px لكن margin-bottom: 16px —
+   الفرق الصغير بينهما يخلق إيقاعاً غير منتظم بصرياً.
+   ──────────────────────────────────────────────────────────────── */
+.card {
+  padding: 24px 26px;         /* ↑ كان: 22px 24px — فضاء داخلي أكثر أناقة */
+}
+
+.card-title {
+  padding-bottom: 14px;       /* ↑ كان: 13px — توحيد مع مضاعفات 2 */
+  margin-bottom: 18px;        /* ↑ كان: 16px — فصل أوضح بين العنوان والمحتوى */
+}
+
+/* ── 2-F: Grid Layouts ──────────────────────────────────────────
+   السبب: gap: 16px و margin-bottom: 16px متطابقان — لا يوجد تمييز
+   بين المسافة الداخلية (بين العناصر) والخارجية (بين الأقسام).
+   الحل: gap يبقى 16px (مسافة داخلية)، margin-bottom يرتفع (مسافة خارجية).
+   ──────────────────────────────────────────────────────────────── */
+.g2, .g3, .g4, .g12, .g21 {
+  gap: 18px;                  /* ↑ كان: 16px — توحيد مع gap الـ KPI */
+  margin-bottom: 20px;        /* ↑ كان: 16px — فرق واضح بين مسافة العناصر والأقسام */
+}
+
+/* ── 2-G: Chart Box ─────────────────────────────────────────────
+   السبب: padding: 10px يضغط الرسوم البيانية على حدود الحاوية. المستخدم
+   يرى الـ chart وكأنه ملتصق بالإطار.
+   ──────────────────────────────────────────────────────────────── */
+.chart-box {
+  padding: 14px;              /* ↑ كان: 10px — فضاء تنفس حول الرسوم البيانية */
+}
+
+/* ── 2-H: Toast Area ────────────────────────────────────────────
+   السبب: min-height: 32px و margin-bottom: 12px غير كافيين بعد رفع
+   padding الـ content العام.
+   ──────────────────────────────────────────────────────────────── */
+#toast-area {
+  margin-bottom: 14px;        /* ↑ كان: 12px — ينسجم مع النظام الجديد */
+}
+
+/* ── 2-I: Large screens (≥1600px) update ───────────────────────
+   السبب: القيم الكبيرة تحتاج تحديث يتوافق مع النظام الجديد
+   ──────────────────────────────────────────────────────────────── */
+@media (min-width: 1600px) {
+  .content { padding: 20px 44px 48px; }  /* ↑ كان: 28px 40px 40px */
+  .g2, .g3, .g4, .g12, .g21 { gap: 22px; margin-bottom: 24px; }
+  .chart-box { padding: 16px; }          /* ↑ كان: 14px */
+}
+
+/* ── 2-J: Tier Strip ────────────────────────────────────────────
+   السبب: gap: 10px بين الـ tier segments ضيّق في سياق المسافات الجديدة
+   ──────────────────────────────────────────────────────────────── */
+.tier-strip {
+  gap: 14px;                  /* ↑ كان: 10px — يتوافق مع النظام العام */
+}
+
+/* ── 2-K: Table wrapper ─────────────────────────────────────────
+   السبب: الجداول تفتقر إلى فضاء كافٍ داخل حاوياتها في بعض التبويبات
+   ──────────────────────────────────────────────────────────────── */
+tbody td {
+  padding: 13px 12px;         /* ↑ كان: 12px 12px — زدنا الأعلى والأسفل قليلاً */
+}
+
+thead th {
+  padding: 14px 12px;         /* ↑ كان: 13px 12px — توحيد مع الـ td */
+}
+
+/* نهاية Phase 2 — Spacing System */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 3 — TYPOGRAPHY SYSTEM REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة: التسلسل الطباعي ضعيف — العناوين والتسميات والقيم
+   متقاربة في الحجم دون فرق واضح بين المستويات. الـ topbar title
+   بـ 13.5px يكاد يساوي الـ subtitle بـ 10.5px. كذلك الـ fg-lbl
+   بـ 10px على حدود القابلية للقراءة.
+
+   الحل: تطبيق تسلسل طباعي واضح بخمسة مستويات:
+   Display (KPI values) → Heading → Subheading → Body → Caption
+   مع تحسين line-height و letter-spacing لكل مستوى.
+
+   القاعدة: تغييرات typography فقط (font-size, font-weight,
+   line-height, letter-spacing) — لا ألوان، لا مسافات جديدة.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 3-A: Topbar Title Hierarchy ────────────────────────────────
+   السبب: tb-title بـ 13.5px و tb-sub بـ 10.5px متقاربان جداً —
+   الفرق 3px لا يكفي لإنشاء هيراركية بصرية واضحة في شريط التنقل.
+   الحل: رفع العنوان الرئيسي ليكون أكثر سيطرة، مع تقليل الـ subtitle
+   لتأكيد دوره كمعلومة ثانوية.
+   ──────────────────────────────────────────────────────────────── */
+.tb-title {
+  font-size: 15px;            /* ↑ كان: 13.5px — أكثر سيطرة وحضوراً */
+  font-weight: 900;           /* ↑ كان: 800 — Black weight للعنوان الرئيسي */
+  letter-spacing: -.01em;     /* ↑ كان: -.005em — تقليص أفضل للحروف الكبيرة */
+  line-height: 1.15;          /* ↑ كان: 1.2 — أكثر إحكاماً للعنوان */
+}
+
+.tb-sub {
+  font-size: 9.5px;           /* ↑ كان: 10.5px — تأكيد دوره الثانوي */
+  font-weight: 600;           /* ↑ كان: 500 — Medium weight للوضوح */
+  letter-spacing: .08em;      /* ↑ كان: .05em — تتباعد أكثر لتعطي طابع "caption" */
+  color: rgba(255,255,255,.36); /* ↑ كان: .42 — أكثر تراجعاً لتعزيز الهيراركية */
+}
+
+/* ── 3-B: Card Title ────────────────────────────────────────────
+   السبب: 12.5px font-size للعناوين الرئيسية للكروت صغير جداً.
+   يجب أن يكون العنوان واضحاً ومسيطراً على محتوى الكارت.
+   ──────────────────────────────────────────────────────────────── */
+.card-title {
+  font-size: 13.5px;          /* ↑ كان: 12.5px — أوضح وأكثر سيطرة */
+  font-weight: 800;           /* ← يبقى 800 — Extra Bold مناسب */
+  letter-spacing: .005em;     /* ↑ كان: .01em — أقل تباعداً للحروف الكبيرة */
+  line-height: 1.25;          /* جديد — ينظم النص متعدد الأسطر */
+}
+
+/* ── 3-D: Filter Labels ─────────────────────────────────────────
+   السبب: fg-lbl بـ 10px على حد القابلية للقراءة — خاصة على
+   الشاشات متوسطة الدقة. نرفعه ونحافظ على طابع الـ uppercase label.
+   ──────────────────────────────────────────────────────────────── */
+.fg-lbl {
+  font-size: 10.5px;          /* ↑ كان: 10px — أفضل للقراءة */
+  letter-spacing: .05em;      /* ↑ كان: .04em — uppercase labels تحتاج تباعداً أكثر */
+  font-weight: 700;           /* ← يبقى — Bold مناسب للـ label */
+}
+
+/* ── 3-E: Tab Labels ────────────────────────────────────────────
+   السبب: 12.5px مع font-weight: 700 مقبول لكن line-height غير محدد
+   قد يخلق عدم اتساق في الارتفاع عند وجود نص متعدد الأسطر.
+   ──────────────────────────────────────────────────────────────── */
+.tab {
+  font-size: 12.5px;          /* ← يبقى — حجم مناسب للـ tabs */
+  line-height: 1.3;           /* جديد — يمنع تفاوت ارتفاع الـ tabs */
+  letter-spacing: .005em;     /* جديد — وضوح طفيف */
+}
+
+/* ── 3-F: Table Typography ──────────────────────────────────────
+   السبب: thead بـ 11px مقبول لكن letter-spacing: .04em مبالغ فيه
+   لعناوين الجداول العربية. يُعطي مظهر "مبعثراً" للعناوين.
+   ──────────────────────────────────────────────────────────────── */
+thead th {
+  font-size: 11.5px;          /* ↑ كان: 11px — أوضح قليلاً */
+  letter-spacing: .025em;     /* ↓ كان: .04em — أقل تباعداً للعربية */
+  line-height: 1.3;           /* جديد — انتظام أفضل */
+}
+
+tbody td {
+  font-size: 12.5px;          /* ↑ كان: 12px — أسهل للقراءة */
+  line-height: 1.45;          /* جديد — مهم للخلايا متعددة الأسطر */
+}
+
+/* ── 3-G: Badge & Pill Text ─────────────────────────────────────
+   السبب: font-size: 10px للـ badge أصغر من اللازم وصعب في بعض
+   السياقات. نرفعه قليلاً لتحسين القابلية للقراءة.
+   ──────────────────────────────────────────────────────────────── */
+.badge {
+  font-size: 10.5px;          /* ↑ كان: 10px — أفضل للقراءة */
+  letter-spacing: .02em;      /* ↓ كان: .025em — تعديل طفيف */
+}
+
+.pill span {
+  font-size: 11.5px;          /* ↑ كان: 11px — أوضح */
+  letter-spacing: .005em;     /* جديد — انتظام */
+}
+
+/* ── 3-H: Pagination ────────────────────────────────────────────
+   السبب: 11px مقبول لكن نجعله متسقاً مع منظومة الـ caption text.
+   ──────────────────────────────────────────────────────────────── */
+.pag-info {
+  font-size: 11.5px;          /* ↑ كان: 11px */
+  letter-spacing: .01em;      /* جديد */
+}
+
+.pag-btn {
+  font-size: 11.5px;          /* ↑ كان: 11px */
+}
+
+/* ── 3-I: Section heading utility ──────────────────────────────
+   السبب: بعض العناوين الفرعية في التبويبات تفتقر إلى تعريف
+   خاص بها — هذه قاعدة عامة لأي عنوان قسم من المستوى الثاني.
+   ──────────────────────────────────────────────────────────────── */
+.section-title,
+.sec-title {
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif;
+  font-size: 15px;            /* Subheading level */
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -.005em;
+  color: var(--tx-main);
+}
+
+/* ── 3-K: Large screens — typography scale ──────────────────────
+   تحديث مضاعفات الشاشات الكبيرة لتتوافق مع النظام الجديد
+   ──────────────────────────────────────────────────────────────── */
+@media (min-width: 1600px) {
+  .tb-title   { font-size: 17px; }
+  .card-title { font-size: 15px; }
+  .kpi-val    { font-size: 36px; }
+  .kpi-lbl    { font-size: 13px; }
+  .tab        { font-size: 13.5px; }
+  thead th    { font-size: 12px; }
+  tbody td    { font-size: 13px; }
+}
+
+@media (min-width: 2200px) {
+  .tb-title   { font-size: 20px; }
+  .kpi-val    { font-size: 42px; }
+  .kpi-lbl    { font-size: 14px; }
+  .card-title { font-size: 17px; }
+  .tab        { font-size: 14.5px; }
+  thead th    { font-size: 13px; }
+  tbody td    { font-size: 14px; }
+}
+
+/* نهاية Phase 3 — Typography */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 5 — TOP NAVIGATION REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. الـ topbar خلفيته gradient رأسي بسيط — يفتقر للعمق والشخصية
+   2. tb-ls له خلفية teal خفيفة تبدو "مبتورة" وغير مقصودة
+   3. الخط المضيء السفلي (::after) ألوانه عشوائية — teal + brass + white
+      بدون تدرج سلس يعطي مظهر مبعثر
+   4. tb-divider بـ height: 22px قصير جداً — لا يقطع الـ topbar بشكل واضح
+   5. أزرار tb-btn border-radius: 11px غير متسقة مع باقي عناصر الـ UI
+   6. progress bar بـ 2px رفيع جداً ولا يُلاحَظ
+   7. status dot animation تصغير إلى 0.85 — تغيير مفاجئ مزعج
+   8. tb-right gap: 8px ضيّق — الأزرار متلاصقة على بعض
+   9. الأزرار لا تملك active state واضحاً بصرياً
+
+   الحل: تحسين بصري للـ topbar وعناصره فقط دون أي تغيير وظيفي.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 5-A: Topbar — عمق بصري وشخصية أقوى ───────────────────────
+   السبب: الـ gradient الرأسي البسيط يجعل الـ topbar يبدو مسطحاً.
+   نضيف subtle radial glow من اليسار (RTL: جهة الشعار) يعطي
+   إحساس بالعمق والثراء البصري دون مبالغة.
+   ──────────────────────────────────────────────────────────────── */
+.topbar {
+  background:
+    radial-gradient(ellipse 40% 100% at 8% 50%, rgba(13,132,156,.12), transparent),
+    linear-gradient(180deg, rgba(6,20,29,.99) 0%, rgba(8,30,43,.97) 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.06),
+    0 4px 6px rgba(0,0,0,.12),
+    0 12px 32px rgba(3,12,18,.32);
+  height: 62px;               /* ↑ كان: 60px — طول إضافي بسيط */
+}
+
+/* ── 5-B: Bottom Accent Line — تدرج أنيق موحّد ─────────────────
+   السبب: الخط السفلي يمر من teal → white → brass بشكل مبعثر.
+   نبسّطه لتدرج teal فقط يتلاشى من المنتصف للطرفين — أنيق وموحّد.
+   ──────────────────────────────────────────────────────────────── */
+.topbar::after {
+  height: 1px;                /* ↓ كان: 2px — خط رفيع أنيق أفضل من سميك ملوّن */
+  background: linear-gradient(
+    to left,
+    transparent 0%,
+    rgba(13,132,156,.5) 20%,
+    rgba(22,164,191,.8) 42%,
+    rgba(255,255,255,.15) 50%,
+    rgba(22,164,191,.8) 58%,
+    rgba(13,132,156,.5) 80%,
+    transparent 100%
+  );
+  opacity: 1;
+}
+
+/* ── 5-C: Logo Section — حد أنيق بدل الـ gradient المبتور ──────
+   السبب: الـ gradient الـ teal على tb-ls يبدو مقطوعاً — عنصر
+   يطفو بشكل غير مقصود داخل الشريط الداكن.
+   الحل: نزيل الخلفية ونستبدل الحد بخط فاصل هادئ.
+   ──────────────────────────────────────────────────────────────── */
+.tb-ls {
+  background: transparent;    /* ↓ كان: gradient teal — يبدو مبتوراً */
+  border-left: 1px solid rgba(255,255,255,.08); /* ↑ كان: rgba(13,132,156,.14) */
+  min-width: 160px;           /* ↓ كان: 170px — أكثر إحكاماً */
+  padding: 0 20px;            /* ↑ كان: 0 18px — نفس توسيع المحتوى */
+}
+
+/* ── 5-D: Dividers — أطول وأكثر وضوحاً ────────────────────────
+   السبب: 22px لا يمتد للـ topbar الكامل (62px). نجعله 32px
+   ليكون فاصلاً بصرياً حقيقياً.
+   ──────────────────────────────────────────────────────────────── */
+.tb-divider {
+  height: 32px;               /* ↑ كان: 22px — فاصل واضح ومقروء */
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255,255,255,.18) 20%,
+    rgba(255,255,255,.18) 80%,
+    transparent 100%
+  );
+}
+
+/* ── 5-E: Logos — وضوح أفضل ────────────────────────────────────
+   السبب: opacity: .92 جيد لكن نضيف drop-shadow أخف وأنيق.
+   ──────────────────────────────────────────────────────────────── */
+.tb-logo,
+.tb-tbc img {
+  opacity: .95;               /* ↑ كان: .92 */
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,.2));
+}
+
+/* ── 5-F: Right Section — مسافة أوسع بين الأزرار ───────────────
+   السبب: gap: 8px يجعل الأزرار متلاصقة — لا تنفس بينها.
+   ──────────────────────────────────────────────────────────────── */
+.tb-right {
+  gap: 10px;                  /* ↑ كان: 8px */
+  padding: 0 20px;            /* ↑ كان: 0 16px */
+}
+
+/* ── 5-G: Buttons — شكل أكثر اتساقاً وأناقة ───────────────────
+   السبب: border-radius: 11px غير متسق مع --r-sm: 10px في النظام.
+   كذلك الخلفية rgba(.08) خفيفة جداً — الأزرار تكاد تختفي.
+   ──────────────────────────────────────────────────────────────── */
+.tb-btn {
+  border-radius: var(--r-sm); /* ↑ كان: 11px — متسق مع نظام التصميم */
+  background: rgba(255,255,255,.10); /* ↑ كان: .08 — أكثر وضوحاً */
+  border: 1px solid rgba(255,255,255,.14); /* ↑ كان: .12 */
+  color: rgba(255,255,255,.90); /* ↑ كان: .85 */
+  min-height: 34px;           /* ↑ كان: 33px */
+  padding: 6px 16px;          /* ↑ كان: 6px 14px */
+  font-size: 11.5px;          /* ↑ كان: 11px */
+  letter-spacing: .015em;
+}
+
+.tb-btn:hover {
+  background: rgba(255,255,255,.18); /* ↑ كان: .15 */
+  border-color: rgba(255,255,255,.28); /* ↑ كان: .24 */
+  box-shadow: 0 4px 16px rgba(0,0,0,.22);
+}
+
+/* ── 5-H: Progress Bar — أسمك وأكثر وضوحاً ────────────────────
+   السبب: 2px رفيع جداً لا يُلاحَظ على شاشة كاملة الحجم.
+   3px مع glow قوي يعطي feedback بصري واضح لتحميل البيانات.
+   ──────────────────────────────────────────────────────────────── */
+.prog-bar {
+  height: 3px;                /* ↑ كان: 2px */
+  top: 62px;                  /* ↑ كان: 60px — يتوافق مع الـ topbar الجديد */
+}
+
+.prog-fill {
+  box-shadow: 0 0 14px rgba(13,132,156,.65), 0 0 4px rgba(22,164,191,.8);
+  /* ↑ كان: 0 0 10px rgba(13,132,156,.5) — glow أقوى وأكثر وضوحاً */
+}
+
+/* ── 5-I: Status Dot — animation أكثر نعومة ─────────────────────
+   السبب: scale(.85) تغيير مفاجئ مزعج. نستبدله بـ opacity pulse
+   فقط — أكثر هدوءاً وأناقة.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: .6; transform: scale(.92); } /* ↑ كان: .55 و .85 */
+}
+
+.dot {
+  width: 9px;                 /* ↑ كان: 8px — أكثر وضوحاً */
+  height: 9px;
+}
+
+/* نهاية Phase 5 — Top Navigation */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 6 — FILTERS REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. filters-row خلفيتها الزجاجية (var(--glass-bg)) مقبولة لكن
+      الـ border: var(--glass-border) بـ rgba(255,255,255,.55) كثيف
+      جداً على خلفية فاتحة — يبدو كإطار أبيض سميك غير مقصود
+   2. العناصر مصطفة على align-items: flex-end — تبدو غير متوازنة
+      لأن بعض الـ labels تختفي في بعض الفلاتر
+   3. .finp و .fsel بـ min-height: 32px وحدود خفيفة تبدو "رخيصة"
+      بالنسبة لبطاقات Executive بجانبها
+   4. .fg gap: 3px بين الـ label والـ input ضيّق جداً
+   5. .f-clear مرتفعة عن باقي العناصر (align-self: flex-end) دون
+      مبرر واضح — تبدو طافية
+   6. لا يوجد فصل بصري داخلي بين مجموعات الفلاتر
+   7. focus ring (3px glow) جيد لكن يمكن تحسينه
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 6-A: Filter Row Container ──────────────────────────────────
+   السبب: الإطار الأبيض الكثيف يبدو غير مقصود على الخلفية الفاتحة.
+   نستبدله بحد دقيق متسق مع باقي البطاقات، ونحسّن الظل
+   ليعطي رفع خفيف يميز قسم الفلاتر كمنطقة تحكم مستقلة.
+   ──────────────────────────────────────────────────────────────── */
+.filters-row {
+  align-items: center;        /* ↑ كان: flex-end — توسيط عمودي موحّد */
+  background: rgba(255,255,255,.92);  /* ↑ كان: var(--glass-bg) .78 — أكثر وضوحاً */
+  border: 1px solid var(--bd-light);  /* ↑ كان: var(--glass-border) .55 — هادئ ومتسق */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 4px 16px rgba(8,45,60,.07),
+    inset 0 1px 0 rgba(255,255,255,.9);
+  gap: 12px;                  /* ↑ كان: 8px — فضاء أوسع بين عناصر الفلاتر */
+}
+
+/* ── 6-B: Filter Group ──────────────────────────────────────────
+   السبب: gap: 3px بين الـ label والـ input يجعلهم يبدوان ملتصقَين.
+   نرفعه لـ 5px لإعطاء تنفس بسيط وربط بصري أفضل.
+   ──────────────────────────────────────────────────────────────── */
+.fg {
+  gap: 5px;                   /* ↑ كان: 3px — ربط بصري أوضح بين label وinput */
+}
+
+/* ── 6-C: Filter Label ───────────────────────────────────────────
+   السبب: اللون var(--teal-3) (#0b6b7e) داكن جداً على الخلفية
+   البيضاء — يبدو ثقيلاً. نخففه ليكون تسمية توجيهية هادئة.
+   ──────────────────────────────────────────────────────────────── */
+.fg-lbl {
+  color: var(--muted-ink);    /* ↑ كان: var(--teal-3) — أكثر هدوءاً كـ label */
+  letter-spacing: .06em;      /* ↑ كان: .05em — uppercase labels تحتاج تباعد */
+}
+
+/* ── 6-D: Select & Input Fields — ارتقاء بصري واضح ─────────────
+   السبب: min-height: 32px وحدود خفيفة تبدو أصغر مما يليق
+   ببطاقات Executive. نرفع الحد الأدنى ونحسّن الظل الداخلي.
+   ──────────────────────────────────────────────────────────────── */
+.finp,
+.fsel {
+  min-height: 36px;           /* ↑ كان: 32px — يتماشى مع مقاس الأزرار */
+  border-radius: var(--r-sm); /* ↑ كان: 10px — متسق مع النظام */
+  border-color: var(--bd-light);
+  box-shadow: inset 0 1px 2px rgba(8,45,60,.04); /* جديد — عمق داخلي خفيف */
+  font-size: 13px;            /* ↑ كان: 12.5px — أوضح قليلاً */
+  color: var(--tx-main);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.fsel {
+  min-width: 110px;           /* ↑ كان: 96px — مساحة أكثر للنص العربي */
+}
+
+.finp {
+  min-width: 160px;           /* ↑ كان: 150px */
+}
+
+/* ── 6-E: Hover State — تلميح واضح ─────────────────────────────
+   السبب: hover يغيّر اللون فقط. نضيف background خفيف يوضح
+   أن الحقل تفاعلي.
+   ──────────────────────────────────────────────────────────────── */
+.finp:hover,
+.fsel:hover {
+  background-color: #fafcfe;  /* جديد — تلميح hover خفيف */
+  border-color: rgba(13,132,156,.40);
+}
+
+/* ── 6-F: Focus State — ring أكثر وضوحاً ───────────────────────
+   السبب: 3px glow مقبول لكن اللون يمكن أن يكون أكثر سطوعاً
+   وأكثر وضوحاً ضمن سياق الخلفية البيضاء للفلاتر.
+   ──────────────────────────────────────────────────────────────── */
+.finp:focus,
+.fsel:focus {
+  border-color: var(--teal);
+  box-shadow:
+    inset 0 1px 2px rgba(8,45,60,.04),
+    0 0 0 3px rgba(13,132,156,.16); /* ↑ كان: .14 — أوضح على الخلفية البيضاء */
+  background-color: #fff;
+}
+
+/* ── 6-G: Clear Button ───────────────────────────────────────────
+   السبب: align-self: flex-end يجعل الزر يطفو عند عدم وجود label
+   فوق باقي الـ inputs. نجعله متوسطاً مع الكل.
+   كذلك نحسّن شكله ليبدو كزر "إعادة ضبط" مميز بصرياً.
+   ──────────────────────────────────────────────────────────────── */
+.f-clear {
+  align-self: center;         /* ↑ كان: flex-end — يتوسط مع باقي العناصر */
+  min-height: 36px;           /* ↑ كان: 40px — يتطابق مع الـ inputs */
+  padding: 7px 18px;          /* ↑ كان: 8px 16px */
+  font-size: 11.5px;          /* ↑ كان: 11px */
+  border-color: var(--bd-mid);
+  color: var(--tx-muted);     /* ↑ كان: var(--tx-sec) — أكثر هدوءاً */
+  border-radius: var(--r-sm); /* ↑ كان: var(--r-pill) — متسق مع الـ inputs */
+  box-shadow: inset 0 1px 2px rgba(8,45,60,.03); /* جديد — عمق داخلي */
+  transition:
+    transform .16s ease,
+    background .16s ease,
+    border-color .16s ease,
+    color .16s ease,
+    box-shadow .16s ease;
+}
+
+.f-clear:hover {
+  background: #fff5f6;        /* ↑ كان: #fdf2f2 — لون أهدأ */
+  border-color: rgba(184,66,90,.35);
+  box-shadow: 0 2px 8px rgba(184,66,90,.10);
+}
+
+/* نهاية Phase 6 — Filters */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 7 — TABS REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. الـ tabs container يستخدم var(--glass-border) أبيض كثيف
+      بنفس مشكلة الفلاتر — إطار أبيض يبدو غير مقصود
+   2. top: 60px لم يُحدَّث بعد تغيير الـ topbar لـ 62px في Phase 5
+   3. كل الـ tabs بنفس الشكل — لا يوجد تمييز بصري بين المجموعات
+      وعندنا 29 تبويب بدون أي فصل منطقي
+   4. الـ tab.active shadow ضعيف (0 8px 20px -4px) ولا يعطي
+      إحساس "محدد" كافياً
+   5. tab:hover يرفع (-1px) بشكل خفي جداً بالكاد يُلاحَظ
+   6. الـ tabs overflow يستخدم auto hidden لكن لا يوجد مؤشر
+      بصري يدل على وجود scroll
+   7. border-radius: 12px للـ tab غير متسق مع --r-md: 14px
+   8. لا يوجد transition على color — اللون يتغير فجأة عند hover
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 7-A: Tabs Container ─────────────────────────────────────────
+   السبب: إطار أبيض كثيف + top قديم (60px) + margin-bottom خفيف.
+   نصلح كل هذه النقاط دفعة واحدة.
+   ──────────────────────────────────────────────────────────────── */
+.tabs {
+  top: 62px;                  /* ↑ كان: 60px — يتوافق مع topbar الجديد (Phase 5) */
+  background: rgba(255,255,255,.94); /* ↑ كان: var(--glass-bg) .78 — أوضح وأنيق */
+  border: 1px solid var(--bd-light); /* ↑ كان: var(--glass-border) أبيض — هادئ ومتسق */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 6px 20px rgba(8,45,60,.08),
+    inset 0 1px 0 rgba(255,255,255,.95);
+  padding: 8px 10px;          /* ضبط التوازن الداخلي */
+  gap: 4px;                   /* ↓ كان: 5px (Phase 2) — أكثر إحكاماً */
+  align-items: center;        /* جديد — توسيط عمودي للـ tabs */
+}
+
+/* ── 7-B: Individual Tab — شكل أكثر حضوراً ──────────────────────
+   السبب: border-radius: 12px غير متسق. transition ناقصة لـ color.
+   padding يمكن تعديله ليعطي مساحة أوسع للنص العربي.
+   ──────────────────────────────────────────────────────────────── */
+.tab {
+  border-radius: var(--r-sm); /* ↑ كان: 12px — متسق مع نظام --r-sm: 10px */
+  padding: 8px 14px;          /* ↓ كان: 10px 16px — أكثر إحكاماً لـ 29 تبويب */
+  color: var(--tx-muted);
+  font-size: 12px;            /* ↓ كان: 12.5px — أصغر قليلاً يناسب الكثافة العالية */
+  transition:
+    background .18s ease,
+    color .18s ease,
+    border-color .18s ease,
+    transform .18s ease,
+    box-shadow .18s ease;     /* ↑ كان: .16s — أكثر نعومة */
+  user-select: none;          /* جديد — يمنع تحديد النص عند الضغط السريع */
+}
+
+/* ── 7-C: Tab Hover — تلميح واضح ────────────────────────────────
+   السبب: hover خفي جداً (translateY -1px فقط). نضيف background
+   أكثر وضوحاً وتغيير لون واضح ليكون التلميح حقيقياً.
+   ──────────────────────────────────────────────────────────────── */
+.tab:hover {
+  background: rgba(13,132,156,.09); /* ↑ كان: .07 — أكثر وضوحاً */
+  color: var(--teal-3);             /* ↑ كان: var(--tx-sec) — ألصق بلون النظام */
+  border-color: rgba(13,132,156,.20); /* ↑ كان: rgba(185,208,219,.55) */
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(13,132,156,.08); /* جديد — ظل خفيف */
+}
+
+/* ── 7-D: Active Tab — حضور قوي ومميز ───────────────────────────
+   السبب: الظل الحالي (0 8px 20px -4px rgba(.3)) خفيف لشريط يضم
+   29 تبويب متزاحماً. نحتاج active state واضح جداً.
+   ──────────────────────────────────────────────────────────────── */
+.tab.active {
+  background: var(--grad-nav);
+  color: #fff;
+  border-color: transparent;
+  box-shadow:
+    0 4px 14px rgba(13,132,156,.32),  /* ↑ كان: 0 8px 20px -4px .3 */
+    0 1px 3px rgba(8,30,43,.20),
+    inset 0 1px 0 rgba(255,255,255,.15); /* جديد — highlight داخلي */
+  transform: translateY(-1px);         /* جديد — رفع خفيف للتاب النشط */
+  font-weight: 800;                    /* جديد — أثقل لتأكيد الاختيار */
+}
+
+/* ── 7-E: Premium Tab — تحسين الذهبي ───────────────────────────
+   السبب: تحسين طفيف على الـ Premium tab ليتوافق مع النظام الجديد
+   ──────────────────────────────────────────────────────────────── */
+.tab.tab-premium {
+  letter-spacing: .01em;       /* جديد — وضوح إضافي للتاب المميز */
+}
+
+.tab.tab-premium.active {
+  box-shadow:
+    0 4px 16px rgba(176,138,78,.38),
+    0 1px 3px rgba(100,60,10,.15),
+    inset 0 1px 0 rgba(255,255,255,.18);
+  transform: translateY(-1px);
+}
+
+/* ── 7-F: Scrollbar للـ tabs عند الامتلاء ────────────────────────
+   السبب: overflow: auto hidden موجود لكن لا يوجد تنسيق للـ scrollbar
+   الأفقي الذي يظهر على الشاشات الصغيرة. نجعله أنيقاً.
+   ──────────────────────────────────────────────────────────────── */
+.tabs::-webkit-scrollbar {
+  height: 3px;                /* scrollbar أفقي رفيع جداً */
+}
+.tabs::-webkit-scrollbar-thumb {
+  background: rgba(13,132,156,.25);
+  border-radius: 999px;
+}
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── 7-G: Panel Transition — أكثر نعومة ──────────────────────────
+   السبب: fadeUp .24s يبدو سريعاً بعد تحسينات الـ tabs.
+   نجعله أبطأ قليلاً وأكثر سلاسة.
+   ──────────────────────────────────────────────────────────────── */
+.panel.active {
+  animation: fadeUp .28s var(--ease-std); /* ↑ كان: .24s — أكثر نعومة */
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); } /* ↑ كان: 6px */
+  to   { opacity: 1; transform: none; }
+}
+
+/* نهاية Phase 7 — Tabs */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 8 — CHART CARDS REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. .card خلفيتها rgba(255,255,255,.97) شبه أبيض — لا يوجد
+      فرق بصري بين بطاقات الـ charts وخلفية الصفحة
+   2. .card::before (شريط teal→brass) يُطبَّق على كل البطاقات
+      بنفس الشكل — لا يوجد تمييز بين أنواع البطاقات
+   3. .card-title border-bottom: 1px solid #e6eff4 خفيف جداً
+      والفصل بين العنوان والمحتوى غير واضح بصرياً
+   4. .card-title-icon بـ 30px صغير والـ border-radius: 11px
+      غير متسق مع نظام --r-sm: 10px
+   5. .card-title .sub (الـ badge الصغيرة) خلفيتها #eef5f8
+      باردة وغير متسقة مع نظام الألوان
+   6. .chart-box خلفيتها gradient خفيف جيد لكن الـ border
+      #eaf1f6 خفيف جداً — الـ chart-box يتلاشى داخل الـ card
+   7. .card:hover transform: translateY(-2px) مقبول لكن لا يوجد
+      تغيير في الـ accent strip عند الـ hover
+   8. لا يوجد تمييز بصري بين بطاقات الـ charts وبطاقات الـ KPI
+      — كل شيء يبدو بنفس المستوى البصري
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 8-A: Card Base — خلفية وظل محسَّنَان ───────────────────────
+   السبب: نضيف تدرجاً خفياً للخلفية وظلاً أكثر عمقاً
+   يميز البطاقات عن خلفية الصفحة بشكل واضح.
+   ──────────────────────────────────────────────────────────────── */
+.card {
+  background: linear-gradient(170deg, #ffffff 0%, #fafcfe 100%);
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 6px 22px rgba(8,45,60,.09),
+    inset 0 1px 0 rgba(255,255,255,1);
+  border-color: rgba(185,208,219,.65); /* ↑ كان: var(--bd-light) — حد أكثر وضوحاً */
+  transition: transform .22s var(--ease-std), box-shadow .22s ease, border-color .22s ease;
+}
+
+/* ── 8-B: Card Accent Strip — أسمك وأكثر حضوراً ────────────────
+   السبب: 3px مع opacity: .85 خفيف. نرفعه لـ 4px مع opacity كاملة
+   ليكون accent واضحاً يُعرِّف البطاقة بصرياً.
+   ──────────────────────────────────────────────────────────────── */
+.card::before {
+  height: 4px;                /* ↑ كان: 3px — أكثر وضوحاً */
+  opacity: 1;                 /* ↑ كان: .85 — كامل الظهور */
+  background: linear-gradient(
+    90deg,
+    var(--teal-3) 0%,
+    var(--teal) 40%,
+    var(--teal-2) 65%,
+    var(--brass-2) 100%
+  );                          /* ↑ كان: تدرج مبسّط — الآن أكثر ثراءً وتدرجاً */
+}
+
+/* ── 8-C: Card Hover — رفع واضح مع تغيير accent ────────────────
+   السبب: hover يغير الـ border فقط. نضيف ظلاً ملوّناً خفياً
+   يعكس لون الـ teal ليكون التفاعل أكثر حيوية.
+   ──────────────────────────────────────────────────────────────── */
+.card:hover {
+  transform: translateY(-3px); /* ↑ كان: -2px */
+  border-color: rgba(13,132,156,.22);
+  box-shadow:
+    0 2px 6px rgba(8,45,60,.07),
+    0 14px 36px rgba(8,45,60,.12),
+    0 0 0 1px rgba(13,132,156,.06),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+
+/* ── 8-D: Card Title — فصل أوضح وأيقونة أكبر ───────────────────
+   السبب: border-bottom خفيف لا يفصل بوضوح بين العنوان والمحتوى.
+   نحسّن الفصل باستخدام لون حد أكثر وضوحاً وخلفية خفيفة للعنوان.
+   ──────────────────────────────────────────────────────────────── */
+.card-title {
+  border-bottom: 1px solid rgba(13,132,156,.10); /* ↑ كان: #e6eff4 — لون النظام */
+  margin-bottom: 20px;        /* ↑ كان: 18px (Phase 2) — فصل أوضح */
+  gap: 10px;                  /* ↓ كان: 11px — إحكام خفيف */
+}
+
+/* ── 8-E: Card Title Icon — أكبر وأكثر حضوراً ─────────────────
+   السبب: 30px صغير والـ border-radius: 11px غير متسق.
+   نكبّره قليلاً ونجعل الـ border-radius متسقاً.
+   ──────────────────────────────────────────────────────────────── */
+.card-title-icon {
+  width: 32px;                /* ↑ كان: 30px */
+  height: 32px;               /* ↑ كان: 30px */
+  border-radius: var(--r-sm); /* ↑ كان: 11px — متسق مع نظام التصميم */
+  font-size: 15px;            /* ↑ كان: 14px */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    0 1px 3px rgba(8,45,60,.10); /* ↑ كان: inset فقط — عمق خارجي خفيف */
+}
+
+/* ── 8-F: Card Title Sub Badge ───────────────────────────────────
+   السبب: #eef5f8 لون بارد غير متسق. نستبدله بلون من نظام الألوان.
+   ──────────────────────────────────────────────────────────────── */
+.card-title .sub {
+  background: var(--bg-info);     /* ↑ كان: #eef5f8 */
+  color: var(--c-info-2);         /* ↑ كان: var(--tx-sec) */
+  border: 1px solid var(--bd-info); /* جديد — حد خفيف يُعرِّف الـ badge */
+  font-size: 10.5px;              /* ↑ كان: 10px */
+  padding: 3px 11px;              /* ↑ كان: 3px 10px */
+}
+
+/* ── 8-G: Chart Box — تحسين الحاوية الداخلية ───────────────────
+   السبب: الـ chart-box يتلاشى داخل الـ card. نجعل حدوده
+   أكثر وضوحاً وخلفيته أكثر نقاءً لإبراز الـ chart.
+   ──────────────────────────────────────────────────────────────── */
+.chart-box {
+  background: linear-gradient(180deg, #fefeff 0%, #f7fafd 100%);
+  border: 1px solid rgba(185,208,219,.55); /* ↑ كان: #eaf1f6 — أكثر وضوحاً */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 0 rgba(8,45,60,.02),
+    0 1px 4px rgba(8,45,60,.05); /* ↑ كان: .04 — عمق أكثر */
+  border-radius: var(--r-md);    /* ↑ كان: var(--r-lg) 18px → 14px — أكثر إحكاماً */
+}
+
+/* ── 8-H: Tier Strip Segments — تحسين بصري ─────────────────────
+   السبب: tier-seg تملك border لكن لا يوجد inset highlight.
+   نضيف highlight خفياً في الأعلى يتسق مع باقي البطاقات.
+   ──────────────────────────────────────────────────────────────── */
+.tier-seg {
+  padding: 18px 16px 16px;   /* ↑ كان: 16px 15px 14px — مزيد من التنفس */
+  box-shadow:
+    var(--sh-d4),
+    inset 0 1px 0 rgba(255,255,255,.7); /* جديد — highlight داخلي */
+}
+
+/* ── 8-I: School Row — تحسين بصري لقوائم المدارس ───────────────
+   السبب: school-row padding: 9px 0 بدون background hover واضح.
+   ──────────────────────────────────────────────────────────────── */
+.school-row {
+  padding: 10px 4px;          /* ↑ كان: 9px 0 — مسافة جانبية للـ hover */
+  border-radius: var(--r-sm); /* جديد — rounded hover */
+  transition: background .14s ease;
+}
+
+.school-row:hover {
+  background: var(--bg-neutral); /* جديد — hover feedback لطيف */
+}
+
+/* نهاية Phase 8 — Chart Cards */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 9 — TABLES REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. .tbl-wrap box-shadow: var(--sh-d4) خفيف جداً — الجدول
+      يبدو مسطحاً ولا يبرز كعنصر منفصل في الصفحة
+   2. thead th: اللون rgba(255,255,255,.87) على navy خفيف جداً
+      لقراءة عناوين الجداول العربية
+   3. thead th border-bottom: 2px solid rgba(brass,.35) —
+      الفاصل بين الرأس والجسم خافت
+   4. tbody td border-bottom: #edf3f7 خفيف جداً — صفوف الجدول
+      تبدو بدون فصل واضح
+   5. zebra striping (nth-child 2n) يستخدم var(--bg-neutral)
+      وهو فرق خفي جداً عن الأبيض — التمييز بين الصفوف ضعيف
+   6. hover يستخدم var(--teal-glow) rgba(.14) — الـ hover
+      مميز لكن يمكن تحسين الانتقال
+   7. .tbl-wrap border-radius: var(--r-lg) 18px — كبير جداً
+      للجداول التي تبدأ مباشرة بهيدر داكن
+   8. badge-* classes كلها في سطر واحد صعبة الصيانة (ليست
+      مشكلة بصرية لكن يمكن تحسين حجم الـ badge)
+   9. أول عمود padding-right: 18px لكن باقي الأعمدة 12px
+      — عدم تناسق يجعل الجدول يبدو منحازاً للجهة اليمنى
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 9-A: Table Wrapper — رفع بصري وحدود أوضح ──────────────────
+   السبب: الجدول يتلاشى في الصفحة بدون ظل كافٍ. نضيف ظلاً
+   يجعله عنصراً بصرياً مستقلاً وحدوداً أكثر وضوحاً.
+   ──────────────────────────────────────────────────────────────── */
+.tbl-wrap {
+  border-radius: var(--r-md);  /* ↓ كان: var(--r-lg) 18px → 14px — يتناسب مع الهيدر الداكن */
+  border: 1px solid rgba(185,208,219,.7); /* ↑ كان: var(--bd-light) — أوضح */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 6px 20px rgba(8,45,60,.09),
+    inset 0 1px 0 rgba(255,255,255,.6); /* ↑ كان: var(--sh-d4) فقط */
+  max-height: 620px;            /* ↑ كان: 580px — مزيد من المحتوى المرئي */
+}
+
+/* ── 9-B: Table Header — وضوح وسلطة بصرية ──────────────────────
+   السبب: عناوين الجداول يجب أن تكون واضحة تماماً على الخلفية
+   الداكنة. نرفع opacity النص ونحسّن الفاصل السفلي.
+   ──────────────────────────────────────────────────────────────── */
+thead th {
+  background: linear-gradient(180deg, #0e3347 0%, var(--navy-deep) 100%); /* ↑ كان: navy→navy-deep */
+  color: rgba(255,255,255,.96); /* ↑ كان: .87 — وضوح أكبر */
+  border-bottom: 2px solid rgba(176,138,78,.55); /* ↑ كان: .35 — فاصل brass واضح */
+  letter-spacing: .03em;        /* ↓ كان: .04em (Phase 3 حدّثه لـ .025em، نضبط هنا) */
+  text-shadow: 0 1px 2px rgba(0,0,0,.2); /* جديد — وضوح إضافي للنص */
+}
+
+/* أول عمود في الهيدر — محاذاة يمين للـ RTL (بصرياً أقصى اليمين) */
+thead th:first-child {
+  padding-right: 20px;          /* ↑ كان: 18px — مساحة أكثر للعمود الأول */
+  border-radius: 0 var(--r-md) 0 0; /* الزاوية العلوية اليمنى — تطابق حافة .tbl-wrap */
+}
+
+/* آخر عمود (بصرياً أقصى اليسار) */
+thead th:last-child {
+  border-radius: var(--r-md) 0 0 0; /* الزاوية العلوية اليسرى — تطابق حافة .tbl-wrap */
+}
+
+/* ── 9-C: Table Body Cells — وضوح الفصل بين الصفوف ─────────────
+   السبب: border-bottom خفيف جداً. نجعله أكثر وضوحاً مع
+   الحفاظ على الخفة البصرية المطلوبة للجداول الكبيرة.
+   ──────────────────────────────────────────────────────────────── */
+tbody td {
+  border-bottom: 1px solid rgba(219,231,238,.9); /* ↑ كان: #edf3f7 — أكثر وضوحاً */
+  padding: 13px 14px;           /* ↑ كان: 12px 12px — تنفس أكثر */
+  transition: background .15s ease; /* ↑ كان: .12s */
+}
+
+tbody td:first-child {
+  padding-right: 20px;          /* ↑ كان: 18px — يتطابق مع th */
+  font-weight: 600;             /* جديد — أول عمود (اسم) أسمك قليلاً */
+}
+
+/* ── 9-D: Zebra Striping — تمييز أوضح بين الصفوف ───────────────
+   السبب: var(--bg-neutral) #f7fafc قريب جداً من الأبيض.
+   نستخدم لوناً أكثر وضوحاً للـ zebra لتحسين القابلية للقراءة
+   في الجداول الكبيرة.
+   ──────────────────────────────────────────────────────────────── */
+tbody tr:nth-child(2n) td {
+  background: #f4f8fb;          /* ↑ كان: var(--bg-neutral) #f7fafc — تمييز أوضح */
+}
+
+/* ── 9-E: Row Hover — تلميح حيوي ────────────────────────────────
+   السبب: var(--teal-glow) rgba(.14) جيد. نضيف border-right
+   لـ RTL يعطي مؤشراً بصرياً إضافياً للصف المحدد.
+   ──────────────────────────────────────────────────────────────── */
+tbody tr:hover td {
+  background: rgba(13,132,156,.08) !important; /* ↑ كان: .14 → أخف وأكثر أناقة */
+}
+
+tbody tr:hover td:first-child {
+  border-right: 3px solid var(--teal); /* جديد — مؤشر يميني للصف المحدد (RTL) */
+  padding-right: 17px; /* تعويض الـ border لمنع الاهتزاز */
+}
+
+/* ── 9-F: Last Row — لا border في الصف الأخير ───────────────────
+   يُحافظ على القاعدة الأصلية مع توسيع للتأكيد
+   ──────────────────────────────────────────────────────────────── */
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── 9-G: Status Badges — أكبر وأوضح ───────────────────────────
+   السبب: padding: 2px 10px صغير جداً للـ badges داخل جداول
+   عريضة. نضيف font-size أوضح وpadding أكثر توازناً.
+   ──────────────────────────────────────────────────────────────── */
+.badge-excellent,
+.badge-good,
+.badge-bad,
+.badge-detr {
+  font-size: 11.5px;            /* ↑ كان: 11px */
+  padding: 3px 12px;            /* ↑ كان: 2px 10px */
+  font-weight: 700;
+  display: inline-block;        /* جديد — منع التمدد غير المقصود */
+  white-space: nowrap;          /* جديد — منع كسر النص */
+}
+
+/* ── 9-H: Pagination Bar — تحسين الفاصل ────────────────────────
+   السبب: الـ pagination bar تحتاج فصلاً واضحاً عن الجدول وخلفية
+   أكثر تطابقاً مع النظام الجديد.
+   ──────────────────────────────────────────────────────────────── */
+.pag-bar {
+  background: #f7fafc;          /* ↑ كان: var(--bg-2) — نفسه لكن صريح */
+  border-top: 1px solid rgba(185,208,219,.7); /* ↑ كان: var(--bd-light) */
+  padding: 12px 18px;           /* ↑ كان: 10px 16px — مزيد من التنفس */
+}
+
+/* نهاية Phase 9 — Tables */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 10 — PORTAL HOME REFINEMENT
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. .portal-hero padding: 12px 20px ضيّق جداً — الـ hero يبدو
+      مضغوطاً ولا يعطي إحساس "بوابة رئيسية" لنظام enterprise
+   2. .portal-hero gradient: 135deg بسيط جداً — لا يوجد عمق أو
+      حياة بصرية. الـ hero هو أول ما يراه المستخدم عند الدخول
+   3. .portal-card border: rgba(13,47,64,.08) خفيف جداً —
+      الكروت تبدو وكأنها جزء من الخلفية لا عناصر مستقلة
+   4. .portal-card box-shadow: 0 1px 3px rgba(.06) — لا تكاد
+      تُرى. الكروت تحتاج رفعاً بصرياً واضحاً
+   5. .portal-card:hover box-shadow خفيف ولا يتناسب مع
+      توقعات المستخدم من بوابة enterprise
+   6. .portal-card-icon font-size: 26px صغير — الأيقونة لا
+      تعطي visual weight كافياً كنقطة دخول
+   7. .portal-cards-grid gap: 16px مناسب لكن لا يوجد visual
+      hierarchy بين الكروت — كلها متساوية بصرياً
+   8. .portal-title 15px و .portal-sub 9.5px — فرق كبير جداً
+      بين العنوانين يخلق قفزة مفاجئة في الـ hierarchy
+   9. .cat-sidebar background: #fff مع border خفيف — لا يتميز
+      عن محتوى الكروت بجانبه
+   10. .portal-updated-val badge جيد لكن يمكن تحسينه
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 10-A: Portal Home Container ────────────────────────────────
+   السبب: gap: 22px و padding: 4px 2px — المسافة العلوية ضيقة جداً
+   والـ gap بين الـ hero والكروت يمكن أن يكون أكثر توازناً.
+   ──────────────────────────────────────────────────────────────── */
+.portal-home {
+  gap: 20px;                  /* ↓ كان: 22px — إحكام خفيف */
+  padding: 8px 2px 28px;     /* ↑ كان: 4px 2px 24px — فضاء أعلى */
+}
+
+/* ── 10-B: Portal Hero — تحويله لبيان بصري حقيقي ───────────────
+   السبب: gradient بسيط وpadding ضيق. الـ hero هو أول انطباع
+   للمستخدم — يجب أن يكون غنياً بصرياً وراسخاً.
+   نضيف radial glow + subtle texture + padding أكثر كرماً.
+   ──────────────────────────────────────────────────────────────── */
+.portal-hero {
+  background:
+    radial-gradient(ellipse 50% 120% at 5% 50%, rgba(13,132,156,.18), transparent),
+    radial-gradient(ellipse 30% 80% at 95% 50%, rgba(176,138,78,.10), transparent),
+    linear-gradient(135deg, #0a2535 0%, #0e3347 45%, #123b52 100%);
+  padding: 18px 26px;         /* ↑ كان: 12px 20px — أكثر كرماً وأناقة */
+  border-radius: var(--r-lg); /* ↑ كان: 14px — متسق مع النظام */
+  box-shadow:
+    0 4px 6px rgba(8,30,43,.12),
+    0 16px 40px rgba(8,30,43,.22),
+    inset 0 1px 0 rgba(255,255,255,.07); /* ↑ كان: shadow واحدة فقط */
+  border: 1px solid rgba(255,255,255,.05); /* جديد — حد خفيف يُعرِّف الـ hero */
+  position: relative;
+  overflow: hidden;
+}
+
+/* خط متوهج أسفل الـ hero — accent line يتناسب مع الـ topbar */
+.portal-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(
+    to left,
+    transparent 0%,
+    rgba(13,132,156,.4) 25%,
+    rgba(22,164,191,.6) 50%,
+    rgba(13,132,156,.4) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* ── 10-C: Portal Title & Subtitle ──────────────────────────────
+   السبب: 15px و 9.5px — القفزة من العنوان للـ subtitle كبيرة.
+   نرفع الـ subtitle قليلاً ونحسّن letter-spacing للعربية.
+   ──────────────────────────────────────────────────────────────── */
+.portal-title {
+  font-size: 16px;            /* ↑ كان: 15px — حضور أقوى */
+  font-weight: 900;           /* ↑ كان: 800 — Black weight */
+  letter-spacing: -.01em;     /* جديد — إحكام للعنوان الكبير */
+}
+
+.portal-sub {
+  font-size: 10px;            /* ↑ كان: 9.5px — أكثر قابلية للقراءة */
+  letter-spacing: .06em;      /* ↑ كان: .04em — أكثر تباعداً للـ subtitle */
+  color: rgba(255,255,255,.55); /* ↑ كان: .6 — متناسق مع tb-sub */
+}
+
+/* ── 10-D: Last Update Badge ─────────────────────────────────────
+   السبب: الـ badge جيد لكن يمكن تحسين حجمه وظهوره ليبدو
+   كمعلومة حيوية مهمة لا مجرد نص ثانوي.
+   ──────────────────────────────────────────────────────────────── */
+.portal-updated-val {
+  font-size: 12.5px;          /* ↑ كان: 12px */
+  background: rgba(255,255,255,.12); /* ↑ كان: .10 — أكثر وضوحاً */
+  border-color: rgba(255,255,255,.20); /* ↑ كان: .16 */
+  padding: 4px 14px;          /* ↑ كان: 4px 12px */
+}
+
+/* ── 10-E: Portal Cards Grid ─────────────────────────────────────
+   السبب: gap: 16px يمكن رفعه قليلاً ليتوافق مع نظام الـ 18px
+   المُعتمد في Phase 2.
+   ──────────────────────────────────────────────────────────────── */
+.portal-cards-grid {
+  gap: 18px;                  /* ↑ كان: 16px — متسق مع نظام الـ gap */
+}
+
+/* ── 10-F: Portal Cards — رفع بصري واضح ───────────────────────
+   السبب: الكروت تبدو وكأنها جزء من خلفية الصفحة. نضيف ظلاً
+   واضحاً وحداً أكثر وضوحاً وتدرجاً خفياً للخلفية.
+   ──────────────────────────────────────────────────────────────── */
+.portal-card {
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  border: 1px solid rgba(185,208,219,.7); /* ↑ كان: rgba(13,47,64,.08) */
+  border-radius: var(--r-md);             /* ↑ كان: 14px — متسق */
+  padding: 22px 20px;                     /* ↑ كان: 20px 18px */
+  gap: 10px;                              /* ↑ كان: 8px */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 6px 20px rgba(8,45,60,.09),
+    inset 0 1px 0 rgba(255,255,255,1);   /* ↑ كان: 0 1px 3px rgba(.06) فقط */
+  transition: transform .20s var(--ease-std), box-shadow .20s ease, border-color .20s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* شريط ألوان خفيف أعلى كل كارت — يتطابق مع نظام الـ card::before */
+.portal-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  background: linear-gradient(90deg, var(--teal-3), var(--teal-2) 60%, var(--brass-2));
+  opacity: .7;
+}
+
+/* ── 10-G: Portal Card Hover — تفاعل executive ─────────────────
+   السبب: hover الحالي (translateY -3px) مقبول لكن الظل
+   لا يتناسب مع مستوى الداشبورد. نضيف teal glow خفيفاً.
+   ──────────────────────────────────────────────────────────────── */
+.portal-card:hover {
+  transform: translateY(-4px); /* ↑ كان: -3px */
+  box-shadow:
+    0 2px 6px rgba(8,45,60,.07),
+    0 16px 40px rgba(8,45,60,.14),
+    0 0 0 1px rgba(13,132,156,.08),
+    inset 0 1px 0 rgba(255,255,255,1);
+  border-color: rgba(13,132,156,.22);
+}
+
+/* ── 10-H: Portal Card Icon ──────────────────────────────────────
+   السبب: 26px للأيقونة صغير كنقطة دخول بصرية رئيسية.
+   نكبّرها ونضيف background خفيف ليبدو الأيقون كعنصر منفصل.
+   ──────────────────────────────────────────────────────────────── */
+.portal-card-icon {
+  font-size: 30px;            /* ↑ كان: 26px — visual weight أقوى */
+  line-height: 1;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-info);   /* جديد — خلفية icon لطيفة */
+  border-radius: var(--r-sm);   /* جديد — شكل محدد */
+  border: 1px solid var(--bd-info); /* جديد — حد ناعم */
+}
+
+/* ── 10-I: Portal Card Title ─────────────────────────────────────
+   السبب: 15px جيد لكن اللون #0d2f40 يمكن أن يكون أكثر حيوية
+   باستخدام متغير النظام.
+   ──────────────────────────────────────────────────────────────── */
+.portal-card-title {
+  font-size: 15px;
+  color: var(--tx-main);      /* ↑ كان: #0d2f40 literal — متغير النظام */
+  letter-spacing: -.005em;    /* جديد — إحكام خفيف */
+}
+
+/* ── 10-J: Portal Card Description ──────────────────────────────
+   السبب: 11.5px و line-height: 1.6 جيد لكن اللون يمكن تعديله
+   باستخدام متغير النظام للاتساق.
+   ──────────────────────────────────────────────────────────────── */
+.portal-card-desc {
+  color: var(--tx-muted);     /* ↑ كان: #5b7684 literal — متغير النظام */
+  line-height: 1.65;          /* ↑ كان: 1.6 — أكثر قابلية للقراءة */
+}
+
+/* ── 10-K: Category Sidebar — تمييز بصري واضح ──────────────────
+   السبب: #fff background مع border خفيف يجعل الـ sidebar يبدو
+   بنفس مستوى الكروت بجانبه. نضيف تدرجاً خفياً.
+   ──────────────────────────────────────────────────────────────── */
+.cat-sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  border: 1px solid rgba(185,208,219,.65); /* ↑ كان: rgba(13,47,64,.08) */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.04),
+    0 4px 16px rgba(8,45,60,.07);  /* جديد — رفع بصري للـ sidebar */
+  border-radius: var(--r-md);      /* ↑ كان: 12px — متسق */
+}
+
+/* ── 10-L: Portal Favorites Card — تناسق مع باقي الكروت ────────
+   السبب: .portal-favorites-card تفتقر لنفس التحسينات
+   التي أضفناها على .portal-card.
+   ──────────────────────────────────────────────────────────────── */
+.portal-favorites-card {
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  border: 1px solid rgba(185,208,219,.65); /* ↑ كان: rgba(13,47,64,.08) */
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 6px 20px rgba(8,45,60,.08),
+    inset 0 1px 0 rgba(255,255,255,1);
+}
+
+/* نهاية Phase 10 — Portal Home */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 11 — SUBTLE ANIMATIONS & MICRO-INTERACTIONS
+   ──────────────────────────────────────────────────────────────
+   المشكلة:
+   1. لا يوجد entrance animation للـ KPI cards — تظهر فجأة
+   2. لا يوجد stagger effect على الكروت — كلها تظهر في آن واحد
+   3. الـ number counter في KPI لا يوجد له أي transition بصري
+   4. hover على الأزرار بدون ripple أو feedback لحظي
+   5. الـ toast slideIn يستخدم translateY فقط بدون fade
+   6. الـ card::before accent strip بدون transition عند hover
+   7. لا يوجد skeleton shimmer حقيقي على الـ loading states
+   8. portal-card hover بطيء نسبياً — يحتاج أكثر حيوية
+   9. tab active لا يوجد له transition عند التنقل بين التبويبات
+
+   القاعدة: animations خفيفة وهادفة فقط — لا شيء flashy.
+   كل animation يجب أن يكون لها purpose واضح:
+   orientation | feedback | hierarchy | delight
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 11-A: KPI Cards Entrance Animation ─────────────────────────
+   السبب: الـ KPI cards تظهر فجأة دون entrance — هذا يشعر
+   المستخدم أن الصفحة "قفزت" بدلاً من أن "ظهرت".
+   نضيف fadeUp خفيف مع stagger لكل كارت.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes kpiEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.kpi {
+  animation: kpiEntrance .40s var(--ease-std) backwards;
+}
+
+/* Stagger — كل كارت يظهر بعد السابق بـ 60ms */
+.kpi:nth-child(1) { animation-delay: .04s; }
+.kpi:nth-child(2) { animation-delay: .10s; }
+.kpi:nth-child(3) { animation-delay: .16s; }
+.kpi:nth-child(4) { animation-delay: .22s; }
+.kpi:nth-child(5) { animation-delay: .28s; }
+.kpi:nth-child(6) { animation-delay: .34s; }
+.kpi:nth-child(7) { animation-delay: .40s; }
+.kpi:nth-child(8) { animation-delay: .46s; }
+
+/* ── 11-B: Card Entrance — أكثر نعومة ──────────────────────────
+   السبب: الكروت العادية تحتاج entrance أبطأ وأهدأ من الـ KPI.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* تطبيق على بطاقات المحتوى داخل الـ panel النشط فقط */
+.panel.active .card {
+  animation: cardEntrance .35s var(--ease-std) both;
+}
+
+.panel.active .card:nth-child(1) { animation-delay: .06s; }
+.panel.active .card:nth-child(2) { animation-delay: .12s; }
+.panel.active .card:nth-child(3) { animation-delay: .18s; }
+.panel.active .card:nth-child(4) { animation-delay: .24s; }
+
+/* ── 11-C: Card Accent Strip Transition ─────────────────────────
+   السبب: عند hover، الـ accent strip تتغير بدون transition.
+   نضيف تأثير يُوسّع الـ strip قليلاً عند hover.
+   ──────────────────────────────────────────────────────────────── */
+.card::before {
+  transition: opacity .22s ease, height .22s ease;
+}
+
+.card:hover::before {
+  height: 5px;                /* ↑ كان: 4px — يتمدد خفيف عند hover */
+  opacity: 1;
+}
+
+/* ── 11-D: KPI Accent Strip — نفس التأثير ───────────────────────
+   ──────────────────────────────────────────────────────────────── */
+.kpi::before {
+  transition: height .22s ease, opacity .22s ease;
+}
+
+.kpi:hover::before {
+  height: 5px;
+}
+
+/* ── 11-E: Portal Cards Entrance ────────────────────────────────
+   السبب: portal cards تظهر دفعة واحدة. نضيف stagger يعطي
+   إحساس "cascade" أنيق عند فتح البوابة.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes portalCardIn {
+  from { opacity: 0; transform: translateY(16px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.portal-card {
+  animation: portalCardIn .38s var(--ease-std) both;
+}
+
+.portal-card:nth-child(1) { animation-delay: .05s; }
+.portal-card:nth-child(2) { animation-delay: .11s; }
+.portal-card:nth-child(3) { animation-delay: .17s; }
+.portal-card:nth-child(4) { animation-delay: .23s; }
+.portal-card:nth-child(5) { animation-delay: .29s; }
+.portal-card:nth-child(6) { animation-delay: .35s; }
+.portal-card:nth-child(7) { animation-delay: .41s; }
+.portal-card:nth-child(8) { animation-delay: .47s; }
+
+/* ── 11-F: Toast — Entrance أكثر حيوية ─────────────────────────
+   السبب: slideIn الحالي يستخدم translateY(-4px) فقط — خفي.
+   نضيف scale خفيف يعطي إحساس "pop in" أكثر وضوحاً.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(.96); /* ↑ كان: -4px فقط */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast {
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+/* ── 11-G: Filter Fields — Focus Animation ──────────────────────
+   السبب: عند focus على حقل فلتر، لا يوجد animation — التغيير
+   مفاجئ. نضيف transition لطيف للـ border وbox-shadow.
+   ──────────────────────────────────────────────────────────────── */
+.finp,
+.fsel {
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    background .18s ease,
+    transform .12s ease;
+}
+
+.finp:focus,
+.fsel:focus {
+  transform: translateY(-1px); /* جديد — رفع خفيف عند الـ focus */
+}
+
+/* ── 11-H: Tab Switch — Indicator Animation ─────────────────────
+   السبب: التنقل بين الـ tabs مفاجئ. نضيف micro-animation
+   على الـ active tab يشير للمستخدم أن التبويب تغيّر.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes tabActivate {
+  0%   { transform: translateY(0) scale(1); }
+  40%  { transform: translateY(-2px) scale(1.02); }
+  100% { transform: translateY(-1px) scale(1); }
+}
+
+.tab.active {
+  animation: tabActivate .25s var(--ease-std) forwards;
+}
+
+/* ── 11-I: Button Press Feedback ────────────────────────────────
+   السبب: الأزرار لا تعطي visual feedback عند الضغط.
+   نضيف active state بسيط يشعر المستخدم بالاستجابة.
+   ──────────────────────────────────────────────────────────────── */
+.tb-btn:active {
+  transform: scale(.97) translateY(1px);
+  transition: transform .08s ease;
+}
+
+.f-clear:active,
+.pag-btn:active {
+  transform: scale(.96) translateY(1px);
+  transition: transform .08s ease;
+}
+
+/* ── 11-J: Shimmer على Loading States ───────────────────────────
+   السبب: shimmer الحالي يستخدم #e0e9f0 → #f0f6f9 → #e0e9f0.
+   نضيف أناقة للـ shimmer بتدرج أكثر بريقاً وsubtlety.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes mxShimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.mx-shimmer {
+  background: linear-gradient(
+    100deg,
+    #e8f0f5 0%,
+    #e8f0f5 35%,
+    #f4f9fb 50%,    /* ↑ كان: #f0f6f9 — أكثر بريقاً */
+    #e8f0f5 65%,
+    #e8f0f5 100%
+  );
+  background-size: 800px 100%;
+  animation: mxShimmer 1.6s ease-in-out infinite; /* ↓ كان: 1.4s — أبطأ وأهدأ */
+}
+
+/* ── 11-K: Scroll-based fade للـ sticky tabs shadow ─────────────
+   السبب: نضيف shadow transition على الـ tabs عند اللصق
+   بالشاشة ليكون الفصل بين الـ tabs والمحتوى أوضح.
+   ──────────────────────────────────────────────────────────────── */
+.tabs {
+  transition: box-shadow .22s ease;
+}
+
+/* ── 11-L: Reduce Motion — احترام تفضيلات المستخدم ─────────────
+   السبب: بعض المستخدمين يفضلون تقليل الحركة لأسباب صحية.
+   يجب احترام prefers-reduced-motion وتعطيل الـ animations.
+   ──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .kpi,
+  .card,
+  .portal-card,
+  .tab.active {
+    animation: none !important;
+  }
+
+  .kpi,
+  .card,
+  .portal-card,
+  .tab,
+  .finp,
+  .fsel,
+  .tb-btn,
+  .f-clear,
+  .pag-btn {
+    transition-duration: .01ms !important;
+  }
+}
+
+/* نهاية Phase 11 — Animations */
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 12 — FINAL POLISH & CONSISTENCY
+   ──────────────────────────────────────────────────────────────
+   الهدف: مراجعة شاملة لكل ما قد يبدو غير متسق بعد المراحل
+   الـ 11 السابقة. تصحيح التفاصيل الصغيرة التي تُفرق بين
+   داشبورد جيد وداشبورد احترافي حقيقي.
+
+   المحاور:
+   - اتساق الـ border-radius عبر كل العناصر
+   - اتساق الـ focus rings
+   - تحسين الـ loading screen
+   - تحسين الـ scrollbar
+   - تحسين body background
+   - تحسين التوازن البصري العام
+   - إصلاح أي تعارض بين المراحل
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 12-A: Body Background — أكثر ثراءً وعمقاً ─────────────────
+   السبب: خلفية الصفحة الحالية بسيطة. إضافة radial gradients
+   خفيفة تعطي إحساساً بالعمق دون تشتيت.
+   ──────────────────────────────────────────────────────────────── */
+body {
+  background:
+    radial-gradient(1200px 600px at 92% -5%, rgba(13,132,156,.065), transparent 52%),
+    radial-gradient(900px 500px at -4% 102%, rgba(176,138,78,.045), transparent 50%),
+    radial-gradient(600px 400px at 50% 110%, rgba(13,132,156,.03), transparent 45%),
+    linear-gradient(180deg, #f5f9fb 0%, var(--bg) 60%, #eaf1f6 100%);
+  /* ↑ كان: 2 gradients + linear — زدنا gradient ثالث للعمق */
+}
+
+/* ── 12-B: Scrollbar — تحسين موحّد ──────────────────────────────
+   السبب: الـ scrollbar الحالي جيد لكن يمكن تحسين الـ thumb
+   ليكون أكثر اتساقاً مع نظام الألوان الجديد.
+   ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 7px;                 /* ↓ كان: 8px — أرفع وأكثر أناقة */
+  height: 7px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(13,132,156,.28); /* ↑ كان: rgba(110,143,160,.45) — لون النظام */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+  transition: background .18s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(13,132,156,.55); /* ↑ كان: .6 — متوازن */
+}
+
+/* ── 12-C: Focus Ring — موحّد ومتسق ─────────────────────────────
+   السبب: :focus-visible يستخدم 2.5px — بعض العناصر تبدو
+   ثقيلة. نجعله أنيقاً ومتسقاً مع نظام الـ teal.
+   ──────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--teal-2); /* ↓ كان: 2.5px — أرفع وأنيق */
+  outline-offset: 3px;              /* ↑ كان: 2px — مسافة أكبر عن العنصر */
+  border-radius: 8px;
+}
+
+/* ── 12-D: Loading Screen — شاشة تحميل أكثر احترافية ───────────
+   السبب: الـ loading screen يمثل أول انطباع كامل للمستخدم.
+   تحسين الـ stats separator وإضافة animation أكثر نعومة.
+   ──────────────────────────────────────────────────────────────── */
+.app-loading-stats {
+  border-top: 1px solid rgba(255,255,255,.12); /* ↑ كان: .10 */
+  padding-top: 18px;          /* ↑ كان: 16px */
+  gap: 28px;                  /* ↑ كان: 24px */
+}
+
+/* فاصل بين إحصاءات الـ loading */
+.app-loading-stats > * + * {
+  border-right: 1px solid rgba(255,255,255,.12); /* جديد — فاصل بصري */
+  padding-right: 28px;        /* جديد — مسافة عن الفاصل */
+}
+
+/* ── 12-E: Toast — تحسين الشكل النهائي ─────────────────────────
+   السبب: border-radius: 13px غير متسق مع نظام الـ r-sm(10) / r-md(14).
+   نجعله var(--r-md) للاتساق.
+   ──────────────────────────────────────────────────────────────── */
+.toast {
+  border-radius: var(--r-md); /* ↑ كان: 13px — متسق مع النظام */
+  padding: 10px 20px;         /* ↑ كان: 9px 18px */
+  font-size: 12.5px;          /* ↑ كان: 12px */
+  box-shadow:
+    var(--sh-d16),
+    0 0 0 1px rgba(255,255,255,.08); /* جديد — حد داخلي خفيف */
+}
+
+/* ── 12-F: Pill Components — اتساق بصري ────────────────────────
+   السبب: .pill يستخدم border-radius: var(--r-pill) لكن الـ padding
+   غير متسق. نضبطه.
+   ──────────────────────────────────────────────────────────────── */
+.pill {
+  padding: 5px 14px;          /* ↑ كان: 4px 12px — أكثر توازناً */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4); /* جديد — inset highlight */
+}
+
+/* ── 12-G: Dropdown/Select — arrow تحسين ────────────────────────
+   السبب: السهم الافتراضي للـ select يتعارض أحياناً مع
+   تصميم الحقول العربية. نضمن اتجاهاً صحيحاً.
+   ──────────────────────────────────────────────────────────────── */
+.fsel {
+  padding-left: 32px;         /* ↑ كان: 28px — مسافة للسهم في اليسار (RTL) */
+}
+
+/* ── 12-H: Map Container — border أكثر وضوحاً ──────────────────
+   السبب: الـ map container يفتقر أحياناً لـ border واضح
+   يُعرّفه كمنطقة تفاعلية منفصلة.
+   ──────────────────────────────────────────────────────────────── */
+#map,
+.map-wrap,
+.leaflet-container {
+  border-radius: var(--r-md); /* ↑ كان: مختلف — متسق مع النظام */
+  border: 1px solid rgba(185,208,219,.7); /* جديد — حد موحّد */
+  box-shadow: 0 2px 8px rgba(8,45,60,.08);
+}
+
+/* ── 12-I: Muted Ink — تعريف متغير مفقود ────────────────────────
+   السبب: استخدمنا var(--muted-ink) في Phase 6 لكنه قد لا يكون
+   معرّفاً في كل البيئات. نضيفه كـ fallback آمن.
+   ──────────────────────────────────────────────────────────────── */
+:root {
+  --muted-ink: #7a96a3;      /* جديد — مستخدم في fg-lbl وعناصر أخرى */
+  --c-info-2:  #0b6b7e;      /* جديد — مستخدم في card-title .sub */
+  --bd-info:   rgba(13,132,156,.20); /* جديد — مستخدم في card-title .sub */
+}
+
+/* ── 12-J: Number / KPI Value — font-variant للأرقام ────────────
+   السبب: الأرقام الكبيرة في KPI تبدو أفضل بـ tabular nums
+   التي تجعل الأرقام بعرض ثابت وأكثر قابلية للمقارنة.
+   ──────────────────────────────────────────────────────────────── */
+.kpi-val,
+.kpi-value {
+  font-variant-numeric: tabular-nums;  /* جديد — أرقام بعرض ثابت */
+  font-feature-settings: "tnum";       /* جديد — دعم إضافي */
+}
+
+/* ── 12-K: Table — last-row rounded corners ─────────────────────
+   السبب: tbl-wrap له border-radius لكن الصفوف الأخيرة لا تحترمه.
+   نضيف rounded corners للخلايا الأخيرة.
+   ──────────────────────────────────────────────────────────────── */
+tbody tr:last-child td:first-child {
+  border-radius: 0 0 var(--r-md) 0; /* بصرياً أقصى اليمين — الزاوية السفلية اليمنى */
+}
+tbody tr:last-child td:last-child {
+  border-radius: 0 0 0 var(--r-md); /* بصرياً أقصى اليسار — الزاوية السفلية اليسرى */
+}
+
+/* ── 12-L: Card grid — visual rhythm ────────────────────────────
+   السبب: التأكد من أن كل grid gaps متسقة بعد كل المراحل.
+   هذا يُلغي أي تعارض قد يكون حدث بين المراحل.
+   ──────────────────────────────────────────────────────────────── */
+.g2  { grid-template-columns: 1fr 1fr; }
+.g3  { grid-template-columns: 1fr 1fr 1fr; }
+.g12 { grid-template-columns: 1fr 2fr; }
+.g21 { grid-template-columns: 2fr 1fr; }
+
+/* ── 12-M: Responsive — مراجعة المحمول ─────────────────────────
+   السبب: التأكد من أن التحسينات لا تكسر التجاوب على الشاشات الصغيرة.
+   ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .content { padding: 12px 14px 28px; }
+  .kpi { padding: 16px 16px 14px; }
+  .kpi-val { font-size: 26px; }
+  .card { padding: 18px 16px; }
+  .filters-row { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+  .tabs { padding: 6px 8px; }
+  .tab { padding: 7px 10px; font-size: 11.5px; }
+
+  /* إلغاء الـ stagger على الجوال — يبدو بطيئاً */
+  .kpi { animation-delay: 0s !important; }
+  .portal-card { animation-delay: 0s !important; }
+  .panel.active .card { animation-delay: 0s !important; }
+}
+
+@media (max-width: 480px) {
+  .content { padding: 10px 10px 24px; }
+  .g2, .g3, .g4 { grid-template-columns: 1fr; }
+  .g12, .g21 { grid-template-columns: 1fr; }
+}
+
+/* نهاية Phase 12 — Final Polish ✦ */
+
+/* زر العين الخارجي (portal-home) — إخفاء/إظهار بيانات الطلاب وعمر المبنى */
+#btnPresentationModeOuter:hover { opacity: .6 !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   KPI CARDS — UNIFIED ENTERPRISE DESIGN SYSTEM (Final Override)
+   ────────────────────────────────────────────────────────────────────────
+   يُطبَّق على كل بطاقة .kpi في المشروع بالكامل (كل تبويب، Static أو JS-generated)
+   بنفس البنية الحالية تمامًا (.kpi > .kpi-icon? + .kpi-val + .kpi-lbl + .kpi-sub*)
+   بدون أي تعديل على HTML/JS — فقط إعادة تصميم بصري كامل عبر Cascade نهائي.
+
+   القاعدة الوحيدة للتمايز بين البطاقات: Accent Color عبر .kc-* (لون الحد
+   العلوي + الأيقونة + الرقم فقط) — كل ما عدا ذلك (الحجم، المسافات، الخط،
+   الظل، الحركة) ثابت 100% في كل مكان.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+  align-items: stretch;
+}
+
+.kpi {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 128px;
+  background: linear-gradient(170deg, #ffffff 0%, #fafcfe 100%);
+  border: 1px solid var(--bd-light);
+  border-top: 1px solid var(--bd-light) !important; /* يمنع أي border-top inline قديم من مضاعفة الشريط اللوني مع ::before */
+  border-radius: var(--r-xl);
+  padding: 22px 22px 20px;
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 4px 14px rgba(8,45,60,.07),
+    inset 0 1px 0 rgba(255,255,255,.85);
+  transition: transform .25s var(--ease-std), box-shadow .25s var(--ease-std), border-color .25s ease;
+}
+
+.kpi:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 2px 5px rgba(8,45,60,.07),
+    0 14px 32px rgba(8,45,60,.14),
+    inset 0 1px 0 rgba(255,255,255,.95);
+  border-color: #b8d4e0;
+}
+
+/* شريط اللون العلوي — العنصر الوحيد المسؤول عن هوية البطاقة */
+.kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  opacity: .92;
+}
+
+/* دائرة زخرفية خافتة في الزاوية — نفس الأسلوب في كل البطاقات */
+.kpi::after {
+  content: "";
+  position: absolute;
+  inset: auto -20px -20px auto;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  opacity: .05;
+  pointer-events: none;
+}
+
+/* حاوية الأيقونة — badge دائري واضح ومتّسق (اختياري: يعمل بوجود
+   .kpi-icon أو غيابه دون أي أثر على المسافات، لأن العناصر الأخرى
+   لا تعتمد على وجودها إطلاقاً) */
+.kpi-icon {
+  position: absolute;
+  top: 16px;
+  right: 16px;                 /* الصفحة dir="rtl" — الأيقونة في الركن العلوي الصحيح بصرياً (يمين) */
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  opacity: 1;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(8,45,60,.18);
+}
+
+.kpi-val {
+  font-family: "Tajawal", "IBM Plex Sans Arabic", sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* فضاء يمنع تداخل الرقم مع أيقونة الركن — فقط في الكروت التي تحتوي أيقونة فعلاً */
+.kpi:has(.kpi-icon) .kpi-val {
+  padding-right: 46px;
+}
+
+.kpi-lbl {
+  margin-top: 9px;
+  color: var(--tx-main);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kpi-sub {
+  margin-top: 4px;
+  color: var(--tx-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* ── ألوان KPI الموحّدة — الفرق الوحيد المسموح به بين البطاقات ── */
+.kpi.kc-blue::before, .kpi.kc-blue .kpi-icon   { background: var(--teal); }
+.kpi.kc-blue::after                            { background: var(--teal); }
+.kpi.kc-blue .kpi-val                          { color: var(--teal-3); }
+
+.kpi.kc-teal::before, .kpi.kc-teal .kpi-icon   { background: var(--teal-3); }
+.kpi.kc-teal::after                            { background: var(--teal); }
+.kpi.kc-teal .kpi-val                          { color: var(--teal); }
+
+.kpi.kc-navy::before, .kpi.kc-navy .kpi-icon   { background: var(--navy); }
+.kpi.kc-navy::after                            { background: var(--navy); }
+.kpi.kc-navy .kpi-val                          { color: var(--navy); }
+
+.kpi.kc-green::before, .kpi.kc-green .kpi-icon { background: var(--c-positive); }
+.kpi.kc-green::after                           { background: var(--c-positive); }
+.kpi.kc-green .kpi-val                         { color: var(--c-positive); }
+
+.kpi.kc-info::before, .kpi.kc-info .kpi-icon   { background: var(--c-info); }
+.kpi.kc-info::after                            { background: var(--c-info); }
+.kpi.kc-info .kpi-val                          { color: var(--c-info-2); }
+
+.kpi.kc-amber::before, .kpi.kc-amber .kpi-icon { background: var(--warn); }
+.kpi.kc-amber::after                           { background: var(--warn); }
+.kpi.kc-amber .kpi-val                         { color: #92400e; }
+
+.kpi.kc-red::before, .kpi.kc-red .kpi-icon     { background: #dc2626; }
+.kpi.kc-red::after                             { background: #dc2626; }
+.kpi.kc-red .kpi-val                           { color: #991b1b; }
+
+.kpi.kc-purple::before, .kpi.kc-purple .kpi-icon { background: var(--purple); }
+.kpi.kc-purple::after                            { background: var(--purple); }
+.kpi.kc-purple .kpi-val                          { color: #4c1d95; }
+
+/* ── ظلال Hover ملوّنة لكل accent — لمسة تنفيذية إضافية عند التمرير ── */
+.kpi.kc-blue:hover, .kpi.kc-teal:hover, .kpi.kc-info:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(13,132,156,.18),
+    0 0 0 1px rgba(13,132,156,.12), inset 0 1px 0 #fff;
+}
+.kpi.kc-green:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(6,106,82,.18),
+    0 0 0 1px rgba(6,106,82,.12), inset 0 1px 0 #fff;
+}
+.kpi.kc-navy:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(13,47,64,.22),
+    0 0 0 1px rgba(13,47,64,.14), inset 0 1px 0 #fff;
+}
+.kpi.kc-amber:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(192,122,20,.20),
+    0 0 0 1px rgba(192,122,20,.14), inset 0 1px 0 #fff;
+}
+.kpi.kc-red:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(125,31,44,.20),
+    0 0 0 1px rgba(125,31,44,.14), inset 0 1px 0 #fff;
+}
+.kpi.kc-purple:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(108,43,217,.18),
+    0 0 0 1px rgba(108,43,217,.12), inset 0 1px 0 #fff;
+}
+
+/* ── جوال — نفس الهوية بمقاسات مناسبة للشاشة الصغيرة ── */
+@media (max-width: 768px) {
+  .kpi     { min-height: 108px; padding: 17px 17px 15px; }
+  .kpi-val { font-size: 26px; }
+  .kpi:has(.kpi-icon) .kpi-val { padding-right: 40px; }
+  .kpi-icon{ width: 32px; height: 32px; font-size: 15px; }
+}
+
+/* نهاية Unified KPI Design System */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   إضافات: (1) إزالة أيقونة الإيموجي من كروت KPI في كل التبويبات
+           (2) تعزيز الظل الافتراضي لكروت "حصر الأصول"
+           (3) تمييز الكارت النشط الذي يفتح البانل الجانبي (Hasr / أنظمة)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 1) إخفاء شارة الإيموجي/اللوجو الدائرية أعلى كل كارت KPI في كل مكان
+      (حصر الأصول، التجهيزات، المدفوعات، ...إلخ) — ونعيد للرقم مساحته كاملة */
+.kpi-icon {
+  display: none !important;
+}
+.kpi:has(.kpi-icon) .kpi-val,
+.kpi .kpi-val {
+  padding-right: 0 !important;
+}
+@media (max-width: 768px) {
+  .kpi:has(.kpi-icon) .kpi-val {
+    padding-right: 0 !important;
+  }
+}
+
+/* 2-أ) السبب الفعلي لاختفاء الظل: تبويب حصر الأصول يستخدم شبكة
+        4 أعمدة بعرض كامل (grid-template-columns:repeat(4,...))، فتلامس
+        الكروت الطرفية (يمين/يسار) حافة #tab-hasr تماماً. و#tab-hasr
+        (زي كل .panel) عندها overflow-x:hidden بدون أي padding جانبي،
+        فتُقصّ ظلال الكروت الطرفية عند الحافة مباشرة. الحل: مسافة
+        داخلية بسيطة تمنح الظل مساحة يظهر فيها دون التأثير على التخطيط. */
+#tab-hasr {
+  padding: 4px 22px 26px !important;
+}
+#tab-hasr,
+#legacyDashboardArea .panel.active#tab-hasr {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 2-ب) ظل واضح ومضمون لكروت تبويب "حصر الأصول" (نفس هوية بقية الكروت
+        + تعزيز إضافي حتى لا يبدو الكارت مسطّحاً) */
+#tab-hasr .kpi {
+  box-shadow:
+    0 1px 3px rgba(8, 45, 60, 0.08),
+    0 6px 18px rgba(8, 45, 60, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+}
+#tab-hasr .kpi:hover {
+  box-shadow:
+    0 2px 6px rgba(8, 45, 60, 0.10),
+    0 16px 34px rgba(8, 45, 60, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+/* 3) الكارت القابل للنقر (يفتح بانل جانبي) — مؤشر واضح + حالة "نشط"
+      عندما يكون البانل الخاص به مفتوحاً، بنفس روح كروت حصر الأصول/نظرة عامة */
+.kpi.hasr-clickable {
+  cursor: pointer;
+}
+
+.kpi.hasr-active {
+  border-color: var(--hac, var(--c-info)) !important;
+  background: linear-gradient(170deg, #ffffff 0%, color-mix(in srgb, var(--hac, var(--c-info)) 6%, #fafcfe) 100%);
+  box-shadow:
+    0 2px 6px rgba(8, 45, 60, 0.09),
+    0 14px 32px color-mix(in srgb, var(--hac, var(--c-info)) 22%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--hac, var(--c-info)) 35%, transparent),
+    inset 0 1px 0 #fff !important;
+  transform: translateY(-2px);
+}
+
+.kpi.hasr-active::before {
+  height: 5px;
+  opacity: 1;
+}

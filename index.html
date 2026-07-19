@@ -56,7 +56,54 @@
      مع خط Tajawal للأرقام والعناوين وIBM Plex Sans Arabic لجسم النص. -->
 
 </head>
-<body>
+<body class="portal-active">
+
+<!-- ════════════════════════════════════════════════════════════════
+     LOADING SCREEN (المرحلة 6 — Loading Screen)
+     شاشة تحميل تراقب فقط جاهزية عناصر KPI الموجودة مسبقاً في الصفحة
+     (لا تتدخل في أي fetch أو منطق قراءة بيانات) — تختفي تلقائياً
+     عند اكتمال البيانات الأساسية (k-total).
+     ════════════════════════════════════════════════════════════════ -->
+<div id="appLoadingScreen" class="app-loading-screen">
+  <div class="app-loading-box">
+    <div class="app-loading-logo">
+      <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" />
+      <div class="app-loading-logo-divider"></div>
+      <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" />
+    </div>
+    <div class="app-loading-title">جاري تجهيز منصة إدارة المرافق التعليمية…</div>
+
+    <div class="app-loading-progress-track">
+      <div class="app-loading-progress-fill" id="appLoadingProgressFill"></div>
+    </div>
+    <div class="app-loading-row">
+      <span id="appLoadingTaskText">تحميل البيانات الأساسية…</span>
+      <span id="appLoadingPct">0%</span>
+    </div>
+
+    <div class="app-loading-skeleton">
+      <div class="app-skel-line"></div>
+      <div class="app-skel-line short"></div>
+      <div class="app-skel-line"></div>
+    </div>
+
+    <div class="app-loading-stats">
+      <div class="app-loading-stat">
+        <div class="app-loading-stat-val" id="appLoadStatSchools">—</div>
+        <div class="app-loading-stat-lbl">عدد المدارس</div>
+      </div>
+      <div class="app-loading-stat">
+        <div class="app-loading-stat-val" id="appLoadStatAssets">—</div>
+        <div class="app-loading-stat-lbl">عدد الأصول</div>
+      </div>
+      <div class="app-loading-stat">
+        <div class="app-loading-stat-val" id="appLoadStatReports">—</div>
+        <div class="app-loading-stat-lbl">عدد البلاغات</div>
+      </div>
+    </div>
+    <div class="app-loading-updated">آخر تحديث: <span id="appLoadStatUpdated">—</span></div>
+  </div>
+</div>
 
 <div class="topbar">
 
@@ -71,7 +118,7 @@
 
   <div class="tb-tbc">
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183"
-         alt="TBC" style="height:26px;opacity:.94;filter:brightness(0) invert(1);display:block" data-evt="2">
+         alt="TBC" style="height:36px;opacity:.94;filter:brightness(0) invert(1);display:block" data-evt="2">
     <div class="tb-divider"></div>
     <div>
       <div class="tb-title" id="topTitle">لوحة بيانات إدارة المرافق التعليمية</div>
@@ -92,55 +139,168 @@
 
 <div class="content">
 
+  <!-- ════════════════════════════════════════════════════════════════
+       PORTAL HOME — Enterprise Portal (المرحلة 2 — Portal Layout)
+       صفحة رئيسية جديدة، غير مربوطة بعد بأي نظام تنقل.
+       مخفية افتراضياً (display:none) حتى لا تؤثر على عمل الداشبورد الحالي.
+       لا تحتوي على أي Charts — فقط شعار / اسم النظام / آخر تحديث / بطاقات الأقسام.
+       ════════════════════════════════════════════════════════════════ -->
+  <div id="portal-home" class="portal-home" style="display:none">
+
+    <div class="portal-hero">
+      <div class="portal-hero-brand">
+        <img class="portal-logo"
+             src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png"
+             alt="Land Sterling" />
+        <div class="portal-hero-divider"></div>
+        <img class="portal-logo portal-logo-tbc"
+             src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183"
+             alt="TBC" />
+        <div class="portal-hero-text">
+          <div class="portal-title" id="portalTitle">منصة إدارة المرافق التعليمية</div>
+          <div class="portal-sub" id="portalSub"></div>
+        </div>
+      </div>
+      <div class="portal-hero-meta">
+        <button type="button" id="btnPresentationModeOuter"
+                onclick="togglePresentationMode()"
+                style="display:flex;align-items:center;justify-content:center;
+                       width:26px;height:26px;background:transparent;
+                       border:none;color:#fff;border-radius:8px;
+                       font-size:13px;line-height:1;cursor:pointer;opacity:.35;
+                       transition:.15s;margin-left:10px">👁</button>
+        <span class="portal-updated-lbl">آخر تحديث</span>
+        <span class="portal-updated-val" id="portalLastUpdate">—</span>
+      </div>
+    </div>
+
+    <div class="portal-cards-grid" id="portalCardsGrid">
+
+      <!-- كارت المفضلة/الاختصارات — عمود طويل بارتفاع الصفين على أقصى اليسار -->
+      <div class="portal-favorites-card" id="portalFavoritesCard">
+        <!-- يُملأ ديناميكياً عبر __renderPortalFavoritesCard() -->
+      </div>
+
+      <div class="portal-card" id="portal-card-assessment" data-category="assessment">
+        <div class="portal-card-icon">📊</div>
+        <div class="portal-card-title">التقييمات والحالة الفنية</div>
+        <div class="portal-card-desc">تحليل FCA، مقارنة المراحل، FCA المرجعي، البيئة المدرسية، تقييم عاين، الأنظمة الرئيسية والتفصيلية</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-assets" data-category="assets">
+        <div class="portal-card-icon">🏗️</div>
+        <div class="portal-card-title">الأصول والمرافق</div>
+        <div class="portal-card-desc">التجهيزات، قطع الغيار، المصاعد، خنادق الصرف، خطة استبدال المكيفات</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-contracts" data-category="contracts">
+        <div class="portal-card-icon">💰</div>
+        <div class="portal-card-title">العقود والتكاليف</div>
+        <div class="portal-card-desc">التكلفة، المدفوعات، العقود، العقود غير المجال</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-operations" data-category="operations">
+        <div class="portal-card-icon">📢</div>
+        <div class="portal-card-title">التشغيل والبلاغات</div>
+        <div class="portal-card-desc">البلاغات، مؤشرات الأداء، مؤشرات المقاول</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-geo" data-category="geo">
+        <div class="portal-card-icon">🗺️</div>
+        <div class="portal-card-title">التحليل الجغرافي</div>
+        <div class="portal-card-desc">الخرائط، التوزيع الجغرافي</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-explore" data-category="explore">
+        <div class="portal-card-icon">🔍</div>
+        <div class="portal-card-title">استكشاف البيانات</div>
+        <div class="portal-card-desc">الجداول، البحث، التقارير</div>
+      </div>
+
+    </div>
+
+    <!-- نافذة اختيار التبويبات (Modal) -->
+    <div class="portal-favorites-modal-overlay" id="portalFavoritesModalOverlay" style="display:none">
+      <div class="portal-favorites-modal">
+        <div class="portal-favorites-modal-head">
+          <div class="portal-favorites-modal-title">⭐ اختر ما تريد رؤيته</div>
+          <button type="button" class="portal-favorites-modal-close" onclick="closeFavoritesModal()">✕</button>
+        </div>
+        <div class="portal-favorites-modal-body" id="portalFavoritesModalBody">
+          <!-- يُملأ ديناميكياً -->
+        </div>
+        <div class="portal-favorites-modal-foot">
+          <button type="button" class="portal-favorites-clear-btn" onclick="clearFavoritesModal()">إلغاء كل الاختيارات</button>
+          <button type="button" class="portal-favorites-save-btn" onclick="saveFavoritesModal()">حفظ الاختيارات</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ════════════════════════════════════════════════════════════════
+       نهاية Portal Home — المحتوى القديم يبدأ كما هو تماماً بالأسفل
+       ════════════════════════════════════════════════════════════════ -->
+
+  <!-- ════════════════════════════════════════════════════════════════
+       LEGACY DASHBOARD AREA (المرحلة 3 — Navigation System)
+       غلاف جديد فقط حول المحتوى القديم بالكامل (فلاتر + KPI + tabs bar
+       + كل الـ panels) لإتاحة التبديل بينه وبين Portal Home.
+       لم يُحذف أو يُنقل أي عنصر داخلي — فقط أُضيف Wrapper خارجي.
+       مخفي افتراضياً لأن Portal Home هي نقطة الدخول الآن.
+       ════════════════════════════════════════════════════════════════ -->
+  <div id="legacyDashboardArea" class="legacy-hidden">
+  <div class="cat-layout">
+    <aside id="categorySidebar" class="cat-sidebar"></aside>
+    <div class="cat-main">
+
   <div id="toast-area"></div>
 
   <div class="filters-row" id="filtersRow" style="display:none">
 
     <div class="fg" id="fg-city">
       <div class="fg-lbl" data-ar="المنطقة الرئيسية" data-en="Main Region">المنطقة الرئيسية</div>
-      <select class="fsel" id="fCity" data-evt="7">
+      <select class="fsel" id="fCity" data-evt="7" aria-label="المنطقة الرئيسية">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg" id="fg-sector" style="display:none">
       <div class="fg-lbl" data-ar="المحافظة" data-en="Governorate">المحافظة</div>
-      <select class="fsel" id="fSector" data-evt="8">
+      <select class="fsel" id="fSector" data-evt="8" aria-label="المحافظة">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="المرحلة" data-en="Stage">المرحلة</div>
-      <select class="fsel" id="fStage" data-evt="9">
+      <select class="fsel" id="fStage" data-evt="9" aria-label="المرحلة">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الجنس" data-en="Gender">الجنس</div>
-      <select class="fsel" id="fGender" data-evt="10">
+      <select class="fsel" id="fGender" data-evt="10" aria-label="الجنس">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="حجم المدرسة" data-en="School Size">حجم المدرسة</div>
-      <select class="fsel" id="fSize" data-evt="11">
+      <select class="fsel" id="fSize" data-evt="11" aria-label="حجم المدرسة">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الملكية" data-en="Ownership">الملكية</div>
-      <select class="fsel" id="fOwner" data-evt="12">
+      <select class="fsel" id="fOwner" data-evt="12" aria-label="الملكية">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl">FCA ≥</div>
-      <select class="fsel" id="fFcaMin" data-evt="13">
+      <select class="fsel" id="fFcaMin" data-evt="13" aria-label="الحد الأدنى لتقييم FCA">
         <option value="0" data-ar="الكل" data-en="All">الكل</option>
         <option value="25">25%</option>
         <option value="50">50%</option>
@@ -151,14 +311,14 @@
 
     <div class="fg">
       <div class="fg-lbl" data-ar="الحي / المنطقة" data-en="District / Area">الحي / المنطقة</div>
-      <select class="fsel" id="fDistrict" style="min-width:140px" data-evt="14">
+      <select class="fsel" id="fDistrict" style="min-width:140px" data-evt="14" aria-label="الحي / المنطقة">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
 
     <div class="fg">
       <div class="fg-lbl" data-ar="حالة الاشتراك" data-en="Subscription Status">حالة الاشتراك</div>
-      <select class="fsel" id="fSubStatus" data-evt="15">
+      <select class="fsel" id="fSubStatus" data-evt="15" aria-label="حالة الاشتراك">
         <option value="" data-ar="الكل" data-en="All">الكل</option>
       </select>
     </div>
@@ -170,6 +330,12 @@
 
     <button class="f-clear" data-evt="17"><span data-ar="✕ مسح الكل" data-en="✕ Clear All">✕ مسح الكل</span></button>
   </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       GLOBAL OVERVIEW KPIs — تظهر فقط عند فتح تبويب "نظرة عامة" داخل
+       أي قسم (بناءً على طلب صريح)، بدل ما تظهر فوق كل التبويبات دايماً
+       ════════════════════════════════════════════════════════════════ -->
+  <div id="globalOverviewKpis">
 
   <div class="kpi-grid">
     <div class="kpi kc-blue">
@@ -264,6 +430,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /globalOverviewKpis -->
 
   <div class="tabs">
     <div class="tab active" id="tabbtn-overview" data-evt="18">نظرة عامة</div>
@@ -501,19 +669,19 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
-          <select class="fsel" id="stageCompareCity" data-evt="55">
+          <select class="fsel" id="stageCompareCity" data-evt="55" aria-label="المنطقة">
             <option value="">— كل المناطق —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">المرحلة (فلتر)</div>
-          <select class="fsel" id="stageCompareStageFilter" data-evt="56">
+          <select class="fsel" id="stageCompareStageFilter" data-evt="56" aria-label="المرحلة (فلتر)">
             <option value="">— كل المراحل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">الترتيب</div>
-          <select class="fsel" id="stageCompareSort" data-evt="57">
+          <select class="fsel" id="stageCompareSort" data-evt="57" aria-label="الترتيب">
             <option value="avg_asc">الأدنى FCA أولاً</option>
             <option value="avg_desc">الأعلى FCA أولاً</option>
             <option value="name">الاسم</option>
@@ -614,25 +782,25 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">المنطقة</div>
-          <select class="fsel" id="fcaRefCity" data-evt="59">
+          <select class="fsel" id="fcaRefCity" data-evt="59" aria-label="المنطقة">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">المحافظة</div>
-          <select class="fsel" id="fcaRefSector" data-evt="60">
+          <select class="fsel" id="fcaRefSector" data-evt="60" aria-label="المحافظة">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">آخر شهر تقييم</div>
-          <select class="fsel" id="fcaRefDate" data-evt="61">
+          <select class="fsel" id="fcaRefDate" data-evt="61" aria-label="آخر شهر تقييم">
             <option value="">— كل —</option>
           </select>
         </div>
         <div class="fg">
           <div class="fg-lbl">التصنيف</div>
-          <select class="fsel" id="fcaRefTier" data-evt="62">
+          <select class="fsel" id="fcaRefTier" data-evt="62" aria-label="التصنيف">
             <option value="">— كل —</option>
             <option value="critical">🔴 حرج (&lt;25%)</option>
             <option value="fair">🟡 متوسط (25–50%)</option>
@@ -643,7 +811,7 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">الترتيب</div>
-          <select class="fsel" id="fcaRefSort" data-evt="63">
+          <select class="fsel" id="fcaRefSort" data-evt="63" aria-label="الترتيب">
             <option value="fca_asc">الأدنى FCA أولاً</option>
             <option value="fca_desc">الأعلى FCA أولاً</option>
             <option value="name">اسم المدرسة</option>
@@ -652,7 +820,7 @@
         </div>
         <div class="fg">
           <div class="fg-lbl">عدد الصفوف</div>
-          <select class="fsel" id="fcaRefPageSize" data-evt="64">
+          <select class="fsel" id="fcaRefPageSize" data-evt="64" aria-label="عدد الصفوف">
             <option value="25">25 مدرسة</option>
             <option value="50" selected>50 مدرسة</option>
             <option value="100">100 مدرسة</option>
@@ -1177,7 +1345,7 @@
              
               style="min-width:240px;padding-right:14px" data-evt="84">
           </div>
-          <select class="fsel" id="tbl-sort" style="font-size:11px" data-evt="85">
+          <select class="fsel" id="tbl-sort" style="font-size:11px" data-evt="85" aria-label="ترتيب الجدول">
             <option value="fca_asc"         data-ar="FCA ↑ تصاعدي"              data-en="FCA ↑ Asc">FCA ↑ تصاعدي</option>
             <option value="fca_desc"        data-ar="FCA ↓ تنازلي"              data-en="FCA ↓ Desc">FCA ↓ تنازلي</option>
             <option value="env_desc"        data-ar="البيئة ↓ تنازلي"           data-en="Env ↓ Desc">البيئة ↓ تنازلي</option>
@@ -1188,7 +1356,7 @@
             <option value="age_desc"        data-ar="عمر المبنى ↓ تنازلي"       data-en="Building Age ↓ Desc">عمر المبنى ↓ تنازلي</option>
             <option value="name"            data-ar="الاسم أ-ي"                 data-en="Name A-Z">الاسم أ-ي</option>
           </select>
-          <select class="fsel" id="tbl-page-size" style="font-size:11px" data-evt="86">
+          <select class="fsel" id="tbl-page-size" style="font-size:11px" data-evt="86" aria-label="عدد الصفوف في الصفحة">
             <option value="25"    data-ar="25 صف"  data-en="25 rows">25 صف</option>
             <option value="50" selected data-ar="50 صف"  data-en="50 rows">50 صف</option>
             <option value="100"   data-ar="100 صف" data-en="100 rows">100 صف</option>
@@ -1327,7 +1495,7 @@
       <!-- المدينة -->
       <div class="fg" style="margin:0;min-width:140px">
         <div class="fg-lbl">🏙️ المدينة</div>
-        <select class="fsel" id="hasr-global-city" data-evt="92">
+        <select class="fsel" id="hasr-global-city" data-evt="92" aria-label="المدينة">
           <option value="">— الكل —</option>
         </select>
       </div>
@@ -1335,7 +1503,7 @@
       <!-- الحالة -->
       <div class="fg" style="margin:0">
         <div class="fg-lbl">📊 الحالة</div>
-        <select class="fsel" id="hasr-global-condition" data-evt="93">
+        <select class="fsel" id="hasr-global-condition" data-evt="93" aria-label="الحالة">
           <option value="">— الكل —</option>
           <option value="excellent">✅ بها أصول ممتازة</option>
           <option value="good">🔵 بها أصول جيدة</option>
@@ -1347,7 +1515,7 @@
       <!-- معادة -->
       <div class="fg" style="margin:0">
         <div class="fg-lbl">🔄 إعادة التقييم</div>
-        <select class="fsel" id="hasr-global-reassessed" data-evt="94">
+        <select class="fsel" id="hasr-global-reassessed" data-evt="94" aria-label="إعادة التقييم">
           <option value="">— الكل —</option>
           <option value="نعم">معادة فقط</option>
           <option value="لا">غير معادة</option>
@@ -1384,68 +1552,80 @@
     <div class="kpi-grid" id="hasr-kpi-row" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
 
       <!-- كارت 1: المدارس المحصورة -->
-      <div class="kpi" style="border-top:3px solid var(--c-info)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-info);margin-bottom:4px;letter-spacing:.04em">🏫 المدارس المحصورة</div>
-        <div class="kpi-val" id="hasr-k-surveyed" style="color:var(--c-info)">—</div>
-        <div class="kpi-lbl">من <span id="hasr-k-target" style="font-weight:800">3,750</span> مدرسة</div>
-        <div style="margin-top:8px;background:#E8F0FE;border-radius:999px;height:6px;overflow:hidden">
-          <div id="hasr-prog-schools" style="height:100%;background:var(--c-info);border-radius:999px;width:0%;transition:width .6s ease"></div>
+      <div class="kpi kc-info">
+        <div class="kpi-icon">🏫</div>
+        <div class="kpi-val" id="hasr-k-surveyed">—</div>
+        <div class="kpi-lbl">المدارس المحصورة</div>
+        <div class="kpi-sub">
+          من <span id="hasr-k-target" style="font-weight:800">3,750</span> مدرسة
+          <div style="margin-top:8px;background:#E8F0FE;border-radius:999px;height:6px;overflow:hidden">
+            <div id="hasr-prog-schools" style="height:100%;background:var(--c-info);border-radius:999px;width:0%;transition:width .6s ease"></div>
+          </div>
+          <span id="hasr-k-coverage" style="display:inline-block;margin-top:4px">0%</span>
         </div>
-        <div class="kpi-sub" id="hasr-k-coverage" style="margin-top:4px;color:var(--c-info)">0%</div>
       </div>
 
       <!-- كارت 2: إجمالي الأصول -->
-      <div class="kpi" style="border-top:3px solid var(--c-positive)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-positive);margin-bottom:4px;letter-spacing:.04em">📊 إجمالي الأصول</div>
-        <div class="kpi-val" id="hasr-k-assets" style="color:var(--c-positive)">—</div>
-        <div class="kpi-lbl">أصل موثّق</div>
+      <div class="kpi kc-green">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-val" id="hasr-k-assets">—</div>
+        <div class="kpi-lbl">إجمالي الأصول</div>
+        <div class="kpi-sub">أصل موثّق</div>
         <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap" id="hasr-assets-breakdown"></div>
       </div>
 
       <!-- كارت 3: المدارس المعادة -->
-      <div class="kpi" style="border-top:3px solid var(--c-special)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-special);margin-bottom:4px;letter-spacing:.04em">🔄 المدارس المعادة</div>
-        <div class="kpi-val" id="hasr-k-reassessed" style="color:var(--c-special)">—</div>
-        <div class="kpi-lbl">أعيد تقييمها</div>
-        <div style="margin-top:8px;background:var(--bg-special);border-radius:999px;height:6px;overflow:hidden">
-          <div id="hasr-prog-reassessed" style="height:100%;background:var(--c-special);border-radius:999px;width:0%;transition:width .6s ease"></div>
+      <div class="kpi kc-purple">
+        <div class="kpi-icon">🔄</div>
+        <div class="kpi-val" id="hasr-k-reassessed">—</div>
+        <div class="kpi-lbl">المدارس المعادة</div>
+        <div class="kpi-sub">
+          أعيد تقييمها
+          <div style="margin-top:8px;background:var(--bg-special);border-radius:999px;height:6px;overflow:hidden">
+            <div id="hasr-prog-reassessed" style="height:100%;background:var(--c-special);border-radius:999px;width:0%;transition:width .6s ease"></div>
+          </div>
+          <span id="hasr-k-reassessed-pct" style="display:inline-block;margin-top:4px">0%</span>
         </div>
-        <div class="kpi-sub" id="hasr-k-reassessed-pct" style="margin-top:4px;color:var(--c-special)">0%</div>
       </div>
 
       <!-- كارت 4: متوسط الأصول -->
-      <div class="kpi" style="border-top:3px solid var(--c-info-2)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-info-2);margin-bottom:4px;letter-spacing:.04em">📐 متوسط الأصول</div>
-        <div class="kpi-val" id="hasr-k-avg-assets" style="color:var(--c-info-2)">—</div>
-        <div class="kpi-lbl">أصل / مدرسة</div>
+      <div class="kpi kc-teal">
+        <div class="kpi-icon">📐</div>
+        <div class="kpi-val" id="hasr-k-avg-assets">—</div>
+        <div class="kpi-lbl">متوسط الأصول</div>
+        <div class="kpi-sub">أصل / مدرسة</div>
       </div>
 
       <!-- كارت 5: المباني -->
-      <div class="kpi" style="border-top:3px solid var(--c-warning)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-warning);margin-bottom:4px;letter-spacing:.04em">🏗️ إجمالي المباني</div>
-        <div class="kpi-val" id="hasr-k-total-buildings" style="color:var(--c-warning)">—</div>
-        <div class="kpi-lbl" id="hasr-k-avg-buildings">— مبنى / مدرسة</div>
+      <div class="kpi kc-amber">
+        <div class="kpi-icon">🏗️</div>
+        <div class="kpi-val" id="hasr-k-total-buildings">—</div>
+        <div class="kpi-lbl">إجمالي المباني</div>
+        <div class="kpi-sub" id="hasr-k-avg-buildings">— مبنى / مدرسة</div>
       </div>
 
       <!-- كارت 6: الغرف -->
-      <div class="kpi" style="border-top:3px solid var(--c-danger)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-danger);margin-bottom:4px;letter-spacing:.04em">🚪 إجمالي الغرف</div>
-        <div class="kpi-val" id="hasr-k-total-rooms" style="color:var(--c-danger)">—</div>
-        <div class="kpi-lbl" id="hasr-k-avg-rooms">— غرفة / مدرسة</div>
+      <div class="kpi kc-red">
+        <div class="kpi-icon">🚪</div>
+        <div class="kpi-val" id="hasr-k-total-rooms">—</div>
+        <div class="kpi-lbl">إجمالي الغرف</div>
+        <div class="kpi-sub" id="hasr-k-avg-rooms">— غرفة / مدرسة</div>
       </div>
 
       <!-- كارت 7: الأنظمة الرئيسية -->
-      <div class="kpi" style="border-top:3px solid var(--c-primary)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-primary);margin-bottom:4px;letter-spacing:.04em">⚙️ الأنظمة الرئيسية</div>
-        <div class="kpi-val" id="hasr-k-main-systems" style="color:var(--c-primary)">—</div>
-        <div class="kpi-lbl">نظام رئيسي</div>
+      <div class="kpi kc-navy">
+        <div class="kpi-icon">⚙️</div>
+        <div class="kpi-val" id="hasr-k-main-systems">—</div>
+        <div class="kpi-lbl">الأنظمة الرئيسية</div>
+        <div class="kpi-sub">نظام رئيسي</div>
       </div>
 
       <!-- كارت 8: الأنظمة الفرعية -->
-      <div class="kpi" style="border-top:3px solid var(--c-info-2)">
-        <div style="font-size:10px;font-weight:700;color:var(--c-info-2);margin-bottom:4px;letter-spacing:.04em">🔩 الأنظمة الفرعية</div>
-        <div class="kpi-val" id="hasr-k-sub-systems" style="color:var(--c-info-2)">—</div>
-        <div class="kpi-lbl">نظام فرعي</div>
+      <div class="kpi kc-teal">
+        <div class="kpi-icon">🔩</div>
+        <div class="kpi-val" id="hasr-k-sub-systems">—</div>
+        <div class="kpi-lbl">الأنظمة الفرعية</div>
+        <div class="kpi-sub">نظام فرعي</div>
       </div>
 
     </div><!-- /kpi-grid -->
@@ -1479,7 +1659,7 @@
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
         <div class="fg" style="margin:0">
           <div class="fg-lbl">ترتيب</div>
-          <select class="fsel" id="hasr-sort" data-evt="98">
+          <select class="fsel" id="hasr-sort" data-evt="98" aria-label="ترتيب">
             <option value="assets_desc">الأصول ↓</option>
             <option value="assets_asc">الأصول ↑</option>
             <option value="name">الاسم</option>
@@ -1546,6 +1726,10 @@
   </div>
 </div><!-- /tab-emp-kpi -->
 
+    </div><!-- /cat-main -->
+  </div><!-- /cat-layout -->
+  </div><!-- /legacyDashboardArea -->
+
 </div>
 
 <footer style="margin-top:36px;padding:16px 28px;background:#071E28;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid rgba(255,255,255,.06)">
@@ -1554,7 +1738,7 @@
          style="height:21px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="101">
     <div style="width:1px;height:20px;background:rgba(255,255,255,.1)"></div>
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC"
-         style="height:26px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="102">
+         style="height:36px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="102">
   </div>
   <div style="font-size:10px;color:rgba(255,255,255,.25);text-align:center;letter-spacing:.04em">
     FACILITIES MANAGEMENT DASHBOARD

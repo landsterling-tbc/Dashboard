@@ -220,8 +220,9 @@ window.LANG = window.LANG || "ar";
 
 
 /* وضع العرض المؤقت: إخفاء/إظهار عناصر محددة بدون حذف أي كود */
-// عند الفتح دايماً كل التبويبات ظاهرة (OFF) — لا يتذكر آخر حالة
-window.__PRESENTATION_MODE__ = false;
+// عند الفتح دايماً كروت الطلاب/عمر المبنى مخفية (ON) لأن بياناتها غير دقيقة
+// — المستخدم هو اللي يقرر يظهرها يدوياً (من زر العين جوا أو برّه)
+window.__PRESENTATION_MODE__ = true;
 
 function setPresentationMode(nextMode) {
   window.__PRESENTATION_MODE__ = !!nextMode;
@@ -262,6 +263,18 @@ function applyPresentationModeUI() {
     btn.textContent = on ? "👁" : "◌";
   }
 
+  // زر العين الخارجي (في صفحة البوابة portal-home) — أيقونة صغيرة زي الجوانية بالظبط
+  const btnOuter = document.getElementById("btnPresentationModeOuter");
+  if (btnOuter) {
+    btnOuter.classList.toggle("on", on);
+    btnOuter.setAttribute("aria-pressed", on ? "true" : "false");
+    btnOuter.title = on
+      ? "بيانات الطلاب وعمر المبنى مخفية (غير دقيقة) — اضغط للإظهار"
+      : "بيانات الطلاب وعمر المبنى ظاهرة — اضغط للإخفاء";
+    btnOuter.textContent = on ? "👁" : "◌";
+    btnOuter.style.opacity = on ? ".35" : ".12";
+  }
+
   if (on) {
     const activeTab = document.querySelector(".tab.active");
     if (activeTab && activeTab.id === "tabbtn-students") {
@@ -269,11 +282,14 @@ function applyPresentationModeUI() {
       if (fallback && typeof showTab === "function") showTab("overview", fallback);
     }
   }
+
+  // حدّث ليستة التبويبات الظاهرة تحت كل كارت في صفحة البوابة (Portal Home)
+  if (typeof __fillPortalCardTabsList === "function") __fillPortalCardTabsList();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // عند كل فتح: تأكد إن الوضع OFF (كل حاجة ظاهرة)
-  window.__PRESENTATION_MODE__ = false;
+  // عند كل فتح: تأكد إن الوضع ON (كروت الطلاب/عمر المبنى مخفية افتراضياً)
+  window.__PRESENTATION_MODE__ = true;
   applyPresentationModeUI();
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.shiftKey && (e.key || "").toLowerCase() === "p") {
@@ -639,17 +655,6 @@ function renderSkeleton(container, lines = 4) {
   el.innerHTML = html;
 }
 
-/* ── Memoization لحساب ثقيل (طلب السابع عشر) — مفتاح من الوسائط ── */
-function memoize(fn) {
-  const cache = new Map();
-  return function (...args) {
-    const key = JSON.stringify(args);
-    if (cache.has(key)) return cache.get(key);
-    const v = fn.apply(this, args);
-    cache.set(key, v);
-    return v;
-  };
-}
 window.IXStates = { renderEmptyState, renderLoadingState, renderErrorState, renderSkeleton };
 
 /* Callback آمن لمحاور Chart.js (ticks.callback) — يُستخدم في scales.x/y.ticks.callback
@@ -2505,152 +2510,6 @@ function renderStageCompareTab() {
 
 
 
-function renderSingleMetricTab(tabId, field, label, color, bgColor, icon) {
-  const el = document.getElementById(tabId + "-content");
-  if (!el) return;
-  const D = FILTERED,
-    vals = D.filter((r) => null != r[field]).map((r) => ({
-      name: r.name,
-      val: r[field],
-      district: r.district,
-      stage: r.stage,
-    }));
-  if (!vals.length)
-    return void (el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">\n      <div style="font-size:48px;margin-bottom:12px">${icon}</div>\n      <div style="font-size:16px;font-weight:800;color:var(--tx-main);margin-bottom:6px">لم يتم التحميل</div>\n    </div>`);
-  const total = vals.reduce((s, r) => s + r.val, 0),
-    avgVal = total / vals.length,
-    maxVal = Math.max(...vals.map((r) => r.val)),
-    minVal = Math.min(...vals.map((r) => r.val)),
-    sorted = [...vals].sort((a, b) => b.val - a.val),
-    byDistrict = {};
-  D.filter((r) => null != r[field]).forEach((r) => {
-    r.district &&
-      (byDistrict[r.district] || (byDistrict[r.district] = []),
-      byDistrict[r.district].push(r[field]));
-  });
-  const distData = Object.entries(byDistrict)
-      .map(([k, v]) => ({ k: k, avg: v.reduce((a, b) => a + b, 0) / v.length }))
-      .sort((a, b) => b.avg - a.avg)
-      .slice(0, 20),
-    byStage = {};
-  D.filter((r) => null != r[field] && r.stage).forEach((r) => {
-    (byStage[r.stage] || (byStage[r.stage] = []), byStage[r.stage].push(r[field]));
-  });
-  const stageData = Object.entries(byStage).map(([k, v]) => ({
-    k: k,
-    avg: v.reduce((a, b) => a + b, 0) / v.length,
-  }));
-  ((el.innerHTML = `\n    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid ${color}">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">إجمالي ${label}</div>\n        <div style="font-size:26px;font-weight:800;color:${color};letter-spacing:-.02em">${total.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${vals.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="card" style="border-top:3px solid ${color}">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">المتوسط</div>\n        <div style="font-size:26px;font-weight:800;color:${color};letter-spacing:-.02em">${avgVal.toFixed(1)}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">لكل مدرسة</div>\n      </div>\n      <div class="card" style="border-top:3px solid ${color}">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أعلى قيمة</div>\n        <div style="font-size:26px;font-weight:800;color:${color};letter-spacing:-.02em">${maxVal.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${esc(sorted[0]?.name?.slice(0, 25) || "")}</div>\n      </div>\n      <div class="card" style="border-top:3px solid ${color}">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أدنى قيمة</div>\n        <div style="font-size:26px;font-weight:800;color:${color};letter-spacing:-.02em">${minVal.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${esc(sorted[sorted.length - 1]?.name?.slice(0, 25) || "")}</div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — ${label}</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-${tabId}-top"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط ${label} حسب الحي <span class="sub">أعلى 20</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-${tabId}-dist"></canvas></div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع القيم — ${label}</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-${tabId}-hist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط ${label} حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-${tabId}-stage"></canvas></div>\n      </div>\n    </div>`),
-    requestAnimationFrame(() => {
-      const top20 = sorted.slice(0, 20);
-      (killChart(`ch-${tabId}-top`),
-        (CHARTS[`ch-${tabId}-top`] = new Chart(document.getElementById(`ch-${tabId}-top`), {
-          type: "bar",
-          data: {
-            labels: top20.map((r) => r.name),
-            datasets: [
-              {
-                label: label,
-                data: top20.map((r) => r.val),
-                backgroundColor: color + "99",
-                borderColor: color,
-                borderWidth: 1.5,
-                borderRadius: 4,
-              },
-            ],
-          },
-          options: {
-            indexAxis: "y",
-            maintainAspectRatio: !1,
-            plugins: { legend: { display: !1 } },
-            scales: { x: { beginAtZero: !0 }, y: { ticks: { font: { size: 10 } } } },
-          },
-        })),
-        killChart(`ch-${tabId}-dist`),
-        (CHARTS[`ch-${tabId}-dist`] = new Chart(document.getElementById(`ch-${tabId}-dist`), {
-          type: "bar",
-          data: {
-            labels: distData.map((d) => d.k),
-            datasets: [
-              {
-                label: "المتوسط",
-                data: distData.map((d) => +d.avg.toFixed(1)),
-                backgroundColor: color + "88",
-                borderColor: color,
-                borderWidth: 1,
-                borderRadius: 4,
-              },
-            ],
-          },
-          options: {
-            indexAxis: "y",
-            maintainAspectRatio: !1,
-            plugins: { legend: { display: !1 } },
-            scales: { x: { beginAtZero: !0 }, y: { ticks: { font: { size: 10 } } } },
-          },
-        })));
-      const bSize = (maxVal - minVal || 1) / 10,
-        histLabels = Array.from(
-          { length: 10 },
-          (_, i) => `${Math.round(minVal + i * bSize)}–${Math.round(minVal + (i + 1) * bSize)}`,
-        ),
-        histData = Array(10).fill(0);
-      (vals.forEach((r) => {
-        histData[Math.min(9, Math.floor((r.val - minVal) / bSize))]++;
-      }),
-        killChart(`ch-${tabId}-hist`),
-        (CHARTS[`ch-${tabId}-hist`] = new Chart(document.getElementById(`ch-${tabId}-hist`), {
-          type: "bar",
-          data: {
-            labels: histLabels,
-            datasets: [
-              {
-                label: label,
-                data: histData,
-                backgroundColor: color + "AA",
-                borderColor: color,
-                borderWidth: 1,
-                borderRadius: 4,
-              },
-            ],
-          },
-          options: {
-            maintainAspectRatio: !1,
-            plugins: { legend: { display: !1 } },
-            scales: {
-              x: { ticks: { font: { size: 9 }, maxRotation: 40 } },
-              y: { beginAtZero: !0, ticks: { stepSize: 1 } },
-            },
-          },
-        })),
-        killChart(`ch-${tabId}-stage`),
-        (CHARTS[`ch-${tabId}-stage`] = new Chart(document.getElementById(`ch-${tabId}-stage`), {
-          type: "bar",
-          data: {
-            labels: stageData.map((s) => s.k),
-            datasets: [
-              {
-                label: "المتوسط",
-                data: stageData.map((s) => +s.avg.toFixed(1)),
-                backgroundColor: stageData.map(
-                  (_, i) => [color, CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning()][i % 4] + "BB",
-                ),
-                borderColor: stageData.map(
-                  (_, i) => [color, CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning()][i % 4],
-                ),
-                borderWidth: 1.5,
-                borderRadius: 5,
-              },
-            ],
-          },
-          options: {
-            maintainAspectRatio: !1,
-            plugins: { legend: { display: !1 } },
-            scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: !0 } },
-          },
-        })));
-    }));
-}
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📅  JS تبويب: الجدول التفصيلي
    ║  (tab-table) — الدوال الخاصة بهذا التبويب تبدأ هنا
@@ -3344,7 +3203,7 @@ function renderStudentsTab() {
                 ? studBinData[5]++
                 : studBinData[6]++;
   }),
-    (el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid #059669">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">إجمالي الطلاب</div>\n        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${totalStudents.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${withStudents.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #0891B2">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط الطلاب/مدرسة</div>\n        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${Math.round(avgStudents).toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">طالب لكل مدرسة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط عمر المبنى</div>\n        <div style="font-size:26px;font-weight:800;color:#D97706;letter-spacing:-.02em">${Math.round(avgAge).toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${withAge.length.toLocaleString()} مبنى مقيّم · سنة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #DC2626">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أقدم مبنى</div>\n        <div style="font-size:26px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${maxAge ? maxAge.buildingAge : "—"}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${maxAge ? esc(maxAge.name.slice(0, 28)) : "—"} · سنة</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — عدد الطلاب</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-stud-top"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">أعمر 20 مبنى <span class="sub">بالسنوات</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-age-top"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع عدد الطلاب </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-stud-hist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">توزيع عمر المبنى بالسنوات </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-age-hist"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">إجمالي الطلاب حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-stud-stage"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط عمر المبنى حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-age-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">إجمالي الطلاب حسب الحي <span class="sub">أعلى 20 حي</span></div>\n      <div class="chart-box" style="height:300px"><canvas id="ch-stud-dist"></canvas></div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">FCA مقابل عمر المبنى <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-fca-age-scatter"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">عدد الطلاب مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-stud-fca-scatter"></canvas></div>\n      </div>\n    </div>`),
+    (el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-green">\n        <div class="kpi-val">${totalStudents.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الطلاب</div>\n        <div class="kpi-sub">${withStudents.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${Math.round(avgStudents).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط الطلاب/مدرسة</div>\n        <div class="kpi-sub">طالب لكل مدرسة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${Math.round(avgAge).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط عمر المبنى</div>\n        <div class="kpi-sub">${withAge.length.toLocaleString()} مبنى مقيّم · سنة</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${maxAge ? maxAge.buildingAge : "—"}</div>\n        <div class="kpi-lbl">أقدم مبنى</div>\n        <div class="kpi-sub">${maxAge ? esc(maxAge.name.slice(0, 28)) : "—"} · سنة</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — عدد الطلاب</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-stud-top"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">أعمر 20 مبنى <span class="sub">بالسنوات</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-age-top"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع عدد الطلاب </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-stud-hist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">توزيع عمر المبنى بالسنوات </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-age-hist"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">إجمالي الطلاب حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-stud-stage"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط عمر المبنى حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-age-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">إجمالي الطلاب حسب الحي <span class="sub">أعلى 20 حي</span></div>\n      <div class="chart-box" style="height:300px"><canvas id="ch-stud-dist"></canvas></div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">FCA مقابل عمر المبنى <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-fca-age-scatter"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">عدد الطلاب مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-stud-fca-scatter"></canvas></div>\n      </div>\n    </div>`),
     requestAnimationFrame(() => {
       (killChart("ch-stud-top"),
         (CHARTS["ch-stud-top"] = new Chart(document.getElementById("ch-stud-top"), {
@@ -3684,26 +3543,26 @@ function renderAcPlanTab() {
     topRegion = sortedByTotal[0];
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-      <div class="card" style="border-top:3px solid ${COLOR_SPLIT}">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">عدد مكيفات السبلت</div>
-        <div style="font-size:26px;font-weight:800;color:${COLOR_SPLIT};letter-spacing:-.02em">${totalSplit.toLocaleString()}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${data.length.toLocaleString()} منطقة</div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi kc-info">
+        <div class="kpi-val">${totalSplit.toLocaleString()}</div>
+        <div class="kpi-lbl">عدد مكيفات السبلت</div>
+        <div class="kpi-sub">${data.length.toLocaleString()} منطقة</div>
       </div>
-      <div class="card" style="border-top:3px solid ${COLOR_WINDOW}">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">عدد مكيفات الشباك</div>
-        <div style="font-size:26px;font-weight:800;color:${COLOR_WINDOW};letter-spacing:-.02em">${totalWindow.toLocaleString()}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${data.length.toLocaleString()} منطقة</div>
+      <div class="kpi kc-amber">
+        <div class="kpi-val">${totalWindow.toLocaleString()}</div>
+        <div class="kpi-lbl">عدد مكيفات الشباك</div>
+        <div class="kpi-sub">${data.length.toLocaleString()} منطقة</div>
       </div>
-      <div class="card" style="border-top:3px solid #059669">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">إجمالي المكيفات</div>
-        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${totalAll.toLocaleString()}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">سبلت + شباك</div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${totalAll.toLocaleString()}</div>
+        <div class="kpi-lbl">إجمالي المكيفات</div>
+        <div class="kpi-sub">سبلت + شباك</div>
       </div>
-      <div class="card" style="border-top:3px solid #7C3AED">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">الأعلى احتياجاً</div>
-        <div style="font-size:20px;font-weight:800;color:#7C3AED;letter-spacing:-.02em">${topRegion ? topRegion.region : "—"}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${topRegion ? (topRegion.split + topRegion.window).toLocaleString() : ""} مكيف إجمالي</div>
+      <div class="kpi kc-purple">
+        <div class="kpi-val" style="font-size:20px">${topRegion ? topRegion.region : "—"}</div>
+        <div class="kpi-lbl">الأعلى احتياجاً</div>
+        <div class="kpi-sub">${topRegion ? (topRegion.split + topRegion.window).toLocaleString() : ""} مكيف إجمالي</div>
       </div>
     </div>
 
@@ -4112,26 +3971,26 @@ function renderKpiTabGeneric_(opts) {
   const contractSuffix = (c) => (hasContract && c ? ` · عقد ${esc(c)}` : "");
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-      <div class="card" style="border-top:3px solid #0891B2">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط الأداء العام — ${esc(months[lastIdx])}</div>
-        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${pctText(overallLast)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${data.length.toLocaleString()} ${esc(entityLabel)}</div>
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi kc-blue">
+        <div class="kpi-val" style="font-size:26px">${pctText(overallLast)}</div>
+        <div class="kpi-lbl">متوسط الأداء العام — ${esc(months[lastIdx])}</div>
+        <div class="kpi-sub">${data.length.toLocaleString()} ${esc(entityLabel)}</div>
       </div>
-      <div class="card" style="border-top:3px solid ${deltaColor(overallDelta || 0)}">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">التغير منذ ${esc(months[0])}</div>
-        <div style="font-size:26px;font-weight:800;color:${deltaColor(overallDelta || 0)};letter-spacing:-.02em">${overallDelta === null ? "—" : `${deltaArrow(overallDelta)} ${deltaText(overallDelta)}`}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">نقطة مئوية (متوسط عام)</div>
+      <div class="kpi ${(overallDelta || 0) > 0 ? "kc-green" : (overallDelta || 0) < 0 ? "kc-red" : "kc-navy"}">
+        <div class="kpi-val" style="font-size:26px;color:${deltaColor(overallDelta || 0)}">${overallDelta === null ? "—" : `${deltaArrow(overallDelta)} ${deltaText(overallDelta)}`}</div>
+        <div class="kpi-lbl">التغير منذ ${esc(months[0])}</div>
+        <div class="kpi-sub">نقطة مئوية (متوسط عام)</div>
       </div>
-      <div class="card" style="border-top:3px solid #059669">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">أفضل ${esc(entityLabel)} أداءً</div>
-        <div style="font-size:20px;font-weight:800;color:#059669;letter-spacing:-.02em">${best ? esc(best.region) : "—"}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${best ? pctText(best.last) + contractSuffix(best.contract) : "—"}</div>
+      <div class="kpi kc-green">
+        <div class="kpi-val" style="font-size:20px">${best ? esc(best.region) : "—"}</div>
+        <div class="kpi-lbl">أفضل ${esc(entityLabel)} أداءً</div>
+        <div class="kpi-sub">${best ? pctText(best.last) + contractSuffix(best.contract) : "—"}</div>
       </div>
-      <div class="card" style="border-top:3px solid #DC2626">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">${esc(followUpLabel)}</div>
-        <div style="font-size:20px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${mostDeclined ? esc(mostDeclined.region) : "—"}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${mostDeclined ? deltaText(mostDeclined.delta) + " نقطة" + contractSuffix(mostDeclined.contract) : "—"}</div>
+      <div class="kpi kc-red">
+        <div class="kpi-val" style="font-size:20px">${mostDeclined ? esc(mostDeclined.region) : "—"}</div>
+        <div class="kpi-lbl">${esc(followUpLabel)}</div>
+        <div class="kpi-sub">${mostDeclined ? deltaText(mostDeclined.delta) + " نقطة" + contractSuffix(mostDeclined.contract) : "—"}</div>
       </div>
     </div>
 
@@ -4416,8 +4275,8 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
         <div class="kpi-lbl">مكرر محتمل</div>
         <div class="kpi-sub">${pct2(duplicates,total)} من الإجمالي</div>
       </div>
-      <div class="kpi kc-red" style="border-top-color:#DC2626">
-        <div class="kpi-val" style="color:#DC2626;font-size:28px">${totalDeaths.toLocaleString()}</div>
+      <div class="kpi kc-red">
+        <div class="kpi-val" style="font-size:28px">${totalDeaths.toLocaleString()}</div>
         <div class="kpi-lbl">إجمالي الوفيات</div>
         <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
       </div>
@@ -4585,7 +4444,7 @@ function renderSpareTab() {
       .filter((r) => null != r.quantity)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 20);
-  ((el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid ${COLOR}">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">عدد المدارس</div>\n        <div style="font-size:26px;font-weight:800;color:${COLOR};letter-spacing:-.02em">${rows.length.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">من إجمالي ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="card" style="border-top:3px solid #059669">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">إجمالي الكميات</div>\n        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${totalQty.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${withQty.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #7C3AED">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">إجمالي القيمة</div>\n        <div style="font-size:26px;font-weight:800;color:#7C3AED;letter-spacing:-.02em">${fmt(totalVal, 0)}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">الكمية × قيمة الوحدة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط قيمة الوحدة</div>\n        <div style="font-size:26px;font-weight:800;color:#D97706;letter-spacing:-.02em">${null != avgUnit ? fmt(avgUnit, 2) : "—"}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">أعلى: ${null != maxUnit ? fmt(maxUnit, 2) : "—"}</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — الكمية</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-top-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي الكميات حسب الحي <span class="sub">أعلى 20</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-dist"></canvas></div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع الكميات حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي القيمة حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-val"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card">\n      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">\n        <div class="card-title" style="margin:0">\n          تفصيل قطع الغيار\n          <span class="sub" id="spare-tbl-cnt">${rows.length.toLocaleString()} مدرسة</span>\n        </div>\n        <select class="fsel" id="spare-tbl-sort" onchange="renderSpareTable()" style="font-size:11px">\n          <option value="qty_desc">الكمية ↓ تنازلي</option>\n          <option value="qty_asc">الكمية ↑ تصاعدي</option>\n          <option value="unit_desc">قيمة الوحدة ↓ تنازلي</option>\n          <option value="unit_asc">قيمة الوحدة ↑ تصاعدي</option>\n          <option value="total_desc">إجمالي القيمة ↓ تنازلي</option>\n          <option value="name">الاسم أ-ي</option>\n        </select>\n      </div>\n      <div class="tbl-wrap">\n        <table>\n          <thead><tr>\n            <th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>\n            <th style="min-width:80px">الرقم الوزاري</th>\n            <th style="min-width:100px">الحي</th>\n            <th style="min-width:110px">المرحلة</th>\n            <th style="min-width:180px">الوصف</th>\n            <th style="min-width:80px">الكمية</th>\n            <th style="min-width:100px">قيمة الوحدة</th>\n            <th style="min-width:110px">إجمالي القيمة</th>\n          </tr></thead>\n          <tbody id="spare-tbl-body"></tbody>\n        </table>\n      </div>\n      <div class="pag-bar" id="spare-tbl-pag">\n        <span class="pag-info" id="spare-pag-info"></span>\n        <div class="pag-btns" id="spare-pag-btns"></div>\n      </div>\n    </div>`),
+  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-info">\n        <div class="kpi-val">${rows.length.toLocaleString()}</div>\n        <div class="kpi-lbl">عدد المدارس</div>\n        <div class="kpi-sub">من إجمالي ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${totalQty.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الكميات</div>\n        <div class="kpi-sub">${withQty.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-purple">\n        <div class="kpi-val">${fmt(totalVal, 0)}</div>\n        <div class="kpi-lbl">إجمالي القيمة</div>\n        <div class="kpi-sub">الكمية × قيمة الوحدة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${null != avgUnit ? fmt(avgUnit, 2) : "—"}</div>\n        <div class="kpi-lbl">متوسط قيمة الوحدة</div>\n        <div class="kpi-sub">أعلى: ${null != maxUnit ? fmt(maxUnit, 2) : "—"}</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — الكمية</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-top-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي الكميات حسب الحي <span class="sub">أعلى 20</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-dist"></canvas></div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع الكميات حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي القيمة حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-val"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card">\n      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">\n        <div class="card-title" style="margin:0">\n          تفصيل قطع الغيار\n          <span class="sub" id="spare-tbl-cnt">${rows.length.toLocaleString()} مدرسة</span>\n        </div>\n        <select class="fsel" id="spare-tbl-sort" onchange="renderSpareTable()" style="font-size:11px">\n          <option value="qty_desc">الكمية ↓ تنازلي</option>\n          <option value="qty_asc">الكمية ↑ تصاعدي</option>\n          <option value="unit_desc">قيمة الوحدة ↓ تنازلي</option>\n          <option value="unit_asc">قيمة الوحدة ↑ تصاعدي</option>\n          <option value="total_desc">إجمالي القيمة ↓ تنازلي</option>\n          <option value="name">الاسم أ-ي</option>\n        </select>\n      </div>\n      <div class="tbl-wrap">\n        <table>\n          <thead><tr>\n            <th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>\n            <th style="min-width:80px">الرقم الوزاري</th>\n            <th style="min-width:100px">الحي</th>\n            <th style="min-width:110px">المرحلة</th>\n            <th style="min-width:180px">الوصف</th>\n            <th style="min-width:80px">الكمية</th>\n            <th style="min-width:100px">قيمة الوحدة</th>\n            <th style="min-width:110px">إجمالي القيمة</th>\n          </tr></thead>\n          <tbody id="spare-tbl-body"></tbody>\n        </table>\n      </div>\n      <div class="pag-bar" id="spare-tbl-pag">\n        <span class="pag-info" id="spare-pag-info"></span>\n        <div class="pag-btns" id="spare-pag-btns"></div>\n      </div>\n    </div>`),
     requestAnimationFrame(() => {
       (killChart("ch-spare-top-qty"),
         (CHARTS["ch-spare-top-qty"] = new Chart(document.getElementById("ch-spare-top-qty"), {
@@ -4850,7 +4709,7 @@ function renderAyenTab() {
   });
   const worst10 = scored.slice(0, 10),
     best10 = [...scored].reverse().slice(0, 10);
-  ((el.innerHTML = `\n    \n    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px">\n      <div class="card" style="border-top:3px solid #0E7490">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط تقييم عاين</div>\n        <div style="font-size:26px;font-weight:800;color:#0E7490;letter-spacing:-.02em">${avgAyen.toFixed(1)}%</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="card" style="border-top:3px solid #DC2626">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">حرج · أقل من 25%</div>\n        <div style="font-size:26px;font-weight:800;color:#DC2626;letter-spacing:-.02em">${critical.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="card" style="border-top:3px solid #D97706">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">متوسط · 25–49%</div>\n        <div style="font-size:26px;font-weight:800;color:#D97706;letter-spacing:-.02em">${needWork.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="card" style="border-top:3px solid #059669">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">جيد · 50–74%</div>\n        <div style="font-size:26px;font-weight:800;color:#059669;letter-spacing:-.02em">${good.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="card" style="border-top:3px solid #0891B2">\n        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">جيد جداً · 75–100%</div>\n        <div style="font-size:26px;font-weight:800;color:#0891B2;letter-spacing:-.02em">${excellent.toLocaleString()}</div>\n        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
+  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="margin-bottom:16px">\n      <div class="kpi kc-teal">\n        <div class="kpi-val">${avgAyen.toFixed(1)}%</div>\n        <div class="kpi-lbl">متوسط تقييم عاين</div>\n        <div class="kpi-sub">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${critical.toLocaleString()}</div>\n        <div class="kpi-lbl">حرج · أقل من 25%</div>\n        <div class="kpi-sub">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${needWork.toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط · 25–49%</div>\n        <div class="kpi-sub">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${good.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد · 50–74%</div>\n        <div class="kpi-sub">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${excellent.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد جداً · 75–100%</div>\n        <div class="kpi-sub">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
     (window._AYEN_ROWS = scored),
     (window._AYEN_PAGE = { cur: 0, SIZE: 50 }),
     requestAnimationFrame(() => {
@@ -5294,32 +5153,32 @@ function renderAllContractsBody() {
     .slice(0, 12);
 
   ((el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
-      <div class="card" style="border-top:3px solid #0891B2;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي العقود</div>
-        <div style="font-size:28px;font-weight:800;color:#0891B2">${total}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">عقد</div>
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi kc-blue">
+        <div class="kpi-val">${total}</div>
+        <div class="kpi-lbl">إجمالي العقود</div>
+        <div class="kpi-sub">عقد</div>
       </div>
-      <div class="card" style="border-top:3px solid #7C3AED;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي قيمة العقود (محدثة)</div>
-        <div style="font-size:18px;font-weight:800;color:#7C3AED">${fmt(totalValue, 0)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · أساسي ${fmt(totalBase, 0)}</div>
+      <div class="kpi kc-purple">
+        <div class="kpi-val" style="font-size:18px">${fmt(totalValue, 0)}</div>
+        <div class="kpi-lbl">إجمالي قيمة العقود (محدثة)</div>
+        <div class="kpi-sub">ر.س · أساسي ${fmt(totalBase, 0)}</div>
       </div>
-      <div class="card" style="border-top:3px solid #0E7490;padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المستخلصات المصروفة</div>
-        <div style="font-size:18px;font-weight:800;color:#0E7490">${fmt(totalSpent, 0)}</div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
+      <div class="kpi kc-teal">
+        <div class="kpi-val" style="font-size:18px">${fmt(totalSpent, 0)}</div>
+        <div class="kpi-lbl">إجمالي المستخلصات المصروفة</div>
+        <div class="kpi-sub">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
       </div>
-      <div class="card" style="border-top:3px solid ${expired ? CSS_TOKENS.danger() : CSS_TOKENS.positive()};padding:16px">
-        <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">جارية / منتهية / قاربت</div>
-        <div style="font-size:20px;font-weight:800;color:var(--tx-main)">
+      <div class="kpi ${expired ? "kc-red" : "kc-green"}">
+        <div class="kpi-val" style="font-size:20px;color:var(--tx-main)">
           <span style="color:#059669">${active}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
           <span style="color:#DC2626">${expired}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
           <span style="color:#D97706">${expiring}</span>
         </div>
-        <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">من إجمالي ${total} عقد</div>
+        <div class="kpi-lbl">جارية / منتهية / قاربت</div>
+        <div class="kpi-sub">من إجمالي ${total} عقد</div>
       </div>
     </div>
 
@@ -6708,15 +6567,6 @@ function _sysDownloadFile(filename, content, mime) {
     a.remove();
   }, 150);
 }
-function _sysExcelTableHTML(title, headers, rows) {
-  const escHtml = (v) =>
-    String(v ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table border="1"><tr>${headers.map((h) => `<th>${escHtml(h)}</th>`).join("")}</tr>${rows.map((row) => `<tr>${row.map((v) => `<td>${escHtml(v)}</td>`).join("")}</tr>`).join("")}</table></body></html>`;
-}
 
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -7269,8 +7119,8 @@ function _sysExcelTableHTML(title, headers, rows) {
         </div>
 
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px">
-          <div class="kpi kc-red" style="border-top-color:#DC2626">
-            <div class="kpi-val" style="color:#DC2626;font-size:28px">${slaBreachPct}%</div>
+          <div class="kpi kc-red">
+            <div class="kpi-val" style="font-size:28px">${slaBreachPct}%</div>
             <div class="kpi-lbl">نسبة اختراق SLA</div>
             <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
           </div>
@@ -10195,26 +10045,26 @@ function renderKhanadeqTab() {
 
   el.innerHTML = `
   <!-- ── KPIs ── -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="card" style="border-top:3px solid #7C3AED">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">إجمالي المدارس</div>
-      <div style="font-size:28px;font-weight:800;color:#7C3AED">${totalSchools.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">في ${cityData.length} مدن</div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${totalSchools.toLocaleString()}</div>
+      <div class="kpi-lbl">إجمالي المدارس</div>
+      <div class="kpi-sub">في ${cityData.length} مدن</div>
     </div>
-    <div class="card" style="border-top:3px solid #0891B2">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">إجمالي خنادق الصرف</div>
-      <div style="font-size:28px;font-weight:800;color:#0891B2">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : "—"}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${citiesWithData > 0 ? citiesWithData + " مدن لها بيانات" : "أدخل الأرقام في الكود"}</div>
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : "—"}</div>
+      <div class="kpi-lbl">إجمالي خنادق الصرف</div>
+      <div class="kpi-sub">${citiesWithData > 0 ? citiesWithData + " مدن لها بيانات" : "أدخل الأرقام في الكود"}</div>
     </div>
-    <div class="card" style="border-top:3px solid #059669">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">متوسط خندق / مدرسة</div>
-      <div style="font-size:28px;font-weight:800;color:#059669">${avgPerSchool}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">خندق لكل مدرسة</div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${avgPerSchool}</div>
+      <div class="kpi-lbl">متوسط خندق / مدرسة</div>
+      <div class="kpi-sub">خندق لكل مدرسة</div>
     </div>
-    <div class="card" style="border-top:3px solid #D97706">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px;letter-spacing:.04em">أعلى مدينة</div>
-      <div style="font-size:28px;font-weight:800;color:#D97706">${maxCity && maxCity.khanadeq > 0 ? maxCity.khanadeq.toLocaleString() : "—"}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${maxCity && maxCity.khanadeq > 0 ? maxCity.city : "لا توجد بيانات بعد"}</div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${maxCity && maxCity.khanadeq > 0 ? maxCity.khanadeq.toLocaleString() : "—"}</div>
+      <div class="kpi-lbl">أعلى مدينة</div>
+      <div class="kpi-sub">${maxCity && maxCity.khanadeq > 0 ? maxCity.city : "لا توجد بيانات بعد"}</div>
     </div>
   </div>
 
@@ -12594,27 +12444,40 @@ function renderTajheezAllTable() {
     return { tier: "جيد جداً 🟢", action: "مراقبة روتينية ضمن خطة الصيانة الوقائية العامة." };
   }
 
+  // ⚡ كاش الجزء الثقيل (map/filter/sort على كامل RAW) — يُعاد حسابه فقط
+  // لما تتغيّر البيانات فعلياً (window.__DATA_REV__)، وليس مع كل رسالة شات.
+  // القص حسب topN يبقى يُنفَّذ طازجاً كل مرة (عملية رخيصة) فوق النتيجة المخزّنة.
+  let __fcbPriorityScoredCache = null;
+  let __fcbPriorityScoredCacheRev = -1;
   function fcbBuildPriorityActions(topN = 8) {
     const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
     if (!D.length) return null;
 
-    const maxAlerts = Math.max(1, ...D.map((r) => r.alerts || 0));
-    const scored = D
-      .filter((r) => null != r.fca)
-      .map((r) => {
-        // درجة الخطورة الداخلية (لترتيب الأولوية فقط): FCA منخفض يرفعها، عمر المبنى
-        // الكبير يرفعها، البيئة الضعيفة ترفعها، وكثرة البلاغات ترفعها — كل عامل بوزنه
-        const fcaRisk = (100 - (r.fca ?? 100)) * 0.5;
-        const ageRisk = Math.min(100, ((r.buildingAge ?? 0) / 50) * 100) * 0.2;
-        const envRisk = (100 - (r.envScore ?? 100)) * 0.15;
-        const alertsRisk = (((r.alerts ?? 0) / maxAlerts) * 100) * 0.15;
-        const riskScore = Math.round(fcaRisk + ageRisk + envRisk + alertsRisk);
-        // درجة الحالة المعروضة من 100 (الأعلى = أفضل) — معكوسة عن درجة الخطورة
-        // لتتوافق مع نظام التصنيف الموحّد المستخدم في كل اللوحة (حرج → جيد جداً)
-        const conditionScore = Math.max(0, Math.min(100, 100 - riskScore));
-        return { name: r.name, fca: r.fca, buildingAge: r.buildingAge, envScore: r.envScore, alerts: r.alerts, riskScore, conditionScore };
-      })
-      .sort((a, b) => b.riskScore - a.riskScore);
+    const rev = window.__DATA_REV__ || 0;
+    let scored;
+    if (__fcbPriorityScoredCache && __fcbPriorityScoredCacheRev === rev) {
+      scored = __fcbPriorityScoredCache;
+    } else {
+      const maxAlerts = Math.max(1, ...D.map((r) => r.alerts || 0));
+      scored = D
+        .filter((r) => null != r.fca)
+        .map((r) => {
+          // درجة الخطورة الداخلية (لترتيب الأولوية فقط): FCA منخفض يرفعها، عمر المبنى
+          // الكبير يرفعها، البيئة الضعيفة ترفعها، وكثرة البلاغات ترفعها — كل عامل بوزنه
+          const fcaRisk = (100 - (r.fca ?? 100)) * 0.5;
+          const ageRisk = Math.min(100, ((r.buildingAge ?? 0) / 50) * 100) * 0.2;
+          const envRisk = (100 - (r.envScore ?? 100)) * 0.15;
+          const alertsRisk = (((r.alerts ?? 0) / maxAlerts) * 100) * 0.15;
+          const riskScore = Math.round(fcaRisk + ageRisk + envRisk + alertsRisk);
+          // درجة الحالة المعروضة من 100 (الأعلى = أفضل) — معكوسة عن درجة الخطورة
+          // لتتوافق مع نظام التصنيف الموحّد المستخدم في كل اللوحة (حرج → جيد جداً)
+          const conditionScore = Math.max(0, Math.min(100, 100 - riskScore));
+          return { name: r.name, fca: r.fca, buildingAge: r.buildingAge, envScore: r.envScore, alerts: r.alerts, riskScore, conditionScore };
+        })
+        .sort((a, b) => b.riskScore - a.riskScore);
+      __fcbPriorityScoredCache = scored;
+      __fcbPriorityScoredCacheRev = rev;
+    }
 
     const top = scored.slice(0, topN).map((r) => ({ ...r, ...fcbConditionTier(r.conditionScore) }));
     const tierCounts = { "حرج 🔴": 0, "متوسط 🟠": 0, "جيد 🟡": 0, "جيد جداً 🟢": 0 };
@@ -13013,7 +12876,12 @@ function renderTajheezAllTable() {
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, "<em>$1</em>")
         .replace(/`([^`]+?)`/g, "<code>$1</code>")
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (m, label, url) {
+          // منع الهروب من داخل خاصية href لو احتوى الرابط على علامة اقتباس
+          // (fcbEscapeHtml لا يُهرّب " لأنها غير خطرة في نص عادي، لكنها خطرة هنا تحديداً)
+          const safeUrl = url.replace(/"/g, "%22");
+          return `<a href="${safeUrl}" target="_blank" rel="noopener">${label}</a>`;
+        });
     }
     function flushPara() {
       if (paraBuf.length) {
@@ -13485,24 +13353,32 @@ function renderTajheezAllTable() {
      ════════════════════════════════════════════════════════════════ */
   function fcbBuildDashboardContext() {
     const g = (id) => document.getElementById(id)?.value || "";
+    /* ⚠️ ملاحظة مهمة: كل المفاتيح هنا تمثل "فلاتر" (إعدادات عرض اختارها
+       المستخدم) فقط — وليست بيانات إحصائية. لذلك سُمّيت جميعها بادئة
+       "فلتر_" صراحةً لمنع أي التباس مع الإحصائيات الفعلية (مثال:
+       "فلتر_الحد_الأدنى_لتقييم_FCA" لا يعني أن هذا أقل رقم FCA فعلي). */
     const filters = {
-      المدينة: g("fCity"),
-      المحافظة: g("fSector"),
-      المرحلة: g("fStage"),
-      الجنس: g("fGender"),
-      حجم_المدرسة: g("fSize"),
-      الملكية: g("fOwner"),
-      الحي: g("fDistrict"),
-      حالة_الاشتراك: g("fSubStatus"),
-      أدنى_FCA: g("fFcaMin"),
-      بحث: (document.getElementById("fSearch")?.value || "").trim(),
+      فلتر_المدينة: g("fCity"),
+      فلتر_المحافظة: g("fSector"),
+      فلتر_المرحلة: g("fStage"),
+      فلتر_الجنس: g("fGender"),
+      فلتر_حجم_المدرسة: g("fSize"),
+      فلتر_الملكية: g("fOwner"),
+      فلتر_الحي: g("fDistrict"),
+      فلتر_حالة_الاشتراك: g("fSubStatus"),
+      فلتر_الحد_الأدنى_لتقييم_FCA: g("fFcaMin"),
+      فلتر_بحث_نصي: (document.getElementById("fSearch")?.value || "").trim(),
     };
-    const applied = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    /* Validation Layer: احذف أي قيمة فارغة/null/undefined/NaN قبل الإرسال */
+    const applied = Object.fromEntries(
+      Object.entries(filters).filter(([, v]) => v !== null && v !== undefined && v !== "" && String(v).toLowerCase() !== "nan")
+    );
     const total = DataService.all().length;
     const shown = DataService.filtered().length;
     return {
       التبويب_المفتوح: window.__ACTIVE_TAB_LABEL__ || window.__ACTIVE_TAB__ || "نظرة عامة",
       الفلاتر_المطبقة: Object.keys(applied).length ? applied : "لا توجد فلاتر — كل البيانات معروضة",
+      ملاحظة_حول_الفلاتر: "قيم هذا القسم هي إعدادات عرض اختارها المستخدم فقط، وليست نتائج إحصائية. لا تُستخدم أبداً كأرقام تحليلية (مثال: فلتر الحد الأدنى لـFCA ليس هو أقل تقييم FCA فعلي).",
       عدد_السجلات_بعد_الفلترة: shown,
       عدد_السجلات_الإجمالي: total,
       ملاحظة: shown < total
@@ -13664,19 +13540,6 @@ function renderTajheezAllTable() {
     return out;
   }
 
-  /* اقتراح أسئلة متابعة ذكية حسب التبويب الحالي (طلب: اقتراح أسئلة) */
-  function fcbSuggestQuestions() {
-    const tab = window.__ACTIVE_TAB__ || "overview";
-    const base = {
-      overview: ["كم عدد المدارس حسب المحافظة؟", "ما توزيع حالة الاشتراك؟", "ما نسبة المباني المستقلة مقابل المشتركة؟"],
-      fca: ["ما متوسط قيمة FCA في العرض الحالي؟", "أعطني أسوأ 10 مدارس في FCA", "كم عدد المباني الحرجة؟"],
-      env: ["ما متوسط درجة البيئة المدرسية؟", "أسوأ 10 مدارس في البيئة", "قارن البيئة بين المحافظات"],
-      students: ["ما أكبر 10 مدارس بعدد الطلاب؟", "ما أقدم المباني؟", "متوسط عمر المبنى؟"],
-      hasr: ["ما إجمالي الأصول المحصورة وتوزيعها؟", "أعلى 10 مدارس أصولاً في الحصر", "كم عدد المدارس المعادة ونسبتها؟"],
-    };
-    return base[tab] || ["لخّص أهم المؤشرات في العرض الحالي", "ما أبرز الملاحظات من البيانات المفلترة؟"];
-  }
-
   async function fcbAskOpenAI(userText) {
     if (!AIService.hasKey()) {
       const err = new Error("NO_API_KEY");
@@ -13699,7 +13562,6 @@ function renderTajheezAllTable() {
     // ── سياق الداشبورد الحالي + محرك الاستعلامات الذكي (المرحلة 4) ──
     const dashContext = fcbBuildDashboardContext();
     const smartResult = fcbSmartQuery(userText);
-    const suggestions = fcbSuggestQuestions();
 
     // ── الملخص الأساسي دايماً (خفيف) ──
     const base = fcbBuildDashboardSummary();
@@ -13877,7 +13739,93 @@ function renderTajheezAllTable() {
       }
     }
 
-    const systemPrompt = `أنت مساعد إدارة المرافق الذكي، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
+    const systemPrompt = `أنت مستشار ذكاء اصطناعي تنفيذي متخصص في إدارة مرافق المدارس، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
+دورك ليس الإجابة المباشرة فحسب — بل تحليل البيانات كمستشار إداري رفيع يُعدّ تقارير لقيادة وزارة التعليم.
+
+══════════════════════════════════════════════════════
+أولوية البيانات — التزم بهذا الترتيب دائماً
+══════════════════════════════════════════════════════
+1. بيانات اللوحة الحالية (المحقونة أسفله)
+2. الفلاتر المطبّقة حالياً في اللوحة
+3. الدليل الوطني لإدارة المرافق (عبر file_search)
+4. منهجية FCA
+5. مبادئ إدارة الأصول (ISO 55000)
+6. أفضل ممارسات الصيانة
+7. أكواد ومعايير البناء
+لا تتجاهل بيانات اللوحة أبداً. لا تخترع أرقاماً أو علاقات أو وقائع.
+إن كانت البيانات غير متاحة، صرّح بذلك صراحةً.
+
+══════════════════════════════════════════════════════
+التحليل المطلوب — نفّذ ما ينطبق على السؤال
+══════════════════════════════════════════════════════
+قبل أي إجابة: حلّل بيانات اللوحة الحالية، راعِ الفلاتر النشطة، وابحث في الدليل الوطني عند أي سؤال يتعلق بالمرافق أو الأصول أو الصيانة أو السلامة أو الامتثال.
+عند وجود البيانات الداعمة، نفّذ:
+• تحليل الاتجاهات • التحليل المقارن • تحليل الأسباب الجذرية
+• تقييم المخاطر • تحليل الأولويات • تحليل الفجوات
+• اكتشاف القيم الشاذة • تحليل التكاليف • تحليل الأثر
+لا تفبرك علاقات غير مدعومة بالبيانات.
+
+══════════════════════════════════════════════════════
+تحليل FCA — عند توفر بياناته
+══════════════════════════════════════════════════════
+قيّم: حالة المنشأة، الأنظمة الحرجة، الأنظمة المعطوبة، أولوية الصيانة،
+أولوية الاستبدال، العمر الخدمي المتبقي (إن توفر)، المخاطر التشغيلية.
+
+══════════════════════════════════════════════════════
+تحليل التكاليف — عند توفر بياناتها
+══════════════════════════════════════════════════════
+حلّل: التكلفة حسب المدرسة/المدينة/الفئة، التوزيع، المحركات الرئيسية،
+أولويات الميزانية، فرص التوفير. لا تُقدّر تكاليف مفقودة.
+
+══════════════════════════════════════════════════════
+صيغة الرد التنفيذي — استخدمها عند الأسئلة التحليلية والاستراتيجية
+══════════════════════════════════════════════════════
+للأسئلة التحليلية والاستراتيجية والمتعلقة بالقرار، رتّب ردك وفق هذا الإطار:
+
+### الملخص التنفيذي
+استنتاج موجز ومباشر.
+
+### النتائج الرئيسية
+أهم الملاحظات الموثّقة بالبيانات.
+
+### تحليل الأسباب الجذرية
+لماذا توجد المشكلة؟ بناءً على البيانات المتاحة.
+
+### تقييم المخاطر
+صنّف: مرتفع / متوسط / منخفض — مع الأثر التشغيلي والمالي.
+
+### تحليل البيانات
+أرقام اللوحة الفعلية فقط — مقارنة المدارس/المدن/الأنظمة/التكاليف عند الإمكان.
+
+### الامتثال للدليل الوطني
+إن انطبق: اشرح التوجيه ذي الصلة ومدى انطباقه.
+
+### التوصيات
+رتّبها حسب الأثر:
+- **فورية** (خلال 30 يوماً)
+- **قصيرة المدى** (1-3 أشهر)
+- **متوسطة المدى** (3-12 شهراً)
+- **بعيدة المدى** (أكثر من سنة)
+يجب أن تكون قابلة للتنفيذ، واقعية، مبنية على أدلة، ومرتّبة حسب الأثر.
+
+### الرؤية الاستراتيجية
+رؤية واحدة مدعومة بالبيانات تساعد صانع القرار.
+
+### المصادر المستخدمة
+لكل استنتاج: بيانات اللوحة / الدليل الوطني / كلاهما.
+
+### مستوى الثقة
+مرتفع / متوسط / منخفض
+إن كانت بيانات اللوحة لا تدعم الاستنتاج كاملاً، صرّح: "بيانات اللوحة المتاحة لا تدعم هذا الاستنتاج بالكامل."
+
+ملاحظة: للأسئلة البسيطة والمباشرة (رقم، سؤال سريع، استفسار محدد)، أجب مباشرة دون الحاجة للإطار الكامل أعلاه.
+
+══════════════════════════════════════════════════════
+أسلوب التواصل
+══════════════════════════════════════════════════════
+كن: مهنياً، تحليلياً، موجزاً، تنفيذياً، موجّهاً للقرار.
+ميّز دائماً بين: الحقائق | التحليل | التوصيات.
+ركّز على: تحسين الصيانة، الميزانية، الامتثال، أداء الأصول، المخاطر التشغيلية، التخطيط الرأسمالي.
 
 ══════════════════════════════════════════════════════
 خبرتك التخصصية
@@ -13944,9 +13892,30 @@ function renderTajheezAllTable() {
 - لو المستخدم سأل سؤالاً عاماً لا يخص اللوحة، جاوبه بشكل طبيعي.
 
 ══════════════════════════════════════════════════════
+⛔⛔ تحذير إلزامي — قواعد DashboardContextBuilder (لا استثناء إطلاقاً)
+══════════════════════════════════════════════════════
+السياق المرفق أدناه مبني بواسطة DashboardContextBuilder v1.0 — كل قسم فيه يحمل _source و_type يحددان مصدره ونوعه.
+
+القواعد الذهبية:
+① _type = "FILTER"    → ⛔ إعداد عرض فقط — لا تستخدمه تحليلياً أبداً
+② _type = "SELECTION" → ⛔ تحديد المستخدم فقط — لا يمثل حقيقة إحصائية
+③ _type = "STATISTIC" → ✅ إحصاء فعلي — هذا المصدر الصحيح لأي رقم تحليلي
+④ _type = "KPI"       → ✅ مؤشر أداء محسوب — يمكن استخدامه تحليلياً
+⑤ _type = "RANKING"   → ✅ ترتيب مستخرج من البيانات الفعلية
+
+أمثلة حرفية لا تتجاوزها:
+• "فلتر_الحد_الأدنى_لتقييم_FCA=0"  → ⛔ هذا فلتر عرض — أدنى FCA الفعلي في: context.statistics.تحليل_FCA.أدنى_قيمة_FCA_فعلية
+• "فلتر_المدينة=جدة"               → ⛔ المستخدم طلب عرض جدة — لا يعني أن جدة الأسوأ أو الأفضل
+• "فلتر_المرحلة=متوسطة"            → ⛔ تحديد عرض — لا يعني أن المرحلة المتوسطة الأعلى أداءً
+• المدرسة المختارة في "selectSchool" → ⛔ مجرد تحديد — ليست الأولوية القصوى إلا لو دعمتها إحصاءات
+
+مصدر الحقيقة الوحيد: context.statistics أو context.kpis أو context.rankings — فقط.
+إن لم تجد الرقم المطلوب هناك، صرّح: "البيانات الحالية لا تكفي لإثبات هذه العلاقة."
+
+══════════════════════════════════════════════════════
 سياق الداشبورد الحالي — أجب على المعروض حالياً
 ══════════════════════════════════════════════════════
-المستخدم يرى الآن تبويباً محدداً وقد طبّق فلاتر. اعتمد على "نتائج_المحرك_التحليلي" و"سياق_الداشبورد" أدناه: إن وُجدت فلاتر مطبّقة، فإجابتك يجب أن تخص المجموعة المفلترة المعروضة، إلا إذا طلب المستخدم كامل قاعدة البيانات صراحةً.
+المستخدم يرى الآن تبويباً محدداً وقد طبّق فلاتر. اعتمد على "نتائج_المحرك_التحليلي" و"سياق_الداشبورد" أدناه: إن وُجدت فلاتر مطبّقة، فإجابتك يجب أن تخص المجموعة المفلترة المعروضة، إلا إذا طلب المستخدم كامل قاعدة البيانات صراحةً. تذكّر: الفلاتر المطبّقة تحدد فقط أي مجموعة سجلات تُعرض، ولا تُستخدم أبداً كأرقام إحصائية بحد ذاتها.
 
 ══════════════════════════════════════════════════════
 محرك الاستعلامات الذكي — الأرقام الموثوقة
@@ -14072,9 +14041,6 @@ ${JSON.stringify(dashContext)}
 نتائج_المحرك_التحليلي (محسوبة من البيانات المعروضة فعلياً):
 ${smartResult ? JSON.stringify(smartResult) : "لا يوجد ناتج محرك مباشر لهذا السؤال — اعتمد على ملخص اللوحة."}
 
-أسئلة_مقترحة (للتبويب الحالي):
-${JSON.stringify(suggestions)}
-
 محرك الأولويات:
 ${JSON.stringify(priorityData)}
 
@@ -14086,7 +14052,119 @@ ${(() => {
   if (!facts.length) return "لا توجد حقائق محفوظة بعد.";
   return facts.map((f, i) => `${i + 1}. ${f.fact}`).join("\n");
 })()}
-راعِ هذه التفضيلات تلقائياً في ردودك (مثلاً مدينة أو مقاول يهتم به المستخدم دائماً) دون إعادة سؤاله عنها.`;
+راعِ هذه التفضيلات تلقائياً في ردودك (مثلاً مدينة أو مقاول يهتم به المستخدم دائماً) دون إعادة سؤاله عنها.${(() => {
+  /* 🔒 سياق حي منقّح من DashboardContextBuilder + AI_ContextEngine
+     يُرفق هنا داخل System Message فقط — لا يظهر للمستخدم أبداً.
+
+     ══════════════════════════════════════════════════════════════════
+     قواعد استخدام هذا السياق (MANDATORY — لا استثناء):
+     1. أي قيمة مصدرها _type='FILTER' أو _type='SELECTION' → ⛔ لا تُستخدم تحليلياً
+     2. أي قيمة مصدرها _type='STATISTIC' أو _type='KPI'   → ✅ موثوقة للتحليل
+     3. إذا لم تجد البيانات → قل: "البيانات الحالية لا تكفي لإثبات هذه العلاقة."
+     4. أدنى/أعلى FCA الفعلي ← فقط من: context.statistics.تحليل_FCA (ليس من active_filters)
+     5. المدينة/المدرسة المختارة في الفلتر ← ليست "أعلى/أسوأ مدينة/مدرسة"
+     ══════════════════════════════════════════════════════════════════ */
+  const inj = window.__FCB_LIVE_CONTEXT_INJECT__;
+  if (!inj) return "";
+
+  let extra = "";
+
+  /* ── السياق المنقّح من DashboardContextBuilder (الأولوية القصوى) ── */
+  if (inj.context) {
+    extra +=
+      "\n\n══════════════════════════════════════════════════════\n" +
+      "السياق_المنقّح (DashboardContextBuilder v1.0) — محدَّث لحظة هذا السؤال\n" +
+      "══════════════════════════════════════════════════════\n";
+
+    /* ── دليل الاستخدام ── */
+    if (inj.reasoning_guide) {
+      extra += "\n🧭 دليل الاستخدام الإلزامي:\n" + inj.reasoning_guide + "\n";
+    }
+
+    /* ── الفلاتر المطبّقة (تحذير مشدّد) ── */
+    const af = inj.context.active_filters;
+    if (af) {
+      extra +=
+        "\n⛔ الفلاتر_المطبّقة (إعدادات عرض فقط — لا تستخدم كأرقام تحليلية):\n" +
+        JSON.stringify(af) + "\n";
+    }
+
+    /* ── KPIs ── */
+    const kpis = inj.context.kpis;
+    if (kpis && Object.keys(kpis).filter(k=>!k.startsWith("_")).length) {
+      extra +=
+        "\n✅ KPIs_الداشبورد (مصدر: KPIs — قيم موثوقة):\n" +
+        JSON.stringify(kpis) + "\n";
+    }
+
+    /* ── الإحصاءات الفعلية ── */
+    const stats = inj.context.statistics;
+    if (stats) {
+      extra +=
+        "\n✅ الإحصاءات_الفعلية (مصدر: Statistics — القيم التحليلية الصحيحة):\n" +
+        JSON.stringify(stats) + "\n";
+    }
+
+    /* ── الترتيبات ── */
+    const rankings = inj.context.rankings;
+    if (rankings) {
+      extra +=
+        "\n✅ الترتيبات (مصدر: Rankings):\n" +
+        JSON.stringify(rankings) + "\n";
+    }
+
+    /* ── العرض الحالي ── */
+    const cv = inj.context.current_view;
+    if (cv) {
+      extra +=
+        "\n📊 العرض_الحالي:\n" + JSON.stringify(cv) + "\n";
+    }
+
+    /* ── التبويب الحالي ── */
+    const ct = inj.context.current_tab;
+    if (ct) {
+      extra += "\n📂 التبويب_الحالي: " + JSON.stringify(ct) + "\n";
+    }
+
+    /* ── البيانات الإضافية (البلاغات/الأنظمة/المصاعد/الحصر) ── */
+    const supp = inj.context.supplemental;
+    if (supp) {
+      extra +=
+        "\n✅ البيانات_الإضافية (مصدر: Statistics→Supplemental):\n" +
+        JSON.stringify(supp) + "\n";
+    }
+
+    /* ── إتاحة البيانات ── */
+    const da = inj.context.data_availability;
+    if (da) {
+      extra +=
+        "\n🔍 إتاحة_البيانات:\n" + JSON.stringify(da) + "\n";
+    }
+  }
+
+  /* ── Global Snapshot (لقطة الداشبورد الكاملة) ── */
+  if (inj.global_snapshot) {
+    extra +=
+      "\n\n══════════════════════════════════════════════════════\n" +
+      "اللقطة_العالمية (Global Snapshot — الداشبورد كاملاً بلا فلاتر للمقارنة)\n" +
+      "══════════════════════════════════════════════════════\n" +
+      JSON.stringify(inj.global_snapshot) + "\n";
+  }
+
+  /* ── التحليل المسبق من AI_ContextEngine (تكملة — نقاط القوة/الضعف/الأولويات) ── */
+  if (inj.insights) {
+    extra +=
+      "\n\n══════════════════════════════════════════════════════\n" +
+      "التحليل_المسبق (AI_ContextEngine — نقاط قوة/ضعف/أولويات من البيانات الحية)\n" +
+      "══════════════════════════════════════════════════════\n" +
+      JSON.stringify(inj.insights) + "\n";
+  }
+
+  /* ── التعليمات التنفيذية (Executive Report إن طُلب) ── */
+  if (inj.execInstr) extra += inj.execInstr;
+
+  return extra;
+})()}`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -14132,6 +14210,14 @@ ${(() => {
     if (window.__FCB_GENERATING) { fcbAbortGeneration(); return; }
     const val = (typeof presetText === "string" ? presetText : inputEl.value).trim();
     if (!val) return;
+    // حماية: رسالة طويلة جداً تُستهلك توكنات كبيرة بلا داعٍ وقد تفشل الطلب — نمنعها بوضوح
+    const FCB_MAX_MSG_LEN = 4000;
+    if (val.length > FCB_MAX_MSG_LEN) {
+      if (typeof showToast === "function") {
+        showToast(`الرسالة طويلة جداً (${val.length.toLocaleString()} حرف) — الحد الأقصى ${FCB_MAX_MSG_LEN.toLocaleString()} حرف`, "error");
+      }
+      return;
+    }
     fcbHideQuickReplies(); // Task 2: إخفاء الاقتراحات بعد أول رسالة
     window.__FCB_LAST_USER = val; // Task 4: لإعادة التوليد
     fcbAppendMsg(val, "user");
@@ -14163,6 +14249,12 @@ ${(() => {
 
     window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
     window.__FCB_GENERATING = true;
+    // حماية: لو الطلب عُلّق (شبكة بطيئة/سيرفر لا يستجيب) لا نترك "يكتب..." للأبد
+    const FCB_TIMEOUT_MS = 45000;
+    let fcbTimedOut = false;
+    const fcbTimeoutTimer = window.__FCB_ABORT
+      ? setTimeout(() => { fcbTimedOut = true; try { window.__FCB_ABORT.abort(); } catch (_) {} }, FCB_TIMEOUT_MS)
+      : null;
     try {
       if (!AIService.hasKey()) {
         // لا يوجد مفتاح API محفوظ — نوضّح ذلك بصراحة للمستخدم، ثم نكمل
@@ -14179,21 +14271,27 @@ ${(() => {
       fcbAppendMsg(reply, "bot");
     } catch (err) {
       fcbHideTyping();
-      // Task 3: المستخدم أوقف التوليد بنفسه
+      // Task 3: المستخدم أوقف التوليد بنفسه، أو انتهت المهلة تلقائياً
       if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
-        fcbAppendMsg("⏹️ تم إيقاف التوليد بواسطة المستخدم.", "bot");
+        fcbAppendMsg(
+          fcbTimedOut
+            ? "⏱️ انتهت مهلة الانتظار — تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+            : "⏹️ تم إيقاف التوليد بواسطة المستخدم.",
+          "bot",
+        );
         return;
       }
       console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
       const prefix = err?.code === "INVALID_KEY"
         ? "⚠️ مفتاح API غير صحيح أو منتهي — راجعه من ⚙️ الإعدادات.\n\n"
         : err?.code === "REQUEST_FAILED"
-          ? `⚠️ فشل الاتصال بـ OpenAI (${err.message || "خطأ غير محدد"}) — تحقق من الاتصال أو المفتاح.\n\n`
+          ? "⚠️ فشل الاتصال بخدمة الذكاء الاصطناعي — تحقق من اتصالك بالإنترنت وحاول مرة أخرى.\n\n"
           : err?.code === "EMPTY_RESPONSE"
             ? "⚠️ الموديل لم يرجع رد — جرب مرة ثانية.\n\n"
             : "";
       fcbAppendMsg(prefix + fcbReplyFor(val), "bot");
     } finally {
+      if (fcbTimeoutTimer) clearTimeout(fcbTimeoutTimer);
       window.__FCB_GENERATING = false;
       window.__FCB_ABORT = null;
       fcbSetSendMode("send");
@@ -14245,6 +14343,11 @@ ${(() => {
     fcbShowTyping();
     window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
     window.__FCB_GENERATING = true;
+    const FCB_TIMEOUT_MS = 45000;
+    let fcbTimedOut = false;
+    const fcbTimeoutTimer = window.__FCB_ABORT
+      ? setTimeout(() => { fcbTimedOut = true; try { window.__FCB_ABORT.abort(); } catch (_) {} }, FCB_TIMEOUT_MS)
+      : null;
     try {
       const reply = await fcbAskOpenAI(last);
       fcbHideTyping();
@@ -14252,12 +14355,18 @@ ${(() => {
     } catch (err) {
       fcbHideTyping();
       if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
-        fcbAppendMsg("⏹️ تم إيقاف التوليد بواسطة المستخدم.", "bot");
+        fcbAppendMsg(
+          fcbTimedOut
+            ? "⏱️ انتهت مهلة الانتظار — تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+            : "⏹️ تم إيقاف التوليد بواسطة المستخدم.",
+          "bot",
+        );
       } else {
         console.warn("[fcb] regenerate error:", err);
         fcbAppendMsg("⚠️ تعذّرت إعادة التوليد — جرّب مرة أخرى.", "bot");
       }
     } finally {
+      if (fcbTimeoutTimer) clearTimeout(fcbTimeoutTimer);
       window.__FCB_GENERATING = false;
       window.__FCB_ABORT = null;
       fcbSetSendMode("send");
@@ -15756,113 +15865,6 @@ ${panelHTML}
   finish();
 }
 
-function askFormatAndSave(canvas, baseName, stamp, doneCb) {
-  // لو الصورة طويلة جدًا (أطول من ~1.8 ضعف عرضها بكذا مرة) نقسّمها لصفحات/صور
-  // بدل ما تتكدس في صورة واحدة يصعب قراءتها
-  var A4_RATIO = 297 / 210; // ارتفاع/عرض ورقة A4 بالبورتريه
-  var sliceRatio = A4_RATIO * 1.15; // هامش بسيط قبل ما نقرر إننا نقسّم
-  var totalRatio = canvas.height / canvas.width;
-  var pageCount = Math.max(1, Math.ceil(totalRatio / sliceRatio));
-
-  function sliceCanvas(count) {
-    var slices = [];
-    var sliceH = Math.ceil(canvas.height / count);
-    for (var i = 0; i < count; i++) {
-      var y = i * sliceH;
-      var h = Math.min(sliceH, canvas.height - y);
-      if (h <= 0) break;
-      var sc = document.createElement("canvas");
-      sc.width = canvas.width;
-      sc.height = h;
-      var ctx = sc.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, sc.width, sc.height);
-      ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-      slices.push(sc);
-    }
-    return slices;
-  }
-
-  // نافذة اختيار بسيطة: صورة PNG أو ملف PDF
-  var overlay = document.createElement("div");
-  overlay.style.cssText =
-    "position:fixed;inset:0;background:rgba(8,20,28,.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif";
-
-  var box = document.createElement("div");
-  box.style.cssText =
-    "background:#fff;border-radius:16px;padding:22px 24px;min-width:280px;max-width:90vw;box-shadow:0 20px 50px rgba(0,0,0,.25);text-align:center";
-  var splitNote =
-    pageCount > 1
-      ? '<div style="font-size:11px;color:#0891B2;margin-bottom:10px">📄 المحتوى طويل، هيتقسّم تلقائيًا إلى ' + pageCount + " أجزاء/صفحات</div>"
-      : "";
-  box.innerHTML =
-    '<div style="font-size:14px;font-weight:800;color:#0f2a37;margin-bottom:14px">اختر صيغة التنزيل</div>' +
-    splitNote +
-    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">' +
-    '<button id="dlAsPng" class="export-btn export-btn-excel">🖼️ صورة PNG</button>' +
-    '<button id="dlAsPdf" class="export-btn export-btn-csv">📄 ملف PDF</button>' +
-    "</div>" +
-    '<button id="dlCancel" style="background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;text-decoration:underline">إلغاء</button>';
-
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  function cleanup() {
-    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    if (doneCb) doneCb();
-  }
-
-  overlay.addEventListener("click", function (e) {
-    if (e.target === overlay) cleanup();
-  });
-  document.getElementById("dlCancel").addEventListener("click", cleanup);
-
-  document.getElementById("dlAsPng").addEventListener("click", function () {
-    var slices = pageCount > 1 ? sliceCanvas(pageCount) : [canvas];
-    slices.forEach(function (sc, idx) {
-      var link = document.createElement("a");
-      link.download = baseName + "_" + stamp + (slices.length > 1 ? "_جزء" + (idx + 1) : "") + ".png";
-      link.href = sc.toDataURL("image/png");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
-    cleanup();
-  });
-
-  document.getElementById("dlAsPdf").addEventListener("click", function () {
-    try {
-      var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-      if (!jsPDFCtor) {
-        if (typeof showToast === "function") showToast("مكتبة PDF غير متاحة", "error");
-        cleanup();
-        return;
-      }
-      var pxToMm = 0.264583; // تحويل بكسل إلى ملم عند 96dpi تقريباً (مع مراعاة scale الكانفاس)
-      var slices = pageCount > 1 ? sliceCanvas(pageCount) : [canvas];
-      var pdf = null;
-
-      slices.forEach(function (sc, idx) {
-        var imgData = sc.toDataURL("image/png");
-        var imgWmm = sc.width * pxToMm;
-        var imgHmm = sc.height * pxToMm;
-        var orientation = imgWmm > imgHmm ? "l" : "p";
-        if (idx === 0) {
-          pdf = new jsPDFCtor({ orientation: orientation, unit: "mm", format: [imgWmm, imgHmm] });
-        } else {
-          pdf.addPage([imgWmm, imgHmm], orientation);
-        }
-        pdf.addImage(imgData, "PNG", 0, 0, imgWmm, imgHmm);
-      });
-
-      pdf.save(baseName + "_" + stamp + ".pdf");
-    } catch (e) {
-      console.warn("[downloadCurrentTab] فشل إنشاء PDF", e);
-      if (typeof showToast === "function") showToast("تعذّر إنشاء PDF", "error");
-    }
-    cleanup();
-  });
-}
 
 
 /* ══════════════════════════════════════════════════════════════════
@@ -16152,7 +16154,9 @@ window.addEventListener('load', function(){
   let hintTimer = null;
 
   function showBubble(){
-    if (hintDisabled || panelOpen()) return;
+    /* لا تظهر الرسالة وإحنا لسه في صفحة اختيار القسم (Portal Home) —
+       تظهر فقط بعد ما المستخدم يدخل جوه أي قسم من أقسام الداشبورد */
+    if (hintDisabled || panelOpen() || document.body.classList.contains('portal-active')) return;
     bubble.classList.add('show');
     setTimeout(()=> bubble.classList.remove('show'), 3400);
   }
@@ -16397,18 +16401,11 @@ window.addEventListener('load', function(){
       }
       .ix-clear-btn:hover { background: var(--teal); color: #fff; border-color: var(--teal); }
 
-      /* ── بطاقات KPI قابلة للنقر ── */
+      /* ── بطاقات KPI قابلة للنقر — نفس شكل باقي كروت KPI تمامًا،
+         الفرق الوحيد المسموح به هو مؤشر الماوس (المربع الكامل زي أي كارت تاني) ── */
       .kpi[data-ix-kpi] {
-        cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s;
-        position: relative;
+        cursor: pointer;
       }
-      .kpi[data-ix-kpi]::after {
-        content: "🔍"; position: absolute; top: 8px; left: 10px;
-        font-size: 11px; opacity: 0; transition: opacity .2s;
-      }
-      .kpi[data-ix-kpi]:hover { transform: translateY(-3px); box-shadow: var(--sh-hover); }
-      .kpi[data-ix-kpi]:hover::after { opacity: .7; }
-      .kpi[data-ix-kpi]:active { transform: translateY(-1px); }
 
       /* ── Tier Strip قابل للنقر ── */
       .tier-seg[data-ix-tier] {
@@ -17267,6 +17264,8 @@ window.addEventListener('load', function(){
       if (!el) return;
       const card = el.closest(".kpi");
       if (!card) return;
+      if (card._ixKpiHooked) return; // منع تكرار ربط نفس البطاقة أكثر من مرة (watchRAW يعيد الاستدعاء)
+      card._ixKpiHooked = true;
 
       card.setAttribute("data-ix-kpi", def.attr);
       card.style.cursor = "pointer";
@@ -17280,7 +17279,8 @@ window.addEventListener('load', function(){
 
     // Also hook KPI for FCA avg: shows distribution
     const fcaAvgCard = document.getElementById("k-fca-avg")?.closest(".kpi");
-    if (fcaAvgCard) {
+    if (fcaAvgCard && !fcaAvgCard._ixKpiHooked) {
+      fcaAvgCard._ixKpiHooked = true;
       fcaAvgCard.setAttribute("data-ix-kpi", "fca-avg");
       fcaAvgCard.style.cursor = "pointer";
       fcaAvgCard.title = "انقر لعرض قائمة المدارس حسب FCA";
@@ -17296,7 +17296,8 @@ window.addEventListener('load', function(){
     }
 
     const envAvgCard = document.getElementById("k-env-avg")?.closest(".kpi");
-    if (envAvgCard) {
+    if (envAvgCard && !envAvgCard._ixKpiHooked) {
+      envAvgCard._ixKpiHooked = true;
       envAvgCard.setAttribute("data-ix-kpi", "env-avg");
       envAvgCard.style.cursor = "pointer";
       envAvgCard.title = "انقر لعرض قائمة المدارس حسب البيئة المدرسية";
@@ -17331,6 +17332,8 @@ window.addEventListener('load', function(){
       if (!el) return;
       const seg = el.closest(".tier-seg");
       if (!seg) return;
+      if (seg._ixTierHooked) return; // منع تكرار ربط نفس الشريحة أكثر من مرة (watchRAW يعيد الاستدعاء)
+      seg._ixTierHooked = true;
 
       seg.setAttribute("data-ix-tier", td.id);
       seg.style.cursor = "pointer";
@@ -17364,6 +17367,11 @@ window.addEventListener('load', function(){
   }
 
   function setupSmartSearch(input) {
+    // منع تكرار ربط نفس الحقل أكثر من مرة (watchRAW يعيد استدعاء هذه الدالة
+    // في كل مرة يتغيّر فيها RAW.length) — نفس نمط _setupHasrSmartSearch
+    if (!input || input._ixSugAttached) return;
+    input._ixSugAttached = true;
+
     // حماية: لو الدالة اتنادت قبل كده على نفس الحقل، امسح العنصر القديم
     // أولاً بدل ما نضيف نسخة مكررة (مثلاً لو حصلت إعادة تحميل للبيانات)
     const existingOld = document.getElementById("ix-search-suggestions");
@@ -18107,19 +18115,6 @@ ${dataCtx}
       return buildSystemPrompt(snap);
     };
 
-    // patch fcbBuildMessages لو موجود
-    if (typeof window.fcbBuildMessages === 'function') {
-      const orig = window.fcbBuildMessages;
-      window.fcbBuildMessages = function(history) {
-        const msgs = orig.call(this, history);
-        // استبدل system message الأولى
-        if (msgs[0] && msgs[0].role === 'system') {
-          msgs[0].content = window.fcbGetSystemPrompt();
-        }
-        return msgs;
-      };
-    }
-
     // كذلك patch fcbSend لو كان يستخدم systemPrompt مباشرة
     const origSend = window.fcbSend;
     if (typeof origSend === 'function') {
@@ -18787,26 +18782,26 @@ function renderFuelTab(_fromDate, _toDate) {
     <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} سجل</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="card" style="border-top:3px solid #0891B2">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي الاستهلاك</div>
-      <div style="font-size:28px;font-weight:800;color:#0891B2">${totalLiters.toLocaleString('ar',{maximumFractionDigits:0})}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">لتر · ${rows.length.toLocaleString()} سجل</div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${totalLiters.toLocaleString('ar',{maximumFractionDigits:0})}</div>
+      <div class="kpi-lbl">إجمالي الاستهلاك</div>
+      <div class="kpi-sub">لتر · ${rows.length.toLocaleString()} سجل</div>
     </div>
-    <div class="card" style="border-top:3px solid #059669">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي التكلفة</div>
-      <div style="font-size:28px;font-weight:800;color:#059669">${totalCost.toLocaleString('ar',{maximumFractionDigits:0})}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ريال سعودي</div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${totalCost.toLocaleString('ar',{maximumFractionDigits:0})}</div>
+      <div class="kpi-lbl">إجمالي التكلفة</div>
+      <div class="kpi-sub">ريال سعودي</div>
     </div>
-    <div class="card" style="border-top:3px solid #D97706">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">متوسط سعر اللتر</div>
-      <div style="font-size:28px;font-weight:800;color:#D97706">${avgCostPerL.toFixed(2)}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">ريال / لتر</div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${avgCostPerL.toFixed(2)}</div>
+      <div class="kpi-lbl">متوسط سعر اللتر</div>
+      <div class="kpi-sub">ريال / لتر</div>
     </div>
-    <div class="card" style="border-top:3px solid #7C3AED">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">عدد السيارات</div>
-      <div style="font-size:28px;font-weight:800;color:#7C3AED">${uniqueCars.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">سيارة نشطة</div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${uniqueCars.toLocaleString()}</div>
+      <div class="kpi-lbl">عدد السيارات</div>
+      <div class="kpi-sub">سيارة نشطة</div>
     </div>
   </div>
 
@@ -19016,26 +19011,26 @@ function renderVehiclesTab() {
   const yearEntries = Object.entries(byYear).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
 
   el.innerHTML = `
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="card" style="border-top:3px solid #0891B2">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي السيارات</div>
-      <div style="font-size:28px;font-weight:800;color:#0891B2">${total.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">سيارة مسجلة</div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString()}</div>
+      <div class="kpi-lbl">إجمالي السيارات</div>
+      <div class="kpi-sub">سيارة مسجلة</div>
     </div>
-    <div class="card" style="border-top:3px solid #DC2626">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">لديها أعطال/حوادث</div>
-      <div style="font-size:28px;font-weight:800;color:#DC2626">${withFaults.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((withFaults/total)*100).toFixed(1) : 0}% من الأسطول</div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${withFaults.toLocaleString()}</div>
+      <div class="kpi-lbl">لديها أعطال/حوادث</div>
+      <div class="kpi-sub">${total ? ((withFaults/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
-    <div class="card" style="border-top:3px solid #059669">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المستخدمون</div>
-      <div style="font-size:28px;font-weight:800;color:#059669">${uniqueUsers.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مستخدم نشط</div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${uniqueUsers.toLocaleString()}</div>
+      <div class="kpi-lbl">المستخدمون</div>
+      <div class="kpi-sub">مستخدم نشط</div>
     </div>
-    <div class="card" style="border-top:3px solid #7C3AED">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المواقع</div>
-      <div style="font-size:28px;font-weight:800;color:#7C3AED">${uniqueLoc.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">موقع مختلف</div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${uniqueLoc.toLocaleString()}</div>
+      <div class="kpi-lbl">المواقع</div>
+      <div class="kpi-sub">موقع مختلف</div>
     </div>
   </div>
 
@@ -19267,26 +19262,26 @@ function renderTrainingTab(_fromDate, _toDate) {
     <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} متدرب</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px">
-    <div class="card" style="border-top:3px solid #0891B2">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">إجمالي المتدربين</div>
-      <div style="font-size:28px;font-weight:800;color:#0891B2">${total.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${neverLogged} لم يدخلوا أبداً</div>
+  <div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString()}</div>
+      <div class="kpi-lbl">إجمالي المتدربين</div>
+      <div class="kpi-sub">${neverLogged} لم يدخلوا أبداً</div>
     </div>
-    <div class="card" style="border-top:3px solid #059669">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مكتملو دورة النظافة</div>
-      <div style="font-size:28px;font-weight:800;color:#059669">${clean_completed.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((clean_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${clean_completed.toLocaleString()}</div>
+      <div class="kpi-lbl">مكتملو دورة النظافة</div>
+      <div class="kpi-sub">${total ? ((clean_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
     </div>
-    <div class="card" style="border-top:3px solid #7C3AED">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مكتملو برنامج المشرفين</div>
-      <div style="font-size:28px;font-weight:800;color:#7C3AED">${sup_completed.toLocaleString()}</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">${total ? ((sup_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${sup_completed.toLocaleString()}</div>
+      <div class="kpi-lbl">مكتملو برنامج المشرفين</div>
+      <div class="kpi-sub">${total ? ((sup_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
     </div>
-    <div class="card" style="border-top:3px solid #D97706">
-      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">متوسط الدرجة</div>
-      <div style="font-size:28px;font-weight:800;color:#D97706">${clean_avgScore.toFixed(1)}%</div>
-      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">دورة النظافة</div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${clean_avgScore.toFixed(1)}%</div>
+      <div class="kpi-lbl">متوسط الدرجة</div>
+      <div class="kpi-sub">دورة النظافة</div>
     </div>
   </div>
 
@@ -21057,100 +21052,6 @@ function hasrBackToSystems() {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   بانيل تفاصيل نظام رئيسي (من داخل البانيل — للتصفح فقط)
-   لا يطبق فلتراً — فقط يعرض معلومات
-════════════════════════════════════════════════════════════════ */
-function hasrOpenSystemDetail(name) {
-  /* نبحث في ctx.systems أولاً ثم في HASR.data */
-  const ctx = HASR._ctx;
-  const schoolCtx = HASR._schoolCtx;
-  let sysObj, subSystems;
-
-  if (schoolCtx) {
-    const rawSc = (HASR.data?.schools||[]).find(s=>s.code===schoolCtx.code);
-    sysObj     = rawSc ? (rawSc.systems||[]).find(s=>s.name===name) : null;
-    subSystems = sysObj ? (sysObj.subSystems||[]) : [];
-  } else {
-    sysObj     = (ctx.systems||[]).find(s=>s.name===name);
-    subSystems = sysObj ? (sysObj.subSystems||[]) : [];
-  }
-
-  const totSys = sysObj?.total || 0;
-  const tE=sysObj?.excellent||0, tG=sysObj?.good||0, tB=sysObj?.bad||0, tD=sysObj?.deteriorated||0;
-  const tot = totSys || 1;
-  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
-
-  /* المدارس التي تحتوي هذا النظام */
-  const schoolsPool = schoolCtx
-    ? (HASR.data?.schools||[]).filter(s=>s.code===schoolCtx.code)
-    : ctx.schools;
-  const schoolRows = schoolsPool
-    .map(sc=>{ const s=(sc.systems||[]).find(x=>x.name===name); return s&&s.total>0?{school:sc,sys:s}:null; })
-    .filter(Boolean).sort((a,b)=>(b.sys.total||0)-(a.sys.total||0));
-
-  _hS('hasr-sp-title','⚙️ '+name);
-  const spSub=document.getElementById('hasr-sp-sub');
-  if(spSub) spSub.textContent=schoolCtx?('🏫 '+schoolCtx.name):(schoolRows.length+' مدرسة · '+totSys.toLocaleString('ar')+' أصل');
-  const tabsEl=document.querySelector('#hasr-sp .hasr-tabs');
-  if(tabsEl) tabsEl.style.display='none';
-  const body=document.getElementById('hasr-sp-body');
-
-  const subHtml = subSystems.length>0
-    ? `<div class="hasr-sec">الأنظمة الفرعية (${subSystems.length}) — اضغط لعرض التفاصيل</div>
-       ${subSystems.map(sub=>`
-         <div class="hasr-srow" onclick="hasrShowSubDetail('${_hE(name)}','${_hE(sub.name)}')">
-           <div style="flex:1">
-             <div class="hasr-sname">${_hE(sub.name)}</div>
-             <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
-               ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
-               ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
-               ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
-               ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
-             </div>
-             <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${((sub.total/tot)*100).toFixed(1)}%</div>
-           </div>
-           <div class="hasr-sbadge">${sub.total.toLocaleString('ar')}</div>
-         </div>`).join('')}`
-    : `<div class="hasr-sec">الأنظمة الفرعية</div>
-       <div style="text-align:center;padding:18px;color:var(--tx-muted);font-size:12px;background:var(--bg-2);border-radius:8px;border:1px dashed var(--bd-light)">لا توجد أنظمة فرعية مسجّلة</div>`;
-
-  const schoolsHtml = schoolRows.length===0
-    ? '<div style="text-align:center;padding:16px;color:var(--tx-muted);font-size:12px">لا توجد مدارس لهذا النظام</div>'
-    : schoolRows.map(({school,sys:s})=>`
-        <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(school.code)}')" style="cursor:pointer">
-          <div style="flex:1">
-            <div class="hasr-sname">${_hE(school.name)}</div>
-            <div class="hasr-smeta">${_hE(school.city)} · ${_hE(school.code)}</div>
-            <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:4px">
-              ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
-              ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
-              ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
-              ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
-            </div>
-          </div>
-          <div class="hasr-sbadge">${(s.total||0).toLocaleString('ar')} أصل</div>
-        </div>`).join('');
-
-  body.innerHTML=`
-    <button class="hasr-back-btn" onclick="hasrBackToSystems()">← رجوع للأنظمة الرئيسية</button>
-    <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#1E3A8A"><div class="hasr-ic-lbl">إجمالي الأصول</div><div class="hasr-ic-val">${totSys.toLocaleString('ar')}</div></div>
-      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأنظمة الفرعية</div><div class="hasr-ic-val">${subSystems.length}</div></div>
-    </div>
-    <div class="hasr-sec">توزيع الحالة</div>
-    <div class="hasr-cbar" style="margin-bottom:8px">
-      ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/tot)*100).toFixed(0)}%</div>`).join('')}
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      ${bars.map(x=>`<span style="font-size:10px;color:var(--tx-sec)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong></span>`).join('')}
-    </div>
-    ${subHtml}
-    <div class="hasr-sec" style="margin-top:14px">المدارس (${schoolRows.length})</div>
-    ${schoolsHtml}
-  `;
-}
-
-/* ════════════════════════════════════════════════════════════════
    بانيل تفاصيل مدرسة — يقرأ من HASR.data.schools مباشرة (الاستثناء الوحيد)
    لأنه يعرض البيانات الكاملة للمدرسة بكل أنظمتها بغض النظر عن الفلتر
 ════════════════════════════════════════════════════════════════ */
@@ -21234,10 +21135,6 @@ function hasrDebounceFilter() {
 
 function hasrGlobalFilterChanged() {
   _hasrApplyFilters();
-}
-
-function hasrChartCityChanged() {
-  _hasrApplyFilters(); /* legacy — الآن hasrGlobalFilterChanged هو المستخدم */
 }
 
 function _hasrChartCondition() {
@@ -21599,25 +21496,25 @@ function renderEmpKpiTab() {
 
   <!-- ══ KPIs ══ -->
   <div class="kpi-grid" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
-    <div class="kpi" style="border-top:3px solid #1D4ED8">
-      <div style="font-size:10px;font-weight:700;color:#1D4ED8;margin-bottom:4px">إجمالي الموظفين</div>
-      <div class="kpi-val" id="emp-k-total" style="color:#1D4ED8">${total.toLocaleString('ar')}</div>
-      <div class="kpi-lbl" id="emp-k-regions">${regions.length} منطقة</div>
+    <div class="kpi kc-blue">
+      <div class="kpi-val" id="emp-k-total">${total.toLocaleString('ar')}</div>
+      <div class="kpi-lbl">إجمالي الموظفين</div>
+      <div class="kpi-sub" id="emp-k-regions">${regions.length} منطقة</div>
     </div>
-    <div class="kpi" style="border-top:3px solid #0891B2">
-      <div style="font-size:10px;font-weight:700;color:#0891B2;margin-bottom:4px">متوسط الدرجة الكلية</div>
-      <div class="kpi-val" id="emp-k-avg" style="color:#0891B2">${avgScore}</div>
-      <div class="kpi-lbl">من 100</div>
+    <div class="kpi kc-teal">
+      <div class="kpi-val" id="emp-k-avg">${avgScore}</div>
+      <div class="kpi-lbl">متوسط الدرجة الكلية</div>
+      <div class="kpi-sub">من 100</div>
     </div>
-    <div class="kpi" style="border-top:3px solid #059669">
-      <div style="font-size:10px;font-weight:700;color:#059669;margin-bottom:4px">جيد جداً ≥ 80</div>
-      <div class="kpi-val" id="emp-k-excellent" style="color:#059669">${gradeCount['جيد جداً']||0}</div>
-      <div class="kpi-lbl" id="emp-k-excellent-pct">${pct(gradeCount['جيد جداً']||0, total)} من الإجمالي</div>
+    <div class="kpi kc-green">
+      <div class="kpi-val" id="emp-k-excellent">${gradeCount['جيد جداً']||0}</div>
+      <div class="kpi-lbl">جيد جداً ≥ 80</div>
+      <div class="kpi-sub" id="emp-k-excellent-pct">${pct(gradeCount['جيد جداً']||0, total)} من الإجمالي</div>
     </div>
-    <div class="kpi" style="border-top:3px solid #DC2626">
-      <div style="font-size:10px;font-weight:700;color:#DC2626;margin-bottom:4px">ضعيف &lt; 50</div>
-      <div class="kpi-val" id="emp-k-weak" style="color:#DC2626">${gradeCount['ضعيف']||0}</div>
-      <div class="kpi-lbl" id="emp-k-weak-pct">${pct(gradeCount['ضعيف']||0, total)} من الإجمالي</div>
+    <div class="kpi kc-red">
+      <div class="kpi-val" id="emp-k-weak">${gradeCount['ضعيف']||0}</div>
+      <div class="kpi-lbl">ضعيف &lt; 50</div>
+      <div class="kpi-sub" id="emp-k-weak-pct">${pct(gradeCount['ضعيف']||0, total)} من الإجمالي</div>
     </div>
   </div>
 
@@ -22266,3 +22163,1927 @@ document.addEventListener("DOMContentLoaded", function () {
   var inp = document.getElementById("fcbInput");
   if (inp && !inp.getAttribute("aria-label")) inp.setAttribute("aria-label", "اكتب رسالتك للمساعد الذكي");
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   PORTAL NAVIGATION LAYER (المرحلة 3 — Navigation System)
+   (المرحلة 4 — Sidebar لكل قسم)
+   طبقة جديدة بالكامل — لا تعدّل showTab() ولا أي دالة render موجودة.
+   تُستخدم فوق النظام القديم فقط عبر استدعاء showTab(name) الأصلية.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* خريطة الأقسام → التبويبات الفرعية (name يطابق تماماً القيم المستخدمة
+   في استدعاءات showTab() الأصلية داخل الكود القديم — لم تُخترع أسماء جديدة) */
+var PORTAL_CATEGORIES = {
+  assessment: {
+    title: "التقييمات والحالة الفنية",
+    icon: "📊",
+    tabs: [
+      { name: "overview",     label: "نظرة عامة" },
+      { name: "fca",          label: "تحليل FCA" },
+      { name: "stage-compare",label: "مقارنة مراحل FCA" },
+      { name: "fca-ref",      label: "FCA المرجعي" },
+      { name: "env",          label: "البيئة المدرسية" },
+      { name: "ayen",         label: "تقييم عاين" },
+      { name: "sys-main",     label: "الأنظمة الرئيسية" },
+      { name: "sys-detail",   label: "الأنظمة التفصيلية" },
+      { name: "stages",       label: "المرحلة الدراسية" }
+    ]
+  },
+  assets: {
+    title: "الأصول والمرافق",
+    icon: "🏗️",
+    tabs: [
+      { name: "hasr",            label: "حصر الأصول" },
+      { name: "tajheez",         label: "التجهيزات" },
+      { name: "spare",           label: "قطع الغيار" },
+      { name: "elevators",       label: "المصاعد" },
+      { name: "elevator-status", label: "حالة المصاعد" },
+      { name: "khanadeq",        label: "خنادق الصرف" },
+      { name: "ac-plan",         label: "خطة استبدال المكيفات" },
+      { name: "students",        label: "الطلاب وعمر المبنى" },
+      { name: "fuel",            label: "استهلاك الوقود" },
+      { name: "vehicles",        label: "السيارات" }
+    ]
+  },
+  contracts: {
+    title: "العقود والتكاليف",
+    icon: "💰",
+    tabs: [
+      { name: "cost",          label: "التكلفة" },
+      { name: "payments",      label: "المدفوعات" },
+      { name: "all-contracts", label: "عقود عدا المجال" }
+    ]
+  },
+  operations: {
+    title: "التشغيل والبلاغات",
+    icon: "📢",
+    tabs: [
+      { name: "balagh",          label: "البلاغات" },
+      { name: "security-safety", label: "الأمن والسلامة" },
+      { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
+      { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
+      { name: "training",        label: "برامج التدريب" },
+      { name: "emp-kpi",         label: "تقييم الموظفين" },
+      { name: "gatekeepers",     label: "البوابين" },
+      { name: "recruitment",     label: "التوظيف" }
+    ]
+  },
+  geo: {
+    title: "التحليل الجغرافي",
+    icon: "🗺️",
+    tabs: [
+      { name: "map", label: "الخريطة" }
+    ]
+  },
+  explore: {
+    title: "استكشاف البيانات",
+    icon: "🔍",
+    tabs: [
+      { name: "table", label: "الجدول التفصيلي" }
+    ]
+  }
+};
+
+window.CURRENT_PORTAL_CATEGORY = null;
+
+/* عرض كل التبويبات الموجودة داخل كل قسم تحت اسم الكارت في Portal Home
+   (بناءً على طلب صريح) — بدل الوصف المختصر، نعرض القائمة الكاملة
+   مبنية مباشرة من نفس PORTAL_CATEGORIES فوق، فتبقى متزامنة دائماً مع
+   أي تعديل على التبويبات مستقبلاً */
+function __fillPortalCardTabsList() {
+  Object.keys(PORTAL_CATEGORIES).forEach(function (key) {
+    var card = document.getElementById("portal-card-" + key);
+    if (!card) return;
+    var descEl = card.querySelector(".portal-card-desc");
+    if (!descEl) return;
+    var hideStudents = !!window.__PRESENTATION_MODE__;
+    var tabs = PORTAL_CATEGORIES[key].tabs.filter(function (t) {
+      return !(hideStudents && t.name === "students");
+    });
+    var html = '<div class="portal-card-tabs-grid">';
+    tabs.forEach(function (t) {
+      html += '<div class="portal-card-tab-item"><span class="portal-card-tab-dot"></span>' + t.label + '</div>';
+    });
+    html += '</div>';
+    descEl.innerHTML = html;
+  });
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", __fillPortalCardTabsList);
+} else {
+  __fillPortalCardTabsList();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   كارت المفضلة / الاختصارات (بناءً على طلب صريح)
+   يتيح للمستخدم اختيار تبويبات محددة من كل الأقسام، وحفظها كاختصارات
+   سريعة على جهازه (localStorage) — قابلة للتعديل في أي وقت.
+   ══════════════════════════════════════════════════════════════════════ */
+var FAVORITES_STORAGE_KEY = "fm_favorite_tabs";
+
+function __getFavoriteTabs() {
+  try {
+    var raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    var parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function __setFavoriteTabs(list) {
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(list));
+  } catch (e) { /* تجاهل بصمت لو التخزين غير متاح */ }
+}
+
+/* رسم كارت الاختصارات — إما دعوة للاختيار (لو فاضي) أو قائمة اختصارات */
+function __renderPortalFavoritesCard() {
+  var card = document.getElementById("portalFavoritesCard");
+  if (!card) return;
+  var favs = __getFavoriteTabs();
+
+  if (!favs.length) {
+    card.innerHTML =
+      '<div class="portal-favorites-empty" onclick="openFavoritesModal()">' +
+      '  <div class="portal-favorites-empty-text">⭐ اختر ما تريد رؤيته — اعمل اختصارات سريعة لأهم التبويبات اللي بتستخدمها كل يوم</div>' +
+      '  <button type="button" class="portal-favorites-cta-btn" onclick="openFavoritesModal()">اختيار الآن</button>' +
+      '</div>';
+    return;
+  }
+
+  var html = '<div class="portal-favorites-head">';
+  html += '  <div class="portal-favorites-title">⭐ اختصاراتك</div>';
+  html += '  <button type="button" class="portal-favorites-edit-btn" onclick="openFavoritesModal()">تعديل الاختيارات</button>';
+  html += '</div>';
+  html += '<div class="portal-favorites-chips">';
+  favs.forEach(function (f) {
+    html += '<button type="button" class="portal-favorites-chip" onclick="openFavoriteTab(\'' + f.category + '\',\'' + f.name + '\')">' + f.label + '</button>';
+  });
+  html += '</div>';
+  card.innerHTML = html;
+}
+
+/* فتح نافذة الاختيار — تبني القائمة ديناميكياً من كل الأقسام */
+function openFavoritesModal() {
+  var body = document.getElementById("portalFavoritesModalBody");
+  var overlay = document.getElementById("portalFavoritesModalOverlay");
+  if (!body || !overlay) return;
+
+  var favs = __getFavoriteTabs();
+  var favKeys = favs.map(function (f) { return f.category + "::" + f.name; });
+
+  var html = '';
+  Object.keys(PORTAL_CATEGORIES).forEach(function (catKey) {
+    var cat = PORTAL_CATEGORIES[catKey];
+    html += '<div class="portal-favorites-group">';
+    html += '  <div class="portal-favorites-group-title">' + cat.icon + ' ' + cat.title + '</div>';
+    cat.tabs.forEach(function (t) {
+      var key = catKey + "::" + t.name;
+      var checked = favKeys.indexOf(key) !== -1 ? "checked" : "";
+      html += '<label class="portal-favorites-check-item">';
+      html += '  <input type="checkbox" data-cat="' + catKey + '" data-name="' + t.name + '" data-label="' + t.label + '" ' + checked + '>';
+      html += '  <span>' + t.label + '</span>';
+      html += '</label>';
+    });
+    html += '</div>';
+  });
+  body.innerHTML = html;
+  overlay.style.display = "flex";
+}
+
+function closeFavoritesModal() {
+  var overlay = document.getElementById("portalFavoritesModalOverlay");
+  if (overlay) overlay.style.display = "none";
+}
+
+/* إلغاء كل الاختيارات دفعة واحدة (بدل الشيل واحد واحد) — بيفضّي
+   كل الـ checkboxes في النافذة، ويحفظ الحالة الفارغة فوراً ويعيد
+   رسم الكارت، عشان الاختصارات فعلاً تتمسح، مش مجرد إزالة الـ ✓
+   البصرية من النافذة. */
+function clearFavoritesModal() {
+  var body = document.getElementById("portalFavoritesModalBody");
+  if (body) {
+    var checked = body.querySelectorAll('input[type="checkbox"]:checked');
+    checked.forEach(function (cb) { cb.checked = false; });
+  }
+  __setFavoriteTabs([]);
+  if (typeof __renderPortalFavoritesCard === "function") __renderPortalFavoritesCard();
+}
+
+function saveFavoritesModal() {
+  var body = document.getElementById("portalFavoritesModalBody");
+  if (!body) return;
+  var checked = body.querySelectorAll('input[type="checkbox"]:checked');
+  var list = [];
+  checked.forEach(function (cb) {
+    list.push({
+      category: cb.getAttribute("data-cat"),
+      name: cb.getAttribute("data-name"),
+      label: cb.getAttribute("data-label")
+    });
+  });
+  __setFavoriteTabs(list);
+  __renderPortalFavoritesCard();
+  closeFavoritesModal();
+}
+
+/* فتح تبويب معيّن مباشرة من الاختصار — بيفتح القسم الصحيح أولاً
+   (نفس navigateToCategory الأصلية) ثم يقفز فوراً للتبويب المطلوب
+   بدل أول تبويب افتراضي في القسم */
+function openFavoriteTab(catKey, tabName) {
+  navigateToCategory(catKey);
+  goToSubTab(tabName);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", __renderPortalFavoritesCard);
+} else {
+  __renderPortalFavoritesCard();
+}
+
+/* الانتقال من Portal Home إلى قسم معيّن + عرض Sidebar الخاص به
+   + فتح أول تبويب فرعي تلقائياً (دون حذف أي تبويب قديم) */
+function navigateToCategory(catKey) {
+  var cat = PORTAL_CATEGORIES[catKey];
+  if (!cat) return;
+  window.CURRENT_PORTAL_CATEGORY = catKey;
+
+  var portalHome = document.getElementById("portal-home");
+  var legacyArea = document.getElementById("legacyDashboardArea");
+  if (portalHome) portalHome.style.display = "none";
+  if (legacyArea) legacyArea.classList.remove("legacy-hidden");
+  document.body.classList.remove("portal-active");
+
+  renderCategorySidebar(catKey);
+
+  if (cat.tabs && cat.tabs.length) {
+    goToSubTab(cat.tabs[0].name);
+  }
+
+  var mainEl = document.querySelector(".content");
+  if (mainEl) mainEl.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+/* العودة إلى Portal Home */
+function goToPortalHome() {
+  window.CURRENT_PORTAL_CATEGORY = null;
+  var portalHome = document.getElementById("portal-home");
+  var legacyArea = document.getElementById("legacyDashboardArea");
+  if (legacyArea) legacyArea.classList.add("legacy-hidden");
+  if (portalHome) portalHome.style.display = "";
+  document.body.classList.add("portal-active");
+}
+
+/* فتح تبويب فرعي عبر النظام القديم showTab() نفسه — بدون أي تعديل عليه */
+function goToSubTab(name) {
+  if (typeof showTab !== "function") return;
+  showTab(name, null);
+  if (name === "payments" && typeof paymentsInitTab === "function") {
+    paymentsInitTab();
+  }
+  window.CURRENT_SECTION = name; /* يُستخدم لاحقاً من قبل المساعد الذكي (المرحلة 9) */
+  highlightSidebarActive(name);
+  __toggleOverviewKpisVisibility(name);
+}
+
+/* تُظهر بطاقات KPI العامة + شريط FCA فقط عند "نظرة عامة" (طلب صريح) */
+function __toggleOverviewKpisVisibility(name) {
+  var legacyArea = document.getElementById("legacyDashboardArea");
+  if (!legacyArea) return;
+  if (name === "overview") legacyArea.classList.add("viewing-overview");
+  else legacyArea.classList.remove("viewing-overview");
+}
+
+/* بناء الـ Sidebar الخاص بكل قسم (خاص بالقسم فقط، وليس Sidebar عام) */
+function renderCategorySidebar(catKey) {
+  var cat = PORTAL_CATEGORIES[catKey];
+  var sidebar = document.getElementById("categorySidebar");
+  if (!sidebar || !cat) return;
+
+  var html = '';
+  html += '<button type="button" id="sidebarToggleBtn" class="cat-sidebar-toggle" onclick="toggleCategorySidebar()" title="فتح القائمة"><span class="cat-sidebar-toggle-icon">☰</span><span class="cat-sidebar-toggle-label">القائمة</span></button>';
+  html += '<div class="cat-sidebar-head">';
+  html += '  <button type="button" class="cat-back-btn" onclick="goToPortalHome()">⟵ الرئيسية</button>';
+  html += '  <div class="cat-sidebar-title">' + cat.icon + ' ' + cat.title + '</div>';
+  html += '</div>';
+
+  /* قسم "⭐ اختصاراتك" — يظهر فقط لو عنده اختصارات محفوظة، ويتيح
+     القفز لأي اختصار من أي قسم مباشرة دون الرجوع لـ Portal Home */
+  var favs = typeof __getFavoriteTabs === "function" ? __getFavoriteTabs() : [];
+  if (favs.length) {
+    html += '<div class="cat-sidebar-favs">';
+    html += '  <div class="cat-sidebar-favs-title">⭐ اختصاراتك</div>';
+    html += '  <div class="cat-sidebar-list">';
+    favs.forEach(function (f) {
+      var isCurrent = f.category === catKey;
+      html += '<button type="button" class="cat-sidebar-item cat-sidebar-fav-item" data-subtab="' + f.name + '" onclick="openFavoriteTab(\'' + f.category + '\',\'' + f.name + '\')">' + f.label + (isCurrent ? '' : ' <span class="cat-sidebar-fav-cat">(' + PORTAL_CATEGORIES[f.category].title + ')</span>') + '</button>';
+    });
+    html += '  </div>';
+    html += '</div>';
+  }
+
+  html += '<div class="cat-sidebar-list">';
+  cat.tabs.forEach(function (t) {
+    html += '<button type="button" class="cat-sidebar-item" data-subtab="' + t.name + '" onclick="goToSubTab(\'' + t.name + '\')">' + t.label + '</button>';
+  });
+  html += '</div>';
+
+  sidebar.innerHTML = html;
+  __applySidebarCollapsedState();
+}
+
+/* حالة القفل تُحفظ عبر الجلسات (localStorage) — افتراضياً مقفول
+   لإتاحة أقصى مساحة للمحتوى والرسوم البيانية من أول لحظة، بناءً
+   على طلب صريح */
+function __isSidebarCollapsed() {
+  var v = localStorage.getItem("fm_sidebar_collapsed");
+  return v === null ? true : v === "true";
+}
+
+function __applySidebarCollapsedState() {
+  var sidebar = document.getElementById("categorySidebar");
+  if (!sidebar) return;
+  var collapsed = __isSidebarCollapsed();
+  sidebar.classList.toggle("collapsed", collapsed);
+  var btn = document.getElementById("sidebarToggleBtn");
+  if (btn) btn.title = collapsed ? "فتح القائمة" : "إغلاق القائمة";
+}
+
+function toggleCategorySidebar() {
+  var collapsed = !__isSidebarCollapsed();
+  localStorage.setItem("fm_sidebar_collapsed", String(collapsed));
+  __applySidebarCollapsedState();
+}
+
+function highlightSidebarActive(name) {
+  var sidebar = document.getElementById("categorySidebar");
+  if (!sidebar) return;
+  var items = sidebar.querySelectorAll(".cat-sidebar-item");
+  items.forEach(function (it) {
+    if (it.getAttribute("data-subtab") === name) it.classList.add("active");
+    else it.classList.remove("active");
+  });
+}
+
+/* ربط بطاقات Portal Home بالتنقل (المرحلة 3) — إضافة مستمعات فقط،
+   دون تعديل الـ HTML الخاص بالبطاقات نفسها */
+document.addEventListener("DOMContentLoaded", function () {
+  var cards = document.querySelectorAll(".portal-card[data-category]");
+  cards.forEach(function (card) {
+    card.addEventListener("click", function () {
+      navigateToCategory(card.getAttribute("data-category"));
+    });
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   REAL DATA COMPLETION SIGNAL (المرحلة 6 — نسخة مُصححة)
+   ──────────────────────────────────────────────────────────────────────
+   تعديل بناءً على طلب صريح: شاشة التحميل يجب ألا تعتمد على مراقبة DOM
+   أو KPIs أو MutationObserver — بل على اكتمال تحميل البيانات الحقيقي.
+
+   الحل: تغليف غير-هدّام (نفس أسلوب showTab سابقاً) لدالة window.loadData
+   الأصلية — نستدعي النسخة الأصلية كما هي بالضبط (بنفس السلوك: fetch
+   GAS_URL + CSV + بناء RAW + applyFilters + رسم الرسوم)، وبعد أن
+   تكتمل (await) فعلياً — نجاحاً أو فشلاً — نُطلق حدث "core-data-ready"
+   مرة واحدة. هذا توقيت حقيقي 100% مأخوذ من اكتمال الـ Promise نفسه،
+   وليس من مراقبة أي عنصر HTML.
+   لا تعديل على منطق loadData() الأصلي إطلاقاً — فقط استدعاء إضافي
+   بعد اكتمالها.
+   ══════════════════════════════════════════════════════════════════════ */
+
+window.__CORE_DATA_READY__ = false;
+
+(function wireRealDataCompletionSignal() {
+  function applyWrap() {
+    if (typeof window.loadData !== "function" || window.loadData.__readyWrapped) return;
+    var originalLoadData = window.loadData;
+    var wrapped = async function (silent) {
+      var result = await originalLoadData(silent);
+      /* تحقّق حقيقي: هل RAW فعلاً امتلأت ببيانات؟ (وليس فقط أن الدالة
+         انتهت — لأن loadData الأصلية تلتقط الأخطاء داخلياً وتُعيد
+         المحاولة تلقائياً عبر setTimeout، فقد "تنتهي" دون أن تكون
+         البيانات قد وصلت فعلاً). لو لسه مفيش بيانات، ننتظر — الكود
+         الأصلي نفسه سيُعيد استدعاء loadData() تلقائياً عند الفشل،
+         وحينها هذا الـ wrapper سيُستدعى من جديد ويتحقق مرة أخرى —
+         بلا حد أقصى زمني، مهما طال الأمر */
+      if (!window.__CORE_DATA_READY__ && typeof RAW !== "undefined" && Array.isArray(RAW) && RAW.length > 0) {
+        window.__CORE_DATA_READY__ = true;
+        document.dispatchEvent(new CustomEvent("core-data-ready"));
+      }
+      return result;
+    };
+    wrapped.__readyWrapped = true;
+    window.loadData = wrapped;
+  }
+  /* لازم يُطبَّق فوراً بشكل متزامن (وليس داخل DOMContentLoaded) حتى يسبق
+     __scheduleDashboardLoad الذي يستدعي loadData() عبر setTimeout(0) —
+     وهو ما يحدث دائماً بعد اكتمال تنفيذ هذا السكربت بالكامل، فالتوقيت آمن */
+  applyWrap();
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+   REAL PROGRESS SIGNAL (تعديل بناءً على طلب صريح: Progress حقيقي)
+   ──────────────────────────────────────────────────────────────────────
+   نفس أسلوب التغليف غير-الهدّام: نغلّف setProgress() الأصلية (الموجودة
+   مسبقاً في الكود القديم، سطر 672) والتي تُستدعى بالفعل من داخل
+   loadData() عند كل مرحلة حقيقية من التحميل (15 → 20 → 30 → 60 → 75 →
+   90 → 100). لا نضيف أي مرحلة وهمية ولا نغيّر النِّسب الأصلية —
+   فقط نعرض تسمية عربية توضح ماذا يحدث فعلياً عند كل نسبة حقيقية.
+
+   ملاحظة أمانة مهمة: "البلاغات" و"التكلفة" و"حصر الأصول" في التصميم
+   الأصلي تُحمَّل بشكل منفصل (Lazy) بعد اكتمال هذا التسلسل أو عند فتح
+   تبويبها — وليست جزءاً من fetch واحد مع المدارس. لذلك لا تظهر لهما
+   نسبة داخل هذا الشريط حتى لا نعرض Progress غير حقيقي؛ بدلاً من ذلك
+   البلاغات تبدأ تحميلها تلقائياً في الخلفية فور اكتمال 100% (نفس سلوك
+   النسخة الأصلية تماماً، دون أي تغيير).
+   ══════════════════════════════════════════════════════════════════════ */
+(function wireRealProgressSignal() {
+  var STAGE_LABELS = {
+    0:   "حدث خطأ في الاتصال — إعادة المحاولة...",
+    15:  "الاتصال بمصدر البيانات...",
+    20:  "بدء تحميل بيانات المدارس والمباني...",
+    30:  "تحميل بيانات المدارس والمباني...",
+    60:  "تحميل وتحليل بيانات FCA (CSV)...",
+    75:  "بناء قاعدة البيانات — ربط الأصول والأنظمة والعقود...",
+    90:  "تجهيز البيانات النهائية...",
+    100: "تجهيز الفلاتر — الرسوم البيانية ستُرسم عند فتح كل قسم"
+  };
+  function applyWrap() {
+    if (typeof window.setProgress !== "function" || window.setProgress.__uiWrapped) return;
+    var originalSetProgress = window.setProgress;
+    var wrapped = function (p) {
+      var result = originalSetProgress(p);
+      __appLoadingSetProgress(p, STAGE_LABELS[p] || null);
+      return result;
+    };
+    wrapped.__uiWrapped = true;
+    window.setProgress = wrapped;
+  }
+  applyWrap();
+})();
+
+function __appLoadingSetProgress(pct, taskText) {
+  var fill = document.getElementById("appLoadingProgressFill");
+  var pctEl = document.getElementById("appLoadingPct");
+  var taskEl = document.getElementById("appLoadingTaskText");
+  var target = Math.max(6, Math.min(100, pct));
+
+  clearInterval(window.__appLoadingCreepTimer);
+
+  if (fill) fill.style.width = target + "%";
+  if (pctEl) pctEl.textContent = Math.round(target) + "%";
+  if (taskEl && taskText) taskEl.textContent = taskText;
+
+  // زحف بصري بطيء أثناء الانتظار الحقيقي لخطوة تالية (مثل انتظار الشبكة) —
+  // لا يمثل تقدماً وهمياً، فقط يمنع ظهور الشريط "متجمداً" لفترة طويلة.
+  // أقصى سقف = المنتصف بين النقطة الحالية والـ 100%، ولا يتخطى 96% أبداً،
+  // وبمجرد وصول الخطوة الحقيقية التالية عبر setProgress() الحقيقية، يُلغى
+  // هذا الزحف فوراً ويُستبدل بالرقم الحقيقي.
+  if (target < 100) {
+    var current = target;
+    var cap = Math.min(96, target + (100 - target) * 0.5);
+    window.__appLoadingCreepTimer = setInterval(function () {
+      current += (cap - current) * 0.06 + 0.1;
+      if (current >= cap) { current = cap; clearInterval(window.__appLoadingCreepTimer); }
+      if (fill) fill.style.width = current + "%";
+      if (pctEl) pctEl.textContent = Math.round(current) + "%";
+    }, 280);
+  }
+}
+
+function __appLoadingHide() {
+  clearInterval(window.__appLoadingCreepTimer);
+  var screen = document.getElementById("appLoadingScreen");
+  if (screen) screen.classList.add("hidden");
+}
+
+document.addEventListener("core-data-ready", function () {
+  __appLoadingSetProgress(100, "اكتمل التحميل");
+
+  /* عرض Portal Home فقط الآن (كان مخفياً من HTML الأصلي منذ المرحلة 2
+     ولم يكن هناك من قبل أي كود يُظهره تلقائياً عند بدء التشغيل — هذا
+     هو سبب عدم ظهور Portal بشكل صحيح، ونُصلحه هنا بأمان) */
+  var portalHome = document.getElementById("portal-home");
+  if (portalHome) portalHome.style.display = "";
+
+  var updEl = document.getElementById("lastTime");
+  var schoolsEl = document.getElementById("k-total");
+  var studentsEl = document.getElementById("k-students-total");
+  var s1 = document.getElementById("appLoadStatSchools");
+  var s2 = document.getElementById("appLoadStatAssets");
+  var s3 = document.getElementById("appLoadStatReports");
+  var s4 = document.getElementById("appLoadStatUpdated");
+  var pTitle = document.getElementById("portalLastUpdate");
+  if (s1 && schoolsEl) s1.textContent = schoolsEl.textContent;
+  if (s2 && studentsEl) s2.textContent = studentsEl.textContent;
+  if (s3 && schoolsEl) s3.textContent = schoolsEl.textContent;
+  if (s4 && updEl) s4.textContent = updEl.textContent || "—";
+  if (pTitle && updEl) pTitle.textContent = updEl.textContent || "—";
+
+  /* البيانات الأساسية (RAW) مشتركة بين كل الأقسام تقريباً — بمجرد
+     اكتمالها تصبح كل الأقسام قابلة للفتح فوراً (التبويبات تُرسم عند
+     الفتح كما كانت دائماً) */
+  ["assessment", "assets", "contracts", "operations", "geo", "explore"].forEach(function (key) {
+    var s = document.getElementById("portalStatus-" + key);
+    var c = document.getElementById("portalCount-" + key);
+    if (s) { s.textContent = "جاهز"; s.className = "portal-card-status ready"; }
+    if (c && schoolsEl) c.textContent = schoolsEl.textContent + " سجل";
+  });
+
+  setTimeout(function () {
+    __appLoadingHide();
+    var walker = document.getElementById("fmbotWalker");
+    if (walker) walker.classList.add("bot-ready");
+  }, 250);
+});
+
+/* بناءً على طلب صريح: لا يوجد أي حد زمني يُجبر الدخول قبل اكتمال
+   البيانات فعلياً، مهما طال وقت التحميل. لو تأخر الاتصال، الكود
+   الأصلي نفسه (retryCount / RETRY_DELAY_MS) يُعيد المحاولة تلقائياً،
+   وشاشة التحميل تبقى ظاهرة وتُحدّث رسالتها فقط لطمأنة المستخدم أن
+   المحاولة مستمرة — دون أي دخول وهمي للـ Portal. */
+setTimeout(function tellUserStillTrying() {
+  if (window.__CORE_DATA_READY__) return;
+  var pctEl = document.getElementById("appLoadingPct");
+  var currentPct = pctEl ? parseInt(String(pctEl.textContent).replace(/[^\d]/g, ""), 10) : NaN;
+  if (!Number.isFinite(currentPct)) currentPct = 15;
+  __appLoadingSetProgress(
+    Math.max(15, currentPct),
+    "الاتصال بمصدر البيانات أبطأ من المعتاد حالياً — جاري إعادة المحاولة..."
+  );
+  setTimeout(tellUserStillTrying, 8000);
+}, 15000);
+
+/* ══════════════════════════════════════════════════════════════════════
+   ASSISTANT CONTEXT (المرحلة 9 — Assistant Context)
+   تغليف غير-هدّام لدالة showTab() القديمة (بدون تعديل جسمها) لضبط
+   window.CURRENT_SECTION تلقائياً أياً كان مصدر التنقل (Sidebar الجديد
+   أو شريط التبويبات القديم) ليستخدمه المساعد الذكي داخل الـ Prompt.
+   ══════════════════════════════════════════════════════════════════════ */
+(function wireAssistantContext() {
+  function applyWrap() {
+    if (typeof window.showTab !== "function" || window.showTab.__contextWrapped) return;
+    var originalShowTab = window.showTab;
+    var wrapped = function (name, el) {
+      var result = originalShowTab(name, el);
+      window.CURRENT_SECTION = name;
+      window.__ACTIVE_TAB__ = name;
+      if (window.CURRENT_PORTAL_CATEGORY) highlightSidebarActive(name);
+      if (typeof __toggleOverviewKpisVisibility === "function") __toggleOverviewKpisVisibility(name);
+      return result;
+    };
+    wrapped.__contextWrapped = true;
+    window.showTab = wrapped;
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyWrap);
+  } else {
+    applyWrap();
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   🧠 AI CONTEXT ENGINE v2.0 — محرك السياق الذكي
+   ─────────────────────────────────────────────────────────────────────────────
+   المهمة 1: قراءة بيانات الداشبورد الحية وبناء Executive Context ديناميكي
+   المهمة 2: Executive Insight Engine — تحليل تلقائي عند الطلب
+
+   القواعد:
+   - لا يُعدَّل أي كود أو منطق موجود
+   - يعمل عبر patch غير هدّام على window.fcbSend
+   - يقرأ FILTERED و DataService و DOM KPIs و RAW_* المتاحة
+   - يُضاف الـ context تلقائياً لكل رسالة إلى GPT
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+(function AI_ContextEngine() {
+  "use strict";
+
+  /* ══════════════════════════════════════════════════════════════════
+     1. بناء Executive Context من بيانات الداشبورد الحية
+     ══════════════════════════════════════════════════════════════════ */
+  function buildLiveContext() {
+    try {
+      var ctx = {};
+
+      /* ── الفلاتر والتبويب الحالي ── */
+      var gv = function(id) {
+        var el = document.getElementById(id);
+        return el ? (el.value || "").trim() : "";
+      };
+      var gt = function(id) {
+        var el = document.getElementById(id);
+        return el ? (el.textContent || "").trim() : null;
+      };
+
+      ctx.التبويب_الحالي = window.__ACTIVE_TAB_LABEL__ || window.__ACTIVE_TAB__ || window.CURRENT_SECTION || "نظرة عامة";
+
+      var filters = {};
+      /* ⚠️ كل المفاتيح هنا فلاتر (إعدادات عرض) فقط — لذلك بادئة "فلتر_"
+         صريحة في كل اسم لمنع الخلط مع الإحصائيات الفعلية. */
+      var fMap = {
+        فلتر_المدينة: "fCity", فلتر_المحافظة: "fSector", فلتر_المرحلة: "fStage",
+        فلتر_الجنس: "fGender", فلتر_الحي: "fDistrict", فلتر_الملكية: "fOwner",
+        فلتر_حالة_الاشتراك: "fSubStatus", فلتر_الحد_الأدنى_لتقييم_FCA: "fFcaMin"
+      };
+      Object.keys(fMap).forEach(function(k) {
+        var v = gv(fMap[k]);
+        /* Validation Layer: تجاهل القيم الفارغة/NaN */
+        if (v && v !== "NaN" && v !== "null" && v !== "undefined") filters[k] = v;
+      });
+      var search = (document.getElementById("fSearch") || {}).value || "";
+      if (search.trim()) filters["فلتر_بحث_نصي"] = search.trim();
+      ctx.الفلاتر_المطبقة = Object.keys(filters).length ? filters : "لا توجد فلاتر — كل البيانات معروضة";
+      ctx.ملاحظة_حول_الفلاتر = "قيم قسم الفلاتر أعلاه هي إعدادات عرض اختارها المستخدم فقط، وليست نتائج إحصائية، ولا يجوز استخدامها كأرقام تحليلية بأي شكل (مثال: فلتر الحد الأدنى لتقييم FCA ليس هو أقل تقييم FCA فعلي — أقل تقييم فعلي يُؤخذ فقط من تحليل_FCA_الحي).";
+
+      /* ── KPIs من الـ DOM (القيم الظاهرة فعلياً للمستخدم) ── */
+      var kpis = {};
+      var kpiMap = {
+        "إجمالي_المدارس": "k-total",
+        "متوسط_FCA": "k-fca-avg",
+        "متوسط_البيئة": "k-env-avg",
+        "مدارس_FCA_منخفضة": "k-low-fca",
+        "إجمالي_التنبيهات": "k-alerts-total",
+        "إجمالي_وحدات_التكييف": "k-ac-total",
+        "إجمالي_الطلاب": "k-students-total",
+        "متوسط_عمر_المبنى": "k-age-avg",
+        "مباني_قديمة_40+": "k-age-old",
+        "مباني_جديدة_-10": "k-age-new",
+        "إجمالي_التكلفة": "cost-k-totalprice"
+      };
+      Object.keys(kpiMap).forEach(function(k) {
+        var v = gt(kpiMap[k]);
+        if (v && v !== "—") kpis[k] = v;
+      });
+      if (Object.keys(kpis).length) ctx.KPIs_الظاهرة_حالياً = kpis;
+
+      /* ── إحصائيات من FILTERED (البيانات المعروضة بعد الفلترة) ── */
+      if (typeof FILTERED !== "undefined" && Array.isArray(FILTERED) && FILTERED.length) {
+        var D = FILTERED;
+        var n = D.length;
+        ctx.عدد_السجلات_المعروضة = n;
+
+        /* FCA */
+        var fcaArr = D.filter(function(r) { return r.fca != null; });
+        if (fcaArr.length) {
+          var fcaSum = fcaArr.reduce(function(s, r) { return s + r.fca; }, 0);
+          var fcaAvg = Math.round(fcaSum / fcaArr.length * 10) / 10;
+          var fcaCrit = fcaArr.filter(function(r) { return r.fca < 25; }).length;
+          var fcaMid  = fcaArr.filter(function(r) { return r.fca >= 25 && r.fca < 50; }).length;
+          var fcaGood = fcaArr.filter(function(r) { return r.fca >= 50 && r.fca < 75; }).length;
+          var fcaVG   = fcaArr.filter(function(r) { return r.fca >= 75; }).length;
+          var fcaMin  = fcaArr.reduce(function(m, r) { return r.fca < m.fca ? r : m; }, fcaArr[0]);
+          var fcaMax  = fcaArr.reduce(function(m, r) { return r.fca > m.fca ? r : m; }, fcaArr[0]);
+          ctx.تحليل_FCA_الحي = {
+            عدد_المقيّم: fcaArr.length,
+            المتوسط: fcaAvg,
+            حرجة_أقل_25: fcaCrit,
+            متوسطة_25_50: fcaMid,
+            جيدة_50_75: fcaGood,
+            جيدة_جداً_75_100: fcaVG,
+            أدنى_درجة: { المدرسة: fcaMin.name, الدرجة: fcaMin.fca },
+            أعلى_درجة: { المدرسة: fcaMax.name, الدرجة: fcaMax.fca },
+            أسوأ_5_مدارس: fcaArr.slice().sort(function(a,b){return a.fca-b.fca;}).slice(0,5).map(function(r){return {اسم:r.name,FCA:r.fca,مدينة:r.city};})
+          };
+        }
+
+        /* البيئة المدرسية */
+        var envArr = D.filter(function(r) { return r.envScore != null; });
+        if (envArr.length) {
+          var envSum = envArr.reduce(function(s, r) { return s + r.envScore; }, 0);
+          ctx.البيئة_المدرسية_الحية = {
+            عدد_المقيّم: envArr.length,
+            المتوسط: Math.round(envSum / envArr.length * 10) / 10,
+            أسوأ_5: envArr.slice().sort(function(a,b){return a.envScore-b.envScore;}).slice(0,5).map(function(r){return {اسم:r.name,درجة:r.envScore,مدينة:r.city};})
+          };
+        }
+
+        /* التوزيع الجغرافي */
+        var cityCount = {};
+        D.forEach(function(r) { if (r.city) cityCount[r.city] = (cityCount[r.city] || 0) + 1; });
+        ctx.توزيع_المدن_الحي = cityCount;
+
+        /* التكلفة */
+        var costArr = D.filter(function(r) { return r.cost != null && r.cost > 0; });
+        if (costArr.length) {
+          var totalCost = costArr.reduce(function(s, r) { return s + r.cost; }, 0);
+          var maxCost   = costArr.reduce(function(m, r) { return r.cost > m.cost ? r : m; }, costArr[0]);
+          ctx.التكلفة_الحية = {
+            الإجمالي: totalCost,
+            متوسط_للمدرسة: Math.round(totalCost / costArr.length),
+            أعلى_مدرسة: { الاسم: maxCost.name, التكلفة: maxCost.cost }
+          };
+        }
+
+        /* المرحلة الدراسية */
+        var stageCount = {};
+        D.forEach(function(r) { if (r.stage) stageCount[r.stage] = (stageCount[r.stage] || 0) + 1; });
+        if (Object.keys(stageCount).length) ctx.توزيع_المراحل_الحي = stageCount;
+      }
+
+      /* ── البلاغات من RAW_BALAGH ── */
+      if (Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) {
+        var bal = window.RAW_BALAGH;
+        var bTotal = bal.length;
+        var statusKey = ["الحالة","Status","status","حالة البلاغ"].find(function(k){return bal[0] && k in bal[0];});
+        var priorityKey = ["الأولوية","Priority","priority","درجة الأولوية"].find(function(k){return bal[0] && k in bal[0];});
+        var cityKeyB = ["المدينة","City","city","المنطقة"].find(function(k){return bal[0] && k in bal[0];});
+        var catKey = ["الفئة","Category","category","نوع البلاغ","الفئة الرئيسية"].find(function(k){return bal[0] && k in bal[0];});
+
+        var bCtx = { الإجمالي: bTotal };
+        if (statusKey) {
+          var statusDist = {};
+          bal.forEach(function(r) { var s = r[statusKey] || "غير محدد"; statusDist[s] = (statusDist[s]||0)+1; });
+          bCtx.توزيع_الحالة = statusDist;
+        }
+        if (priorityKey) {
+          var pDist = {};
+          bal.forEach(function(r) { var p = r[priorityKey] || "غير محدد"; pDist[p] = (pDist[p]||0)+1; });
+          bCtx.توزيع_الأولوية = pDist;
+        }
+        if (cityKeyB) {
+          var cDist = {};
+          bal.forEach(function(r) { var c = r[cityKeyB] || "غير محدد"; cDist[c] = (cDist[c]||0)+1; });
+          var cSorted = Object.keys(cDist).sort(function(a,b){return cDist[b]-cDist[a];}).slice(0,5);
+          var top5c = {};
+          cSorted.forEach(function(k){ top5c[k] = cDist[k]; });
+          bCtx.أعلى_5_مدن_بلاغاً = top5c;
+        }
+        if (catKey) {
+          var catDist = {};
+          bal.forEach(function(r) { var c = r[catKey] || "غير محدد"; catDist[c] = (catDist[c]||0)+1; });
+          var catSorted = Object.keys(catDist).sort(function(a,b){return catDist[b]-catDist[a];}).slice(0,5);
+          var top5cat = {};
+          catSorted.forEach(function(k){ top5cat[k] = catDist[k]; });
+          bCtx.أعلى_5_فئات = top5cat;
+        }
+        ctx.البلاغات_الحية = bCtx;
+      }
+
+      /* ── الأنظمة المتعطلة من RAW_ALL_SYSTEMS ── */
+      if (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) {
+        var sys = window.RAW_ALL_SYSTEMS;
+        var condKey = ["الحالة","condition","Condition","حالة النظام"].find(function(k){return sys[0] && k in sys[0];});
+        var sysNameKey = ["النظام_الرئيسي","System","system","اسم النظام","النظام"].find(function(k){return sys[0] && k in sys[0];});
+        if (condKey && sysNameKey) {
+          var brokenSys = sys.filter(function(r){ var c = String(r[condKey]||"").toLowerCase(); return c.includes("متعطل") || c.includes("خراب") || c.includes("broken") || c.includes("failed"); });
+          if (brokenSys.length) {
+            var sysDist = {};
+            brokenSys.forEach(function(r){ var s = r[sysNameKey]||"غير محدد"; sysDist[s] = (sysDist[s]||0)+1; });
+            var sySorted = Object.keys(sysDist).sort(function(a,b){return sysDist[b]-sysDist[a];}).slice(0,5);
+            var topSys = {};
+            sySorted.forEach(function(k){ topSys[k] = sysDist[k]; });
+            ctx.أعطال_الأنظمة_الحية = { الإجمالي: brokenSys.length, أكثر_الأنظمة_عطلاً: topSys };
+          }
+        }
+      }
+
+      /* ── المصاعد المتعطلة ── */
+      if (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
+        var elev = window.RAW_ELEVATORS;
+        var elevStatKey = ["الحالة","Status","status"].find(function(k){return elev[0] && k in elev[0];});
+        if (elevStatKey) {
+          var broken = elev.filter(function(r){ var s = String(r[elevStatKey]||"").toLowerCase(); return s.includes("متعطل") || s.includes("out") || s.includes("broken"); });
+          ctx.المصاعد_الحية = { الإجمالي: elev.length, المتعطلة: broken.length, العاملة: elev.length - broken.length };
+        }
+      }
+
+      /* ── مؤشر الوقت ── */
+      ctx.وقت_الاستعلام = new Date().toLocaleString("ar-SA", { hour12: true });
+
+      /* Validation Layer: إزالة أي قيمة Null/Undefined/NaN قبل الإرسال لـ GPT */
+      return sanitizeContextDeep(ctx);
+    } catch (e) {
+      console.warn("[AI_ContextEngine] buildLiveContext error:", e);
+      return { خطأ: "تعذّر بناء السياق الحي" };
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     1ب. طبقة التحقق (Validation Layer)
+          تُزيل أي قيمة Null/Undefined/NaN بشكل متكرر (Deep) من أي
+          كائن قبل إرساله ضمن سياق GPT، دون التأثير على القيم الصحيحة
+          (بما فيها الأصفار الفعلية 0 والقيم المنطقية false).
+     ══════════════════════════════════════════════════════════════════ */
+  function sanitizeContextDeep(value) {
+    if (Array.isArray(value)) {
+      return value
+        .map(sanitizeContextDeep)
+        .filter(function(v) { return v !== null && v !== undefined; });
+    }
+    if (value && typeof value === "object") {
+      var out = {};
+      Object.keys(value).forEach(function(k) {
+        var v = value[k];
+        if (v === null || v === undefined) return;
+        if (typeof v === "number" && isNaN(v)) return;
+        if (typeof v === "string" && (v.trim() === "" || v.trim().toLowerCase() === "nan")) return;
+        out[k] = sanitizeContextDeep(v);
+      });
+      return out;
+    }
+    return value;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     2. كشف طلبات التحليل التنفيذي
+     ══════════════════════════════════════════════════════════════════ */
+  var EXECUTIVE_PATTERNS = [
+    /حل[ِّ]?[لا]?\s*البيانات|حل[ِّ]?ل\s*الداش/i,
+    /اعط[ِ]?[نيي]\s*(ي|لي)?\s*ملخص/i,
+    /ما\s*رأيك|رأيك\s*في/i,
+    /executive\s*summary/i,
+    /ما\s*أهم\s*المشاكل/i,
+    /أهم\s*المشاكل|أبرز\s*المشاكل/i,
+    /تقرير\s*شامل|تقرير\s*تنفيذي/i,
+    /ملخص\s*تنفيذي|ملخص\s*شامل/i,
+    /اعمل\s*(لي)?\s*(تقرير|ملخص|تحليل)/i,
+    /top\s*risks?|critical\s*schools/i,
+    /ما\s*الأولويات|الأولويات\s*الرئيسية/i,
+    /ما\s*أبرز\s*النتائج|أبرز\s*المؤشرات/i,
+    /مدارس\s*حرجة|أسوأ\s*المدارس/i,
+    /quick\s*wins?|توصيات\s*سريعة/i,
+    /ما\s*وضع|كيف\s*الوضع|وضع\s*المدارس/i,
+    /overview|نظرة\s*(عامة|شاملة)/i,
+    /احتاج\s*(تحليل|تقرير|ملخص)/i,
+    /ابدأ\s*(بالتحليل|التحليل)/i
+  ];
+
+  function isExecutiveRequest(text) {
+    return EXECUTIVE_PATTERNS.some(function(p) { return p.test(text); });
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     2ب. استخراج المؤشرات والعلاقات ونقاط القوة/الضعف والأولويات
+          (مرحلة تحليل مسبقة قبل إرسال الطلب إلى GPT — يحوّل المساعد
+          من "قارئ بيانات" إلى Executive Decision Assistant)
+     ══════════════════════════════════════════════════════════════════ */
+  function buildAnalyticalInsights(ctx) {
+    try {
+      var insights = {
+        أهم_المؤشرات: {},
+        العلاقات_المكتشفة: [],
+        نقاط_القوة: [],
+        نقاط_الضعف: [],
+        الأولويات_المرتبة: []
+      };
+
+      var fca  = ctx.تحليل_FCA_الحي;
+      var env  = ctx.البيئة_المدرسية_الحية;
+      var cost = ctx.التكلفة_الحية;
+      var bal  = ctx.البلاغات_الحية;
+      var sysBroken = ctx.أعطال_الأنظمة_الحية;
+      var elev = ctx.المصاعد_الحية;
+      var cityDist = ctx.توزيع_المدن_الحي;
+
+      /* ── أهم المؤشرات ── */
+      if (fca) {
+        insights.أهم_المؤشرات.متوسط_FCA = fca.المتوسط;
+        insights.أهم_المؤشرات.نسبة_المدارس_الحرجة =
+          fca.عدد_المقيّم ? Math.round((fca.حرجة_أقل_25 / fca.عدد_المقيّم) * 1000) / 10 + "%" : null;
+      }
+      if (env) insights.أهم_المؤشرات.متوسط_البيئة_المدرسية = env.المتوسط;
+      if (cost) insights.أهم_المؤشرات.متوسط_التكلفة_للمدرسة = cost.متوسط_للمدرسة;
+      if (bal) insights.أهم_المؤشرات.إجمالي_البلاغات = bal.الإجمالي;
+      if (sysBroken) insights.أهم_المؤشرات.إجمالي_الأنظمة_المتعطلة = sysBroken.الإجمالي;
+      if (elev) insights.أهم_المؤشرات.نسبة_المصاعد_المتعطلة =
+        elev.الإجمالي ? Math.round((elev.المتعطلة / elev.الإجمالي) * 1000) / 10 + "%" : null;
+
+      /* ── العلاقات بين البيانات (Operational Insights) ── */
+      if (fca && cost && fca.المتوسط != null && fca.المتوسط < 50 && cost.متوسط_للمدرسة) {
+        insights.العلاقات_المكتشفة.push(
+          "متوسط FCA منخفض نسبياً (" + fca.المتوسط + ") مع وجود تكلفة صيانة قائمة — يستحق فحص العلاقة بين الإنفاق الحالي وفعاليته في رفع تقييم الحالة الفنية."
+        );
+      }
+      if (fca && env && fca.المتوسط != null && env.المتوسط != null && Math.abs(fca.المتوسط - env.المتوسط) > 20) {
+        insights.العلاقات_المكتشفة.push(
+          "فجوة ملحوظة بين متوسط FCA (" + fca.المتوسط + ") ومتوسط البيئة المدرسية (" + env.المتوسط + ") — قد يشير لتفاوت بين الحالة الإنشائية والخدمية للمباني."
+        );
+      }
+      if (bal && bal.أعلى_5_مدن_بلاغاً && fca && fca.أسوأ_5_مدارس) {
+        var topComplaintCity = Object.keys(bal.أعلى_5_مدن_بلاغاً)[0];
+        var worstFcaCities = fca.أسوأ_5_مدارس.map(function(s){ return s.مدينة; });
+        if (topComplaintCity && worstFcaCities.indexOf(topComplaintCity) !== -1) {
+          insights.العلاقات_المكتشفة.push(
+            "مدينة \"" + topComplaintCity + "\" تتصدر عدد البلاغات وتظهر أيضاً ضمن أسوأ المدارس من حيث FCA — نمط متكرر يستدعي أولوية تدخل جغرافية."
+          );
+        }
+      }
+      if (sysBroken && sysBroken.أكثر_الأنظمة_عطلاً) {
+        var topSysName = Object.keys(sysBroken.أكثر_الأنظمة_عطلاً)[0];
+        if (topSysName) {
+          insights.العلاقات_المكتشفة.push(
+            "نظام \"" + topSysName + "\" هو الأكثر تكراراً في الأعطال (" + sysBroken.أكثر_الأنظمة_عطلاً[topSysName] + " حالة) — نمط متكرر عبر أكثر من موقع."
+          );
+        }
+      }
+      if (bal && bal.توزيع_الأولوية) {
+        var highP = Object.keys(bal.توزيع_الأولوية).find(function(k){ return /عالي|عاجل|high|urgent/i.test(k); });
+        if (highP && bal.توزيع_الأولوية[highP]) {
+          insights.العلاقات_المكتشفة.push(
+            "يوجد " + bal.توزيع_الأولوية[highP] + " بلاغاً بأولوية عالية ضمن إجمالي " + bal.الإجمالي + " بلاغ — نسبة تستحق المتابعة العاجلة."
+          );
+        }
+      }
+
+      /* ── نقاط القوة والضعف ── */
+      if (fca) {
+        if (fca.جيدة_جداً_75_100 && fca.عدد_المقيّم) {
+          var goodPct = Math.round((fca.جيدة_جداً_75_100 / fca.عدد_المقيّم) * 100);
+          if (goodPct >= 40) insights.نقاط_القوة.push("نسبة " + goodPct + "% من المدارس تحقق تقييم FCA \"جيد جداً\".");
+        }
+        if (fca.حرجة_أقل_25 > 0) {
+          insights.نقاط_الضعف.push(fca.حرجة_أقل_25 + " مدرسة ضمن الفئة الحرجة (FCA أقل من 25) تحتاج تدخلاً عاجلاً.");
+        }
+      }
+      if (sysBroken && sysBroken.الإجمالي > 0) {
+        insights.نقاط_الضعف.push(sysBroken.الإجمالي + " عطل مسجّل في الأنظمة الرئيسية حالياً.");
+      }
+      if (elev && elev.المتعطلة > 0) {
+        insights.نقاط_الضعف.push(elev.المتعطلة + " مصعد متعطل من إجمالي " + elev.الإجمالي + ".");
+      }
+      if (env && env.المتوسط != null && env.المتوسط >= 75) {
+        insights.نقاط_القوة.push("متوسط البيئة المدرسية مرتفع (" + env.المتوسط + ") ويعكس جودة خدمية جيدة.");
+      }
+
+      /* ── الأولويات المرتبة (Priority Actions) ── */
+      if (fca && fca.أسوأ_5_مدارس) {
+        fca.أسوأ_5_مدارس.slice(0, 3).forEach(function(s) {
+          insights.الأولويات_المرتبة.push("تدخل عاجل: " + s.اسم + " (FCA=" + s.FCA + ", " + s.مدينة + ")");
+        });
+      }
+      if (sysBroken && sysBroken.أكثر_الأنظمة_عطلاً) {
+        var firstSys = Object.keys(sysBroken.أكثر_الأنظمة_عطلاً)[0];
+        if (firstSys) insights.الأولويات_المرتبة.push("معالجة تكرار أعطال نظام: " + firstSys);
+      }
+      if (elev && elev.المتعطلة > 0) {
+        insights.الأولويات_المرتبة.push("إصلاح المصاعد المتعطلة (" + elev.المتعطلة + ")");
+      }
+
+      /* لو لم نجد بيانات كافية لأي قسم، نوضّح ذلك صراحة بدل تركه فارغاً بصمت */
+      if (!insights.العلاقات_المكتشفة.length) insights.العلاقات_المكتشفة.push("لا توجد بيانات كافية حالياً لاستخراج علاقات موثوقة بين المؤشرات.");
+      if (!insights.نقاط_القوة.length) insights.نقاط_القوة.push("لا توجد بيانات كافية لتحديد نقاط قوة واضحة ضمن العرض الحالي.");
+      if (!insights.نقاط_الضعف.length) insights.نقاط_الضعف.push("لا توجد بيانات كافية لتحديد نقاط ضعف واضحة ضمن العرض الحالي.");
+      if (!insights.الأولويات_المرتبة.length) insights.الأولويات_المرتبة.push("لا توجد بيانات كافية لترتيب أولويات محددة ضمن العرض الحالي.");
+
+      return sanitizeContextDeep(insights);
+    } catch (e) {
+      console.warn("[AI_ContextEngine] buildAnalyticalInsights error:", e);
+      return null;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     3. بناء طلب التقرير التنفيذي
+     ══════════════════════════════════════════════════════════════════ */
+  function buildExecutiveInstruction(ctx) {
+    var activeTab = ctx.التبويب_الحالي || "النظرة العامة";
+    var filtersDesc = typeof ctx.الفلاتر_المطبقة === "string"
+      ? ctx.الفلاتر_المطبقة
+      : JSON.stringify(ctx.الفلاتر_المطبقة);
+
+    return (
+      "\n\n[EXECUTIVE_ANALYSIS_REQUEST]\n" +
+      "المستخدم يطلب تحليلاً تنفيذياً شاملاً (Executive Decision Assistant). لا تكتفِ بعرض الأرقام — " +
+      "فسّرها، اشرح أسبابها المحتملة، حدّد الأولويات، واستخرج العلاقات بين البيانات، ونبّه لأي رقم غير منطقي. " +
+      "أعِدّ تقريراً بالأقسام التالية بالترتيب (اذكر فقط ما تدعمه البيانات المتاحة، ولا تخترع أي استنتاج غير مدعوم):\n" +
+      "1. **Executive Summary** — ملخص تنفيذي قصير (3-4 جمل)\n" +
+      "2. **Key Findings** — أهم النتائج المستخرجة من البيانات\n" +
+      "3. **Top Risks** — أهم المخاطر الحالية موثّقة بالأرقام\n" +
+      "4. **Critical Schools** — المدارس ذات الأولوية القصوى (FCA < 25) مع أسمائها ودرجاتها\n" +
+      "5. **Cost Analysis** — تحليل أهم عناصر التكلفة\n" +
+      "6. **Facility Condition Analysis** — تحليل حالة المباني باستخدام FCA\n" +
+      "7. **Operational Insights** — الأنماط والعلاقات بين البيانات (مثال: هل ارتفاع التكلفة مرتبط بانخفاض FCA؟ هل توجد مدينة بها مشاكل متكررة؟ هل يتكرر عطل نظام معين؟)\n" +
+      "8. **Priority Actions** — الإجراءات مرتبة حسب الأولوية الفعلية (غير عشوائية)\n" +
+      "9. **Recommendations** — توصيات قصيرة وقابلة للتنفيذ\n" +
+      "10. **Executive Conclusion** — استنتاج نهائي موجّه للإدارة العليا\n\n" +
+      "⚠️ الشرط الأساسي: كل البنود تعتمد على البيانات الحالية بعد تطبيق الفلاتر التالية: " + filtersDesc + "\n" +
+      "التبويب الحالي المفتوح: " + activeTab + "\n" +
+      "السياق الحي و«التحليل_المسبق» المرفقان أدناه يحتويان على الأرقام والاستنتاجات الأولية الفعلية — استخدمها كأساس ولا تخمّن أي رقم. " +
+      "إذا لم تكفِ البيانات لقسم معيّن، صرّح بذلك صراحة داخل ذلك القسم بدل حذفه أو اختلاق محتوى له. " +
+      "التزم بأسلوب احترافي، منظم، مختصر، ومناسب لعرضه على مدير تنفيذي — وليس مجرد قائمة أرقام."
+    );
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     4. Patch window.fcbSend — الطبقة الرئيسية
+     ══════════════════════════════════════════════════════════════════ */
+  function applyContextPatch() {
+    if (typeof window.fcbSend !== "function") return;
+    if (window.fcbSend.__aiContextEnginePatch) return; // لا تطبّق مرتين
+
+    var _originalFcbSend = window.fcbSend;
+
+    window.fcbSend = async function(presetText) {
+      /* 1) احصل على النص الأصلي */
+      var inputEl = document.getElementById("fcbInput");
+      var rawText = (typeof presetText === "string" ? presetText : (inputEl ? inputEl.value : "")).trim();
+
+      if (!rawText) {
+        return _originalFcbSend.apply(this, arguments);
+      }
+
+      /* 2) ابنِ السياق الحي من الداشبورد */
+      var liveCtx = buildLiveContext();
+
+      /* 3) استخرج المؤشرات/العلاقات/نقاط القوة والضعف/الأولويات
+             قبل إرسال الطلب لـ GPT (Executive Decision Assistant) */
+      var insights = buildAnalyticalInsights(liveCtx);
+
+      /* 4) كشف طلب التحليل التنفيذي */
+      var execInstr = isExecutiveRequest(rawText) ? buildExecutiveInstruction(liveCtx) : "";
+
+      /* 5) خزّن السياق الحي والتحليل المسبق في window.__FCB_LIVE_CONTEXT_INJECT__
+             فقط. هذا الكائن يُقرأ لاحقاً داخل System Message عند بناء
+             الطلب لـ OpenAI (fcbAskOpenAI) — ولا يُضاف أبداً إلى رسالة
+             المستخدم الظاهرة في واجهة المحادثة (Hidden Context). */
+      window.__FCB_LIVE_CONTEXT_INJECT__ = {
+        context: liveCtx,
+        insights: insights,
+        execInstr: execInstr,
+        timestamp: Date.now()
+      };
+
+      /* 6) نُرسل رسالة المستخدم كما كتبها تماماً، دون أي إضافة ظاهرة */
+      return _originalFcbSend.apply(this, arguments);
+    };
+
+    window.fcbSend.__aiContextEnginePatch = true;
+    window.fcbSend.__originalFcbSend = _originalFcbSend;
+    console.log("[AI_ContextEngine] ✅ تم تفعيل محرك السياق الذكي — المساعد يقرأ الآن بيانات الداشبورد الحية");
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     5. انتظر تحميل dashboard.js ثم طبّق الـ patch
+     ══════════════════════════════════════════════════════════════════ */
+  var _attempts = 0;
+  var _patchInterval = setInterval(function() {
+    _attempts++;
+    if (typeof window.fcbSend === "function") {
+      clearInterval(_patchInterval);
+      /* تأخير بسيط لضمان انتهاء كل الـ patches الأخرى أولاً */
+      setTimeout(applyContextPatch, 300);
+    }
+    if (_attempts > 100) {
+      clearInterval(_patchInterval);
+      console.warn("[AI_ContextEngine] لم يُعثر على window.fcbSend بعد 10 ثوانٍ");
+    }
+  }, 100);
+
+  /* ══════════════════════════════════════════════════════════════════
+     6. تعريض الأدوات عالمياً للاستخدام المستقبلي
+     ══════════════════════════════════════════════════════════════════ */
+  window.AI_ContextEngine = {
+    buildLiveContext: buildLiveContext,
+    buildAnalyticalInsights: buildAnalyticalInsights,
+    sanitizeContextDeep: sanitizeContextDeep,
+    isExecutiveRequest: isExecutiveRequest,
+    buildExecutiveInstruction: buildExecutiveInstruction,
+    reapplyPatch: applyContextPatch,
+    version: "2.2"
+  };
+
+})();
+/* ══ نهاية AI Context Engine v2.2 (Filters/Statistics Separation Fix) ══ */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   📐 Dashboard Context Builder v1.0
+   ────────────────────────────────────────────────────────────────────────────
+   الطبقة الوحيدة المسؤولة عن بناء Context قبل إرساله إلى GPT.
+
+   المراحل:
+     STEP 1 — Collect   : جمع البيانات من جميع مصادر الداشبورد
+     STEP 2 — Normalize : توحيد الأسماء + تنظيف القيم
+     STEP 3 — Structure : تقسيم إلى أقسام واضحة (KPIs / Stats / Charts / …)
+     STEP 4 — Validate  : تصنيف كل قيمة (KPI / Stat / Filter / Selection)
+                          ومنع استخدام Filter أو Selection كبيانات تحليلية
+     STEP 5 — Snapshot  : Global Dashboard Snapshot مع Cache ذكي
+     STEP 6 — Patch     : استبدال window.__FCB_LIVE_CONTEXT_INJECT__ بالسياق
+                          المنقّح بالكامل قبل كل إرسال إلى GPT
+
+   القواعد الثابتة (لا استثناء):
+     • Filter ≠ Data   → لا تُستخدم في التحليل
+     • Selection ≠ Fact → لا تُستخدم كإحصائية
+     • Default values  → تُحذف كلياً (0، "الكل"، null، undefined، NaN، "")
+     • أي قيمة تستخدم → مصدرها مسمّى صراحةً (source tag)
+   ════════════════════════════════════════════════════════════════════════════ */
+(function DashboardContextBuilder() {
+  "use strict";
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     0. ثوابت وأدوات مشتركة
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /* قيم تُعتبر "افتراضية" وتُحذف دائماً من Context */
+  var DEFAULT_VALUES = new Set([
+    "", "null", "undefined", "nan", "الكل", "all",
+    "اختر", "select", "select school", "اختر مدرسة",
+    "جميع المدن", "جميع المراحل", "جميع الجنسين",
+    "all cities", "all stages", "all genders"
+  ]);
+
+  /* معرفات عناصر الفلاتر في DOM */
+  var FILTER_DOM_IDS = {
+    فلتر_المدينة:               "fCity",
+    فلتر_المحافظة:              "fSector",
+    فلتر_المرحلة:               "fStage",
+    فلتر_الجنس:                 "fGender",
+    فلتر_حجم_المدرسة:           "fSize",
+    فلتر_الملكية:               "fOwner",
+    فلتر_الحي:                  "fDistrict",
+    فلتر_حالة_الاشتراك:        "fSubStatus",
+    فلتر_الحد_الأدنى_لتقييم_FCA: "fFcaMin",
+    فلتر_بحث_نصي:              "fSearch"
+  };
+
+  /* KPI DOM IDs المعروضة في الواجهة */
+  var KPI_DOM_IDS = {
+    KPI_إجمالي_المدارس:    "k-total",
+    KPI_متوسط_FCA:          "k-fca-avg",
+    KPI_متوسط_البيئة:       "k-env-avg",
+    KPI_مدارس_FCA_منخفضة:  "k-low-fca",
+    KPI_إجمالي_التنبيهات:  "k-alerts-total",
+    KPI_وحدات_التكييف:     "k-ac-total",
+    KPI_إجمالي_الطلاب:     "k-students-total",
+    KPI_متوسط_عمر_المبنى:  "k-age-avg",
+    KPI_مباني_قديمة:        "k-age-old",
+    KPI_مباني_جديدة:        "k-age-new",
+    KPI_إجمالي_التكلفة:    "cost-k-totalprice"
+  };
+
+  /* ── أداة: قراءة قيمة DOM (text أو value) ── */
+  function domText(id) {
+    var el = document.getElementById(id);
+    return el ? (el.textContent || el.value || "").trim() : null;
+  }
+  function domVal(id) {
+    var el = document.getElementById(id);
+    return el ? (el.value || "").trim() : null;
+  }
+
+  /* ── أداة: إزالة القيم الافتراضية/الفارغة بعمق ── */
+  function sanitizeDeep(val) {
+    if (Array.isArray(val)) {
+      return val.map(sanitizeDeep).filter(function(v) {
+        return v !== null && v !== undefined;
+      });
+    }
+    if (val && typeof val === "object") {
+      var out = {};
+      Object.keys(val).forEach(function(k) {
+        var v = val[k];
+        if (v === null || v === undefined) return;
+        if (typeof v === "number" && isNaN(v)) return;
+        if (typeof v === "string" && DEFAULT_VALUES.has(v.trim().toLowerCase())) return;
+        out[k] = sanitizeDeep(v);
+      });
+      return Object.keys(out).length ? out : null;
+    }
+    return val;
+  }
+
+  /* ── أداة: آمن تحويل للرقم ── */
+  function safeNum(v) {
+    var n = parseFloat(v);
+    return isFinite(n) ? n : null;
+  }
+
+  /* ── أداة: متوسط مصفوفة أرقام ── */
+  function avg(arr, field) {
+    var nums = arr.map(function(r) { return safeNum(r[field]); }).filter(function(n) { return n !== null; });
+    if (!nums.length) return null;
+    return Math.round(nums.reduce(function(a, b) { return a + b; }, 0) / nums.length * 10) / 10;
+  }
+
+  /* ── أداة: أعلى/أدنى N عنصر ── */
+  function topN(arr, field, n, ascending) {
+    return arr.slice().sort(function(a, b) {
+      return ascending ? (a[field] - b[field]) : (b[field] - a[field]);
+    }).slice(0, n).map(function(r) {
+      return { اسم: r.name, المدينة: r.city, القيمة: r[field] };
+    });
+  }
+
+  /* ── أداة: توزيع حسب حقل فئوي ── */
+  function countBy(arr, field, limit) {
+    var dist = {};
+    arr.forEach(function(r) {
+      var v = r[field];
+      if (v != null && String(v).trim()) dist[v] = (dist[v] || 0) + 1;
+    });
+    var sorted = Object.keys(dist).sort(function(a, b) { return dist[b] - dist[a]; });
+    if (limit && sorted.length > limit) sorted = sorted.slice(0, limit);
+    var out = {};
+    sorted.forEach(function(k) { out[k] = dist[k]; });
+    return out;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 1 — Collect Dashboard Data
+     جمع البيانات من جميع مصادر الداشبورد الحالية
+     ══════════════════════════════════════════════════════════════════════════ */
+  function collectDashboardData() {
+    var collected = {
+      raw:       null,   // DataService.all() — كل البيانات
+      filtered:  null,   // DataService.filtered() — بعد الفلاتر
+      kpisDom:   {},     // KPIs المعروضة في DOM
+      filtersDom:{},     // قيم عناصر الفلاتر
+      activeTab: null,   // التبويب الحالي
+      dataRev:   null,   // رقم إصدار البيانات للكاش
+      // بيانات التبويبات الإضافية
+      rawBalagh:     window.RAW_BALAGH     || [],
+      rawAllSystems: window.RAW_ALL_SYSTEMS|| [],
+      rawElevators:  window.RAW_ELEVATORS  || [],
+      hasr:          window.HASR           || null,
+    };
+
+    /* RAW + FILTERED من DataService أو المتغيرات العامة */
+    try {
+      if (typeof DataService !== "undefined") {
+        collected.raw      = DataService.all();
+        collected.filtered = DataService.filtered();
+      } else {
+        collected.raw      = (typeof RAW      !== "undefined") ? RAW      : [];
+        collected.filtered = (typeof FILTERED !== "undefined") ? FILTERED : [];
+      }
+    } catch(e) {
+      collected.raw      = (typeof RAW      !== "undefined") ? RAW      : [];
+      collected.filtered = (typeof FILTERED !== "undefined") ? FILTERED : [];
+    }
+
+    /* KPIs من DOM */
+    Object.keys(KPI_DOM_IDS).forEach(function(key) {
+      var v = domText(KPI_DOM_IDS[key]);
+      if (v && v !== "—" && v !== "-") collected.kpisDom[key] = v;
+    });
+
+    /* Filters من DOM — نقرأ فقط، نُصنّف لاحقاً */
+    Object.keys(FILTER_DOM_IDS).forEach(function(key) {
+      var v = domVal(FILTER_DOM_IDS[key]);
+      if (v) collected.filtersDom[key] = v;
+    });
+
+    /* التبويب الحالي */
+    collected.activeTab  = window.__ACTIVE_TAB_LABEL__ || window.__ACTIVE_TAB__ || "نظرة عامة";
+    collected.dataRev    = window.__DATA_REV__ || 0;
+
+    return collected;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 2 — Normalize Data
+     توحيد الأسماء + إزالة التكرار + تحويل الأنواع
+     ══════════════════════════════════════════════════════════════════════════ */
+  function normalizeData(collected) {
+    var norm = {
+      rawCount:      Array.isArray(collected.raw)      ? collected.raw.length      : 0,
+      filteredCount: Array.isArray(collected.filtered) ? collected.filtered.length : 0,
+      rawData:       Array.isArray(collected.raw)      ? collected.raw             : [],
+      filteredData:  Array.isArray(collected.filtered) ? collected.filtered        : [],
+      kpis:          {},
+      filters:       {},   // فقط القيم غير الافتراضية
+      activeTab:     collected.activeTab,
+      dataRev:       collected.dataRev,
+      supplemental:  {
+        balagh:     collected.rawBalagh,
+        systems:    collected.rawAllSystems,
+        elevators:  collected.rawElevators,
+        hasr:       collected.hasr,
+      }
+    };
+
+    /* تنقية KPIs: إزالة "—" والقيم الفارغة */
+    Object.keys(collected.kpisDom).forEach(function(k) {
+      var v = collected.kpisDom[k];
+      if (v && v !== "—") norm.kpis[k] = v;
+    });
+
+    /* تنقية Filters: إزالة القيم الافتراضية صراحةً */
+    Object.keys(collected.filtersDom).forEach(function(k) {
+      var v = String(collected.filtersDom[k] || "").trim();
+      if (!v || DEFAULT_VALUES.has(v.toLowerCase())) return;  // افتراضية → تُحذف
+      if (v === "0" && k === "فلتر_الحد_الأدنى_لتقييم_FCA") return;  // 0 = بلا فلتر
+      norm.filters[k] = v;
+    });
+
+    return norm;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 3 — Build Structured Context
+     تقسيم البيانات إلى أقسام مصنّفة بوضوح
+     ══════════════════════════════════════════════════════════════════════════ */
+  function buildStructuredContext(norm) {
+
+    var D    = norm.filteredData;   // بيانات العمل = المفلترة
+    var DALL = norm.rawData;        // البيانات الكاملة للمقارنة
+    var hasFilters = Object.keys(norm.filters).length > 0;
+
+    /* ─── قسم: Global Dashboard ────────────────────────────────── */
+    var globalDashboard = {
+      _source:               "GlobalDashboard",
+      _description:          "بيانات الداشبورد الكاملة بدون فلاتر",
+      إجمالي_المدارس_في_النظام: DALL.length,
+      توزيع_المدن_الكامل:    countBy(DALL, "city", 15),
+      توزيع_المراحل_الكامل: countBy(DALL, "stage", 10),
+    };
+
+    /* ─── قسم: Current View ──────────────────────────────────────
+       البيانات بعد تطبيق الفلاتر الحالية (قد تساوي Global إن لا فلاتر) */
+    var currentView = {
+      _source:              "CurrentView",
+      _description:         hasFilters
+                             ? "بيانات المجموعة المعروضة بعد تطبيق الفلاتر الحالية"
+                             : "بيانات الداشبورد كاملة (لا فلاتر مطبّقة)",
+      عدد_السجلات_المعروضة: D.length,
+      عدد_السجلات_الكلي:   DALL.length,
+      نسبة_من_الكلي:       DALL.length
+                             ? Math.round(D.length / DALL.length * 1000) / 10 + "%"
+                             : null,
+    };
+
+    /* ─── قسم: Current Tab ───────────────────────────────────────
+       التبويب الذي فتحه المستخدم حالياً */
+    var currentTab = {
+      _source:        "CurrentTab",
+      اسم_التبويب:   norm.activeTab,
+      _note:          "أعطِ أولوية لبيانات هذا التبويب عند الإجابة على أسئلته",
+    };
+
+    /* ─── قسم: Active Filters ────────────────────────────────────
+       ⚠️ هذا القسم: إعدادات عرض فقط — لا تُستخدم كإحصاءات أبداً */
+    var activeFilters = {
+      _source:     "ActiveFilters",
+      _type:       "FILTER",
+      _critical_warning:
+        "⛔ هذا القسم يحتوي على إعدادات عرض (Filters) اختارها المستخدم فقط. " +
+        "لا تستخدم أي قيمة من هذا القسم كإحصاء أو رقم تحليلي. " +
+        "مثال: فلتر_الحد_الأدنى_لتقييم_FCA=30 لا يعني أن أدنى FCA فعلي=30 — " +
+        "أدنى FCA الفعلي يُؤخذ فقط من قسم KPIs أو Statistics.",
+      فلاتر_مطبّقة: hasFilters ? norm.filters : null,
+      وصف:          hasFilters
+                     ? "المستخدم طبّق فلاتر — الإجابة يجب أن تخص المجموعة المعروضة فقط ما لم يطلب الكل صراحةً"
+                     : "لا فلاتر — كل البيانات معروضة",
+    };
+
+    /* ─── قسم: User Selections ──────────────────────────────────
+       ما اختاره المستخدم (تحديد مدرسة/مدينة) — ليس حقيقة إحصائية */
+    var userSelections = {
+      _source:   "UserSelections",
+      _type:     "SELECTION",
+      _warning:  "⛔ قيم التحديد هنا تعني ما اختاره المستخدم للعرض فقط — ليست إحصاءات. المدينة المختارة ليست 'أعلى مدينة'.",
+    };
+
+    /* ─── قسم: KPIs ─────────────────────────────────────────────
+       أرقام المؤشرات الظاهرة في الواجهة — تعكس البيانات المعروضة */
+    var kpiSection = {
+      _source:       "KPIs",
+      _type:         "KPI",
+      _description:  "مؤشرات أداء رئيسية محسوبة من البيانات المعروضة بعد الفلاتر",
+    };
+    Object.keys(norm.kpis).forEach(function(k) {
+      kpiSection[k] = norm.kpis[k];
+    });
+
+    /* ─── قسم: Statistics (من FILTERED) ─────────────────────────
+       إحصاءات محسوبة مباشرةً من البيانات الفعلية المعروضة */
+    var statistics = buildStatisticsSection(D, DALL);
+
+    /* ─── قسم: Charts (ملخص) ────────────────────────────────────
+       ملخص ما تعرضه الرسوم البيانية الحالية */
+    var charts = buildChartsSection(D);
+
+    /* ─── قسم: Tables (ملخص) ────────────────────────────────────
+       أهم صفوف الجداول */
+    var tables = buildTablesSection(D);
+
+    /* ─── قسم: Rankings ─────────────────────────────────────────
+       ترتيبات أعلى/أدنى */
+    var rankings = buildRankingsSection(D);
+
+    /* ─── قسم: Data Availability ────────────────────────────────
+       ما هو متاح وما هو غير متاح */
+    var dataAvailability = buildDataAvailabilitySection(norm);
+
+    /* ─── قسم: Supplemental Data ────────────────────────────────
+       بيانات التبويبات الأخرى (البلاغات، الأنظمة، المصاعد، الحصر) */
+    var supplemental = buildSupplementalSection(norm.supplemental);
+
+    /* ─── قسم: Metadata ─────────────────────────────────────────
+       سياق الاستعلام */
+    var metadata = {
+      _source:      "Metadata",
+      وقت_الاستعلام: new Date().toLocaleString("ar-SA", { hour12: true }),
+      إصدار_البيانات: norm.dataRev,
+      المصدر_الأول:  "ContextBuilder v1.0",
+    };
+
+    return {
+      global_dashboard:   globalDashboard,
+      current_view:       currentView,
+      current_tab:        currentTab,
+      active_filters:     activeFilters,
+      user_selections:    userSelections,
+      kpis:               kpiSection,
+      statistics:         statistics,
+      charts:             charts,
+      tables:             tables,
+      rankings:           rankings,
+      supplemental:       supplemental,
+      data_availability:  dataAvailability,
+      metadata:           metadata,
+    };
+  }
+
+  /* ── Statistics Section ─────────────────────────────────────────────────── */
+  function buildStatisticsSection(D, DALL) {
+    var sec = {
+      _source:      "Statistics",
+      _type:        "STATISTIC",
+      _description: "إحصاءات محسوبة مباشرةً من البيانات الفعلية (filteredData). " +
+                    "هذه القيم هي المصدر الصحيح للأرقام التحليلية — وليس الفلاتر.",
+    };
+
+    /* FCA */
+    var fcaArr = D.filter(function(r) { return r.fca != null && isFinite(r.fca); });
+    if (fcaArr.length) {
+      var fcaVals = fcaArr.map(function(r) { return r.fca; });
+      var fcaSum  = fcaVals.reduce(function(a, b) { return a + b; }, 0);
+      var fcaAvg  = Math.round(fcaSum / fcaVals.length * 10) / 10;
+      var fcaMin  = fcaArr.reduce(function(m, r) { return r.fca < m.fca ? r : m; }, fcaArr[0]);
+      var fcaMax  = fcaArr.reduce(function(m, r) { return r.fca > m.fca ? r : m; }, fcaArr[0]);
+      sec.تحليل_FCA = {
+        _source:              "Statistics→FCA",
+        المصدر_الصحيح_للأرقام: "هذه الإحصاءات محسوبة من البيانات الفعلية — ليس من الفلاتر",
+        عدد_المدارس_المقيّمة: fcaArr.length,
+        المتوسط_الفعلي:       fcaAvg,
+        أدنى_قيمة_FCA_فعلية:  {
+          _note:    "هذا أدنى تقييم FCA فعلي في البيانات المعروضة — ليس من الفلتر",
+          المدرسة:  fcaMin.name,
+          المدينة:  fcaMin.city,
+          الدرجة:   fcaMin.fca,
+        },
+        أعلى_قيمة_FCA_فعلية:  {
+          المدرسة: fcaMax.name,
+          المدينة: fcaMax.city,
+          الدرجة:  fcaMax.fca,
+        },
+        توزيع_الفئات: {
+          حرجة_أقل_من_25:       fcaArr.filter(function(r) { return r.fca < 25; }).length,
+          متوسطة_25_إلى_50:     fcaArr.filter(function(r) { return r.fca >= 25 && r.fca < 50; }).length,
+          جيدة_50_إلى_75:       fcaArr.filter(function(r) { return r.fca >= 50 && r.fca < 75; }).length,
+          جيدة_جداً_75_إلى_100: fcaArr.filter(function(r) { return r.fca >= 75; }).length,
+        },
+        أسوأ_5_مدارس: fcaArr.slice().sort(function(a,b){return a.fca-b.fca;}).slice(0,5).map(function(r){
+          return { اسم: r.name, درجة_FCA: r.fca, مدينة: r.city };
+        }),
+        أفضل_5_مدارس: fcaArr.slice().sort(function(a,b){return b.fca-a.fca;}).slice(0,5).map(function(r){
+          return { اسم: r.name, درجة_FCA: r.fca, مدينة: r.city };
+        }),
+      };
+    }
+
+    /* البيئة المدرسية */
+    var envArr = D.filter(function(r) { return r.envScore != null && isFinite(r.envScore); });
+    if (envArr.length) {
+      var envSum = envArr.reduce(function(s, r) { return s + r.envScore; }, 0);
+      sec.البيئة_المدرسية = {
+        _source:              "Statistics→Environment",
+        عدد_المقيّم:          envArr.length,
+        المتوسط_الفعلي:       Math.round(envSum / envArr.length * 10) / 10,
+        أسوأ_5_مدارس: envArr.slice().sort(function(a,b){return a.envScore-b.envScore;}).slice(0,5).map(function(r){
+          return { اسم: r.name, درجة: r.envScore, مدينة: r.city };
+        }),
+        أفضل_5_مدارس: envArr.slice().sort(function(a,b){return b.envScore-a.envScore;}).slice(0,5).map(function(r){
+          return { اسم: r.name, درجة: r.envScore, مدينة: r.city };
+        }),
+      };
+    }
+
+    /* التكلفة */
+    var costArr = D.filter(function(r) { return r.cost != null && r.cost > 0; });
+    if (costArr.length) {
+      var totalCost = costArr.reduce(function(s, r) { return s + r.cost; }, 0);
+      var maxCostR  = costArr.reduce(function(m, r) { return r.cost > m.cost ? r : m; }, costArr[0]);
+      sec.التكلفة = {
+        _source:               "Statistics→Cost",
+        الإجمالي:             totalCost,
+        متوسط_للمدرسة:       Math.round(totalCost / costArr.length),
+        أعلى_مدرسة_تكلفة:   { الاسم: maxCostR.name, التكلفة: maxCostR.cost, المدينة: maxCostR.city },
+        عدد_مدارس_لها_تكلفة: costArr.length,
+      };
+    }
+
+    /* الطلاب وعمر المبنى */
+    var ageArr = D.filter(function(r) { return r.buildingAge != null && isFinite(r.buildingAge); });
+    var stuArr = D.filter(function(r) { return r.students    != null && r.students > 0; });
+    if (ageArr.length || stuArr.length) {
+      sec.الطلاب_والمبنى = {
+        _source: "Statistics→StudentsAge",
+      };
+      if (stuArr.length) {
+        sec.الطلاب_والمبنى.إجمالي_الطلاب  = stuArr.reduce(function(s,r){return s+r.students;},0);
+        sec.الطلاب_والمبنى.متوسط_الطلاب   = avg(stuArr, "students");
+      }
+      if (ageArr.length) {
+        sec.الطلاب_والمبنى.متوسط_عمر_المبنى     = avg(ageArr, "buildingAge");
+        sec.الطلاب_والمبنى.مبانٍ_أعمارها_فوق_40 = ageArr.filter(function(r){return r.buildingAge>40;}).length;
+        sec.الطلاب_والمبنى.مبانٍ_جديدة_أقل_10   = ageArr.filter(function(r){return r.buildingAge<10;}).length;
+      }
+    }
+
+    /* التوزيع الجغرافي */
+    var cityDist = countBy(D, "city", 15);
+    if (Object.keys(cityDist).length) {
+      sec.التوزيع_الجغرافي = { _source: "Statistics→Geography", توزيع_المدن: cityDist };
+    }
+
+    /* التوزيع حسب المرحلة */
+    var stageDist = countBy(D, "stage", 10);
+    if (Object.keys(stageDist).length) {
+      sec.توزيع_المراحل = { _source: "Statistics→Stages", توزيع: stageDist };
+    }
+
+    return sec;
+  }
+
+  /* ── Charts Section ──────────────────────────────────────────────────────── */
+  function buildChartsSection(D) {
+    return {
+      _source:     "Charts",
+      _type:       "CHART",
+      _description:"ملخص البيانات المعروضة في الرسوم البيانية — مصدرها FILTERED",
+      توزيع_FCA_للرسوم: (function() {
+        var fcaArr = D.filter(function(r) { return r.fca != null; });
+        if (!fcaArr.length) return null;
+        return {
+          حرجة:      fcaArr.filter(function(r){return r.fca<25;}).length,
+          متوسطة:    fcaArr.filter(function(r){return r.fca>=25&&r.fca<50;}).length,
+          جيدة:      fcaArr.filter(function(r){return r.fca>=50&&r.fca<75;}).length,
+          جيدة_جداً: fcaArr.filter(function(r){return r.fca>=75;}).length,
+        };
+      })(),
+    };
+  }
+
+  /* ── Tables Section ──────────────────────────────────────────────────────── */
+  function buildTablesSection(D) {
+    return {
+      _source:     "Tables",
+      _type:       "TABLE",
+      _description:"صفوف أعلى/أدنى من الجداول — مصدرها FILTERED",
+      أدنى_10_FCA: (function() {
+        var fcaArr = D.filter(function(r){return r.fca!=null;});
+        return fcaArr.length ? topN(fcaArr,"fca",10,true) : null;
+      })(),
+      أعلى_10_تكلفة: (function() {
+        var costArr = D.filter(function(r){return r.cost>0;});
+        return costArr.length ? topN(costArr,"cost",10,false) : null;
+      })(),
+    };
+  }
+
+  /* ── Rankings Section ────────────────────────────────────────────────────── */
+  function buildRankingsSection(D) {
+    return {
+      _source:        "Rankings",
+      _type:          "RANKING",
+      _description:   "ترتيبات مستخرجة من البيانات الفعلية — مصدرها FILTERED",
+      أعلى_5_مدن_عدد_مدارس: (function() {
+        var dist = countBy(D,"city",5);
+        return Object.keys(dist).length ? dist : null;
+      })(),
+      أعلى_5_مدارس_FCA: (function() {
+        var fcaArr = D.filter(function(r){return r.fca!=null;});
+        return fcaArr.length ? topN(fcaArr,"fca",5,false) : null;
+      })(),
+      أسوأ_5_مدارس_FCA: (function() {
+        var fcaArr = D.filter(function(r){return r.fca!=null;});
+        return fcaArr.length ? topN(fcaArr,"fca",5,true) : null;
+      })(),
+    };
+  }
+
+  /* ── Supplemental Section ────────────────────────────────────────────────── */
+  function buildSupplementalSection(sup) {
+    var sec = {
+      _source:     "SupplementalData",
+      _type:       "SUPPLEMENTAL",
+      _description:"بيانات التبويبات الإضافية (البلاغات / الأنظمة / المصاعد / حصر الأصول)",
+    };
+
+    /* البلاغات */
+    var bal = sup.balagh;
+    if (Array.isArray(bal) && bal.length) {
+      var statusKey   = ["الحالة","Status","status"].find(function(k){return k in (bal[0]||{});});
+      var priorityKey = ["الأولوية","Priority","priority"].find(function(k){return k in (bal[0]||{});});
+      var catKey      = ["الفئة الرئيسية","الفئة","Category"].find(function(k){return k in (bal[0]||{});});
+      var bCtx        = { _source:"Statistics→Complaints", إجمالي_البلاغات: bal.length };
+      if (statusKey) {
+        var sDist = {};
+        bal.forEach(function(r){ var s=r[statusKey]||"غير محدد"; sDist[s]=(sDist[s]||0)+1; });
+        bCtx.توزيع_الحالة = sDist;
+      }
+      if (priorityKey) {
+        var pDist = {};
+        bal.forEach(function(r){ var p=r[priorityKey]||"غير محدد"; pDist[p]=(pDist[p]||0)+1; });
+        bCtx.توزيع_الأولوية = pDist;
+      }
+      if (catKey) {
+        var cDist = {};
+        bal.forEach(function(r){ var c=r[catKey]||"غير محدد"; cDist[c]=(cDist[c]||0)+1; });
+        var cTop = Object.keys(cDist).sort(function(a,b){return cDist[b]-cDist[a];}).slice(0,5);
+        var cOut = {};
+        cTop.forEach(function(k){ cOut[k]=cDist[k]; });
+        bCtx.أعلى_5_فئات = cOut;
+      }
+      sec.البلاغات = bCtx;
+    }
+
+    /* الأنظمة المتعطلة */
+    var sys = sup.systems;
+    if (Array.isArray(sys) && sys.length) {
+      var condKey    = ["الحالة","condition","Condition"].find(function(k){return k in (sys[0]||{});});
+      var sysNameKey = ["النظام_الرئيسي","System","system","النظام"].find(function(k){return k in (sys[0]||{});});
+      if (condKey && sysNameKey) {
+        var broken = sys.filter(function(r){
+          var c=String(r[condKey]||"").toLowerCase();
+          return c.includes("متعطل")||c.includes("broken")||c.includes("failed");
+        });
+        if (broken.length) {
+          var sysDist = {};
+          broken.forEach(function(r){ var s=r[sysNameKey]||"غير محدد"; sysDist[s]=(sysDist[s]||0)+1; });
+          var sysSorted = Object.keys(sysDist).sort(function(a,b){return sysDist[b]-sysDist[a];}).slice(0,5);
+          var sysOut = {};
+          sysSorted.forEach(function(k){ sysOut[k]=sysDist[k]; });
+          sec.أعطال_الأنظمة = {
+            _source:        "Statistics→Systems",
+            الإجمالي:       broken.length,
+            أكثر_أنظمة_عطلاً: sysOut,
+          };
+        }
+      }
+    }
+
+    /* المصاعد */
+    var elev = sup.elevators;
+    if (Array.isArray(elev) && elev.length) {
+      var eStatKey = ["الحالة","Status","status"].find(function(k){return k in (elev[0]||{});});
+      if (eStatKey) {
+        var eBroken = elev.filter(function(r){
+          var s=String(r[eStatKey]||"").toLowerCase();
+          return s.includes("متعطل")||s.includes("broken")||s.includes("out");
+        });
+        sec.المصاعد = {
+          _source:    "Statistics→Elevators",
+          الإجمالي:  elev.length,
+          المتعطلة:  eBroken.length,
+          العاملة:   elev.length - eBroken.length,
+        };
+      }
+    }
+
+    /* حصر الأصول */
+    var hasr = sup.hasr;
+    if (hasr && hasr.loaded && hasr.data) {
+      var hasrSys = hasr.data.systems || [];
+      sec.حصر_الأصول = {
+        _source:                "Statistics→HASR",
+        محمّل:                  true,
+        عدد_المدارس_المحصورة:  (hasr.data.schools || []).length,
+        إجمالي_الأصول:         hasrSys.reduce(function(s,sys){return s+(sys.total||0);},0),
+        توزيع_الحالة: {
+          ممتاز:   hasrSys.reduce(function(s,sys){return s+(sys.excellent||0);},0),
+          جيد:     hasrSys.reduce(function(s,sys){return s+(sys.good||0);},0),
+          سيئ:     hasrSys.reduce(function(s,sys){return s+(sys.bad||0);},0),
+          متهالك:  hasrSys.reduce(function(s,sys){return s+(sys.deteriorated||0);},0),
+        },
+        ملاحظة: "للتفاصيل الكاملة لأنظمة بعينها، يُحقن extraContext تلقائياً في fcbAskOpenAI",
+      };
+    }
+
+    return sec;
+  }
+
+  /* ── Data Availability Section ───────────────────────────────────────────── */
+  function buildDataAvailabilitySection(norm) {
+    var D = norm.filteredData;
+    return {
+      _source:             "DataAvailability",
+      بيانات_FCA_متاحة:   D.some(function(r){return r.fca!=null;})      ? "نعم" : "لا",
+      بيانات_البيئة_متاحة: D.some(function(r){return r.envScore!=null;}) ? "نعم" : "لا",
+      بيانات_التكلفة_متاحة: D.some(function(r){return r.cost>0;})        ? "نعم" : "لا",
+      بيانات_الطلاب_متاحة: D.some(function(r){return r.students>0;})    ? "نعم" : "لا",
+      بيانات_البلاغات_متاحة: (Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) ? "نعم" : "لا",
+      بيانات_الأنظمة_متاحة: (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) ? "نعم" : "لا",
+      بيانات_المصاعد_متاحة: (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) ? "نعم" : "لا",
+      بيانات_الحصر_متاحة:  (window.HASR && window.HASR.loaded) ? "نعم" : "لا",
+      تحذير_بيانات_غير_كافية:
+        "إذا كانت البيانات المطلوبة تظهر 'لا' أعلاه، أبلغ المستخدم: " +
+        "'البيانات الحالية لا تكفي لإثبات هذه العلاقة.' ولا تخترع أي نتائج.",
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 4 — Validation Layer
+     التحقق من مصدر كل قيمة وتصنيفها + حذف ما لا يجب إرساله
+     ══════════════════════════════════════════════════════════════════════════ */
+  function validateAndTag(structured) {
+    /* تحقق من عدم وجود قيم Filter في أقسام الإحصاءات */
+    var warnings = [];
+
+    /* ── القاعدة: active_filters لا يُستخدم تحليلياً أبداً ── */
+    /* نُبقي على القسم لكن نُضيف تحذير إضافياً */
+    if (structured.active_filters && structured.active_filters.فلاتر_مطبّقة) {
+      var filterNames = Object.keys(structured.active_filters.فلاتر_مطبّقة);
+      filterNames.forEach(function(k) {
+        /* لو وجدنا اسم فلتر في أي مفتاح آخر، ننبّه */
+        if (k.includes("FCA") || k.includes("fca")) {
+          warnings.push(
+            "تحذير Validation: '" + k + "' هو Filter وليس إحصاء FCA. " +
+            "أدنى FCA الفعلي موجود في: statistics.تحليل_FCA.أدنى_قيمة_FCA_فعلية"
+          );
+        }
+      });
+    }
+
+    /* إضافة ملاحظات التحقق */
+    if (warnings.length) {
+      structured._validation_warnings = warnings;
+    }
+
+    /* حذف القيم الفارغة بعمق من الهيكل كله */
+    return sanitizeDeep(structured);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 5 — Global Snapshot (مع Cache ذكي)
+     لقطة كاملة من بيانات الداشبورد — تُبنى مرة وتُحدَّث عند الحاجة
+     ══════════════════════════════════════════════════════════════════════════ */
+  var _snapshotCache    = null;
+  var _snapshotCacheRev = -1;
+
+  function buildGlobalSnapshot() {
+    var rev = window.__DATA_REV__ || 0;
+    if (_snapshotCache && _snapshotCacheRev === rev) return _snapshotCache;
+
+    /* لو لا توجد بيانات، أعد null */
+    var DALL = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
+    if (!DALL.length) {
+      _snapshotCache = null;
+      return null;
+    }
+
+    var snapshot = {
+      _source:      "GlobalSnapshot",
+      _description: "لقطة كاملة من جميع KPIs والإحصاءات والترتيبات للداشبورد كله (بدون فلاتر)",
+      _timestamp:   new Date().toLocaleString("ar-SA", { hour12: true }),
+      إجمالي_المدارس: DALL.length,
+      تحليل_FCA:      buildStatisticsSection(DALL, DALL).تحليل_FCA       || null,
+      البيئة:         buildStatisticsSection(DALL, DALL).البيئة_المدرسية || null,
+      التكلفة:        buildStatisticsSection(DALL, DALL).التكلفة          || null,
+      توزيع_المدن:   countBy(DALL, "city", 15),
+      توزيع_المراحل: countBy(DALL, "stage", 10),
+    };
+
+    _snapshotCache    = sanitizeDeep(snapshot);
+    _snapshotCacheRev = rev;
+    return _snapshotCache;
+  }
+
+  /* مسح الكاش عند أي تحديث للبيانات */
+  function invalidateSnapshot() {
+    _snapshotCache    = null;
+    _snapshotCacheRev = -1;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     API الرئيسي: build() — يُنفذ كل المراحل ويعيد Context النهائي
+     ══════════════════════════════════════════════════════════════════════════ */
+  function build() {
+    try {
+      var collected  = collectDashboardData();          // STEP 1
+      var normalized = normalizeData(collected);         // STEP 2
+      var structured = buildStructuredContext(normalized); // STEP 3
+      var validated  = validateAndTag(structured);       // STEP 4
+      var snapshot   = buildGlobalSnapshot();            // STEP 5
+
+      return {
+        _builder_version:  "DashboardContextBuilder v1.0",
+        _build_time:       new Date().toISOString(),
+        context:           validated,
+        global_snapshot:   snapshot,
+        reasoning_guide:
+          "قبل استخدام أي قيمة: تحقق من _source الخاص بها. " +
+          "إذا كان _type='FILTER' أو _type='SELECTION' → لا تستخدمها تحليلياً. " +
+          "إذا كان _type='STATISTIC' أو _type='KPI' → هذه القيمة موثوقة للتحليل. " +
+          "إذا لم تكن البيانات كافية → قل 'البيانات الحالية لا تكفي لإثبات هذه العلاقة.'",
+      };
+    } catch (e) {
+      console.error("[DashboardContextBuilder] build() error:", e);
+      return {
+        _builder_version: "DashboardContextBuilder v1.0",
+        _error:           "فشل بناء السياق: " + e.message,
+        context:          { خطأ: "تعذّر بناء السياق — راجع console للتفاصيل" },
+      };
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     STEP 6 — Patch window.fcbSend
+     يُجري Build قبل كل إرسال ويضع النتيجة في __FCB_LIVE_CONTEXT_INJECT__
+     مع الحفاظ على التوافق مع AI_ContextEngine القائم
+     ══════════════════════════════════════════════════════════════════════════ */
+  function applyBuilderPatch() {
+    if (typeof window.fcbSend !== "function") return;
+    if (window.fcbSend.__dcbPatch) return; // لا تُطبّق مرتين
+
+    var _prev = window.fcbSend;
+
+    window.fcbSend = async function(presetText) {
+      try {
+        var inputEl = document.getElementById("fcbInput");
+        var rawText = (typeof presetText === "string"
+          ? presetText
+          : (inputEl ? inputEl.value : "")
+        ).trim();
+
+        if (rawText) {
+          /* ── بناء السياق المنقّح ── */
+          var built = build();
+
+          /* ── اندماج مع AI_ContextEngine إن كان موجوداً ──
+             نُفضّل سياق Builder لكن نحتفظ بالـ insights الإضافية
+             من AI_ContextEngine (نقاط القوة/الضعف/الأولويات) */
+          var existing = window.__FCB_LIVE_CONTEXT_INJECT__ || {};
+          window.__FCB_LIVE_CONTEXT_INJECT__ = {
+            /* السياق المنقّح من Builder — يحلّ محل السياق القديم */
+            context:   built.context,
+            /* Global Snapshot */
+            global_snapshot: built.global_snapshot,
+            /* Reasoning guide للموديل */
+            reasoning_guide: built.reasoning_guide,
+            /* الـ insights من AI_ContextEngine تُبقى إن وُجدت */
+            insights:  existing.insights || null,
+            /* التعليمات التنفيذية تبقى */
+            execInstr: existing.execInstr || "",
+            /* توقيت ومعرّف الـ builder */
+            builder_version: "DashboardContextBuilder v1.0",
+            timestamp:       Date.now(),
+          };
+        }
+      } catch (e) {
+        console.warn("[DashboardContextBuilder] patch error:", e);
+        /* لا نوقف السير — نستمر بالـ patch القديم */
+      }
+
+      return _prev.apply(this, arguments);
+    };
+
+    window.fcbSend.__dcbPatch = true;
+    window.fcbSend.__dcbOriginal = _prev;
+    console.log("[DashboardContextBuilder] ✅ تم تفعيل Dashboard Context Builder v1.0 — السياق المنقّح يُبنى قبل كل إرسال");
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     التهيئة: انتظار تحميل fcbSend ثم تطبيق الـ patch
+     (يأتي بعد AI_ContextEngine لضمان أن Builder هو آخر من يعدّل السياق)
+     ══════════════════════════════════════════════════════════════════════════ */
+  var _initAttempts = 0;
+  var _initInterval = setInterval(function() {
+    _initAttempts++;
+    if (typeof window.fcbSend === "function") {
+      clearInterval(_initInterval);
+      /* تأخير 500ms لأن AI_ContextEngine يأخذ 300ms — نتأكد أننا بعده */
+      setTimeout(applyBuilderPatch, 500);
+    }
+    if (_initAttempts > 120) {
+      clearInterval(_initInterval);
+      console.warn("[DashboardContextBuilder] لم يُعثر على window.fcbSend بعد 12 ثانية");
+    }
+  }, 100);
+
+  /* مسح الكاش عند تحديث البيانات */
+  var _origDataRev = window.__DATA_REV__;
+  setInterval(function() {
+    if (window.__DATA_REV__ !== _origDataRev) {
+      invalidateSnapshot();
+      _origDataRev = window.__DATA_REV__;
+    }
+  }, 2000);
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     تعريض API العامة
+     ══════════════════════════════════════════════════════════════════════════ */
+  window.DashboardContextBuilder = {
+    build:             build,
+    buildGlobalSnapshot: buildGlobalSnapshot,
+    invalidateSnapshot:  invalidateSnapshot,
+    collectDashboardData: collectDashboardData,
+    version:           "1.0",
+  };
+
+})();
+/* ══ نهاية Dashboard Context Builder v1.0 ══ */

@@ -678,6 +678,25 @@ function setProgress(p) {
   const b = document.getElementById("prog");
   ((b.style.width = p + "%"), p >= 100 && setTimeout(() => (b.style.width = "0%"), 600));
 }
+function renderOverviewAssetKpis() {
+  try {
+    if (!(window.HASR && window.HASR.loaded && window.HASR.data)) return;
+    const hs  = window.HASR.data.summary || {};
+    const hsc = window.HASR.data.schools || [];
+    const tD  = hsc.reduce((t, x) => t + (x.deteriorated || 0), 0);
+    const totalAssets = hs.totalAssets || 0;
+    setText("k-assets-total", totalAssets ? totalAssets.toLocaleString() : "—");
+    setText(
+      "k-assets-total-sub",
+      hs.totalSchoolsSurveyed
+        ? `${hs.totalSchoolsSurveyed.toLocaleString()} مدرسة محصورة`
+        : ""
+    );
+    setText("k-assets-deteriorated", tD.toLocaleString());
+  } catch (e) {
+    console.warn("[renderOverviewAssetKpis]", e);
+  }
+}
 function setText(id, v) {
   const el = document.getElementById(id);
   el && (el.textContent = v);
@@ -1026,6 +1045,7 @@ function renderKPIs() {
     ),
     setText("k-alerts-total", alertsTotal.toLocaleString()),
     setText("k-ac-total", acTotal.toLocaleString()));
+  if (typeof renderOverviewAssetKpis === "function") renderOverviewAssetKpis();
   const studArr = D.filter((r) => null != r.students && r.students > 0),
     studTotal = studArr.reduce((s, r) => s + r.students, 0),
     studAvg = studArr.length ? studTotal / studArr.length : null,
@@ -3070,6 +3090,13 @@ let __bgRevalidatedOnce = false;
     // لو المستخدم يحتاج بيانات بلاغات أحدث، فيه زر "إعادة المحاولة/تحميل البلاغات" داخل التبويب نفسه.
     if (!window.__BALAGH_LOAD_STATE__ || window.__BALAGH_LOAD_STATE__ === "error") {
       window.loadBalaghSeparate();
+    }
+    // تحميل صامت لبيانات حصر الأصول مرة واحدة عند بدء اللوحة — عشان بطاقات
+    // "إجمالي الأصول" و"أصول متهالكة" في نظرة عامة تظهر بأرقام حقيقية من
+    // غير ما ننتظر المستخدم يفتح تبويب "حصر الأصول" بنفسه.
+    if (typeof fcbEnsureHasrLoaded === "function" && !window.__HASR_EAGER_LOAD_TRIGGERED__) {
+      window.__HASR_EAGER_LOAD_TRIGGERED__ = true;
+      fcbEnsureHasrLoaded();
     }
   } catch (err) {
     if (
@@ -5725,7 +5752,7 @@ function renderSysMain() {
   const mainSystems = [...new Set(data.map((r) => r["القسم الرئيسي"]).filter(Boolean))]
     .filter((s) => !HIDDEN_SYSTEMS.includes(s))
     .sort();
-  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1–5)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
+  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية FCA والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1–5)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
     tierRows,
   )
     .filter(([k]) => "6" !== k)
@@ -6033,7 +6060,7 @@ function _sysBrowseRenderMain() {
   const mainList = Object.keys(sysMap).filter(s => s !== "6").sort();
 
   /* رأس الـ Modal */
-  document.getElementById("sysBrowseTitle").textContent = "الأنظمة الرئيسية";
+  document.getElementById("sysBrowseTitle").textContent = "الأنظمة الرئيسية FCA";
   document.getElementById("sysBrowseSub").textContent =
     `${mainList.length} نظام — اختر نظاماً لعرض أنظمته الفرعية`;
   document.getElementById("sysBrowseBack").style.display = "none";
@@ -13386,6 +13413,38 @@ function renderTajheezAllTable() {
 عن أسئلة تخص مناطق أو مدن خارج نطاق المشروع كأنها ضمن البيانات.
 
 ══════════════════════════════════════════════════════
+⚠️ تفريق إلزامي: "الأنظمة" — مصطلح واحد، مفهومان مختلفان تماماً
+══════════════════════════════════════════════════════
+اللوحة فيها نوعان مختلفان تماماً من "الأنظمة"، ولازم تفرّق بينهم دايماً
+ولا تخلطهم ولا تفترض إنهم نفس الشيء:
+
+1) الأنظمة الرئيسية FCA / الأنظمة التفصيلية FCA (تبويبَي sys-main و
+   sys-detail، من ملف "المدارس_والأنظمة"): دي الأنظمة الإنشائية/الفنية
+   (كهرباء، سباكة، تكييف، سلامة... إلخ) اللي تقييمها هو **سبب** درجة
+   FCA للمدرسة — يعني كل نظام فرعي بياخد تقييم من 1-5، ومتوسط كل الأنظمة
+   دي هو اللي بيحدد درجة FCA. لو حد سأل عن "أسوأ نظام" أو "الأنظمة
+   المتضررة" في سياق تقييم المباني/الصيانة الفنية، فده المقصود.
+
+2) أنظمة حصر الأصول (تبويب "حصر الأصول"، من window.HASR): دي **حاجة
+   مختلفة تمامًا** — قوائم فعلية للأصول المادية (تكييفات، مصاعد، أجهزة
+   إلخ) وحالتها (ممتاز/جيد/سيء/متدهور) — مالهاش علاقة مباشرة بحساب
+   درجة FCA. لو حد سأل عن "عدد الأصول" أو "الأصول المتدهورة" في سياق
+   الجرد/الحصر المادي، فده المقصود، مش أنظمة FCA.
+
+لو السؤال غامض وميعرفش أنهي نوع، اسأل المستخدم يوضح أو وضّح إنت الفرق
+في ردك قبل ما تجاوب برقم واحد بس.
+
+══════════════════════════════════════════════════════
+ملاحظة: أسماء تبويبات تم تحديثها مؤخراً
+══════════════════════════════════════════════════════
+- "الأنظمة الرئيسية" و"الأنظمة التفصيلية" (القديم) → بقى اسمهم الرسمي
+  "الأنظمة الرئيسية FCA" و"الأنظمة التفصيلية FCA" (التوضيح أعلاه).
+- "المدفوعات" (القديم) → بقى اسمها الرسمي "المدفوعات للمجال"، وهي
+  بيانات مالية خاصة بمدفوعات عقود إدارة المرافق (FM) داخل نطاق المشروع
+  — مش مدفوعات عامة لكل الجهة.
+عند الإشارة لأي من التبويبات دي في ردك، استخدم الاسم الجديد.
+
+══════════════════════════════════════════════════════
 أولوية البيانات — التزم بهذا الترتيب دائماً
 ══════════════════════════════════════════════════════
 1. بيانات اللوحة الحالية (المحقونة أسفله)
@@ -19332,6 +19391,7 @@ async function fcbEnsureHasrLoaded() {
       // نسخة قديمة من الملخص من غير حصر_الأصول حتى لو HASR.loaded بقت true.
       window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1;
       console.log('✅ fcbEnsureHasrLoaded: بيانات حصر الأصول اتحمّلت بنجاح للشات بوت', HASR.data?.summary);
+      if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
       return true;
     } catch (e) {
       HASR._lastLoadError = (e && e.message) ? e.message : String(e);
@@ -19359,6 +19419,7 @@ async function loadHasrData() {
     }
     const el = document.getElementById('hasr-fetch-time');
     if (el) el.textContent = 'آخر تحديث: ' + new Date().toLocaleString('ar-SA');
+    if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
     _hasrShowLoading(false);
     _hasrRenderAll();
   } catch(e) {
@@ -21611,8 +21672,8 @@ var PORTAL_CATEGORIES = {
       { name: "fca-ref",      label: "FCA المرجعي" },
       { name: "env",          label: "البيئة المدرسية" },
       { name: "ayen",         label: "تقييم عاين" },
-      { name: "sys-main",     label: "الأنظمة الرئيسية" },
-      { name: "sys-detail",   label: "الأنظمة التفصيلية" },
+      { name: "sys-main",     label: "الأنظمة الرئيسية FCA" },
+      { name: "sys-detail",   label: "الأنظمة التفصيلية FCA" },
       { name: "stages",       label: "المرحلة الدراسية" }
     ]
   },
@@ -21637,7 +21698,7 @@ var PORTAL_CATEGORIES = {
     icon: "💰",
     tabs: [
       { name: "cost",          label: "التكلفة" },
-      { name: "payments",      label: "المدفوعات" },
+      { name: "payments",      label: "المدفوعات للمجال" },
       { name: "all-contracts", label: "عقود عدا المجال" }
     ]
   },

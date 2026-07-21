@@ -24,12 +24,13 @@ const SHEET_NAMES = {
   fuelConsumption   : 'استهلاك_الوقود',
   vehicles          : 'السيارات',
   training          : 'برامج_التدريب',
-  employeeKpi       : 'تقييم_الموظفين',  // ★ جديد — شيت تقييم الموظفين
+  employeeKpi       : 'تقييم_الموظفين',
+  safetyTeamKpi     : 'مؤشرات_أداء_فريق_السلامة',  // ★ جديد — مؤشرات أداء فريق السلامة الأسبوعية
 };
 
 // ── إعدادات الكاش ───────────────────────────────────────────────
 const CACHE_SECONDS  = 600;
-const CACHE_KEY_FULL = 'tbc_sheet_v5';   // ★ رُفِّع الإصدار لتفادي تعارض كاش قديم (بسبب إضافة حالة_المصاعد)
+const CACHE_KEY_FULL = 'tbc_sheet_v6';   // ★ رُفِّع الإصدار لتفادي تعارض كاش قديم (بسبب إضافة مؤشرات_أداء_فريق_السلامة)
 const CACHE_CHUNK_MAX = 95 * 1024;
 
 // ══════════════════════════════════════════════════════════════════
@@ -206,7 +207,8 @@ function clearCache_(cache) {
       'tbc_sheet_v1', 'tbc_sheet_v1_chunks',
       'tbc_sheet_v2', 'tbc_sheet_v2_chunks',
       'tbc_sheet_v3', 'tbc_sheet_v3_chunks',
-      'tbc_sheet_v4', 'tbc_sheet_v4_chunks'
+      'tbc_sheet_v4', 'tbc_sheet_v4_chunks',
+      'tbc_sheet_v5', 'tbc_sheet_v5_chunks'
     );
     cache.removeAll(keys);
   } catch (err) {}

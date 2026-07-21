@@ -29,7 +29,9 @@
     stop:        '<rect x="6" y="6" width="12" height="12" rx="2"/>',
     copy:        '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     redo:        '<path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/>',
-    trash:       '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'
+    trash:       '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+    expand:      '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+    collapse:    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
   };
 
   function svg(name, extra) {
@@ -165,8 +167,10 @@
 
         /* حلقة حدودية حول الحرفين — كل الخطوط المقطوعة تلمس هذه الحلقة
            فتبدو "ملتصقة" بها بدل ما تختفي فجأة في فراغ */
-        '<g class="ac-wire-eye-ring-spin">' +
-          '<circle class="ac-wire-eye-ring" cx="340" cy="335" r="102" fill="none" stroke="url(#meshG4-' + u + ')" stroke-width="1.1" opacity="0.9"/>' +
+        '<g class="ac-wire-eye-track" data-eye-uid="' + u + '">' +
+          '<g class="ac-wire-eye-ring-spin">' +
+            '<circle class="ac-wire-eye-ring" cx="340" cy="335" r="102" fill="none" stroke="url(#meshG4-' + u + ')" stroke-width="1.1" opacity="0.9"/>' +
+          '</g>' +
         '</g>' +
 
         /* Node dots with twinkle */
@@ -303,7 +307,7 @@
 
     /* Ambient field */
     var field = el('div', 'ac-field');
-    field.innerHTML = '<div class="ac-aurora"></div><div class="ac-grid"></div>';
+    field.innerHTML = '<div class="ac-aurora"></div><div class="ac-grid"></div><div class="ac-orb-watermark">' + acWireOrbSVG('wm') + '</div>';
     panel.appendChild(field);
 
     /* ── Hero ── */
@@ -328,6 +332,7 @@
           '<div class="ac-sub">محلل المرافق التعليمية التنفيذي</div>' +
         '</div>' +
         '<button class="ac-clear-chat-btn-top" type="button" id="ac-clear-chat-btn" title="حذف المحادثة">' + svg('trash') + '</button>' +
+        '<button class="ac-clear-chat-btn-top" type="button" id="ac-expand-btn" title="تكبير النافذة">' + svg('expand') + '</button>' +
         '<button class="ac-close" type="button" aria-label="إغلاق">' + svg('x') + '</button>' +
       '</div>' +
       '<div class="ac-status-strip">' +
@@ -406,6 +411,49 @@
     root.appendChild(panel);
     document.body.appendChild(root);
     buildParticles(field, 16);
+
+    /* ════════════════════════════════════════════════════════════
+       عين تتابع الماوس — الحلقة حول "AI" بتتحرك شوية ناحية المؤشر
+       لما يقرب منها، وترجع للمنتصف لما يبعد. تأثير بصري بحت،
+       بيشتغل على الكرتين (برا وجوا) بنفس المبدأ.
+       ════════════════════════════════════════════════════════════ */
+    (function setupEyeTracking() {
+      var EYE_MAX_OFFSET  = 13;  // أقصى إزاحة بالبكسل جوه الحلقة
+      var EYE_RANGE       = 260; // بعد أقصى (بالبكسل) يبدأ عنده التأثير
+      var tracks = [trigger, panel].map(function(container) {
+        return container.querySelector('.ac-wire-eye-track');
+      }).filter(Boolean);
+      if (!tracks.length) return;
+
+      var raf = null;
+      function updateEyes(mx, my) {
+        tracks.forEach(function(track) {
+          var svgEl = track.ownerSVGElement;
+          if (!svgEl) return;
+          var rect = svgEl.getBoundingClientRect();
+          if (!rect.width || !rect.height) return; // مخفي (display:none) — تجاهله
+          var cx = rect.left + rect.width / 2;
+          var cy = rect.top + rect.height / 2;
+          var dx = mx - cx, dy = my - cy;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          var strength = Math.max(0, 1 - dist / EYE_RANGE);
+          if (strength <= 0) {
+            track.style.transform = 'translate(0px,0px)';
+            return;
+          }
+          var ang = Math.atan2(dy, dx);
+          var offset = EYE_MAX_OFFSET * strength;
+          var ox = Math.cos(ang) * offset;
+          var oy = Math.sin(ang) * offset;
+          track.style.transform = 'translate(' + ox.toFixed(2) + 'px,' + oy.toFixed(2) + 'px)';
+        });
+      }
+      document.addEventListener('mousemove', function(e) {
+        if (raf) return;
+        var mx = e.clientX, my = e.clientY;
+        raf = requestAnimationFrame(function() { raf = null; updateEyes(mx, my); });
+      }, { passive: true });
+    })();
 
     /* ════════════════════════════════════════════════════════════
        DATA BRIDGE — يقرأ فقط من window.fcbBuildImpactReport()
@@ -1026,6 +1074,30 @@
         threadEl.innerHTML = '';
         acHistoryRestored = true; // منع أي محاولة استعادة سجل بعد الحذف
         if (quickRepliesEl) quickRepliesEl.style.display = '';
+      });
+    }
+
+    /* ── تكبير/تصغير نافذة الشات — تبديل + حفظ التفضيل محلياً ── */
+    var EXPAND_STORAGE_KEY = 'ac_panel_expanded_v1';
+    var expandBtn = panel.querySelector('#ac-expand-btn');
+    function applyExpandState(expanded) {
+      panel.classList.toggle('ac-expanded', expanded);
+      if (expandBtn) {
+        expandBtn.innerHTML = svg(expanded ? 'collapse' : 'expand');
+        expandBtn.title = expanded ? 'تصغير النافذة' : 'تكبير النافذة';
+      }
+    }
+    if (expandBtn) {
+      var savedExpanded = true; // الافتراضي: النافذة موسّعة من أول فتح
+      try {
+        var savedRaw = localStorage.getItem(EXPAND_STORAGE_KEY);
+        if (savedRaw !== null) savedExpanded = savedRaw === '1'; // احترم اختيار المستخدم لو غيّره قبل كده
+      } catch (_) {}
+      applyExpandState(savedExpanded);
+      expandBtn.addEventListener('click', function() {
+        var next = !panel.classList.contains('ac-expanded');
+        applyExpandState(next);
+        try { localStorage.setItem(EXPAND_STORAGE_KEY, next ? '1' : '0'); } catch (_) {}
       });
     }
 

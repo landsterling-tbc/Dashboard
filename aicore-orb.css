@@ -148,6 +148,12 @@
 
 /* حلقة الحرفين — تدور ببطء حول نفسها فقط (بدون أي تشويه رأسي حتى لا يتقاطع
    مع دورانها). النبضة الضوئية أصبحت في القلب المضيء بالمنتصف بدلاً من الحلقة. */
+.ac-wire-eye-track {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform .35s var(--ac-ease-out);
+  will-change: transform;
+}
 .ac-wire-eye-ring-spin {
   transform-box: fill-box;
   transform-origin: center;
@@ -381,7 +387,7 @@
   max-height: min(740px, calc(100vh - 40px));
   display: flex; flex-direction: column; overflow: hidden;
   border-radius: var(--ac-r-xl);
-  background: rgba(255,255,255,.97);
+  background: #e2e6ec;
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border: 1px solid rgba(10,37,51,.07);
@@ -389,10 +395,16 @@
   transform-origin: 26px calc(100% - 26px);
   transform: translateY(8px) scale(.4);
   opacity: 0; pointer-events: none; filter: blur(1px);
-  transition: transform .45s var(--ac-spring-soft), opacity .3s var(--ac-ease-out), filter .3s var(--ac-ease-out);
+  transition: transform .45s var(--ac-spring-soft), opacity .3s var(--ac-ease-out), filter .3s var(--ac-ease-out), width .35s var(--ac-ease-out), max-height .35s var(--ac-ease-out);
 }
 #aicore-root.ac-open #aicore-panel {
   transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; filter: blur(0);
+}
+
+/* ── وضع النافذة الموسّعة (تكبير) — نفس الانتقال السلس، بس أبعاد أكبر ── */
+#aicore-panel.ac-expanded {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(880px, calc(100vh - 40px));
 }
 
 /* Ambient field — nearly invisible, just the faintest tonal wash */
@@ -405,6 +417,34 @@
 }
 #aicore-panel .ac-field .ac-grid { display: none; }
 #aicore-panel .ac-field span.ac-p { display: none; }
+
+/* علامة مائية على شكل الكرة الحقيقية (نفس SVG بالضبط) — خلف كل محتوى النافذة،
+   خفيفة جداً بشكل افتراضي، وتتوهّج وتلف أسرع وقت التفكير/التوليد زي الكرة الأصلية. */
+#aicore-panel .ac-orb-watermark {
+  position: absolute; left: 50%; top: 50%; width: 560px; height: 560px;
+  margin-left: -280px; margin-top: -280px;
+  opacity: .04;
+  filter: blur(.5px) saturate(1.3);
+  transition: opacity .6s var(--ac-ease-out);
+}
+#aicore-panel .ac-orb-watermark svg { width: 100%; height: 100%; display: block; }
+#aicore-panel .ac-orb-watermark::after {
+  content: '';
+  position: absolute; inset: 0; border-radius: 50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50' y='50' font-family='Arial, Helvetica, sans-serif' font-weight='700' font-size='30' letter-spacing='1' fill='%230d2f40' text-anchor='middle' dominant-baseline='central'%3EAI%3C/text%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 26%;
+  pointer-events: none;
+}
+/* عمداً بدون أي override لسرعة الدوران هنا — الكرة الخلفية بتاخد بالظبط
+   نفس مدة الدوران/النبض بتاع الكرتين التانيين (الزر العائم + كرة الشات)
+   عن طريق نفس الكلاسات المشتركة (ac-wire-grid-group..)، فالثلاثة مرتبطين
+   ومتزامنين تلقائيًا، وقت التفكير كمان بيتسارعوا مع بعض بنفس القاعدة العامة. */
+#aicore-panel.ac-thinking .ac-orb-watermark,
+#aicore-panel.ac-generating .ac-orb-watermark {
+  opacity: .10;
+}
 
 /* ── Hero — clean, spacious, executive ── */
 #aicore-panel .ac-hero {
@@ -496,11 +536,11 @@
 }
 #aicore-panel .ac-status-item {
   padding: 8px 8px; border-radius: 10px;
-  background: rgba(13,47,64,.02);
-  border: none;
+  background: #dde3f2;
+  border: 1px solid rgba(13,47,64,.10);
   transition: background .2s, transform .2s var(--ac-spring-soft);
 }
-#aicore-panel .ac-status-item:hover { background: rgba(13,47,64,.05); transform: translateY(-1px); }
+#aicore-panel .ac-status-item:hover { background: #d2d9ec; transform: translateY(-1px); }
 #aicore-panel .ac-si-label {
   font-size: 8px; color: var(--ac-ink-faint); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 3px; font-weight: 600;
 }
@@ -546,8 +586,8 @@
 /* ── Cards — minimal borders, clean surfaces ── */
 #aicore-panel .ac-card {
   position: relative; border-radius: 14px; padding: 14px;
-  background: rgba(13,47,64,.02);
-  border: 1px solid rgba(13,47,64,.05);
+  background: #dde3f2;
+  border: 1px solid rgba(13,47,64,.11);
   transition: transform .25s var(--ac-spring-soft), background .2s, box-shadow .2s;
   overflow: hidden;
 }
@@ -557,7 +597,7 @@
 }
 #aicore-panel .ac-card:hover {
   transform: translateY(-1px);
-  background: rgba(13,47,64,.04);
+  background: #d2d9ec;
   box-shadow: var(--ac-shadow-sm);
 }
 #aicore-panel .ac-card.ac-accent-teal   { --ac-accent: rgba(13,132,156,.2); }
@@ -590,11 +630,11 @@
 #aicore-panel .ac-exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #aicore-panel .ac-exec-item {
   padding: 12px; border-radius: 12px;
-  background: rgba(13,47,64,.02);
-  border: none;
+  background: #dde3f2;
+  border: 1px solid rgba(13,47,64,.10);
   transition: transform .2s var(--ac-spring-soft), background .2s;
 }
-#aicore-panel .ac-exec-item:hover { transform: translateY(-1px); background: rgba(13,47,64,.04); }
+#aicore-panel .ac-exec-item:hover { transform: translateY(-1px); background: #d2d9ec; }
 #aicore-panel .ac-exec-item.ac-exec-full { grid-column: 1 / -1; }
 #aicore-panel .ac-ei-label { font-size: 10px; color: var(--ac-ink-faint); margin-bottom: 5px; font-weight: 500; letter-spacing: .2px; }
 #aicore-panel .ac-ei-value { font-size: 13px; font-weight: 700; color: var(--ac-ink); }
@@ -636,7 +676,7 @@
 /* ── Cost cards ── */
 #aicore-panel .ac-cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #aicore-panel .ac-cost-item {
-  background: rgba(13,47,64,.02); border: none;
+  background: #dde3f2; border: 1px solid rgba(13,47,64,.10);
   border-radius: 12px; padding: 12px;
   transition: transform .2s var(--ac-spring-soft);
 }
@@ -652,10 +692,10 @@
 #aicore-panel .ac-rec-list { display: flex; flex-direction: column; gap: 8px; }
 #aicore-panel .ac-rec {
   border-radius: 12px; overflow: hidden;
-  background: rgba(13,47,64,.02); border: none;
+  background: #dde3f2; border: 1px solid rgba(13,47,64,.10);
   transition: transform .2s var(--ac-spring-soft), background .2s;
 }
-#aicore-panel .ac-rec:hover { background: rgba(13,47,64,.04); transform: translateY(-1px); }
+#aicore-panel .ac-rec:hover { background: #d2d9ec; transform: translateY(-1px); }
 #aicore-panel .ac-rec-header { display: flex; align-items: center; gap: 8px; padding: 12px 12px 0; }
 #aicore-panel .ac-rec-priority-bar { width: 3px; align-self: stretch; border-radius: 3px; background: var(--ac-warn); flex-shrink: 0; }
 #aicore-panel .ac-rec.ac-pr-high .ac-rec-priority-bar { background: var(--ac-danger); }
@@ -713,7 +753,7 @@
    ════════════════════════════════════════════════════════════════════ */
 #aicore-panel .ac-chat-wrap { display: flex; flex-direction: column; gap: 8px; }
 #aicore-panel .ac-chat-thread {
-  display: flex; flex-direction: column; gap: 14px;
+  display: flex; flex-direction: column; gap: 18px;
   max-height: min(420px, 50vh); overflow-y: auto;
   padding: 4px 2px;
   scrollbar-width: thin; scrollbar-color: rgba(13,47,64,.12) transparent;
@@ -730,7 +770,7 @@
 }
 
 #aicore-panel .ac-msg-row {
-  display: flex; gap: 10px; max-width: 94%; min-width: 0;
+  display: flex; gap: 11px; max-width: 94%; min-width: 0;
   animation: ac-msg-in .35s var(--ac-spring-soft) both;
 }
 #aicore-panel .ac-msg-row.ac-msg-user { align-self: flex-start; flex-direction: row; }
@@ -741,42 +781,46 @@
 
 /* Avatars — subtle, not attention-grabbing */
 #aicore-panel .ac-msg-avatar {
-  flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   margin-top: 2px;
 }
-#aicore-panel .ac-msg-avatar svg { width: 12px; height: 12px; }
+#aicore-panel .ac-msg-avatar svg { width: 13px; height: 13px; }
 #aicore-panel .ac-msg-user .ac-msg-avatar {
-  background: rgba(13,47,64,.05); color: var(--ac-ink-faint);
+  background: rgba(13,132,156,.1); color: var(--ac-teal-3);
   font-size: 9px; font-weight: 700;
 }
 #aicore-panel .ac-msg-bot .ac-msg-avatar {
-  background: var(--ac-navy);
-  color: rgba(255,255,255,.9);
+  background: rgba(13,47,64,.06);
+  color: var(--ac-navy);
 }
 
-/* Bubbles — clean, no border-left accent, enterprise-grade */
+/* Bubbles — فاتحة بالكامل زي باقي الداشبورد، بدون أي خلفيات غامقة أو أسود.
+   التمييز بين المستخدم والشات بوت بقى عن طريق لون الحدود/الخلفية الفاتحة فقط. */
 #aicore-panel .ac-msg-bubble {
-  padding: 12px 16px; border-radius: 16px; font-size: 13px; line-height: 1.7;
+  padding: 14px 18px; border-radius: 18px; font-size: 13.5px; line-height: 1.75;
   transition: box-shadow .2s;
   min-width: 0; max-width: 100%;
 }
 #aicore-panel .ac-msg-user .ac-msg-bubble {
-  background: rgba(13,47,64,.04); border: none; color: var(--ac-ink);
-  border-bottom-left-radius: 4px;
+  background: rgba(13,132,156,.14); border: 1px solid rgba(13,132,156,.24); color: var(--ac-ink);
+  border-bottom-left-radius: 5px;
 }
 #aicore-panel .ac-msg-bot .ac-msg-bubble {
-  background: #fff; color: var(--ac-ink);
-  border: 1px solid rgba(13,47,64,.06);
-  border-bottom-right-radius: 4px;
+  background: #dde3f2; color: var(--ac-ink);
+  border: 1px solid rgba(13,47,64,.09);
+  border-inline-start: 3px solid var(--ac-teal);
+  border-bottom-right-radius: 5px;
   box-shadow: var(--ac-shadow-sm);
 }
+#aicore-panel .ac-msg-bot .ac-msg-content a { color: var(--ac-teal); }
+#aicore-panel .ac-msg-bot .ac-msg-content strong { color: var(--ac-ink); }
 #aicore-panel .ac-msg-content p { margin: 0 0 8px; }
 #aicore-panel .ac-msg-content p:last-child { margin-bottom: 0; }
 #aicore-panel .ac-msg-content > *:first-child { margin-top: 0 !important; }
 #aicore-panel .ac-msg-content > *:last-child  { margin-bottom: 0 !important; }
 #aicore-panel .ac-msg-content { color: var(--ac-ink); }
-#aicore-panel .ac-msg-time { font-size: 9px; color: var(--ac-ink-faint); margin-top: 4px; padding: 0 4px; opacity: .6; }
+#aicore-panel .ac-msg-time { font-size: 9px; color: var(--ac-ink-faint); margin-top: 5px; padding: 0 4px; opacity: .6; }
 
 /* Message actions */
 #aicore-panel .ac-msg-actions {
@@ -874,7 +918,8 @@
 /* Tables */
 #aicore-panel .ac-table-wrap {
   margin: 8px 0; overflow-x: auto; -webkit-overflow-scrolling: touch;
-  border-radius: 10px; border: 1px solid rgba(13,47,64,.06); max-width: 100%;
+  border-radius: 10px; border: 1px solid rgba(13,47,64,.08); max-width: 100%; width: 100%;
+  background: #e4e9f5;
 }
 #aicore-panel .ac-table-wrap::-webkit-scrollbar { height: 4px; }
 #aicore-panel .ac-table-wrap::-webkit-scrollbar-thumb { background: rgba(13,47,64,.1); border-radius: 4px; }
@@ -956,7 +1001,10 @@
 #aicore-panel .ac-md-math-block { margin: 8px 0; padding: 10px 14px; border-radius: 10px; background: rgba(13,132,156,.03); border: none; font-family: 'SFMono-Regular', Consolas, monospace; font-style: italic; color: var(--ac-teal-3); text-align: center; white-space: pre-wrap; direction: ltr; }
 
 /* Chart */
-#aicore-panel .ac-chart-wrap { margin: 8px 0; padding: 10px; border-radius: 10px; background: rgba(13,47,64,.02); border: none; min-height: 60px; }
+#aicore-panel .ac-chart-wrap {
+  margin: 8px 0; padding: 10px; border-radius: 10px; background: #dde3f2; border: 1px solid rgba(13,47,64,.10);
+  min-height: 60px; width: 100%; min-width: 0; box-sizing: border-box; position: relative;
+}
 #aicore-panel .ac-chart-wrap canvas { max-width: 100%; }
 #aicore-panel .ac-chart-loading { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ac-ink-faint); padding: 14px 0; justify-content: center; }
 #aicore-panel .ac-chart-loading svg { width: 12px; height: 12px; animation: ac-spin 1.5s linear infinite; opacity: .4; }
@@ -970,14 +1018,14 @@
 #aicore-panel .ac-fb-val    { font-size: 11px; font-weight: 700; color: var(--ac-ink); }
 
 /* Quick replies */
-#aicore-panel .ac-quick-replies { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px; }
+#aicore-panel .ac-quick-replies { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 0; }
 #aicore-panel .ac-qr-pill {
-  font-family: inherit; font-size: 11px; font-weight: 500; color: var(--ac-ink-dim);
-  padding: 7px 14px; border-radius: 100px; cursor: pointer;
-  background: rgba(13,47,64,.03); border: 1px solid rgba(13,47,64,.08);
+  font-family: inherit; font-size: 11.5px; font-weight: 500; color: var(--ac-ink-dim);
+  padding: 8px 16px; border-radius: 100px; cursor: pointer;
+  background: #dde3f2; border: 1px solid rgba(13,47,64,.09);
   transition: transform .2s var(--ac-spring-soft), background .15s, color .15s, border-color .15s;
 }
-#aicore-panel .ac-qr-pill:hover { background: rgba(13,47,64,.06); color: var(--ac-ink); border-color: rgba(13,47,64,.12); transform: translateY(-1px); }
+#aicore-panel .ac-qr-pill:hover { background: #d2d9ec; color: var(--ac-ink); border-color: rgba(13,47,64,.14); transform: translateY(-1px); }
 #aicore-panel .ac-qr-pill:active { transform: scale(.96); }
 
 /* Alert boxes */
@@ -998,12 +1046,12 @@
 }
 #aicore-panel .ac-input-shell {
   display: flex; align-items: flex-end; gap: 8px;
-  background: rgba(10,37,51,.03); border: 1px solid rgba(10,37,51,.07);
+  background: #e8ecf6; border: 1px solid rgba(10,37,51,.09);
   border-radius: 18px; padding: 7px 7px 7px 18px;
   transition: border-color .25s, box-shadow .25s, background .25s;
 }
 #aicore-panel .ac-input-shell:focus-within {
-  background: rgba(10,37,51,.045);
+  background: #dde3f2;
   border-color: rgba(25,167,198,.28);
   box-shadow: 0 0 0 3px rgba(25,167,198,.08);
 }

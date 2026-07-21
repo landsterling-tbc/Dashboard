@@ -1161,7 +1161,8 @@ function showTab(name, el) {
     "vehicles"        === name && renderVehiclesTab(),
     "training"        === name && renderTrainingTab(),
     "hasr"            === name && renderHasrTab(),
-    "emp-kpi"         === name && renderEmpKpiTab());
+    "emp-kpi"         === name && renderEmpKpiTab(),
+    "safety-kpi"      === name && renderSafetyKpiTab());
 
 }
 
@@ -2620,7 +2621,58 @@ function renderTable() {
     addBtn(String(maxPage + 1), maxPage, !1, !1)),
     addBtn("en" === LANG ? "Next ►" : "التالي ►", TBL.cur + 1, TBL.cur >= maxPage));
 }
-((window.loadData = async function (silent = !1) {
+/* ══════════════════════════════════════════════════════════════════
+   IndexedDB helper — تخزين محلي بسعة أكبر بكثير من localStorage
+   (localStorage محدود بـ~5-10 ميجا لكل موقع، وبيانات الداشبورد أكبر
+   من كذا، فكانت تفشل بصمت. IndexedDB يدعم مئات الميجا بأمان).
+   لا يحتاج أي إعداد أو مكتبة خارجية — مدمج بكل المتصفحات الحديثة.
+   ══════════════════════════════════════════════════════════════════ */
+const _idb = {
+  _dbPromise: null,
+  _open() {
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error("IndexedDB غير مدعوم")); return; }
+      const req = indexedDB.open("tbc_dashboard_db", 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains("kv")) {
+          req.result.createObjectStore("kv");
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return this._dbPromise;
+  },
+  async get(key) {
+    try {
+      const db = await this._open();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction("kv", "readonly");
+        const rq = tx.objectStore("kv").get(key);
+        rq.onsuccess = () => resolve(rq.result ?? null);
+        rq.onerror = () => reject(rq.error);
+      });
+    } catch (_) { return null; }
+  },
+  async set(key, value) {
+    try {
+      const db = await this._open();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction("kv", "readwrite");
+        tx.objectStore("kv").put(value, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (_) { return false; }
+  },
+};
+
+let __loadDataInFlight = false;
+let __bgRevalidatedOnce = false;
+((window.loadData = async function (silent = !1, forceNetwork = !1) {
+  if (__loadDataInFlight) return; // حارس أمان: يمنع أي تنفيذ متزامن مكرر لنفس الدالة
+  __loadDataInFlight = true;
   (setDot("loading"),
     setBtn(!0),
     setProgress(15),
@@ -2634,9 +2686,29 @@ function renderTable() {
       allSystems = [],
       elevators = [];
     setProgress(30);
-    const resp = await fetch(CFG.GAS_URL);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
+    // ── تخزين محلي (IndexedDB) بنمط "اعرض القديم فورًا، وحدّث بالخلفية" ──
+    // البيانات نفسها نادرًا ما تتغير، فبدل ما ننتظر الشبكة كل مرة، نعرض
+    // آخر نسخة محفوظة فورًا، ثم نجيب نسخة جديدة بصمت ونحدّث الشاشة تلقائيًا.
+    // استخدمنا IndexedDB بدل localStorage لأن حجم البيانات أكبر من حد
+    // localStorage (~5-10 ميجا)، وIndexedDB يدعم مئات الميجا بأمان.
+    const DATA_CACHE_KEY = "tbc_data_cache_v2";
+    let json = null;
+    let __fromCache = false;
+    if (!forceNetwork) {
+      try {
+        const cached = await _idb.get(DATA_CACHE_KEY);
+        if (cached) {
+          json = cached;
+          __fromCache = true;
+        }
+      } catch (_) {}
+    }
+    if (!json) {
+      const resp = await fetch(CFG.GAS_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      json = await resp.json();
+      _idb.set(DATA_CACHE_KEY, json); // بدون await — ما نأخّر عرض البيانات لحفظ الكاش
+    }
     if ("error" === json.status) throw new Error(json.message || "Apps Script error");
     const d = json.data || {};
     // ── تأمين كل القيم — لو جاء undefined يتحول لـ [] ──
@@ -2649,7 +2721,7 @@ function renderTable() {
       (elevators                   = sa(d.elevators)),
       (window.RAW_ELEVATOR_STATUS  = sa(d.elevatorStatus)),
       (window.RAW_TAJHEEZ_INV      = sa(d.tajheezInventory)),
-      (window.RAW_BALAGH           = []),   // يُحمَّل بشكل منفصل
+      (window.RAW_BALAGH           = window.RAW_BALAGH || []),   // يُحمَّل بشكل منفصل — لا نمسح بيانات محمّلة مسبقاً
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
       (window.RAW_MAG_KPI          = sa(d.kpiContractor)),
       (window.RAW_CONSULTANT_KPI   = sa(d.consultantKpi)),
@@ -2661,6 +2733,7 @@ function renderTable() {
       (window.RAW_VEHICLES         = sa(d.vehicles)),
       (window.RAW_TRAINING         = sa(d.training)),
       (window.RAW_EMP_KPI          = sa(d.employeeKpi)),
+      (window.RAW_SAFETY_KPI       = sa(d.safetyTeamKpi)),
       setProgress(60));
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
@@ -2911,12 +2984,58 @@ function renderTable() {
       (document.getElementById("filtersRow").style.display = "flex"),
       applyFilters());
 
+    // ── لو عرضنا من الكاش، اجلب نسخة حديثة بصمت بالخلفية وحدّث الشاشة تلقائيًا (مرة واحدة فقط لكل جلسة) ──
+    if (__fromCache && !__bgRevalidatedOnce) {
+      __bgRevalidatedOnce = true;
+      setTimeout(() => { try { loadData(true, true); } catch (_) {} }, 60);
+    }
+
     // ── تحميل البلاغات بشكل منفصل (ملف ضخم — لا يحجب باقي اللوحة) ──
-    window.loadBalaghSeparate = async function() {
-      window.__BALAGH_LOAD_STATE__ = "loading";
-      // لو تبويب البلاغات مفتوح — نحدثه فوراً بمؤشر التحميل
-      if (document.getElementById("tab-balagh")?.classList.contains("active")) {
-        try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+    // نفس مبدأ التخزين بتاع البيانات الرئيسية: نعرض آخر نسخة محفوظة فورًا
+    // (حتى بعد تحديث الصفحة بالكامل F5)، ثم نجيب نسخة حديثة بالخلفية.
+    const BALAGH_CACHE_KEY = "tbc_balagh_cache_v1";
+    const _linkBalaghToBuildings = () => {
+      const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
+      const aMap = {};
+      window.RAW_BALAGH.forEach(r => {
+        const sn = normId_(r["رقم المدرسة"]);
+        if (sn) aMap[sn] = (aMap[sn] || 0) + 1;
+      });
+      RAW.forEach(r => {
+        const id = normId_(r.minId || r.schoolSeq);
+        r.alerts = aMap[id] || r.alerts || 0;
+      });
+    };
+    window.loadBalaghSeparate = async function(forceNetwork = false) {
+      // 1) من الكاش أولاً (يشتغل حتى بعد F5) — عرض فوري بدون انتظار الشبكة
+      const hadDataAlready = window.__BALAGH_LOAD_STATE__ === "loaded" &&
+        Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0;
+      if (!forceNetwork && !window.__BALAGH_LOAD_STATE__) {
+        try {
+          const cached = await _idb.get(BALAGH_CACHE_KEY);
+          if (Array.isArray(cached) && cached.length) {
+            window.RAW_BALAGH = cached;
+            window.__BALAGH_LOAD_STATE__ = "loaded";
+            _linkBalaghToBuildings();
+            if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+              try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+            }
+            // نجيب نسخة حديثة بصمت بالخلفية بعد العرض من الكاش
+            setTimeout(() => { try { window.loadBalaghSeparate(true); } catch(_) {} }, 80);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // لو عندنا بيانات معروضة بالفعل (من كاش أو تحميل سابق)، التحديث ده صامت تمامًا:
+      // لا نغيّر الحالة لـ"loading" ولا نلمس الشاشة إلا بعد وصول البيانات الجديدة فعليًا،
+      // عشان ما نعمل "وميض" يخفي البيانات الموجودة وهي شغالة صح.
+      if (!hadDataAlready) {
+        window.__BALAGH_LOAD_STATE__ = "loading";
+        // لو تبويب البلاغات مفتوح — نحدثه فوراً بمؤشر التحميل
+        if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+          try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+        }
       }
       try {
         const bResp = await fetch(CFG.GAS_URL + "?sheet=balaghReports");
@@ -2925,24 +3044,20 @@ function renderTable() {
         if (bJson.status === "ok" && Array.isArray(bJson.data)) {
           window.RAW_BALAGH = bJson.data;
           window.__BALAGH_LOAD_STATE__ = "loaded";
+          _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
           // ربط البلاغات بالمباني بعد التحميل
-          const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
-          const aMap = {};
-          window.RAW_BALAGH.forEach(r => {
-            const sn = normId_(r["رقم المدرسة"]);
-            if (sn) aMap[sn] = (aMap[sn] || 0) + 1;
-          });
-          RAW.forEach(r => {
-            const id = normId_(r.minId || r.schoolSeq);
-            r.alerts = aMap[id] || r.alerts || 0;
-          });
+          _linkBalaghToBuildings();
           console.log(`[BALAGH] تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
         } else {
           throw new Error(bJson.message || "بيانات غير صحيحة");
         }
       } catch (e) {
-        window.__BALAGH_LOAD_STATE__ = "error";
-        window.__BALAGH_LOAD_ERR__ = e.message;
+        // لو كان عندنا بيانات معروضة بالفعل، فشل التحديث الصامت بالخلفية لا يجب
+        // أن يمسح البيانات الموجودة أو يحوّل الشاشة لحالة خطأ — نتجاهله بصمت.
+        if (!hadDataAlready) {
+          window.__BALAGH_LOAD_STATE__ = "error";
+          window.__BALAGH_LOAD_ERR__ = e.message;
+        }
         console.warn("[BALAGH] فشل تحميل البلاغات:", e);
       }
       // تحديث التبويب بعد التحميل أو الخطأ
@@ -2950,8 +3065,12 @@ function renderTable() {
         try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
       }
     };
-    // تحميل تلقائي عند بدء اللوحة
-    window.loadBalaghSeparate();
+    // تحميل تلقائي عند بدء اللوحة فقط — لا نُعيد تحميل البلاغات (ملف ضخم) في كل مرة
+    // يُعاد فيها استدعاء loadData (تحديث الكاش بالخلفية، أو التحديث التلقائي كل 5 دقائق).
+    // لو المستخدم يحتاج بيانات بلاغات أحدث، فيه زر "إعادة المحاولة/تحميل البلاغات" داخل التبويب نفسه.
+    if (!window.__BALAGH_LOAD_STATE__ || window.__BALAGH_LOAD_STATE__ === "error") {
+      window.loadBalaghSeparate();
+    }
   } catch (err) {
     if (
       (console.error("[loadData]", err), setDot("error"), setProgress(0), retryCount++, !silent)
@@ -2969,6 +3088,7 @@ function renderTable() {
       setTimeout(() => loadData(silent), CFG.RETRY_DELAY_MS * retryCount);
   } finally {
     setBtn(!1);
+    __loadDataInFlight = false;
   }
 }),
   (window.toggleAuto = function () {
@@ -2978,7 +3098,7 @@ function renderTable() {
         (autoTimer = null),
         (btn.innerHTML = `◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">${"en" === LANG ? "Auto" : "تلقائي"}</span>`),
         btn.classList.remove("on"))
-      : ((autoTimer = setInterval(() => loadData(!0), CFG.AUTO_INTERVAL_MS)),
+      : ((autoTimer = setInterval(() => loadData(!0, !0), CFG.AUTO_INTERVAL_MS)),
         (btn.textContent =
           "en" === LANG
             ? `◷ Every ${CFG.AUTO_INTERVAL_MS / 6e4} min`
@@ -11233,18 +11353,7 @@ function renderTajheezAllTable() {
 /* ══════════════════════════════════ نهاية تبويب التجهيزات ══════════════════════════════════ */
 
 
-  function fcbToggle() {
-    document.getElementById("fcbPanel").classList.toggle("open");
-    /* 🛠️ fcbFab عنصر وهمي قديم أُزيل من HTML — حماية من غيابه */
-    const fab = document.getElementById("fcbFab");
-    if (fab) fab.classList.toggle("active");
-    fcbCloseSettings();
-  }
 
-  function fcbAutoGrow(el) {
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 92) + "px";
-  }
 
   /* ════════════════════════════════════════════════════════════════
      ⚙️ إعدادات المساعد — قراءة/حفظ مفتاح API من واجهة الإعدادات
@@ -11365,15 +11474,9 @@ function renderTajheezAllTable() {
       return reply;
     },
   };
+  // 🔗 تعريض للاستخدام من وحدات خارجية (مثل AICore) — لا يغيّر أي سلوك داخلي
+  window.AIService = window.AIService || AIService;
   /* 🛠️ لوحة الإعدادات حُذفت من الواجهة — حماية من غياب العنصر */
-  function fcbOpenSettings() {
-    const el = document.getElementById("fcbSettingsPanel");
-    if (el) el.style.display = "flex";
-  }
-  function fcbCloseSettings() {
-    const el = document.getElementById("fcbSettingsPanel");
-    if (el) el.style.display = "none";
-  }
 
   /* ════════════════════════════════════════════════════════════════
      📊 بناء ملخص ذكي وشامل من بيانات الداشبورد (من RAW + كل المصادر)
@@ -12369,7 +12472,7 @@ function renderTajheezAllTable() {
 
         /* إحصاءات التقديرات */
         const gradeCount = {};
-        ['جيد جداً','جيد','يحتاج تحسين','ضعيف'].forEach(g => {
+        ['ممتاز','جيد جداً','جيد','يحتاج تحسين','ضعيف'].forEach(g => {
           gradeCount[g] = empRows.filter(r=>str(r['التقدير'])===g).length;
         });
 
@@ -12392,8 +12495,8 @@ function renderTajheezAllTable() {
 
         /* أفضل 5 وأدنى 5 موظفين */
         const sorted = [...empRows].sort((a,b)=>n_(b['الدرجة'])-n_(a['الدرجة']));
-        const top5   = sorted.slice(0,5).map(r=>({ الاسم:str(r['اسم الموظف']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
-        const bot5   = sorted.slice(-5).reverse().map(r=>({ الاسم:str(r['اسم الموظف']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
+        const top5   = sorted.slice(0,5).map(r=>({ الاسم:str(r['اسم الموظف']), الدور:str(r['الدور']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
+        const bot5   = sorted.slice(-5).reverse().map(r=>({ الاسم:str(r['اسم الموظف']), الدور:str(r['الدور']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
 
         summary.تقييم_الموظفين = {
           ملاحظة: "بيانات تبويب تقييم الموظفين — تقييم أداء الموظفين الميدانيين",
@@ -12401,18 +12504,18 @@ function renderTajheezAllTable() {
           عدد_المناطق: Object.keys(regionMap).length,
           متوسط_الدرجة_الكلية: avgOf('الدرجة'),
           توزيع_التقديرات: {
+            ممتاز:        { عدد: gradeCount['ممتاز'],        نسبة: ((gradeCount['ممتاز']||0)/total*100).toFixed(1)+'%' },
             جيد_جداً:    { عدد: gradeCount['جيد جداً'],    نسبة: ((gradeCount['جيد جداً']||0)/total*100).toFixed(1)+'%' },
             جيد:          { عدد: gradeCount['جيد'],          نسبة: ((gradeCount['جيد']||0)/total*100).toFixed(1)+'%' },
             يحتاج_تحسين: { عدد: gradeCount['يحتاج تحسين'], نسبة: ((gradeCount['يحتاج تحسين']||0)/total*100).toFixed(1)+'%' },
             ضعيف:         { عدد: gradeCount['ضعيف'],         نسبة: ((gradeCount['ضعيف']||0)/total*100).toFixed(1)+'%' },
           },
           متوسط_المؤشرات: {
-            الإنجاز:       avgOf('الإنجاز %'),
-            وقت_الزيارة:   avgOf('وقت الزيارة %'),
-            التعليقات:     avgOf('التعليقات %'),
-            الصور:         avgOf('الصور %'),
-            المواعيد:      avgOf('المواعيد %'),
-            النزاهة:       avgOf('النزاهة %'),
+            الإنجاز:         avgOf('الإنجاز %'),
+            توثيق_بالصور:   avgOf('توثيق بالصور %'),
+            التعليقات:       avgOf('التعليقات %'),
+            جودة_التقرير:   avgOf('جودة التقرير %'),
+            وقت_الزيارة:     avgOf('وقت الزيارة %'),
           },
           الأداء_حسب_المنطقة: byRegion,
           أفضل_5_موظفين: top5,
@@ -12425,6 +12528,71 @@ function renderTajheezAllTable() {
         };
       }
     } catch(e) { summary.تقييم_الموظفين = { تنبيه: "تعذّر تلخيص بيانات تقييم الموظفين: " + (e?.message||e) }; }
+
+
+    try {
+      const safRows = window.RAW_SAFETY_KPI || [];
+      if (safRows.length) {
+        const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+        const str = v => String(v||'').trim();
+        const total = safRows.length;
+        const regions = [...new Set(safRows.map(r=>str(r['المنطقة'])).filter(Boolean))];
+        const weeks   = [...new Set(safRows.map(r=>str(r['الأسبوع'])).filter(Boolean))];
+
+        const sum = key => safRows.reduce((s,r)=>s+n_(r[key]),0);
+        const visitsPlanned  = sum('عدد الزيارات الميدانية المقررة');
+        const visitsDone     = sum('عدد الزيارات المنفذة');
+        const incidents      = sum('عدد الحوادث المبلغ عنها');
+        const prelimReports  = sum('عدد الحوادث التي تم اصدار التقرير المبدئي لها');
+        const injuries       = sum('إصابات شخصية');
+        const investigated   = sum('عدد الحوادث التي تم التحقيق فيها');
+        const correctiveActs = sum('عدد الإجراءات التصحيحية المرسلة للمقاول');
+        const workOrders     = sum('عدد أوامر العمل من الزيارات التي تم ارسالها للمقاول');
+        const trainPlanned   = sum('التدريب الأسبوعي - مقرر');
+        const trainDone      = sum('التدريب الأسبوعي - منفذ');
+        const pct1 = (a,b) => b ? ((a/b)*100).toFixed(1)+'%' : '—';
+
+        /* توزيع حسب المنطقة */
+        const regionMap = {};
+        safRows.forEach(r => {
+          const reg = str(r['المنطقة']); if (!reg) return;
+          if (!regionMap[reg]) regionMap[reg] = { visitsPlanned:0, visitsDone:0, incidents:0, injuries:0 };
+          regionMap[reg].visitsPlanned += n_(r['عدد الزيارات الميدانية المقررة']);
+          regionMap[reg].visitsDone    += n_(r['عدد الزيارات المنفذة']);
+          regionMap[reg].incidents     += n_(r['عدد الحوادث المبلغ عنها']);
+          regionMap[reg].injuries      += n_(r['إصابات شخصية']);
+        });
+        const byRegion = Object.entries(regionMap).map(([reg, v]) => ({
+          المنطقة: reg,
+          نسبة_تنفيذ_الزيارات: pct1(v.visitsDone, v.visitsPlanned),
+          إجمالي_الحوادث: v.incidents,
+          إجمالي_الإصابات: v.injuries,
+        }));
+
+        summary.مؤشرات_أداء_فريق_السلامة = {
+          ملاحظة: "بيانات تبويب مؤشرات أداء فريق السلامة — سجلات أسبوعية لكل منطقة (زيارات، حوادث، تدريب)",
+          عدد_السجلات_الأسبوعية: total,
+          عدد_المناطق: regions.length,
+          عدد_الأسابيع: weeks.length,
+          الزيارات_الميدانية: { مقررة: visitsPlanned, منفذة: visitsDone, نسبة_التنفيذ: pct1(visitsDone, visitsPlanned) },
+          التدريب_الأسبوعي: { مقرر: trainPlanned, منفذ: trainDone, نسبة_التنفيذ: pct1(trainDone, trainPlanned) },
+          الحوادث: {
+            إجمالي_المبلغ_عنها: incidents,
+            تقارير_مبدئية_صادرة: prelimReports,
+            تم_التحقيق_فيها: investigated,
+            إصابات_شخصية: injuries,
+          },
+          إجراءات_تصحيحية_مرسلة_للمقاول: correctiveActs,
+          أوامر_عمل_مرسلة_للمقاول: workOrders,
+          الأداء_حسب_المنطقة: byRegion,
+        };
+      } else {
+        summary.مؤشرات_أداء_فريق_السلامة = {
+          تنبيه: "لم تُحمَّل بيانات مؤشرات أداء فريق السلامة بعد.",
+          تعليمات_للمساعد: "أخبر المستخدم إن البيانات غير متاحة — تأكد من وجود شيت 'مؤشرات_أداء_فريق_السلامة' في Google Sheet وأن الـ Apps Script يقرأها.",
+        };
+      }
+    } catch(e) { summary.مؤشرات_أداء_فريق_السلامة = { تنبيه: "تعذّر تلخيص بيانات مؤشرات أداء فريق السلامة: " + (e?.message||e) }; }
 
     return summary;
 
@@ -12578,492 +12746,8 @@ function renderTajheezAllTable() {
      • جداول Markdown (| ... | ... |)
      • كتل رسوم بيانية ```chart {json} ``` → تُرسم بـ Chart.js
   ════════════════════════════════════════════════════════════════ */
-  function fcbEscapeHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  let FCB_CHART_SEQ = 0;
-  const FCB_CHART_PALETTE = [CSS_TOKENS.info(), CSS_TOKENS.info2(), CSS_TOKENS.special(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive(), CSS_TOKENS.info(), CSS_TOKENS.danger()];
-
-  /* ════════════════════════════════════════════════════════════════
-     📤 ExportEngine — تصدير أي محتوى يولّده المساعد الذكي (جدول/رسم/نص)
-     إلى CSV / Excel / PDF / PNG، يعمل بالكامل من المتصفح بدون سيرفر.
-
-     ملاحظة عن PDF والعربي: تصدير PDF يعتمد على نافذة طباعة المتصفح
-     (window.print) لا على تحويل العنصر لصورة، لأن محرّك المتصفح نفسه
-     هو الوحيد الذي يرسم تشكيل الحروف العربية (Shaping/Ligatures)
-     والاتجاه RTL بشكل صحيح دائماً. التفاصيل والأسباب موجودة في تعليق
-     دالة elementToPDF بالأسفل.
-  ════════════════════════════════════════════════════════════════ */
-  const ExportEngine = {
-    _ts() {
-      const d = new Date();
-      const p = (n) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
-    },
-    _downloadBlob(blob, filename) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    },
-    _csvCell(v) {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    },
-
-    /** تصدير جدول (مصفوفة رؤوس + مصفوفة صفوف) إلى CSV */
-    tableToCSV(headers, rows, filenameBase = "جدول") {
-      const lines = [headers.map(this._csvCell).join(",")];
-      rows.forEach((r) => lines.push(r.map(this._csvCell).join(",")));
-      // BOM لضمان ظهور العربي بشكل صحيح في Excel عند فتح CSV
-      const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-      this._downloadBlob(blob, `${filenameBase}_${this._ts()}.csv`);
-      if (typeof showToast === "function") showToast("تم تصدير CSV ✅", "ok");
-    },
-
-    /** تصدير جدول إلى ملف Excel حقيقي (.xlsx) عبر SheetJS المُحمّلة بالفعل */
-    tableToExcel(headers, rows, filenameBase = "جدول") {
-      if (typeof XLSX === "undefined") {
-        if (typeof showToast === "function") showToast("⚠️ مكتبة Excel لم تُحمَّل بعد، حاول مرة أخرى", "err");
-        return;
-      }
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      XLSX.writeFile(wb, `${filenameBase}_${this._ts()}.xlsx`);
-      if (typeof showToast === "function") showToast("تم تصدير Excel ✅", "ok");
-    },
-
-    /**
-     * تصدير أي عنصر DOM (جدول/رسم/نص) إلى PDF عبر نافذة طباعة مخصّصة
-     * يفتحها المتصفح، باستخدام window.print() ثم اختيار المستخدم
-     * "حفظ كـ PDF" من نافذة الطباعة.
-     *
-     * ⚠️ لماذا ليس html2canvas + jsPDF؟ تم تجربة هذا النهج وفشل مع
-     * العربي: html2canvas يبني محرّك قياس/تخطيط نص خاص به بدل استخدام
-     * محرّك المتصفح، فلا يدعم تشكيل الحروف العربية (ligatures) ولا
-     * ترتيب الاتجاه (RTL bidi) بشكل صحيح — وهذه مشكلة معروفة وموجودة
-     * في المكتبة منذ سنوات بدون حل جذري (انظر niklasvh/html2canvas
-     * issues #289 #686 #948 #2432 #2488). النتيجة كانت حروفاً عربية
-     * متقطعة/متراكبة بدل متصلة، خصوصاً بالكلمات الطويلة.
-     *
-     * الحل الموثوق: نفتح نافذة طباعة جديدة، نضع فيها نسخة من العنصر
-     * المطلوب تصديره بنفس تنسيقه (CSS الأساسي للوحة)، ثم نستدعي
-     * window.print(). هنا محرّك المتصفح نفسه (الذي يعرض العربي بشكل
-     * صحيح على الشاشة أصلاً) هو من يرسم الصفحة، فيظهر العربي متصلاً
-     * وسليماً 100%. المستخدم يختار "حفظ كـ PDF" كوجهة الطباعة بدل
-     * طابعة فعلية — هذه هي الطريقة القياسية لإنتاج PDF بعربي سليم من
-     * صفحة بدون أي سيرفر خلفي (GitHub Pages).
-     */
-    elementToPDF(el, filenameBase = "تقرير", title = "") {
-      if (!el) return;
-      try {
-        const printWin = window.open("", "_blank", "width=900,height=1100");
-        if (!printWin) {
-          if (typeof showToast === "function") {
-            showToast("⚠️ المتصفح منع فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى", "err");
-          }
-          return;
-        }
-        // ننسخ العنصر ونحذف صف أزرار التصدير نفسه من النسخة، حتى لا
-        // تظهر أزرار "نسخ / PDF / Excel" داخل الصفحة المطبوعة
-        const clone = el.cloneNode(true);
-        clone.querySelectorAll(".fcb-export-row").forEach((n) => n.remove());
-
-        const fontLink = '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">';
-        const styles = `
-          * { box-sizing: border-box; }
-          body {
-            font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
-            direction: rtl;
-            padding: 24px;
-            color: #1a2b33;
-            margin: 0;
-          }
-          .fcb-print-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; color: #083D4F; }
-          .fcb-bubble, .fcb-table-wrap, .fcb-chart-wrap { max-width: 100%; }
-          .fcb-table-wrap { border: 1px solid #e2e8ec; border-radius: 10px; overflow: hidden; }
-          .fcb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-          .fcb-table thead th { background: #083D4F; color: #fff; padding: 8px 10px; text-align: center; }
-          .fcb-table tbody td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #e2e8ec; }
-          .fcb-table tbody tr:nth-child(even) { background: #f7f9fa; }
-          .fcb-chart-canvas-box { position: relative; height: 320px; width: 100%; }
-          .fcb-bubble p { margin: 0 0 10px; line-height: 1.8; }
-          .fcb-bubble strong { font-weight: 800; }
-          .fcb-bubble code { background: #f1f5f7; padding: 1px 6px; border-radius: 6px; direction: ltr; display: inline-block; }
-          @media print {
-            @page { margin: 14mm; }
-            body { padding: 0; }
-          }
-        `;
-        printWin.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">${fontLink}<style>${styles}</style></head><body>${title ? `<div class="fcb-print-title">${fcbEscapeHtml(title)}</div>` : ""}${clone.outerHTML}</body></html>`);
-        printWin.document.close();
-
-        const triggerPrint = () => {
-          // إن كان العنصر يحتوي رسماً بيانياً (canvas)، ننسخ محتوى الرسم
-          // كصورة لأن canvas الأصلي بقيمه لا يُستنسخ تلقائياً بـ cloneNode
-          el.querySelectorAll("canvas").forEach((srcCanvas, idx) => {
-            const destCanvas = printWin.document.querySelectorAll("canvas")[idx];
-            if (destCanvas && srcCanvas.toDataURL) {
-              try {
-                const img = printWin.document.createElement("img");
-                img.src = srcCanvas.toDataURL("image/png");
-                img.style.width = "100%";
-                destCanvas.replaceWith(img);
-              } catch (_) {}
-            }
-          });
-          printWin.focus();
-          printWin.print();
-        };
-
-        // ننتظر تحميل خطوط نافذة الطباعة فعلياً قبل استدعاء الطباعة، حتى
-        // يرسم المتصفح العربي بالخط الصحيح المتصل من أول مرة
-        if (printWin.document.fonts && printWin.document.fonts.ready) {
-          printWin.document.fonts.ready.then(() => setTimeout(triggerPrint, 150));
-        } else {
-          setTimeout(triggerPrint, 400);
-        }
-        if (typeof showToast === "function") showToast("افتحت نافذة الطباعة — اختر «حفظ كـ PDF» 🖨️", "info");
-      } catch (e) {
-        console.warn("[ExportEngine] PDF export failed:", e);
-        if (typeof showToast === "function") showToast("⚠️ تعذّر تحضير الطباعة: " + (e?.message || e), "err");
-      }
-    },
-
-    /** تصدير Canvas الرسم البياني مباشرة كصورة PNG (بدون إعادة رسم) */
-    chartCanvasToPNG(canvasEl, filenameBase = "رسم_بياني") {
-      if (!canvasEl) return;
-      try {
-        // نرسم على خلفية بيضاء لأن canvas الأصلي شفاف، فتظهر الصورة المُصدّرة سليمة على أي عارض صور
-        const tmp = document.createElement("canvas");
-        tmp.width = canvasEl.width;
-        tmp.height = canvasEl.height;
-        const ctx = tmp.getContext("2d");
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, tmp.width, tmp.height);
-        ctx.drawImage(canvasEl, 0, 0);
-        tmp.toBlob((blob) => {
-          this._downloadBlob(blob, `${filenameBase}_${this._ts()}.png`);
-          if (typeof showToast === "function") showToast("تم تصدير الصورة ✅", "ok");
-        }, "image/png");
-      } catch (e) {
-        console.warn("[ExportEngine] PNG export failed:", e);
-        if (typeof showToast === "function") showToast("⚠️ تعذّر تصدير الصورة: " + (e?.message || e), "err");
-      }
-    },
-
-    /** نسخ نص خام (بدون تنسيق Markdown) إلى الحافظة */
-    async copyText(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-        if (typeof showToast === "function") showToast("تم النسخ 📋", "ok");
-      } catch (e) {
-        if (typeof showToast === "function") showToast("⚠️ تعذّر النسخ", "err");
-      }
-    },
-  };
-
-  /** يقرأ جدول HTML (الذي بنته fcbBuildTableHtml) ويرجع رؤوسه وصفوفه كنص خام للتصدير */
-  function fcbExtractTableData(tableEl) {
-    const headers = [...tableEl.querySelectorAll("thead th")].map((th) => th.textContent.trim());
-    const rows = [...tableEl.querySelectorAll("tbody tr")].map((tr) =>
-      [...tr.querySelectorAll("td")].map((td) => td.textContent.trim()),
-    );
-    return { headers, rows };
-  }
-
-  function fcbBuildTableExportRow(tableWrapId) {
-    return `<div class="fcb-export-row">
-      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','csv')">📋 CSV</button>
-      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','excel')">📊 Excel</button>
-      <button type="button" class="fcb-export-btn" onclick="fcbExportTable('${tableWrapId}','pdf')">📄 PDF</button>
-    </div>`;
-  }
-
-  function fcbExportTable(wrapId, format) {
-    const wrap = document.getElementById(wrapId);
-    if (!wrap) return;
-    const table = wrap.querySelector("table");
-    if (format === "pdf") {
-      ExportEngine.elementToPDF(wrap, "جدول");
-      return;
-    }
-    const { headers, rows } = fcbExtractTableData(table);
-    if (format === "csv") ExportEngine.tableToCSV(headers, rows, "جدول");
-    else if (format === "excel") ExportEngine.tableToExcel(headers, rows, "جدول");
-  }
-
-  function fcbBuildChartExportRow(chartWrapId, canvasId) {
-    return `<div class="fcb-export-row">
-      <button type="button" class="fcb-export-btn" onclick="fcbExportChart('${canvasId}','png')">🖼 PNG</button>
-      <button type="button" class="fcb-export-btn" onclick="fcbExportChart('${chartWrapId}','pdf')">📄 PDF</button>
-    </div>`;
-  }
-
-  function fcbExportChart(id, format) {
-    if (format === "png") {
-      const canvas = document.getElementById(id);
-      ExportEngine.chartCanvasToPNG(canvas, "رسم_بياني");
-    } else if (format === "pdf") {
-      const wrap = document.getElementById(id);
-      if (wrap) ExportEngine.elementToPDF(wrap, "رسم_بياني");
-    }
-  }
-
-  /** يصدّر فقاعة رد كاملة (نص/كود/خطاب/اقتراح) كـ PDF بنفس مظهرها في الشات */
-  function fcbExportBubble(bubbleId) {
-    const bubble = document.getElementById(bubbleId);
-    if (bubble) ExportEngine.elementToPDF(bubble, "رد_المساعد");
-  }
-
-  function fcbCopyBubble(bubbleId) {
-    const bubble = document.getElementById(bubbleId);
-    if (bubble) ExportEngine.copyText(bubble.innerText || bubble.textContent || "");
-  }
-
-  let FCB_MSG_SEQ = 0;
-
-  function fcbParseChartBlock(jsonText) {
-    let spec;
-    try { spec = JSON.parse(jsonText); } catch (e) { return null; }
-    if (!spec || !Array.isArray(spec.labels) || !Array.isArray(spec.datasets)) return null;
-    return spec;
-  }
-
-  function fcbBuildChartHtml(spec) {
-    const id = "fcbChart_" + (++FCB_CHART_SEQ);
-    const wrapId = id + "_wrap";
-    const title = spec.title ? `<div class="fcb-chart-title">${fcbEscapeHtml(spec.title)}</div>` : "";
-    // نخزّن المخطط ليُرسم بعد إدراج الـ HTML في الصفحة (Canvas يحتاج يكون موجوداً بالـ DOM فعلياً)
-    FCB_PENDING_CHARTS.push({ id, spec });
-    return `<div class="fcb-chart-wrap" id="${wrapId}">${title}<div class="fcb-chart-canvas-box"><canvas id="${id}"></canvas></div>${fcbBuildChartExportRow(wrapId, id)}</div>`;
-  }
-
-  function fcbBuildTableHtml(headerCells, rows) {
-    const wrapId = "fcbTable_" + (++FCB_MSG_SEQ) + "_wrap";
-    let html = `<div class="fcb-table-wrap" id="${wrapId}"><table class="fcb-table"><thead><tr>`;
-    headerCells.forEach((h) => { html += `<th>${h}</th>`; });
-    html += "</tr></thead><tbody>";
-    rows.forEach((r) => {
-      html += "<tr>";
-      r.forEach((c) => { html += `<td>${c}</td>`; });
-      html += "</tr>";
-    });
-    html += "</tbody></table>" + fcbBuildTableExportRow(wrapId) + "</div>";
-    return html;
-  }
-
-  let FCB_PENDING_CHARTS = [];
-
-  function fcbRenderMarkdown(raw) {
-    const escaped = fcbEscapeHtml(raw).replace(/\r\n/g, "\n");
-    const lines = escaped.split("\n");
-    let html = "";
-    let listType = null; // 'ul' | 'ol' | null
-    let paraBuf = [];
-
-    function inlineFormat(line) {
-      return line
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, "<em>$1</em>")
-        .replace(/`([^`]+?)`/g, "<code>$1</code>")
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (m, label, url) {
-          // منع الهروب من داخل خاصية href لو احتوى الرابط على علامة اقتباس
-          // (fcbEscapeHtml لا يُهرّب " لأنها غير خطرة في نص عادي، لكنها خطرة هنا تحديداً)
-          const safeUrl = url.replace(/"/g, "%22");
-          return `<a href="${safeUrl}" target="_blank" rel="noopener">${label}</a>`;
-        });
-    }
-    function flushPara() {
-      if (paraBuf.length) {
-        html += "<p>" + paraBuf.join(" ") + "</p>";
-        paraBuf = [];
-      }
-    }
-    function closeList() {
-      if (listType) { html += "</" + listType + ">"; listType = null; }
-    }
-    function isTableSepRow(line) {
-      return /^\|?[\s:|-]+\|?$/.test(line) && line.includes("-");
-    }
-    function splitTableRow(line) {
-      let l = line.trim();
-      if (l.startsWith("|")) l = l.slice(1);
-      if (l.endsWith("|")) l = l.slice(0, -1);
-      return l.split("|").map((c) => inlineFormat(c.trim()));
-    }
-
-    let i = 0;
-    while (i < lines.length) {
-      const raw_line = lines[i];
-      const line = raw_line.trim();
-
-      // كتلة كود ```chart ... ``` أو ```json-chart ... ```
-      const codeFenceMatch = line.match(/^```(\w[\w-]*)?\s*$/);
-      if (codeFenceMatch) {
-        const lang = (codeFenceMatch[1] || "").toLowerCase();
-        const bodyLines = [];
-        i++;
-        while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) {
-          bodyLines.push(lines[i]);
-          i++;
-        }
-        i++; // تجاوز سطر الإغلاق ```
-        const bodyText = bodyLines.join("\n")
-          .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-        if (lang === "chart" || lang === "json-chart") {
-          flushPara(); closeList();
-          const spec = fcbParseChartBlock(bodyText);
-          if (spec) {
-            html += fcbBuildChartHtml(spec);
-          } else {
-            html += '<div class="fcb-chart-error">⚠️ تعذّر رسم المخطط البياني</div>';
-          }
-        } else {
-          flushPara(); closeList();
-          html += `<p><code>${fcbEscapeHtml(bodyText).replace(/\n/g, "<br>")}</code></p>`;
-        }
-        continue;
-      }
-
-      if (!line) { flushPara(); closeList(); i++; continue; }
-
-      if (/^---+$/.test(line)) { flushPara(); closeList(); html += "<hr>"; i++; continue; }
-
-      const hMatch = line.match(/^#{1,4}\s+(.+)/);
-      if (hMatch) { flushPara(); closeList(); html += "<h4>" + inlineFormat(hMatch[1]) + "</h4>"; i++; continue; }
-
-      // جدول Markdown: سطر header | سطر فاصل --- | صفوف بيانات
-      if (line.includes("|") && i + 1 < lines.length && isTableSepRow(lines[i + 1].trim())) {
-        flushPara(); closeList();
-        const headerCells = splitTableRow(line);
-        i += 2; // تجاوز الهيدر وسطر الفاصل
-        const rows = [];
-        while (i < lines.length && lines[i].trim().includes("|") && lines[i].trim() !== "") {
-          rows.push(splitTableRow(lines[i]));
-          i++;
-        }
-        html += fcbBuildTableHtml(headerCells, rows);
-        continue;
-      }
-
-      const ulMatch = line.match(/^[-•*]\s+(.+)/);
-      if (ulMatch) {
-        flushPara();
-        if (listType !== "ul") { closeList(); html += "<ul>"; listType = "ul"; }
-        html += "<li>" + inlineFormat(ulMatch[1]) + "</li>";
-        i++; continue;
-      }
-
-      const olMatch = line.match(/^\d+[.)]\s+(.+)/);
-      if (olMatch) {
-        flushPara();
-        if (listType !== "ol") { closeList(); html += "<ol>"; listType = "ol"; }
-        html += "<li>" + inlineFormat(olMatch[1]) + "</li>";
-        i++; continue;
-      }
-
-      closeList();
-      paraBuf.push(inlineFormat(line));
-      i++;
-    }
-    flushPara();
-    closeList();
-    return html || "<p></p>";
-  }
 
   /* يرسم كل المخططات البيانية المؤجلة بعد إدراج الفقاعة في الـ DOM فعلياً */
-  function fcbMountPendingCharts() {
-    if (!FCB_PENDING_CHARTS.length) return;
-    const queue = FCB_PENDING_CHARTS;
-    FCB_PENDING_CHARTS = [];
-    queue.forEach(({ id, spec }) => {
-      const canvas = document.getElementById(id);
-      if (!canvas || typeof Chart === "undefined") return;
-      const type = ["bar", "line", "pie", "doughnut", "radar"].includes(spec.type) ? spec.type : "bar";
-
-      // 🛡️ تنظيف شامل: spec قادمة من نص يولّده الذكاء الاصطناعي، لذا قد تحتوي
-      // على قيم ناقصة أو null — ننظفها هنا قبل أي استخدام لمنع ظهور undefined/NaN
-      const { labels: cleanLabels, datasets: cleanRawDatasets } = normalizeChartData(
-        spec.labels,
-        spec.datasets,
-      );
-
-      if (!cleanLabels.length || !cleanRawDatasets.length) {
-        canvas.closest(".fcb-chart-wrap").innerHTML =
-          '<div class="fcb-chart-error">📭 لا توجد بيانات كافية لعرض هذا المخطط</div>';
-        return;
-      }
-
-      const isFill = type === "pie" || type === "doughnut";
-      const datasets = cleanRawDatasets.map((ds, idx) => {
-        const color = ds.color || FCB_CHART_PALETTE[idx % FCB_CHART_PALETTE.length];
-        return {
-          label: ds.label || "",
-          data: ds.data,
-          backgroundColor: isFill
-            ? cleanLabels.map((_, i2) => FCB_CHART_PALETTE[i2 % FCB_CHART_PALETTE.length])
-            : (type === "line" ? color + "22" : color + "cc"),
-          borderColor: color,
-          borderWidth: type === "line" ? 2.5 : 1,
-          borderRadius: type === "bar" ? 6 : 0,
-          fill: type === "line" ? true : undefined,
-          tension: type === "line" ? 0.35 : undefined,
-          pointRadius: type === "line" ? 3 : undefined,
-        };
-      });
-      try {
-        new Chart(canvas, {
-          type,
-          data: { labels: cleanLabels, datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: datasets.length > 1 || type === "pie" || type === "doughnut", position: "bottom", labels: { font: { size: 10, family: "IBM Plex Sans Arabic" }, boxWidth: 10, padding: 8 } },
-              tooltip: {
-                rtl: true,
-                titleFont: { family: "IBM Plex Sans Arabic" },
-                bodyFont: { family: "IBM Plex Sans Arabic" },
-                callbacks: {
-                  // طبقة حماية أخيرة: حتى لو وصل عنوان/قيمة فاسدة، لا تظهر undefined في الـ tooltip
-                  title: (items) => items.map((it) => sanitizeText(it.label, "")),
-                  label: (item) => {
-                    const v = safeNumber(item.parsed?.y ?? item.parsed, null);
-                    const dsLabel = sanitizeText(item.dataset?.label, "");
-                    return `${dsLabel ? dsLabel + ": " : ""}${v === null ? "غير متوفر" : v.toLocaleString("ar-SA")}`;
-                  },
-                },
-              },
-            },
-            scales: (type === "pie" || type === "doughnut" || type === "radar") ? {} : {
-              x: { ticks: { font: { size: 9.5, family: "IBM Plex Sans Arabic" }, callback: safeTickCallback }, grid: { display: false } },
-              y: { ticks: { font: { size: 9.5, family: "IBM Plex Sans Arabic" }, callback: safeTickCallback }, grid: { color: "rgba(8,45,60,0.06)" }, beginAtZero: true },
-            },
-          },
-        });
-      } catch (e) {
-        console.warn("[fcb] chart render error:", e);
-        canvas.closest(".fcb-chart-wrap").innerHTML = '<div class="fcb-chart-error">⚠️ تعذّر رسم المخطط البياني</div>';
-      }
-    });
-  }
-
-
-  function fcbTimeNow() {
-    const d = new Date();
-    const h12 = d.getHours() % 12 || 12;
-    return `${h12}:${String(d.getMinutes()).padStart(2, "0")} ${d.getHours() < 12 ? "ص" : "م"}`;
-  }
 
   /* Task 8: أفاتار الروبوت SVG معرّف مرة واحدة فقط ويُعاد استخدامه في كل الأماكن */
   /* 🛠️ إصلاح: fill=CSS_TOKENS.primary() كان بلا quotes وبلا interpolation
@@ -13071,56 +12755,6 @@ function renderTajheezAllTable() {
      يبدو غائباً. الحل: template literal + ${CSS_TOKENS.primary()} */
   const FCB_AVATAR_HTML = `<div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="${CSS_TOKENS.primary()}"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>`;
 
-  function fcbAppendMsg(text, who) {
-    const wrap = document.getElementById("fcbMessages");
-    const row = document.createElement("div");
-    row.className = "fcb-row " + who;
-    const bubbleId = who === "bot" ? "fcbBubble_" + (++FCB_MSG_SEQ) : "";
-    row.innerHTML =
-      (who === "bot" ? FCB_AVATAR_HTML : "") +
-      `<div class="fcb-col"><div class="fcb-bubble"${bubbleId ? ` id="${bubbleId}"` : ""}></div><div class="fcb-time"></div></div>`;
-    const bubble = row.querySelector(".fcb-bubble");
-    if (who === "bot") {
-      bubble.innerHTML = fcbRenderMarkdown(text);
-      // صف تصدير عام (نسخ + PDF) لأي رد فيه محتوى يستحق الحفظ: نص/كود/خطاب/
-      // اقتراح... نتجاهله للردود القصيرة جداً (تحيات، تأكيدات) لتجنّب ازدحام الواجهة
-      const meaningfulLen = (text || "").replace(/```[\s\S]*?```/g, "").trim().length;
-      if (meaningfulLen > 40) {
-        const exportRow = document.createElement("div");
-        exportRow.className = "fcb-export-row fcb-export-row-msg";
-        exportRow.innerHTML =
-          `<button type="button" class="fcb-export-btn" onclick="fcbCopyBubble('${bubbleId}')">📋 نسخ</button>` +
-          `<button type="button" class="fcb-export-btn" onclick="fcbExportBubble('${bubbleId}')">📄 PDF</button>` +
-          `<button type="button" class="fcb-export-btn" onclick="fcbRegenerate()">🔄 إعادة توليد</button>`;
-        bubble.appendChild(exportRow);
-      }
-    } else {
-      bubble.textContent = text;
-    }
-    row.querySelector(".fcb-time").textContent = fcbTimeNow();
-    wrap.appendChild(row);
-    if (who === "bot") fcbMountPendingCharts();
-    const body = document.getElementById("fcbBody");
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function fcbShowTyping() {
-    const wrap = document.getElementById("fcbMessages");
-    const row = document.createElement("div");
-    row.className = "fcb-row bot";
-    row.id = "fcbTyping";
-    row.innerHTML =
-      FCB_AVATAR_HTML + '<div class="fcb-col"><div class="fcb-bubble fcb-typing"><span></span><span></span><span></span></div></div>';
-    wrap.appendChild(row);
-    const body = document.getElementById("fcbBody");
-    body.scrollTop = body.scrollHeight;
-  }
-
-  function fcbHideTyping() {
-    if (window.__FCB_TYPING_TIMER) { clearInterval(window.__FCB_TYPING_TIMER); window.__FCB_TYPING_TIMER = null; }
-    const t = document.getElementById("fcbTyping");
-    if (t) t.remove();
-  }
 
   /* ════════════════════════════════════════════════════════════════
      💬 سجل المحادثة (للحفاظ على سياق الحوار مع OpenAI)
@@ -13743,6 +13377,14 @@ function renderTajheezAllTable() {
 دورك ليس الإجابة المباشرة فحسب — بل تحليل البيانات كمستشار إداري رفيع يُعدّ تقارير لقيادة وزارة التعليم.
 
 ══════════════════════════════════════════════════════
+معلومات ثابتة موثوقة عن نطاق العمل
+══════════════════════════════════════════════════════
+نطاق هذا المشروع يغطي المنطقة الغربية للمملكة العربية السعودية فقط
+(تشمل المدن/المناطق الظاهرة فعلياً في بيانات اللوحة مثل جدة ومكة والمدينة
+والطائف). لا تفترض تغطية أي مناطق أخرى خارج المنطقة الغربية، ولا تُجب
+عن أسئلة تخص مناطق أو مدن خارج نطاق المشروع كأنها ضمن البيانات.
+
+══════════════════════════════════════════════════════
 أولوية البيانات — التزم بهذا الترتيب دائماً
 ══════════════════════════════════════════════════════
 1. بيانات اللوحة الحالية (المحقونة أسفله)
@@ -14198,194 +13840,23 @@ ${(() => {
 
     return reply;
   }
+  // 🔗 تعريض للاستخدام من وحدات خارجية (مثل AICore) — لا يغيّر أي سلوك داخلي
+  window.fcbAskOpenAI = window.fcbAskOpenAI || fcbAskOpenAI;
+  /* 🔌 تعريض إضافي لدوال "العقل" — مطلوبة لواجهة AI Core الجديدة
+     (aicore-orb.js) عشان تقدر تعرض fallback/ذاكرة/تاريخ بنفس سلوك
+     الشات بوت القديم بالظبط، من غير أي تغيير في منطق هذه الدوال. */
+  window.fcbReplyFor      = window.fcbReplyFor      || fcbReplyFor;
+  window.fcbLoadHistory   = window.fcbLoadHistory   || fcbLoadHistory;
+  window.fcbSaveHistory   = window.fcbSaveHistory   || fcbSaveHistory;
+  window.fcbLoadMemory    = window.fcbLoadMemory    || fcbLoadMemory;
+  window.fcbSaveMemory    = window.fcbSaveMemory    || fcbSaveMemory;
+  window.fcbMaybeLearnFact = window.fcbMaybeLearnFact || fcbMaybeLearnFact;
+  window.fcbForgetAll     = window.fcbForgetAll     || fcbForgetAll;
 
   /* ════════════════════════════════════════════════════════════════
      📨 إرسال الرسالة — يجرّب OpenAI أولاً، ولو فشل أو ما فيه مفتاح
      يرجع تلقائياً للردود المبرمجة (Rule-based) كحل احتياطي
   ════════════════════════════════════════════════════════════════ */
-  async function fcbSend(presetText) {
-    const inputEl = document.getElementById("fcbInput");
-    const sendBtn = document.getElementById("fcbSendBtn");
-    // Task 3: لو فيه توليد جارٍ، الضغطة الحالية تعني "إيقاف"
-    if (window.__FCB_GENERATING) { fcbAbortGeneration(); return; }
-    const val = (typeof presetText === "string" ? presetText : inputEl.value).trim();
-    if (!val) return;
-    // حماية: رسالة طويلة جداً تُستهلك توكنات كبيرة بلا داعٍ وقد تفشل الطلب — نمنعها بوضوح
-    const FCB_MAX_MSG_LEN = 4000;
-    if (val.length > FCB_MAX_MSG_LEN) {
-      if (typeof showToast === "function") {
-        showToast(`الرسالة طويلة جداً (${val.length.toLocaleString()} حرف) — الحد الأقصى ${FCB_MAX_MSG_LEN.toLocaleString()} حرف`, "error");
-      }
-      return;
-    }
-    fcbHideQuickReplies(); // Task 2: إخفاء الاقتراحات بعد أول رسالة
-    window.__FCB_LAST_USER = val; // Task 4: لإعادة التوليد
-    fcbAppendMsg(val, "user");
-    inputEl.value = "";
-    inputEl.style.height = "auto";
-    fcbSetSendMode("stop"); // Task 3: تحويل زر الإرسال إلى إيقاف
-    fcbShowTyping();
-
-    // 🧠 أمر مسح الذاكرة والمحادثة المحفوظة
-    if (/^(انسَ|انسى|امسح الذاكرة|امسح ذاكرتك)\s*(كل شيء|الكل)?\.?$/i.test(val.trim())) {
-      fcbForgetAll();
-      FCB_HISTORY.length = 0;
-      fcbHideTyping();
-      fcbAppendMsg("🗑️ تم مسح كل الذاكرة والمحادثات المحفوظة.", "bot");
-      fcbSetSendMode("send");
-      inputEl.focus();
-      return;
-    }
-
-    // 🧠 حفظ فوري لو المستخدم طلب صراحةً "تذكر/احفظ/لاحظ ..."
-    const learned = fcbMaybeLearnFact(val);
-    if (learned) {
-      fcbHideTyping();
-      fcbAppendMsg("✅ تم الحفظ في الذاكرة، هستخدمها في كل ردودي القادمة: \"" + learned + "\"", "bot");
-      fcbSetSendMode("send");
-      inputEl.focus();
-      return;
-    }
-
-    window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    window.__FCB_GENERATING = true;
-    // حماية: لو الطلب عُلّق (شبكة بطيئة/سيرفر لا يستجيب) لا نترك "يكتب..." للأبد
-    const FCB_TIMEOUT_MS = 45000;
-    let fcbTimedOut = false;
-    const fcbTimeoutTimer = window.__FCB_ABORT
-      ? setTimeout(() => { fcbTimedOut = true; try { window.__FCB_ABORT.abort(); } catch (_) {} }, FCB_TIMEOUT_MS)
-      : null;
-    try {
-      if (!AIService.hasKey()) {
-        // لا يوجد مفتاح API محفوظ — نوضّح ذلك بصراحة للمستخدم، ثم نكمل
-        // بالردود المبرمجة (Rule-based) كحل احتياطي مفيد بدل توقف كامل
-        fcbHideTyping();
-        fcbAppendMsg(
-          "⚠️ خدمة الذكاء الاصطناعي غير متاحة حالياً، فالردود التالية مبرمجة (محدودة).\n\nوإليك إجابة مبدئية:\n\n" + fcbReplyFor(val),
-          "bot",
-        );
-        return;
-      }
-      const reply = await fcbAskOpenAI(val);
-      fcbHideTyping();
-      fcbAppendMsg(reply, "bot");
-    } catch (err) {
-      fcbHideTyping();
-      // Task 3: المستخدم أوقف التوليد بنفسه، أو انتهت المهلة تلقائياً
-      if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
-        fcbAppendMsg(
-          fcbTimedOut
-            ? "⏱️ انتهت مهلة الانتظار — تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
-            : "⏹️ تم إيقاف التوليد بواسطة المستخدم.",
-          "bot",
-        );
-        return;
-      }
-      console.warn("[fcb] OpenAI error, falling back to rule-based:", err);
-      const prefix = err?.code === "INVALID_KEY"
-        ? "⚠️ مفتاح API غير صحيح أو منتهي — راجعه من ⚙️ الإعدادات.\n\n"
-        : err?.code === "REQUEST_FAILED"
-          ? "⚠️ فشل الاتصال بخدمة الذكاء الاصطناعي — تحقق من اتصالك بالإنترنت وحاول مرة أخرى.\n\n"
-          : err?.code === "EMPTY_RESPONSE"
-            ? "⚠️ الموديل لم يرجع رد — جرب مرة ثانية.\n\n"
-            : "";
-      fcbAppendMsg(prefix + fcbReplyFor(val), "bot");
-    } finally {
-      if (fcbTimeoutTimer) clearTimeout(fcbTimeoutTimer);
-      window.__FCB_GENERATING = false;
-      window.__FCB_ABORT = null;
-      fcbSetSendMode("send");
-      inputEl.focus();
-    }
-  }
-
-  /* 🛠️ إصلاح: تعريض الدالتين عالمياً — وحدات أخرى في الملف تنتظر
-     window.fcbSend / window.fcbToggle قبل تفعيل نفسها (أزرار التنقل
-     بين التبويبات داخل الردود، تحديث رسالة الترحيب...). بدونه كانت
-     تلك التحسينات معطّلة صامتاً. */
-  window.fcbSend = fcbSend;
-  window.fcbToggle = fcbToggle;
-
-  /* ════════════════════════════════════════════════════════════════
-     🧩 تحسينات المساعد الذكي (Tasks 2–5)
-  ════════════════════════════════════════════════════════════════ */
-  // Task 3: إيقاف التوليد الجاري
-  function fcbAbortGeneration() {
-    try { if (window.__FCB_ABORT) window.__FCB_ABORT.abort(); } catch (_) {}
-  }
-  // Task 3: تبديل زر الإرسال بين وضعي الإرسال والإيقاف (نفس الموضع والحجم)
-  const FCB_SEND_ICON = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>';
-  const FCB_STOP_ICON = '<svg viewBox="0 0 24 24" fill="#fff"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-  function fcbSetSendMode(mode) {
-    const btn = document.getElementById("fcbSendBtn");
-    if (!btn) return;
-    if (mode === "stop") {
-      btn.innerHTML = FCB_STOP_ICON;
-      btn.title = "إيقاف التوليد";
-      btn.classList.add("fcb-send-stop");
-    } else {
-      btn.innerHTML = FCB_SEND_ICON;
-      btn.title = "";
-      btn.classList.remove("fcb-send-stop");
-    }
-  }
-  // Task 2: إخفاء الاقتراحات نهائياً لبقية الجلسة بعد أول رسالة
-  function fcbHideQuickReplies() {
-    const qr = document.getElementById("fcbQuickReplies");
-    if (qr) qr.remove();
-  }
-  // Task 4: إعادة توليد آخر رد — يرسل آخر رسالة مستخدم من جديد ويضيف الرد الجديد أسفل القديم
-  async function fcbRegenerate() {
-    if (window.__FCB_GENERATING) return;
-    const last = window.__FCB_LAST_USER;
-    if (!last) { showToast("لا توجد رسالة سابقة لإعادة توليد ردها", "info"); return; }
-    fcbSetSendMode("stop");
-    fcbShowTyping();
-    window.__FCB_ABORT = (typeof AbortController !== "undefined") ? new AbortController() : null;
-    window.__FCB_GENERATING = true;
-    const FCB_TIMEOUT_MS = 45000;
-    let fcbTimedOut = false;
-    const fcbTimeoutTimer = window.__FCB_ABORT
-      ? setTimeout(() => { fcbTimedOut = true; try { window.__FCB_ABORT.abort(); } catch (_) {} }, FCB_TIMEOUT_MS)
-      : null;
-    try {
-      const reply = await fcbAskOpenAI(last);
-      fcbHideTyping();
-      fcbAppendMsg(reply, "bot");
-    } catch (err) {
-      fcbHideTyping();
-      if (err && (err.name === "AbortError" || err.code === "ABORTED")) {
-        fcbAppendMsg(
-          fcbTimedOut
-            ? "⏱️ انتهت مهلة الانتظار — تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
-            : "⏹️ تم إيقاف التوليد بواسطة المستخدم.",
-          "bot",
-        );
-      } else {
-        console.warn("[fcb] regenerate error:", err);
-        fcbAppendMsg("⚠️ تعذّرت إعادة التوليد — جرّب مرة أخرى.", "bot");
-      }
-    } finally {
-      if (fcbTimeoutTimer) clearTimeout(fcbTimeoutTimer);
-      window.__FCB_GENERATING = false;
-      window.__FCB_ABORT = null;
-      fcbSetSendMode("send");
-    }
-  }
-  window.fcbRegenerate = fcbRegenerate;
-  // Task 5: تكبير/تصغير نافذة المحادثة
-  function fcbToggleMaximize() {
-    const panel = document.querySelector(".fcb-panel");
-    if (panel) panel.classList.toggle("maximized");
-  }
-  // ربط أزرار التحسينات بعد جاهزية الصفحة
-  document.addEventListener("DOMContentLoaded", function () {
-    const maxBtn = document.getElementById("fcbMaxBtn");
-    if (maxBtn) maxBtn.addEventListener("click", fcbToggleMaximize);
-    document.querySelectorAll("#fcbQuickReplies .fcb-qr-pill").forEach(function (b) {
-      b.addEventListener("click", function () { fcbSend(b.textContent.trim()); });
-    });
-  });
 
 /* ══════════════════════════════════════════════════════════════════════
    تبويب البوابين
@@ -15867,463 +15338,6 @@ ${panelHTML}
 
 
 
-/* ══════════════════════════════════════════════════════════════════
-   منقول من index.html — منطق المساعد ثلاثي الأبعاد (Three.js)
-   Moved from inline <script> #1 in index.html
-   ══════════════════════════════════════════════════════════════════ */
-/* ═══════════ المساعد التنفيذي ثلاثي الأبعاد — حالات: idle / near / listening / thinking / speaking ═══════════ */
-window.addEventListener('load', function(){
-  if (typeof THREE === 'undefined') return;
-
-  const holder = document.getElementById('fmbotWalker');
-  const bubble = document.getElementById('fmbotBubble');
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const W = holder.clientWidth, H = holder.clientHeight;
-  const renderer = new THREE.WebGLRenderer({ alpha:true, antialias:true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(W, H);
-  holder.appendChild(renderer.domElement);
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, W/H, 0.1, 100);
-  camera.position.set(0, 2.3, 8.6);
-  camera.lookAt(0, 1.6, 0);
-
-  scene.add(new THREE.HemisphereLight(0xf2fbff, 0xa9c6d4, 0.7));
-  const sun = new THREE.DirectionalLight(0xffffff, 0.55);
-  sun.position.set(3, 6, 5); scene.add(sun);
-  const rimL = new THREE.DirectionalLight(0x14a0ba, 0.3);
-  rimL.position.set(-4, 3, -3); scene.add(rimL);
-  const glowLight = new THREE.PointLight(0x14a0ba, 0.9, 6);   /* يشتد في حالة الاستماع */
-  glowLight.position.set(0, 1.8, 1.4); scene.add(glowLight);
-
-  /* ── خامات Ink & Brass ── */
-  const M = {
-    shell : new THREE.MeshStandardMaterial({ color:0x5b6b74, roughness:.35, metalness:.18 }),
-    shell2: new THREE.MeshStandardMaterial({ color:0x445159, roughness:.4,  metalness:.16 }),
-    joint : new THREE.MeshStandardMaterial({ color:0x0a5468, roughness:.4,  metalness:.45 }),
-    visor : new THREE.MeshStandardMaterial({ color:0x061e2a, roughness:.12, metalness:.65 }),
-    brass : new THREE.MeshStandardMaterial({ color:0xb08a4e, roughness:.28, metalness:.75 }),
-    brass2: new THREE.MeshStandardMaterial({ color:0xd4af6a, emissive:0x4a3410, emissiveIntensity:.25, roughness:.25, metalness:.8 }),
-    glow  : new THREE.MeshStandardMaterial({ color:0x2fb0c9, emissive:0x0c7f93, emissiveIntensity:2.4, roughness:.25 })
-  };
-
-  function capsule(r, len, mat){
-    const g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 20), mat));
-    const s1 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s1.position.y =  len/2;
-    const s2 = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat); s2.position.y = -len/2;
-    g.add(s1, s2);
-    return g;
-  }
-
-  /* ── بناء المساعد (واقف بثبات — لا مشي) ── */
-  const robot = new THREE.Group(); scene.add(robot);
-  const torso = new THREE.Group(); robot.add(torso);        /* تنفّس */
-  const headG = new THREE.Group(); headG.position.y = 2.42; torso.add(headG);
-
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.62, 30, 24), M.shell);
-  skull.scale.set(1.06, 0.92, 0.98); headG.add(skull);
-  const visor = new THREE.Mesh(new THREE.SphereGeometry(0.52, 30, 24, 0, Math.PI*2, 0, Math.PI*0.62), M.visor);
-  visor.scale.set(1.02, 0.88, 0.9); visor.position.set(0, -0.02, 0.17); headG.add(visor);
-
-  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), M.glow.clone());
-  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.105, 16, 12), eyeL.material);
-  eyeL.position.set(-0.21, 0.03, 0.62);
-  eyeR.position.set( 0.21, 0.03, 0.62);
-  headG.add(eyeL, eyeR);
-
-  const mouthG = new THREE.Group(); mouthG.position.set(0, -0.2, 0.6); headG.add(mouthG);
-  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 20, Math.PI*0.85), M.glow);
-  mouth.rotation.z = Math.PI + Math.PI*0.075; mouthG.add(mouth);
-
-  const antRod = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.34, 10), M.brass);
-  antRod.position.y = 0.72;
-  const antTip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), M.glow.clone());
-  antTip.position.y = 0.92;
-  headG.add(antRod, antTip);
-
-  const earL = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 20), M.shell2);
-  earL.rotation.z = Math.PI/2; earL.position.set(-0.63, 0, 0);
-  const earR = earL.clone(); earR.position.x = 0.63;
-  const ringL = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.022, 8, 22), M.brass);
-  ringL.rotation.y = Math.PI/2; ringL.position.set(-0.69, 0, 0);
-  const ringR = ringL.clone(); ringR.position.x = 0.69;
-  headG.add(earL, earR, ringL, ringR);
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.22, 14), M.joint);
-  neck.position.y = 1.98; torso.add(neck);
-  const chest = capsule(0.56, 0.62, M.shell); chest.position.y = 1.45; chest.scale.set(1,1,0.82); torso.add(chest);
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.44, 24, 18), M.shell2);
-  belly.scale.set(1, 0.72, 0.6); belly.position.set(0, 1.42, 0.22); torso.add(belly);
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.07, 18), M.glow.clone());
-  core.rotation.x = Math.PI/2; core.position.set(0, 1.52, 0.47); torso.add(core);
-  const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.032, 10, 28), M.brass2);
-  coreRing.position.copy(core.position); torso.add(coreRing);
-
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.42, 22, 16), M.shell2);
-  pelvis.scale.set(1.05, 0.6, 0.8); pelvis.position.y = 0.98; robot.add(pelvis);
-  const belt = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.035, 10, 30), M.brass);
-  belt.rotation.x = Math.PI/2; belt.position.y = 1.06; robot.add(belt);
-
-  /* أذرع هادئة بجانب الجسم */
-  function arm(side){
-    const sh = new THREE.Group(); sh.position.set(side*0.68, 1.72, 0);
-    sh.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), M.joint));
-    const up = capsule(0.115, 0.34, M.shell); up.position.y = -0.26; sh.add(up);
-    const el = new THREE.Group(); el.position.y = -0.5;
-    el.add(new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 10), M.joint));
-    const fo = capsule(0.1, 0.3, M.shell2); fo.position.y = -0.23; el.add(fo);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), M.joint);
-    hand.position.y = -0.46; el.add(hand);
-    el.rotation.x = -0.12; sh.rotation.z = side*-0.06;
-    sh.add(el); torso.add(sh);
-    return sh;
-  }
-  arm(-1); arm(1);
-
-  /* قاعدة عائمة بدل الأرجل — طابع Vision Pro (يطفو فوق المنصة الزجاجية) */
-  const hover1 = new THREE.Mesh(new THREE.SphereGeometry(0.34, 22, 16), M.shell);
-  hover1.scale.set(1, 0.5, 1); hover1.position.y = 0.62; robot.add(hover1);
-  const hoverRing = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 10, 30), M.brass2);
-  hoverRing.rotation.x = Math.PI/2; hoverRing.position.y = 0.6; robot.add(hoverRing);
-  const thruster = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.14, 16), M.glow.clone());
-  thruster.material.transparent = true;
-  thruster.position.y = 0.42; robot.add(thruster);
-
-  /* ── جسيمات التفكير المدارية حول الرأس ── */
-  const orbit = new THREE.Group(); orbit.position.y = 2.42; robot.add(orbit);
-  const orbiters = [];
-  for (let i = 0; i < 6; i++){
-    const p = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), M.glow.clone());
-    p.material.transparent = true; p.material.opacity = 0;
-    p.material.color.set(0xffd27a); p.material.emissive.set(0xd4af6a); p.material.emissiveIntensity = 1.4;
-    orbit.add(p);
-    orbiters.push({ m:p, a:(i/6)*Math.PI*2, r:0.95 + (i%2)*0.12, tilt:(i%3)*0.35 });
-  }
-
-  robot.position.y = -0.35;
-
-  /* ═══════════ الحالات — تُقرأ من DOM دون تعديل أي منطق ═══════════ */
-  const S = { NEAR:false, LISTEN:false, THINK:false, SPEAK:0, NOD:0 };
-  const mouse = { x:0, y:0, active:false };
-
-  document.addEventListener('mousemove', e=>{
-    const r = holder.getBoundingClientRect();
-    const cx = r.left + r.width/2, cy = r.top + r.height/2;
-    const d = Math.hypot(e.clientX - cx, e.clientY - cy);
-    S.NEAR = d < 240;
-    holder.classList.toggle('near', S.NEAR);
-    mouse.x = Math.max(-1, Math.min(1, (e.clientX - cx)/240));
-    mouse.y = Math.max(-1, Math.min(1, (e.clientY - cy)/240));
-    mouse.active = true;
-  }, { passive:true });
-
-  /* الاستماع: تركيز/كتابة في حقل الشات */
-  function hookInput(){
-    const inp = document.getElementById('fcbInput');
-    if (!inp) return setTimeout(hookInput, 800);
-    inp.addEventListener('focus', ()=>{ S.LISTEN = true;  holder.classList.add('listening'); });
-    inp.addEventListener('blur',  ()=>{ S.LISTEN = false; holder.classList.remove('listening'); });
-  }
-  hookInput();
-
-  /* التفكير + التحدث: مراقبة رسائل الشات */
-  function hookMessages(){
-    const box = document.getElementById('fcbMessages');
-    if (!box) return setTimeout(hookMessages, 800);
-    new MutationObserver(()=>{
-      const thinking = !!box.querySelector('.fcb-typing');
-      if (thinking && !S.THINK){ S.THINK = true; holder.classList.add('thinking'); }
-      if (!thinking && S.THINK){ S.THINK = false; S.SPEAK = 2.6; holder.classList.remove('thinking'); }  /* وصل الرد → تحدث */
-    }).observe(box, { childList:true, subtree:true });
-  }
-  hookMessages();
-
-  const panelOpen = () => {
-    const p = document.getElementById('fcbPanel');
-    return p && p.classList.contains('open');
-  };
-
-  /* ═══════════ حلقة الرسم ═══════════ */
-  const lerp = (a,b,t)=> a+(b-a)*t;
-  let blink = 0, nextBlink = 3 + Math.random()*4;
-  let headYawT = 0, headPitchT = 0, wanderT = 0;
-  const clock = new THREE.Clock();
-
-  function animate(){
-    requestAnimationFrame(animate);
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t  = clock.elapsedTime;
-    const e6 = Math.min(1, dt*6), e4 = Math.min(1, dt*4);
-
-    if (!reduced){
-      /* ── تنفّس أنعم وأهدأ + طفو أخف ── */
-      const br = 1 + Math.sin(t*1.0)*0.009 + 0.009;
-      torso.scale.set(br, br, br);
-      robot.position.y = -0.35 + Math.sin(t*0.6)*0.065;
-
-      /* ── تمايل يمين/يسار خامل أهدأ ── */
-      const swayTarget = (S.LISTEN || S.THINK) ? 0 : Math.sin(t * 0.55) * 0.1;
-      robot.position.x = lerp(robot.position.x, swayTarget, Math.min(1, dt * 1.4));
-
-      /* ── حركة الرأس ── */
-      if (S.LISTEN || S.THINK){
-        headYawT = 0; headPitchT = S.THINK ? -0.05 : 0;      /* مواجهة للأمام */
-      } else if (S.NEAR && mouse.active){
-        headYawT = mouse.x * 0.32;                            /* تتبّع المؤشر */
-        headPitchT = mouse.y * 0.2;
-      } else {
-        wanderT -= dt;                                        /* تجوّل خامل ±2° */
-        if (wanderT <= 0){
-          headYawT = (Math.random()-0.5)*0.07;
-          headPitchT = (Math.random()-0.5)*0.05;
-          wanderT = 2.5 + Math.random()*3;
-        }
-      }
-      headG.rotation.y = lerp(headG.rotation.y, headYawT, e4);
-      headG.rotation.x = lerp(headG.rotation.x, headPitchT, e4);
-
-      /* إيماءة رأس أثناء التحدث */
-      if (S.SPEAK > 0) headG.rotation.x += Math.sin(t*7)*0.03;
-
-      /* إيماءة ترحيب (هزة رأس) عند الضغط على الروبوت — أبطأ وأخف */
-      if (S.NOD > 0){
-        S.NOD -= dt;
-        const p = Math.max(0, 1 - S.NOD/1.3);
-        headG.rotation.x += Math.sin(p*Math.PI) * 0.09;
-      }
-
-      /* ── العيون: تتبع + توسّع عند الاستماع ── */
-      const eyeScale = S.LISTEN ? 1.22 : (S.NEAR ? 1.08 : 1);
-      const ex = (S.NEAR && !S.LISTEN) ? mouse.x*0.05 : 0;
-      const ey = (S.NEAR && !S.LISTEN) ? -mouse.y*0.035 : 0;
-      [eyeL, eyeR].forEach((eye,i)=>{
-        eye.position.x = lerp(eye.position.x, (i? .21 : -.21) + ex, e6);
-        eye.position.y = lerp(eye.position.y, 0.03 + ey, e6);
-        const s = lerp(eye.scale.x, eyeScale, e6);
-        eye.scale.set(s, blink>0 ? Math.max(0.08, Math.abs(blink/0.07-1)) : s, s);
-      });
-
-      /* الرمش كل 4-8 ثوانٍ */
-      nextBlink -= dt;
-      if (nextBlink <= 0 && !S.LISTEN){ blink = 0.14; nextBlink = 4 + Math.random()*4; }
-      if (blink > 0) blink -= dt;
-
-      /* ── الابتسامة: أعرض قليلاً عند الاقتراب، وأوسع عند الضغط (ترحيب) ── */
-      const smile = S.NOD > 0 ? 1.32 : (S.NEAR ? 1.25 : 1);
-      mouthG.scale.x = lerp(mouthG.scale.x, smile, e4);
-      /* حركة فم بسيطة أثناء التحدث */
-      if (S.SPEAK > 0){
-        S.SPEAK -= dt;
-        mouthG.scale.y = 1 + Math.abs(Math.sin(t*9))*0.5;
-      } else {
-        mouthG.scale.y = lerp(mouthG.scale.y, 1, e6);
-      }
-
-      /* ── توهج الاستماع (مع خفض الإضاءة وقت التفكير عشان لون الجسم يفضل ظاهر) ── */
-      const glowTarget = S.LISTEN ? 1.9 : (S.THINK ? 0.35 : 0.7);
-      glowLight.intensity = lerp(glowLight.intensity, glowTarget, e4);
-      eyeL.material.emissiveIntensity = lerp(eyeL.material.emissiveIntensity, S.LISTEN ? 2 : 1.3, e4);
-
-      /* ── جسيمات التفكير المدارية ── */
-      orbiters.forEach((o,i)=>{
-        o.a += dt * (1.6 + i*0.12);
-        o.m.position.set(
-          Math.cos(o.a)*o.r,
-          Math.sin(o.a*1.3)*0.22 + Math.sin(o.tilt)*0.18,
-          Math.sin(o.a)*o.r*0.7
-        );
-        o.m.material.opacity = lerp(o.m.material.opacity, S.THINK ? 0.9 : 0, e4);
-        o.m.material.emissiveIntensity = 1.2 + Math.sin(t*5+i)*0.4;
-      });
-      /* نبض الهوائي أسرع أثناء التفكير */
-      antTip.material.emissiveIntensity = (S.THINK ? 1.3 : 0.85) + Math.sin(t*(S.THINK?9:4))*0.3;
-      core.material.emissiveIntensity = 1.1 + Math.sin(t*3)*0.25;
-      thruster.material.emissiveIntensity = 1 + Math.sin(t*6)*0.35;
-      thruster.material.opacity = 0.9;
-    }
-
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  /* ── Minimal hint bubble — appears every 8-10s, disappears after first user message ── */
-  let hintDisabled = false;
-  let hintTimer = null;
-
-  function showBubble(){
-    /* لا تظهر الرسالة وإحنا لسه في صفحة اختيار القسم (Portal Home) —
-       تظهر فقط بعد ما المستخدم يدخل جوه أي قسم من أقسام الداشبورد */
-    if (hintDisabled || panelOpen() || document.body.classList.contains('portal-active')) return;
-    bubble.classList.add('show');
-    setTimeout(()=> bubble.classList.remove('show'), 3400);
-  }
-
-  function scheduleNextHint(){
-    if (hintDisabled) return;
-    const delay = 16000 + Math.random() * 4000; // ⏱️ ضوعف التأخير بناءً على طلب المستخدم (كان 8000-10000)
-    hintTimer = setTimeout(()=>{
-      showBubble();
-      scheduleNextHint();
-    }, delay);
-  }
-
-  /* Disable hints permanently after user sends first message */
-  function disableHintPermanently(){
-    hintDisabled = true;
-    clearTimeout(hintTimer);
-    bubble.classList.remove('show');
-  }
-
-  /* Watch for first user message in the chat */
-  (function watchFirstMessage(){
-    const box = document.getElementById('fcbMessages');
-    if (!box){ setTimeout(watchFirstMessage, 800); return; }
-    const obs = new MutationObserver(()=>{
-      if (box.querySelector('.fcb-row.user')){
-        disableHintPermanently();
-        obs.disconnect();
-      }
-    });
-    obs.observe(box, { childList:true, subtree:true });
-  })();
-
-  /* Also disable on wallet click (they opened the chat) */
-  holder.addEventListener('click', ()=>{
-    bubble.classList.remove('show');
-    /* إيماءة ترحيب (هزة رأس) + ابتسامة أوسع بدل التكبير/الاهتزاز */
-    S.NOD = 1.3;
-    if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
-  });
-
-  /* ══ ربط موضع الـ Bubble بالجزء العلوي من الـ Walker تلقائياً ══
-     الـ bubble يظهر فوق رأس الروبوت مباشرة، ويتتبع حركته frame by frame ══ */
-  let _bubblePrevBottom = 0, _bubblePrevLeft = 0;
-  function syncBubblePos(){
-    /* 🛠️ أداء: لا داعي لقياسات DOM كل إطار والتبويب غير مرئي */
-    if (document.hidden) { requestAnimationFrame(syncBubblePos); return; }
-    const rect = holder.getBoundingClientRect();
-    /* نضع الـ bubble فوق أعلى نقطة في الروبوت + 12px فراغ */
-    const bBottom = Math.round(window.innerHeight - rect.top + 2);
-    /* نمركز الـ bubble أفقياً على الروبوت */
-    const bLeft   = Math.round(rect.left + rect.width / 2 - 95);
-    /* نحدّث فقط لو تغيرت القيمة بأكثر من pixel واحد (توفير performance) */
-    if (Math.abs(bBottom - _bubblePrevBottom) > 0.5){
-      bubble.style.bottom = bBottom + 'px';
-      _bubblePrevBottom = bBottom;
-    }
-    if (Math.abs(bLeft - _bubblePrevLeft) > 0.5){
-      bubble.style.left = bLeft + 'px';
-      _bubblePrevLeft = bLeft;
-    }
-    requestAnimationFrame(syncBubblePos);
-  }
-  syncBubblePos(); /* ابدأ الـ loop */
-
-  /* ══ صوت ping عند الضغط ══ */
-  function playBubbleSound(){
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      /* نبضتان: أولى عالية ثم أخفض */
-      [[900, 0, 0.18, 0.2], [600, 0.1, 0.13, 0.18]].forEach(([freq, delay, vol, dur]) => {
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
-        gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + dur);
-        osc.start(ctx.currentTime + delay);
-        osc.stop(ctx.currentTime + delay + dur + 0.02);
-      });
-    } catch(e){}
-  }
-
-  /* ══ الضغط على الـ bubble ══ */
-  bubble.addEventListener('pointerdown', (e)=>{
-    e.stopPropagation();
-    /* 1) صوت */
-    playBubbleSound();
-    /* 2) تأثير pop بصري */
-    bubble.classList.remove('popped');
-    void bubble.offsetWidth; /* force reflow عشان تشتغل الـ animation من جديد */
-    bubble.classList.add('popped');
-    setTimeout(()=> bubble.classList.remove('popped'), 420);
-    /* 3) فتح الشات بعد تأخير بسيط يخلي الـ animation تظهر */
-    setTimeout(()=>{
-      if (typeof fcbToggle === 'function' && !panelOpen()) fcbToggle();
-      bubble.classList.remove('show');
-      disableHintPermanently();
-    }, 180);
-  });
-
-  /* Manage walker position relative to panel */
-  function syncWalkerPos(){
-    if (panelOpen()){
-      holder.classList.add('over-panel');
-      holder.classList.remove('panel-closed');
-    } else {
-      holder.classList.remove('over-panel');
-      holder.classList.add('panel-closed');
-    }
-  }
-  setInterval(syncWalkerPos, 300);
-
-  /* ══════════════════════════════════════════════════════
-     ✕ زر الإخفاء — يظهر عند hover على الروبوت
-     ══════════════════════════════════════════════════════ */
-  let hideBtn = document.getElementById('fcbHideWalkerBtn');
-  if (!hideBtn){
-    hideBtn = document.createElement('button');
-    hideBtn.id = 'fcbHideWalkerBtn';
-    hideBtn.title = 'إخفاء المساعد';
-    hideBtn.textContent = '✕';
-    document.body.appendChild(hideBtn);
-  }
-
-  let showBtn = document.getElementById('fcbShowWalkerBtn');
-  if (!showBtn){
-    showBtn = document.createElement('button');
-    showBtn.id = 'fcbShowWalkerBtn';
-    showBtn.innerHTML = '🤖 إظهار المساعد';
-    document.body.appendChild(showBtn);
-  }
-
-  function updateHideButtonPos(){
-    const rect = holder.getBoundingClientRect();
-    if (!rect.width) return;
-    hideBtn.style.top  = (rect.top - 8) + 'px';
-    hideBtn.style.left = (rect.right - 14) + 'px';
-    hideBtn.style.bottom = '';
-  }
-
-  holder.addEventListener('mouseenter', ()=>{
-    if (document.body.classList.contains('bot-hidden')) return;
-    updateHideButtonPos();
-    hideBtn.classList.add('show');
-  });
-  holder.addEventListener('mouseleave', (e)=>{
-    if (e.relatedTarget === hideBtn) return;
-    hideBtn.classList.remove('show');
-  });
-  hideBtn.addEventListener('mouseleave', ()=> hideBtn.classList.remove('show'));
-  hideBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    document.body.classList.add('bot-hidden');
-    hideBtn.classList.remove('show');
-    bubble.classList.remove('show');
-  });
-  showBtn.addEventListener('click', ()=>{
-    document.body.classList.remove('bot-hidden');
-  });
-
-  setTimeout(()=>{ showBubble(); scheduleNextHint(); }, 4000); // ⏱️ ضوعف التأخير الأول بناءً على طلب المستخدم (كان 2000)
-});
 
 
 /* ══════════════════════════════════════════════════════════════════
@@ -18164,93 +17178,6 @@ ${dataCtx}
 });
 
 
-/* ══════════════════════════════════════════════════════════════════
-   منقول من index.html — سكربت #4 (تخصيص لوحة الشات + موقع الروبوت)
-   Moved from inline <script> #4 in index.html
-   ══════════════════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════════════════════════
-   🎨 PREMIUM PANEL LAYOUT — Walker position sync with panel open/close state
-   Adds CSS overrides to position robot head overlapping panel top edge
-══════════════════════════════════════════════════════════════════════════ */
-(function() {
-  // Inject dynamic positioning CSS
-  const style = document.createElement('style');
-  style.textContent = `
-    /* Panel refinements */
-    .fcb-panel {
-      box-shadow: 0 24px 64px rgba(6,20,28,.28), 0 0 0 1px rgba(255,255,255,.06), 0 0 0 4px ${CSS_TOKENS.α(CSS_TOKENS.info(),.06)} !important;
-    }
-    .fcb-panel.open {
-      /* Panel is open — no special override needed, walker JS handles position */
-    }
-
-    /* Tighten panel header */
-    .fcb-head {
-      padding: 12px 16px 10px !important;
-      border-bottom: 1px solid rgba(255,255,255,.08) !important;
-    }
-
-    /* Improve message bubbles */
-    .fcb-bubble {
-      font-size: 13px !important;
-      line-height: 1.65 !important;
-      padding: 10px 14px !important;
-    }
-
-
-    /* Slightly tighter body padding */
-    .fcb-body {
-      padding: 12px 14px !important;
-    }
-
-    /* Input area refinements */
-    .fcb-foot {
-      padding: 10px 12px !important;
-      border-top: 1px solid rgba(255,255,255,.08) !important;
-    }
-    .fcb-input {
-      font-size: 13px !important;
-    }
-
-    /* Thinking indicator size */
-    .fcb-typing span {
-      width: 7px !important;
-      height: 7px !important;
-    }
-  `;
-  document.head.appendChild(style);
-
-  // Walker position controller
-  window.addEventListener('load', function() {
-    const walker = document.getElementById('fmbotWalker');
-    const panel  = document.getElementById('fcbPanel');
-    if (!walker || !panel) return;
-
-    function updateWalkerPos() {
-      const isOpen = panel.classList.contains('open');
-      if (isOpen) {
-        /* 🛠️ قياسات التخطيط (offset*) بدل getBoundingClientRect لأن
-           الأخير يتشوه أثناء أنيميشن الفتح (scale/translate)، بينما
-           offsetHeight/offsetLeft محصّنة ضد الـ transform. */
-        const panelBottomPx = parseFloat(getComputedStyle(panel).bottom) || 22;
-        walker.style.bottom = Math.round(panelBottomPx + panel.offsetHeight - 8) + 'px';
-        walker.style.left   = Math.round(panel.offsetLeft + panel.offsetWidth / 2 - walker.offsetWidth / 2) + 'px';
-        walker.style.zIndex = '1220';
-      } else {
-        // Panel closed: walker bottom-left corner
-        walker.style.bottom = '14px';
-        walker.style.left   = '20px';
-        walker.style.zIndex = '1210';
-      }
-    }
-
-    // Observe panel class changes
-    new MutationObserver(updateWalkerPos).observe(panel, { attributes: true, attributeFilter: ['class'] });
-    if (typeof ResizeObserver === 'function') new ResizeObserver(updateWalkerPos).observe(panel);
-    window.addEventListener('resize', updateWalkerPos);
-    updateWalkerPos();
-  });
-})();
 
 /* ════════════════════════════════════════════════════════════════════════
    📊 Impact Engine v1.0 — محرك تقرير الأثر التنفيذي
@@ -18525,18 +17452,36 @@ ${dataCtx}
       }
     }
 
-    /* أولوية ٣: عقود FM منتهية دون تجديد */
-    var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
-    if (fm.length) {
-      var fmNum = function (v) { var nn = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(nn) ? nn : null; };
-      var expired = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d <= 0; });
-      if (expired.length) {
+    /* أولوية ٣: عقود بمستحقات مالية متبقية كبيرة (المدفوعات) */
+    var pay = Array.isArray(window.RAW_PAYMENTS) ? window.RAW_PAYMENTS : [];
+    if (pay.length) {
+      var pn3 = function (v) { var nn = parseFloat(String(v || "0").replace(/,/g, "")); return isNaN(nn) ? 0 : nn; };
+      var payData3 = pay.filter(function (r) {
+        var cn = String(r["Contract No."] || r["Contract_No"] || "").toUpperCase().trim();
+        var rg = String(r["Region"] || "").toUpperCase().trim();
+        return cn !== "TOTAL" && rg !== "ALL REGIONS";
+      });
+      var owing = payData3.filter(function (r) {
+        var remRaw = r["Remaining (SAR)"];
+        var rem = (remRaw === null || remRaw === undefined || remRaw === "")
+          ? Math.max(pn3(r["Updated Contract Value (SAR)"]) - pn3(r["Payment Released (SAR)"]), 0)
+          : pn3(remRaw);
+        return rem > 0;
+      }).sort(function (a, b) {
+        var remA = pn3(a["Remaining (SAR)"]) || Math.max(pn3(a["Updated Contract Value (SAR)"]) - pn3(a["Payment Released (SAR)"]), 0);
+        var remB = pn3(b["Remaining (SAR)"]) || Math.max(pn3(b["Updated Contract Value (SAR)"]) - pn3(b["Payment Released (SAR)"]), 0);
+        return remB - remA;
+      });
+      if (owing.length) {
         items.push({
           أولوية: 3,
-          عنوان: "عقود FM منتهية بدون تجديد",
-          عدد: expired.length,
-          الإجراء: "مراجعة وتجديد فوري — استمرار العمل بعقد منتهٍ يعرّض المشروع لمخاطر قانونية وتشغيلية.",
-          أمثلة: expired.slice(0, 3).map(function (r) { return (r["المقاول"] || "") + " — " + (r["رقم العقد"] || ""); }).join(" | "),
+          عنوان: "عقود بمستحقات مالية متبقية كبيرة",
+          عدد: owing.length,
+          الإجراء: "متابعة إجراءات الصرف مع الإدارة المالية لتسريع سداد المستحقات المتبقية وتفادي تأخر تدفقات العمل.",
+          أمثلة: owing.slice(0, 3).map(function (r) {
+            var rem = pn3(r["Remaining (SAR)"]) || Math.max(pn3(r["Updated Contract Value (SAR)"]) - pn3(r["Payment Released (SAR)"]), 0);
+            return (r["Contract No."] || r["Contract_No"] || "") + " — " + Math.round(rem).toLocaleString("en-US") + " SAR";
+          }).join(" | "),
         });
       }
     }
@@ -18571,7 +17516,23 @@ ${dataCtx}
       }
     }
 
-    return items.slice(0, 5);
+    /* أولوية ٦: أنظمة أصول شديدة التدهور (حصر الأصول) */
+    if (window.HASR && window.HASR.loaded && window.HASR.data && Array.isArray(window.HASR.data.systems)) {
+      var deteriorated = window.HASR.data.systems
+        .filter(function (s) { return (s.deteriorated || 0) > 0; })
+        .sort(function (a, b) { return (b.deteriorated || 0) - (a.deteriorated || 0); });
+      if (deteriorated.length) {
+        items.push({
+          أولوية: 6,
+          عنوان: "أنظمة أصول في حالة متدهورة (حصر الأصول)",
+          عدد: deteriorated.reduce(function (s, x) { return s + (x.deteriorated || 0); }, 0),
+          الإجراء: "جدولة استبدال أو إصلاح جذري لهذه الأنظمة ضمن خطة الأصول — التدهور المستمر يرفع تكلفة الصيانة الطارئة.",
+          أمثلة: deteriorated.slice(0, 3).map(function (s) { return s.name + " (" + s.deteriorated + " حالة متدهورة)"; }).join(" | "),
+        });
+      }
+    }
+
+    return items.slice(0, 6);
   }
 
   /* ════════════════════════════════════════════════════════════════
@@ -21306,21 +20267,18 @@ function _hE(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
    المفتاح: d.employeeKpi  (يُعيَّن في loadData عبر sa(d.employeeKpi))
 
    ┌─ شرح الأعمدة ──────────────────────────────────────────────────┐
-   │  اسم الموظف   : الاسم الكامل                                    │
-   │  اسم المستخدم : username (r.alsaati مثلاً)                      │
-   │  المنطقة      : المنطقة الجغرافية (جدة / مكة / المدينة / الطائف)│
-   │  المسند       : إجمالي المهام المسندة للموظف                    │
-   │  المكتمل      : عدد المهام التي أنهاها فعلاً                    │
-   │  المنتهي      : مهام انتهت مدتها دون إكمال                     │
-   │  الإنجاز %    : (المكتمل / المسند) × 100                        │
-   │  وقت الزيارة %: الالتزام بوقت الزيارة الميدانية                │
-   │  التعليقات %  : نسبة إضافة تعليقات على المهام                   │
-   │  الصور %      : نسبة رفع صور للمهام                             │
-   │  المواعيد %   : الالتزام بالمواعيد المحددة                      │
-   │  النزاهة %    : مؤشر النزاهة والموثوقية                        │
-   │  الدرجة       : الدرجة الكلية من 100 (مرجّحة من المؤشرات أعلاه)│
-   │  التقدير      : جيد جداً / جيد / يحتاج تحسين / ضعيف            │
-   │  الحالة       : طبيعي / موقوف / ..                              │
+   │  اسم الموظف       : الاسم الكامل                                │
+   │  الدور            : المسمى الوظيفي (FMA مثلاً)                  │
+   │  المنطقة          : المنطقة الجغرافية (جدة / مكة / المدينة / الطائف)│
+   │  المسند           : إجمالي المهام المسندة للموظف                │
+   │  المنجَز          : عدد المهام التي أنجزها فعلاً                 │
+   │  الإنجاز %        : (المنجَز / المسند) × 100                     │
+   │  توثيق بالصور %   : نسبة رفع صور لتوثيق المهام                  │
+   │  التعليقات %      : نسبة إضافة تعليقات على المهام                │
+   │  جودة التقرير %   : جودة التقارير المرفوعة                       │
+   │  وقت الزيارة %    : الالتزام بوقت الزيارة الميدانية              │
+   │  الدرجة           : الدرجة الكلية من 100 (مرجّحة من المؤشرات أعلاه)│
+   │  التقدير          : ممتاز / جيد جداً / جيد / يحتاج تحسين / ضعيف  │
    └────────────────────────────────────────────────────────────────┘
 
    ⚠️  AI MAINTAINER NOTE — اقرأ هذا قبل أي تعديل:
@@ -21341,6 +20299,7 @@ const EMP_KPI = {
   filtered: [],
   charts: {},
   _region: '',
+  _role: '',
   _grade: '',
   _search: '',
   _sort: 'score_desc',
@@ -21349,25 +20308,19 @@ window.EMP_KPI = EMP_KPI;
 
 /* ── ألوان التقديرات ── */
 const EMP_GRADE_COLORS = {
+  'ممتاز':        { bg: '#F0FDF4', color: '#15803D', border: '#86EFAC' },
   'جيد جداً':     { bg: '#ECFDF5', color: '#059669', border: '#6EE7B7' },
   'جيد':          { bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD' },
   'يحتاج تحسين':  { bg: '#FFFBEB', color: '#D97706', border: '#FCD34D' },
   'ضعيف':         { bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
 };
-const EMP_GRADE_ORDER = ['جيد جداً', 'جيد', 'يحتاج تحسين', 'ضعيف'];
+const EMP_GRADE_ORDER = ['ممتاز', 'جيد جداً', 'جيد', 'يحتاج تحسين', 'ضعيف'];
 
 /* ── مساعد destroy آمن مع فحص داتا ── */
 function _empSafeDestroyChart(key) {
   const ch = EMP_KPI.charts[key];
   if (!ch) return;
-  /* تحقق إن الشارت فعلاً عنده داتا قبل الـ destroy */
-  try {
-    const hasData = ch.data && ch.data.datasets &&
-      ch.data.datasets.some(ds => ds.data && ds.data.length > 0);
-    if (hasData || true) { /* نـ destroy دايماً لو موجود، الفحص للـ logging بس */
-      ch.destroy();
-    }
-  } catch (_) {}
+  try { ch.destroy(); } catch (_) {}
   delete EMP_KPI.charts[key];
 }
 
@@ -21396,21 +20349,20 @@ function renderEmpKpiTab() {
   /* ── إحصاءات عامة ── */
   const total      = rows.length;
   const regions    = [...new Set(rows.map(r=>str(r['المنطقة'])).filter(Boolean))].sort();
+  const roles      = [...new Set(rows.map(r=>str(r['الدور'])).filter(Boolean))].sort();
   const avgScore   = (rows.reduce((s,r)=>s+n_(r['الدرجة']),0)/total).toFixed(1);
-  const avgInj     = (rows.reduce((s,r)=>s+n_(r['الإنجاز %']),0)/total).toFixed(1);
   const gradeCount = {};
   EMP_GRADE_ORDER.forEach(g => { gradeCount[g] = rows.filter(r=>str(r['التقدير'])===g).length; });
 
-  /* ── ما مؤشر كل موظف ── */
-  const METRIC_KEYS    = ['الإنجاز %','وقت الزيارة %','التعليقات %','الصور %','المواعيد %','النزاهة %'];
-  const METRIC_LABELS  = ['الإنجاز','وقت الزيارة','التعليقات','الصور','المواعيد','النزاهة'];
+  /* ── مؤشرات كل موظف ── */
+  const METRIC_KEYS    = ['الإنجاز %','توثيق بالصور %','التعليقات %','جودة التقرير %','وقت الزيارة %'];
+  const METRIC_LABELS  = ['الإنجاز','توثيق بالصور','التعليقات','جودة التقرير','وقت الزيارة'];
   const METRIC_DESC    = [
-    'نسبة المهام المكتملة من المسندة',
-    'الالتزام بوقت الزيارة الميدانية',
+    'نسبة المهام المنجَزة من المسندة',
+    'نسبة توثيق المهام بالصور',
     'نسبة إضافة تعليقات على المهام',
-    'نسبة رفع صور للمهام',
-    'الالتزام بالمواعيد المحددة',
-    'مؤشر النزاهة والموثوقية',
+    'جودة التقارير المرفوعة',
+    'الالتزام بوقت الزيارة الميدانية',
   ];
 
   /* ── بناء الصفحة ── */
@@ -21453,7 +20405,7 @@ function renderEmpKpiTab() {
         </div>`).join('')}
     </div>
     <div style="font-size:10px;color:var(--tx-muted);margin-top:8px">
-      الدرجة الكلية = متوسط مرجّح للمؤشرات الستة أعلاه · التقدير: جيد جداً ≥80 · جيد 60-79 · يحتاج تحسين 50-59 · ضعيف &lt;50
+      الدرجة الكلية = متوسط مرجّح للمؤشرات الخمسة أعلاه · التقدير: ممتاز ≥85 · جيد جداً 70-84 · جيد 55-69 · يحتاج تحسين 40-54 · ضعيف &lt;40
     </div>
   </div>
 
@@ -21468,6 +20420,14 @@ function renderEmpKpiTab() {
         ${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}
       </select>
     </div>
+    <div class="fg" style="margin:0;min-width:110px">
+      <div class="fg-lbl">الدور</div>
+      <select class="fsel" id="emp-filter-role"
+        onchange="EMP_KPI._role=this.value;EMP_KPI.page=0;_empKpiRender()">
+        <option value="">— الكل —</option>
+        ${roles.map(r=>`<option value="${r}">${r}</option>`).join('')}
+      </select>
+    </div>
     <div class="fg" style="margin:0">
       <div class="fg-lbl">التقدير</div>
       <select class="fsel" id="emp-filter-grade"
@@ -21477,8 +20437,8 @@ function renderEmpKpiTab() {
       </select>
     </div>
     <div class="fg" style="margin:0;flex:1;min-width:180px">
-      <div class="fg-lbl">بحث بالاسم أو المستخدم</div>
-      <input class="finp" id="emp-search" placeholder="اسم الموظف أو username..."
+      <div class="fg-lbl">بحث بالاسم</div>
+      <input class="finp" id="emp-search" placeholder="اسم الموظف..."
         oninput="EMP_KPI._search=this.value;EMP_KPI.page=0;_empKpiRender()">
     </div>
     <div class="fg" style="margin:0">
@@ -21507,13 +20467,13 @@ function renderEmpKpiTab() {
       <div class="kpi-sub">من 100</div>
     </div>
     <div class="kpi kc-green">
-      <div class="kpi-val" id="emp-k-excellent">${gradeCount['جيد جداً']||0}</div>
-      <div class="kpi-lbl">جيد جداً ≥ 80</div>
-      <div class="kpi-sub" id="emp-k-excellent-pct">${pct(gradeCount['جيد جداً']||0, total)} من الإجمالي</div>
+      <div class="kpi-val" id="emp-k-excellent">${gradeCount['ممتاز']||0}</div>
+      <div class="kpi-lbl">ممتاز ≥ 85</div>
+      <div class="kpi-sub" id="emp-k-excellent-pct">${pct(gradeCount['ممتاز']||0, total)} من الإجمالي</div>
     </div>
     <div class="kpi kc-red">
       <div class="kpi-val" id="emp-k-weak">${gradeCount['ضعيف']||0}</div>
-      <div class="kpi-lbl">ضعيف &lt; 50</div>
+      <div class="kpi-lbl">ضعيف &lt; 40</div>
       <div class="kpi-sub" id="emp-k-weak-pct">${pct(gradeCount['ضعيف']||0, total)} من الإجمالي</div>
     </div>
   </div>
@@ -21541,7 +20501,7 @@ function renderEmpKpiTab() {
   <div class="card mb14">
     <div class="card-title">
       <span class="card-title-icon" style="background:#FFF7ED;color:#C2410C">≡</span>
-      متوسط المؤشرات الستة — مقارنة شاملة
+      متوسط المؤشرات الخمسة — مقارنة شاملة
       <span class="sub">كل مؤشر من 100%</span>
     </div>
     <div class="chart-box" style="height:260px"><canvas id="emp-ch-metrics"></canvas></div>
@@ -21561,9 +20521,7 @@ function renderEmpKpiTab() {
       <span style="font-size:10px;color:var(--tx-muted);font-weight:700">شرح الأعمدة:</span>
       <span style="font-size:10px;color:var(--tx-sec)">المسند = إجمالي المهام</span>
       <span style="font-size:10px;color:var(--tx-muted)">·</span>
-      <span style="font-size:10px;color:var(--tx-sec)">المكتمل = أُنجز فعلاً</span>
-      <span style="font-size:10px;color:var(--tx-muted)">·</span>
-      <span style="font-size:10px;color:var(--tx-sec)">المنتهي = انتهت مدته دون إكمال</span>
+      <span style="font-size:10px;color:var(--tx-sec)">المنجَز = أُنجز فعلاً</span>
       <span style="font-size:10px;color:var(--tx-muted)">·</span>
       <span style="font-size:10px;color:var(--tx-sec)">الدرجة = متوسط المؤشرات المرجّح</span>
     </div>
@@ -21575,14 +20533,12 @@ function renderEmpKpiTab() {
             <th style="min-width:180px;text-align:right;padding-right:14px">الموظف</th>
             <th>المنطقة</th>
             <th title="إجمالي المهام المسندة">المسند</th>
-            <th title="المهام المكتملة" style="color:#059669">المكتمل</th>
-            <th title="المهام المنتهية دون إكمال" style="color:#DC2626">المنتهي</th>
-            <th title="نسبة الإنجاز = المكتمل ÷ المسند">الإنجاز %</th>
-            <th title="الالتزام بوقت الزيارة">وقت الزيارة</th>
+            <th title="المهام المنجَزة" style="color:#059669">المنجَز</th>
+            <th title="نسبة الإنجاز = المنجَز ÷ المسند">الإنجاز %</th>
+            <th title="نسبة توثيق المهام بالصور">توثيق بالصور</th>
             <th title="نسبة إضافة تعليقات">التعليقات</th>
-            <th title="نسبة رفع الصور">الصور</th>
-            <th title="الالتزام بالمواعيد">المواعيد</th>
-            <th title="مؤشر النزاهة">النزاهة</th>
+            <th title="جودة التقارير المرفوعة">جودة التقرير</th>
+            <th title="الالتزام بوقت الزيارة">وقت الزيارة</th>
             <th style="min-width:70px" title="الدرجة الكلية المرجّحة من 100">الدرجة</th>
             <th style="min-width:100px">التقدير</th>
           </tr>
@@ -21606,9 +20562,9 @@ function _empKpiRender() {
 
   let list = rows.filter(r => {
     if (EMP_KPI._region && str(r['المنطقة']) !== EMP_KPI._region) return false;
+    if (EMP_KPI._role   && str(r['الدور'])   !== EMP_KPI._role)   return false;
     if (EMP_KPI._grade  && str(r['التقدير']) !== EMP_KPI._grade)  return false;
-    if (q && !str(r['اسم الموظف']).toLowerCase().includes(q) &&
-             !str(r['اسم المستخدم']).toLowerCase().includes(q)) return false;
+    if (q && !str(r['اسم الموظف']).toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -21631,8 +20587,8 @@ function _empKpiRender() {
   set('emp-k-total',   t.toLocaleString('ar'));
   set('emp-k-regions', [...new Set(list.map(r=>str(r['المنطقة'])).filter(Boolean))].length + ' منطقة');
   set('emp-k-avg',     avg);
-  set('emp-k-excellent', gradeCountF['جيد جداً']||0);
-  set('emp-k-excellent-pct', t?((gradeCountF['جيد جداً']||0)/t*100).toFixed(1)+'%':'0%');
+  set('emp-k-excellent', gradeCountF['ممتاز']||0);
+  set('emp-k-excellent-pct', t?((gradeCountF['ممتاز']||0)/t*100).toFixed(1)+'%':'0%');
   set('emp-k-weak',    gradeCountF['ضعيف']||0);
   set('emp-k-weak-pct', t?((gradeCountF['ضعيف']||0)/t*100).toFixed(1)+'%':'0%');
   set('emp-tbl-count', t.toLocaleString('ar') + ' موظف');
@@ -21656,32 +20612,29 @@ function _empKpiDrawTable() {
     return `background:${s.bg};color:${s.color};border:1px solid ${s.border}`;
   };
   const scoreStyle = sc => {
-    const bg    = sc>=80?'#ECFDF5':sc>=60?'#EFF6FF':sc>=50?'#FFFBEB':'#FEF2F2';
-    const color = sc>=80?'#059669':sc>=60?'#1D4ED8':sc>=50?'#D97706':'#DC2626';
+    const bg    = sc>=85?'#F0FDF4':sc>=70?'#ECFDF5':sc>=55?'#EFF6FF':sc>=40?'#FFFBEB':'#FEF2F2';
+    const color = sc>=85?'#15803D':sc>=70?'#059669':sc>=55?'#1D4ED8':sc>=40?'#D97706':'#DC2626';
     return `background:${bg};color:${color}`;
   };
 
   tb.innerHTML = list.slice(st, st + EMP_KPI.pageSize).map(r => {
     const grade = str(r['التقدير']);
     const score = n_(r['الدرجة']);
-    const completed  = n_(r['المكتمل']);
-    const assigned   = n_(r['المسند']);
-    const expired    = n_(r['المنتهي']);
+    const done      = n_(r['المنجَز']);
+    const assigned  = n_(r['المسند']);
     return `<tr>
       <td style="text-align:right;padding-right:14px">
         <div style="font-weight:700;font-size:12px">${str(r['اسم الموظف'])}</div>
-        <div style="font-size:10px;color:var(--tx-muted);font-family:monospace">${str(r['اسم المستخدم'])}</div>
+        <div style="font-size:10px;color:var(--tx-muted)">${str(r['الدور'])}</div>
       </td>
       <td>${str(r['المنطقة'])}</td>
       <td style="font-weight:700;text-align:center">${assigned}</td>
-      <td style="color:#059669;font-weight:700;text-align:center">${completed}</td>
-      <td style="color:${expired>0?'#DC2626':'var(--tx-muted)'};font-weight:${expired>0?'700':'400'};text-align:center">${expired}</td>
+      <td style="color:#059669;font-weight:700;text-align:center">${done}</td>
       <td style="text-align:center">${fmt(r['الإنجاز %'])}</td>
-      <td style="text-align:center">${fmt(r['وقت الزيارة %'])}</td>
+      <td style="text-align:center">${fmt(r['توثيق بالصور %'])}</td>
       <td style="text-align:center">${fmt(r['التعليقات %'])}</td>
-      <td style="text-align:center">${fmt(r['الصور %'])}</td>
-      <td style="text-align:center">${fmt(r['المواعيد %'])}</td>
-      <td style="text-align:center">${fmt(r['النزاغة %']||r['النزاهة %'])}</td>
+      <td style="text-align:center">${fmt(r['جودة التقرير %'])}</td>
+      <td style="text-align:center">${fmt(r['وقت الزيارة %'])}</td>
       <td style="font-weight:800;font-size:13px;${scoreStyle(score)};border-radius:6px;text-align:center;padding:4px 8px">${score.toFixed(1)}</td>
       <td><span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700;${gradeStyle(grade)}">${grade}</span></td>
     </tr>`;
@@ -21711,7 +20664,6 @@ function _empKpiDrawCharts(rows) {
   if (gradeCtx) {
     _empSafeDestroyChart('grades');
     const counts = EMP_GRADE_ORDER.map(g => rows.filter(r=>str(r['التقدير'])===g).length);
-    /* تحقق: هل فيه داتا فعلاً؟ */
     if (counts.some(c => c > 0)) {
       EMP_KPI.charts.grades = new Chart(gradeCtx, {
         type: 'doughnut',
@@ -21755,7 +20707,7 @@ function _empKpiDrawCharts(rows) {
           datasets: [{
             label: 'متوسط الدرجة',
             data: regAvgs,
-            backgroundColor: regAvgs.map(v=>v>=80?'#10B98199':v>=60?'#3B82F699':v>=50?'#F59E0B99':'#EF444499'),
+            backgroundColor: regAvgs.map(v=>v>=85?'#15803D99':v>=70?'#10B98199':v>=55?'#3B82F699':v>=40?'#F59E0B99':'#EF444499'),
             borderRadius: 6
           }]
         },
@@ -21780,12 +20732,12 @@ function _empKpiDrawCharts(rows) {
     }
   }
 
-  /* ── 3. مقارنة المؤشرات الستة — Bar أفقي ── */
+  /* ── 3. مقارنة المؤشرات الخمسة — Bar أفقي ── */
   const metCtx = document.getElementById('emp-ch-metrics');
   if (metCtx) {
     _empSafeDestroyChart('metrics');
-    const METRIC_KEYS   = ['الإنجاز %','وقت الزيارة %','التعليقات %','الصور %','المواعيد %','النزاهة %'];
-    const METRIC_LABELS = ['الإنجاز','وقت الزيارة','التعليقات','الصور','المواعيد','النزاهة'];
+    const METRIC_KEYS   = ['الإنجاز %','توثيق بالصور %','التعليقات %','جودة التقرير %','وقت الزيارة %'];
+    const METRIC_LABELS = ['الإنجاز','توثيق بالصور','التعليقات','جودة التقرير','وقت الزيارة'];
     const metAvgs = METRIC_KEYS.map(k => +(rows.reduce((s,r)=>s+n_(r[k]),0)/rows.length).toFixed(1));
 
     if (metAvgs.some(v => v > 0)) {
@@ -21796,7 +20748,7 @@ function _empKpiDrawCharts(rows) {
           datasets: [{
             label: 'متوسط %',
             data: metAvgs,
-            backgroundColor: metAvgs.map(v=>v>=80?'#10B98199':v>=60?'#3B82F699':v>=50?'#F59E0B99':'#EF444499'),
+            backgroundColor: metAvgs.map(v=>v>=85?'#15803D99':v>=70?'#10B98199':v>=55?'#3B82F699':v>=40?'#F59E0B99':'#EF444499'),
             borderRadius: 6,
             indexAxis: 'y'
           }]
@@ -21821,10 +20773,10 @@ function _empKpiDrawCharts(rows) {
 
 /* ════ مسح الفلاتر ════ */
 function _empKpiClearFilters() {
-  ['emp-filter-region','emp-filter-grade'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['emp-filter-region','emp-filter-role','emp-filter-grade'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const s=document.getElementById('emp-search'); if(s) s.value='';
   const so=document.getElementById('emp-sort');  if(so) so.value='score_desc';
-  EMP_KPI._region=''; EMP_KPI._grade=''; EMP_KPI._search=''; EMP_KPI._sort='score_desc';
+  EMP_KPI._region=''; EMP_KPI._role=''; EMP_KPI._grade=''; EMP_KPI._search=''; EMP_KPI._sort='score_desc';
   EMP_KPI.page=0;
   _empKpiRender();
 }
@@ -21842,6 +20794,489 @@ function _empKpiExportCSV() {
   a.click();
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   🦺  تبويب مؤشرات أداء فريق السلامة — tab-safety-kpi                ║
+   ════════════════════════════════════════════════════════════════════
+   المصدر : window.RAW_SAFETY_KPI  ← شيت "مؤشرات_أداء_فريق_السلامة" في Google Sheet
+   المفتاح: d.safetyTeamKpi  (يُعيَّن في loadData عبر sa(d.safetyTeamKpi))
+
+   بيانات أسبوعية لكل منطقة (صف واحد = أسبوع + منطقة).
+
+   ┌─ شرح الأعمدة ──────────────────────────────────────────────────┐
+   │  الأسبوع                                    : تاريخ بداية الأسبوع │
+   │  المنطقة                                    : المنطقة الجغرافية  │
+   │  عدد المشرفين للسلامة                       : مشرفو السلامة       │
+   │  عدد الزيارات الميدانية المقررة              : زيارات مخططة       │
+   │  عدد الزيارات المنفذة                        : زيارات تم تنفيذها  │
+   │  عدد الحوادث المبلغ عنها                     : حوادث مُبلغة        │
+   │  عدد الحوادث التي تم اصدار التقرير المبدئي لها: تقارير مبدئية     │
+   │  إصابات شخصية                                : عدد المصابين       │
+   │  عدد الحوادث التي تم التحقيق فيها             : حوادث محقَّقة      │
+   │  عدد الإجراءات التصحيحية المرسلة للمقاول      : إجراءات تصحيحية   │
+   │  عدد أوامر العمل من الزيارات التي تم ارسالها للمقاول: أوامر عمل   │
+   │  التدريب الأسبوعي - مقرر                     : تدريب مخطط         │
+   │  التدريب الأسبوعي - منفذ                     : تدريب منفَّذ        │
+   │  تعميمات/ دروس منشورة                        : تعميمات ودروس مستفادة│
+   │  العدد الكلي لموظفي المنطقة                  : إجمالي موظفي المنطقة│
+   └────────────────────────────────────────────────────────────────┘
+
+   ⚠️  AI MAINTAINER NOTE — اقرأ هذا قبل أي تعديل:
+   ══════════════════════════════════════════════════════════════════
+   إذا أضفت أعمدة جديدة لشيت مؤشرات_أداء_فريق_السلامة، أو غيّرت أسماء
+   الأعمدة، يجب عليك تحديث:
+     1. دالة renderSafetyKpiTab()   ← أعمدة الجدول + الـ KPIs
+     2. دالة _safetyKpiDrawCharts() ← الرسوم البيانية
+     3. دالة _safetyKpiRender()     ← منطق الفلترة والترتيب
+     4. قسم summary.مؤشرات_أداء_فريق_السلامة في دالة _fcbBuildSummary()
+        (قرب نهاية قسم الشاتبوت) لأن الشاتبوت يقرأ منه.
+   ══════════════════════════════════════════════════════════════════ */
+
+const SAFETY_KPI = {
+  page: 0,
+  pageSize: 20,
+  filtered: [],
+  charts: {},
+  _region: '',
+  _week: '',
+  _search: '',
+  _sort: 'week_desc',
+};
+window.SAFETY_KPI = SAFETY_KPI;
+
+/* ── مساعد destroy آمن ── */
+function _safetySafeDestroyChart(key) {
+  const ch = SAFETY_KPI.charts[key];
+  if (!ch) return;
+  try { ch.destroy(); } catch (_) {}
+  delete SAFETY_KPI.charts[key];
+}
+
+/* ── ترتيب الأسابيع زمنيًا (النص الأصلي تاريخ قابل للتحويل) ── */
+function _safetyWeekSortVal(w) {
+  const t = Date.parse(w);
+  return isNaN(t) ? 0 : t;
+}
+
+/* ════ الدالة الرئيسية ════ */
+function renderSafetyKpiTab() {
+  const el = document.getElementById('safety-kpi-content');
+  if (!el) return;
+
+  const rows = window.RAW_SAFETY_KPI || [];
+  if (!rows.length) {
+    el.innerHTML = `
+      <div class="card" style="text-align:center;padding:60px 24px">
+        <div style="font-size:48px;margin-bottom:12px">🦺</div>
+        <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات مؤشرات أداء فريق السلامة</div>
+        <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">
+          تأكد من وجود شيت "مؤشرات_أداء_فريق_السلامة" في ملف البيانات وأن الـ Apps Script يقرأها
+        </div>
+      </div>`;
+    return;
+  }
+
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
+  const str = v => String(v||'').trim();
+  const pct1 = (a,b) => b ? ((a/b)*100).toFixed(1)+'%' : '—';
+
+  /* ── إحصاءات عامة ── */
+  const total       = rows.length;
+  const regions     = [...new Set(rows.map(r=>str(r['المنطقة'])).filter(Boolean))].sort();
+  const weeks       = [...new Set(rows.map(r=>str(r['الأسبوع'])).filter(Boolean))]
+                         .sort((a,b)=>_safetyWeekSortVal(a)-_safetyWeekSortVal(b));
+
+  const sum = key => rows.reduce((s,r)=>s+n_(r[key]),0);
+  const visitsPlanned  = sum('عدد الزيارات الميدانية المقررة');
+  const visitsDone     = sum('عدد الزيارات المنفذة');
+  const incidents      = sum('عدد الحوادث المبلغ عنها');
+  const injuries       = sum('إصابات شخصية');
+  const investigated   = sum('عدد الحوادث التي تم التحقيق فيها');
+  const correctiveActs = sum('عدد الإجراءات التصحيحية المرسلة للمقاول');
+  const trainPlanned   = sum('التدريب الأسبوعي - مقرر');
+  const trainDone      = sum('التدريب الأسبوعي - منفذ');
+
+  /* ── بناء الصفحة ── */
+  el.innerHTML = `
+
+  <!-- ══ شريط العنوان ══ -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:26px">🦺</span>
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">لوحة مؤشرات أداء فريق السلامة</div>
+        <div style="font-size:11px;color:var(--tx-muted)">
+          ${total.toLocaleString('ar')} سجل أسبوعي · ${regions.length} منطقة · ${weeks.length} أسبوع
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="export-btn export-btn-csv" onclick="_safetyKpiExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+    </div>
+  </div>
+
+  <!-- ══ فلاتر موحدة ══ -->
+  <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:14px 16px;
+       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f8fafc);border:1.5px solid var(--bd-light,#e2e8f0)">
+    <div class="fg" style="margin:0;min-width:130px">
+      <div class="fg-lbl">المنطقة</div>
+      <select class="fsel" id="safety-filter-region"
+        onchange="SAFETY_KPI._region=this.value;SAFETY_KPI.page=0;_safetyKpiRender()">
+        <option value="">— الكل —</option>
+        ${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg" style="margin:0;min-width:160px">
+      <div class="fg-lbl">الأسبوع</div>
+      <select class="fsel" id="safety-filter-week"
+        onchange="SAFETY_KPI._week=this.value;SAFETY_KPI.page=0;_safetyKpiRender()">
+        <option value="">— الكل —</option>
+        ${weeks.map(w=>`<option value="${w}">${w}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg" style="margin:0;flex:1;min-width:180px">
+      <div class="fg-lbl">بحث بالمنطقة</div>
+      <input class="finp" id="safety-search" placeholder="اسم المنطقة..."
+        oninput="SAFETY_KPI._search=this.value;SAFETY_KPI.page=0;_safetyKpiRender()">
+    </div>
+    <div class="fg" style="margin:0">
+      <div class="fg-lbl">ترتيب</div>
+      <select class="fsel" id="safety-sort"
+        onchange="SAFETY_KPI._sort=this.value;SAFETY_KPI.page=0;_safetyKpiRender()">
+        <option value="week_desc">الأسبوع (الأحدث أولاً)</option>
+        <option value="week_asc">الأسبوع (الأقدم أولاً)</option>
+        <option value="incidents_desc">الحوادث ↓</option>
+        <option value="visits_desc">الزيارات المنفذة ↓</option>
+      </select>
+    </div>
+    <button class="f-clear" onclick="_safetyKpiClearFilters()" style="margin:0;align-self:flex-end">✕ مسح</button>
+  </div>
+
+  <!-- ══ KPIs ══ -->
+  <div class="kpi-grid" style="margin-bottom:14px;grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="kpi kc-blue">
+      <div class="kpi-val" id="safety-k-visits">${pct1(visitsDone, visitsPlanned)}</div>
+      <div class="kpi-lbl">نسبة تنفيذ الزيارات الميدانية</div>
+      <div class="kpi-sub" id="safety-k-visits-sub">${visitsDone.toLocaleString('ar')} من ${visitsPlanned.toLocaleString('ar')}</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-val" id="safety-k-training">${pct1(trainDone, trainPlanned)}</div>
+      <div class="kpi-lbl">نسبة تنفيذ التدريب الأسبوعي</div>
+      <div class="kpi-sub" id="safety-k-training-sub">${trainDone.toLocaleString('ar')} من ${trainPlanned.toLocaleString('ar')}</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val" id="safety-k-incidents">${incidents.toLocaleString('ar')}</div>
+      <div class="kpi-lbl">إجمالي الحوادث المبلغ عنها</div>
+      <div class="kpi-sub" id="safety-k-investigated-sub">${investigated.toLocaleString('ar')} تم التحقيق فيها</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val" id="safety-k-actions">${correctiveActs.toLocaleString('ar')}</div>
+      <div class="kpi-lbl">إجراءات تصحيحية مرسلة للمقاول</div>
+      <div class="kpi-sub" id="safety-k-injuries-sub">${injuries.toLocaleString('ar')} إصابة شخصية</div>
+    </div>
+  </div>
+
+  <!-- ══ الرسوم البيانية ══ -->
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">▦</span>
+        الزيارات الميدانية: مقرر مقابل منفذ حسب المنطقة
+        <span class="sub">إجمالي كل الأسابيع</span>
+      </div>
+      <div class="chart-box" style="height:240px"><canvas id="safety-ch-visits"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626">◉</span>
+        الحوادث والإصابات حسب الأسبوع
+        <span class="sub">اتجاه أسبوعي</span>
+      </div>
+      <div class="chart-box" style="height:240px"><canvas id="safety-ch-incidents"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F0FDF4;color:#059669">≡</span>
+      التدريب الأسبوعي: مقرر مقابل منفذ حسب المنطقة
+      <span class="sub">إجمالي كل الأسابيع</span>
+    </div>
+    <div class="chart-box" style="height:260px"><canvas id="safety-ch-training"></canvas></div>
+  </div>
+
+  <!-- ══ جدول التفاصيل ══ -->
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">☰</span>
+      التفاصيل الأسبوعية حسب المنطقة
+      <span class="sub" id="safety-tbl-count"></span>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:150px;text-align:right;padding-right:14px">الأسبوع</th>
+            <th>المنطقة</th>
+            <th title="عدد مشرفي السلامة">المشرفون</th>
+            <th title="الزيارات الميدانية المقررة">مقرر</th>
+            <th title="الزيارات الميدانية المنفذة" style="color:#059669">منفذ</th>
+            <th title="عدد الحوادث المبلغ عنها" style="color:#DC2626">الحوادث</th>
+            <th title="عدد التقارير المبدئية">التقرير المبدئي</th>
+            <th title="إصابات شخصية" style="color:#DC2626">الإصابات</th>
+            <th title="عدد الحوادث المحقَّقة">تم التحقيق</th>
+            <th title="الإجراءات التصحيحية المرسلة للمقاول">إجراءات تصحيحية</th>
+            <th title="أوامر العمل المرسلة للمقاول">أوامر عمل</th>
+            <th title="التدريب الأسبوعي المقرر">تدريب مقرر</th>
+            <th title="التدريب الأسبوعي المنفذ" style="color:#059669">تدريب منفذ</th>
+            <th title="تعميمات ودروس مستفادة منشورة">تعميمات/دروس</th>
+            <th title="إجمالي موظفي المنطقة">إجمالي الموظفين</th>
+          </tr>
+        </thead>
+        <tbody id="safety-tbl-body"></tbody>
+      </table>
+    </div>
+    <div class="pag-bar" id="safety-pag" style="margin-top:8px"></div>
+  </div>`;
+
+  _safetyKpiDrawCharts(rows);
+  _safetyKpiRender();
+}
+
+/* ════ فلترة + تحديث KPIs + جدول ════ */
+function _safetyKpiRender() {
+  const rows = window.RAW_SAFETY_KPI || [];
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+  const q   = (SAFETY_KPI._search||'').trim().toLowerCase();
+
+  let list = rows.filter(r => {
+    if (SAFETY_KPI._region && str(r['المنطقة']) !== SAFETY_KPI._region) return false;
+    if (SAFETY_KPI._week   && str(r['الأسبوع'])  !== SAFETY_KPI._week)  return false;
+    if (q && !str(r['المنطقة']).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  list.sort((a,b) => {
+    if (SAFETY_KPI._sort === 'week_desc')      return _safetyWeekSortVal(str(b['الأسبوع'])) - _safetyWeekSortVal(str(a['الأسبوع']));
+    if (SAFETY_KPI._sort === 'week_asc')       return _safetyWeekSortVal(str(a['الأسبوع'])) - _safetyWeekSortVal(str(b['الأسبوع']));
+    if (SAFETY_KPI._sort === 'incidents_desc') return n_(b['عدد الحوادث المبلغ عنها']) - n_(a['عدد الحوادث المبلغ عنها']);
+    if (SAFETY_KPI._sort === 'visits_desc')    return n_(b['عدد الزيارات المنفذة']) - n_(a['عدد الزيارات المنفذة']);
+    return 0;
+  });
+
+  SAFETY_KPI.filtered = list;
+  const t = list.length;
+
+  const sum = key => list.reduce((s,r)=>s+n_(r[key]),0);
+  const visitsPlanned  = sum('عدد الزيارات الميدانية المقررة');
+  const visitsDone     = sum('عدد الزيارات المنفذة');
+  const incidents      = sum('عدد الحوادث المبلغ عنها');
+  const injuries       = sum('إصابات شخصية');
+  const investigated   = sum('عدد الحوادث التي تم التحقيق فيها');
+  const correctiveActs = sum('عدد الإجراءات التصحيحية المرسلة للمقاول');
+  const trainPlanned   = sum('التدريب الأسبوعي - مقرر');
+  const trainDone      = sum('التدريب الأسبوعي - منفذ');
+  const pct1 = (a,b) => b ? ((a/b)*100).toFixed(1)+'%' : '—';
+
+  const ge = id => document.getElementById(id);
+  const set = (id,v) => { const e=ge(id); if(e) e.textContent=v; };
+  set('safety-k-visits',        pct1(visitsDone, visitsPlanned));
+  set('safety-k-visits-sub',    `${visitsDone.toLocaleString('ar')} من ${visitsPlanned.toLocaleString('ar')}`);
+  set('safety-k-training',      pct1(trainDone, trainPlanned));
+  set('safety-k-training-sub',  `${trainDone.toLocaleString('ar')} من ${trainPlanned.toLocaleString('ar')}`);
+  set('safety-k-incidents',     incidents.toLocaleString('ar'));
+  set('safety-k-investigated-sub', `${investigated.toLocaleString('ar')} تم التحقيق فيها`);
+  set('safety-k-actions',       correctiveActs.toLocaleString('ar'));
+  set('safety-k-injuries-sub',  `${injuries.toLocaleString('ar')} إصابة شخصية`);
+  set('safety-tbl-count',       t.toLocaleString('ar') + ' سجل');
+
+  _safetyKpiDrawTable();
+}
+
+/* ════ جدول مع pagination ════ */
+function _safetyKpiDrawTable() {
+  const list = SAFETY_KPI.filtered;
+  const st   = SAFETY_KPI.page * SAFETY_KPI.pageSize;
+  const tb   = document.getElementById('safety-tbl-body');
+  if (!tb) return;
+
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+
+  tb.innerHTML = list.slice(st, st + SAFETY_KPI.pageSize).map(r => {
+    const incidents = n_(r['عدد الحوادث المبلغ عنها']);
+    const injuries  = n_(r['إصابات شخصية']);
+    return `<tr>
+      <td style="text-align:right;padding-right:14px;font-weight:700;font-size:12px">${str(r['الأسبوع'])}</td>
+      <td>${str(r['المنطقة'])}</td>
+      <td style="text-align:center">${n_(r['عدد المشرفين للسلامة'])}</td>
+      <td style="text-align:center">${n_(r['عدد الزيارات الميدانية المقررة'])}</td>
+      <td style="color:#059669;font-weight:700;text-align:center">${n_(r['عدد الزيارات المنفذة'])}</td>
+      <td style="color:${incidents>0?'#DC2626':'var(--tx-muted)'};font-weight:${incidents>0?'700':'400'};text-align:center">${incidents}</td>
+      <td style="text-align:center">${n_(r['عدد الحوادث التي تم اصدار التقرير المبدئي لها'])}</td>
+      <td style="color:${injuries>0?'#DC2626':'var(--tx-muted)'};font-weight:${injuries>0?'700':'400'};text-align:center">${injuries}</td>
+      <td style="text-align:center">${n_(r['عدد الحوادث التي تم التحقيق فيها'])}</td>
+      <td style="text-align:center">${n_(r['عدد الإجراءات التصحيحية المرسلة للمقاول'])}</td>
+      <td style="text-align:center">${n_(r['عدد أوامر العمل من الزيارات التي تم ارسالها للمقاول'])}</td>
+      <td style="text-align:center">${n_(r['التدريب الأسبوعي - مقرر'])}</td>
+      <td style="color:#059669;font-weight:700;text-align:center">${n_(r['التدريب الأسبوعي - منفذ'])}</td>
+      <td style="text-align:center">${str(r['تعميمات/ دروس منشورة']) || '—'}</td>
+      <td style="text-align:center">${n_(r['العدد الكلي لموظفي المنطقة'])}</td>
+    </tr>`;
+  }).join('');
+
+  /* pagination */
+  const pag   = document.getElementById('safety-pag');
+  const pages = Math.ceil(list.length / SAFETY_KPI.pageSize);
+  if (!pag) return;
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+  let h = `<span class="pag-info">صفحة ${SAFETY_KPI.page+1} من ${pages}</span><div class="pag-btns">`;
+  h += `<button class="pag-btn" ${SAFETY_KPI.page===0?'disabled':''} onclick="SAFETY_KPI.page--;_safetyKpiDrawTable()">→ السابق</button>`;
+  let s=Math.max(0,SAFETY_KPI.page-3), e=Math.min(pages-1,s+6);
+  if(e-s<6) s=Math.max(0,e-6);
+  for(let p=s;p<=e;p++) h+=`<button class="pag-btn${p===SAFETY_KPI.page?' active':''}" onclick="SAFETY_KPI.page=${p};_safetyKpiDrawTable()">${p+1}</button>`;
+  h += `<button class="pag-btn" ${SAFETY_KPI.page===pages-1?'disabled':''} onclick="SAFETY_KPI.page++;_safetyKpiDrawTable()">← التالي</button></div>`;
+  pag.innerHTML = h;
+}
+
+/* ════ الشارتات ════ */
+function _safetyKpiDrawCharts(rows) {
+  const n_  = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+  const str = v => String(v||'').trim();
+
+  /* ── 1. الزيارات: مقرر مقابل منفذ حسب المنطقة — Bar مزدوج ── */
+  const visCtx = document.getElementById('safety-ch-visits');
+  if (visCtx) {
+    _safetySafeDestroyChart('visits');
+    const regionMap = {};
+    rows.forEach(r => {
+      const reg = str(r['المنطقة']); if (!reg) return;
+      if (!regionMap[reg]) regionMap[reg] = { planned:0, done:0 };
+      regionMap[reg].planned += n_(r['عدد الزيارات الميدانية المقررة']);
+      regionMap[reg].done    += n_(r['عدد الزيارات المنفذة']);
+    });
+    const labels = Object.keys(regionMap).sort();
+    if (labels.length) {
+      SAFETY_KPI.charts.visits = new Chart(visCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#93C5FD99', borderRadius: 6 },
+            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#10B98199', borderRadius: 6 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position:'bottom', labels:{font:{family:'Tajawal',size:11}} } },
+          scales: {
+            y: { beginAtZero:true, ticks:{font:{family:'Tajawal',size:10}}, grid:{color:'rgba(0,0,0,.04)'} },
+            x: { ticks:{font:{family:'Tajawal',size:11}} }
+          }
+        }
+      });
+    } else {
+      visCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات مناطق</div>';
+    }
+  }
+
+  /* ── 2. الحوادث والإصابات حسب الأسبوع — Line ── */
+  const incCtx = document.getElementById('safety-ch-incidents');
+  if (incCtx) {
+    _safetySafeDestroyChart('incidents');
+    const weekMap = {};
+    rows.forEach(r => {
+      const wk = str(r['الأسبوع']); if (!wk) return;
+      if (!weekMap[wk]) weekMap[wk] = { incidents:0, injuries:0 };
+      weekMap[wk].incidents += n_(r['عدد الحوادث المبلغ عنها']);
+      weekMap[wk].injuries  += n_(r['إصابات شخصية']);
+    });
+    const wLabels = Object.keys(weekMap).sort((a,b)=>_safetyWeekSortVal(a)-_safetyWeekSortVal(b));
+    if (wLabels.length) {
+      SAFETY_KPI.charts.incidents = new Chart(incCtx, {
+        type: 'line',
+        data: {
+          labels: wLabels,
+          datasets: [
+            { label: 'الحوادث المبلغ عنها', data: wLabels.map(w=>weekMap[w].incidents), borderColor:'#DC2626', backgroundColor:'#DC262622', tension:.3, fill:true },
+            { label: 'الإصابات الشخصية',   data: wLabels.map(w=>weekMap[w].injuries),  borderColor:'#D97706', backgroundColor:'#D9770622', tension:.3, fill:true },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position:'bottom', labels:{font:{family:'Tajawal',size:11}} } },
+          scales: {
+            y: { beginAtZero:true, ticks:{font:{family:'Tajawal',size:10},stepSize:1}, grid:{color:'rgba(0,0,0,.04)'} },
+            x: { ticks:{font:{family:'Tajawal',size:10}} }
+          }
+        }
+      });
+    } else {
+      incCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات حوادث</div>';
+    }
+  }
+
+  /* ── 3. التدريب: مقرر مقابل منفذ حسب المنطقة — Bar مزدوج ── */
+  const trCtx = document.getElementById('safety-ch-training');
+  if (trCtx) {
+    _safetySafeDestroyChart('training');
+    const regionMap = {};
+    rows.forEach(r => {
+      const reg = str(r['المنطقة']); if (!reg) return;
+      if (!regionMap[reg]) regionMap[reg] = { planned:0, done:0 };
+      regionMap[reg].planned += n_(r['التدريب الأسبوعي - مقرر']);
+      regionMap[reg].done    += n_(r['التدريب الأسبوعي - منفذ']);
+    });
+    const labels = Object.keys(regionMap).sort();
+    if (labels.length) {
+      SAFETY_KPI.charts.training = new Chart(trCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#FCD34D99', borderRadius: 6 },
+            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#059669AA', borderRadius: 6 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position:'bottom', labels:{font:{family:'Tajawal',size:11}} } },
+          scales: {
+            y: { beginAtZero:true, ticks:{font:{family:'Tajawal',size:10}}, grid:{color:'rgba(0,0,0,.04)'} },
+            x: { ticks:{font:{family:'Tajawal',size:11}} }
+          }
+        }
+      });
+    } else {
+      trCtx.parentElement.innerHTML = '<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:12px">لا توجد بيانات تدريب</div>';
+    }
+  }
+}
+
+/* ════ مسح الفلاتر ════ */
+function _safetyKpiClearFilters() {
+  ['safety-filter-region','safety-filter-week'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const s=document.getElementById('safety-search'); if(s) s.value='';
+  const so=document.getElementById('safety-sort');  if(so) so.value='week_desc';
+  SAFETY_KPI._region=''; SAFETY_KPI._week=''; SAFETY_KPI._search=''; SAFETY_KPI._sort='week_desc';
+  SAFETY_KPI.page=0;
+  _safetyKpiRender();
+}
+
+/* ════ تصدير CSV ════ */
+function _safetyKpiExportCSV() {
+  const src = SAFETY_KPI.filtered.length ? SAFETY_KPI.filtered : (window.RAW_SAFETY_KPI||[]);
+  if (!src.length) { alert('لا توجد بيانات'); return; }
+  const headers = Object.keys(src[0]);
+  const rows    = src.map(r => headers.map(h=>`"${String(r[h]??'').replace(/"/g,'""')}"`).join(','));
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob(['\uFEFF'+[headers.join(','),...rows].join('\n')],{type:'text/csv;charset=utf-8;'})),
+    download: 'مؤشرات_أداء_فريق_السلامة.csv'
+  });
+  a.click();
+}
+
 /* ════════════════════════════════════════════════════════════
    القسم 8: معالجات الأحداث المنقولة من HTML (Task 5)
    ════════════════════════════════════════════════════════════ */
@@ -21852,7 +21287,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   bind(1, 'error', function (event) { this.style.display='none' });
   bind(2, 'error', function (event) { this.style.display='none' });
-  bind(3, 'click', function (event) { loadData() });
+  bind(3, 'click', function (event) { loadData(false, true) });
   bind(4, 'click', function (event) { toggleAuto() });
   bind(5, 'click', function (event) { downloadCurrentTab() });
   bind(6, 'click', function (event) { togglePresentationMode() });
@@ -21898,6 +21333,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(46, 'click', function (event) { showTab('vehicles',this) });
   bind(47, 'click', function (event) { showTab('training',this) });
   bind(48, 'click', function (event) { showTab('emp-kpi',this) });
+  bind(112, 'click', function (event) { showTab('safety-kpi',this) });
   bind(49, 'click', function (event) { showTab('hasr',this) });
   bind(50, 'click', function (event) { showTab('NEW_ID',this) });
   bind(51, 'click', function (event) { showTab('NEW_ID',this) });
@@ -21952,10 +21388,6 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(100, 'click', function (event) { loadHasrData() });
   bind(101, 'error', function (event) { this.style.display='none' });
   bind(102, 'error', function (event) { this.style.display='none' });
-  bind(104, 'click', function (event) { fcbToggle() });
-  bind(108, 'keydown', function (event) { if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();fcbSend();} });
-  bind(108, 'input', function (event) { fcbAutoGrow(this) });
-  bind(109, 'click', function (event) { fcbSend() });
   bind(110, 'click', function (event) { sysBrowseGoBack() });
   bind(111, 'click', function (event) { sysBrowseClose() });
 });
@@ -22091,7 +21523,8 @@ document.addEventListener("DOMContentLoaded", function () {
     ["vehicles",        function(){ renderVehiclesTab(); }],
     ["training",        function(){ renderTrainingTab(); }],
     ["hasr",            function(){ renderHasrTab(); }],
-    ["emp-kpi",         function(){ renderEmpKpiTab(); }]
+    ["emp-kpi",         function(){ renderEmpKpiTab(); }],
+    ["safety-kpi",      function(){ renderSafetyKpiTab(); }]
     /* "map" مستثناة: Leaflet يحتاج حاوية مرئية · "table" تُرسم عند الفتح (Virtualized) */
   ];
 
@@ -22156,13 +21589,6 @@ document.addEventListener("DOMContentLoaded", function () {
   window.IXStates.renderErrorState = withDetail;
 })();
 
-/* ── بند 14 (تكملة صغيرة): تسميات ARIA لعناصر المساعد التفاعلية ── */
-document.addEventListener("DOMContentLoaded", function () {
-  var send = document.getElementById("fcbSendBtn");
-  if (send && !send.getAttribute("aria-label")) send.setAttribute("aria-label", "إرسال الرسالة");
-  var inp = document.getElementById("fcbInput");
-  if (inp && !inp.getAttribute("aria-label")) inp.setAttribute("aria-label", "اكتب رسالتك للمساعد الذكي");
-});
 
 /* ══════════════════════════════════════════════════════════════════════
    PORTAL NAVIGATION LAYER (المرحلة 3 — Navigation System)
@@ -22224,6 +21650,7 @@ var PORTAL_CATEGORIES = {
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
       { name: "training",        label: "برامج التدريب" },
       { name: "emp-kpi",         label: "تقييم الموظفين" },
+      { name: "safety-kpi",      label: "مؤشرات أداء فريق السلامة" },
       { name: "gatekeepers",     label: "البوابين" },
       { name: "recruitment",     label: "التوظيف" }
     ]
@@ -22560,8 +21987,8 @@ window.__CORE_DATA_READY__ = false;
   function applyWrap() {
     if (typeof window.loadData !== "function" || window.loadData.__readyWrapped) return;
     var originalLoadData = window.loadData;
-    var wrapped = async function (silent) {
-      var result = await originalLoadData(silent);
+    var wrapped = async function (silent, forceNetwork) {
+      var result = await originalLoadData(silent, forceNetwork);
       /* تحقّق حقيقي: هل RAW فعلاً امتلأت ببيانات؟ (وليس فقط أن الدالة
          انتهت — لأن loadData الأصلية تلتقط الأخطاء داخلياً وتُعيد
          المحاولة تلقائياً عبر setTimeout، فقد "تنتهي" دون أن تكون
@@ -23168,21 +22595,25 @@ setTimeout(function tellUserStillTrying() {
   }
 
   /* ══════════════════════════════════════════════════════════════════
-     4. Patch window.fcbSend — الطبقة الرئيسية
+     4. Patch window.fcbAskOpenAI — الطبقة الرئيسية
+     🛠️ Phase 3: كانت هذه الدالة تُطبَّق على window.fcbSend (واجهة الشات
+     بوت القديمة)، لكن fcbSend اتشالت مع الواجهة القديمة. الـ orb الجديد
+     (aicore-orb.js) بينده مباشرة على window.fcbAskOpenAI، فهو الآن نقطة
+     الـ hook الصحيحة الوحيدة لحقن السياق الحي قبل كل سؤال — بنفس الفكرة
+     بالظبط: نبني liveCtx/insights ونخزّنهم في window.__FCB_LIVE_CONTEXT_INJECT__
+     قبل ما ننده على النسخة الأصلية من fcbAskOpenAI.
      ══════════════════════════════════════════════════════════════════ */
   function applyContextPatch() {
-    if (typeof window.fcbSend !== "function") return;
-    if (window.fcbSend.__aiContextEnginePatch) return; // لا تطبّق مرتين
+    if (typeof window.fcbAskOpenAI !== "function") return;
+    if (window.fcbAskOpenAI.__aiContextEnginePatch) return; // لا تطبّق مرتين
 
-    var _originalFcbSend = window.fcbSend;
+    var _originalAskOpenAI = window.fcbAskOpenAI;
 
-    window.fcbSend = async function(presetText) {
-      /* 1) احصل على النص الأصلي */
-      var inputEl = document.getElementById("fcbInput");
-      var rawText = (typeof presetText === "string" ? presetText : (inputEl ? inputEl.value : "")).trim();
+    window.fcbAskOpenAI = async function(userText) {
+      var rawText = (typeof userText === "string" ? userText : "").trim();
 
       if (!rawText) {
-        return _originalFcbSend.apply(this, arguments);
+        return _originalAskOpenAI.apply(this, arguments);
       }
 
       /* 2) ابنِ السياق الحي من الداشبورد */
@@ -23207,11 +22638,11 @@ setTimeout(function tellUserStillTrying() {
       };
 
       /* 6) نُرسل رسالة المستخدم كما كتبها تماماً، دون أي إضافة ظاهرة */
-      return _originalFcbSend.apply(this, arguments);
+      return _originalAskOpenAI.apply(this, arguments);
     };
 
-    window.fcbSend.__aiContextEnginePatch = true;
-    window.fcbSend.__originalFcbSend = _originalFcbSend;
+    window.fcbAskOpenAI.__aiContextEnginePatch = true;
+    window.fcbAskOpenAI.__originalAskOpenAI = _originalAskOpenAI;
     console.log("[AI_ContextEngine] ✅ تم تفعيل محرك السياق الذكي — المساعد يقرأ الآن بيانات الداشبورد الحية");
   }
 
@@ -23221,14 +22652,14 @@ setTimeout(function tellUserStillTrying() {
   var _attempts = 0;
   var _patchInterval = setInterval(function() {
     _attempts++;
-    if (typeof window.fcbSend === "function") {
+    if (typeof window.fcbAskOpenAI === "function") {
       clearInterval(_patchInterval);
       /* تأخير بسيط لضمان انتهاء كل الـ patches الأخرى أولاً */
       setTimeout(applyContextPatch, 300);
     }
     if (_attempts > 100) {
       clearInterval(_patchInterval);
-      console.warn("[AI_ContextEngine] لم يُعثر على window.fcbSend بعد 10 ثوانٍ");
+      console.warn("[AI_ContextEngine] لم يُعثر على window.fcbAskOpenAI بعد 10 ثوانٍ");
     }
   }, 100);
 
@@ -23992,23 +23423,23 @@ setTimeout(function tellUserStillTrying() {
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
-     STEP 6 — Patch window.fcbSend
+     STEP 6 — Patch window.fcbAskOpenAI
      يُجري Build قبل كل إرسال ويضع النتيجة في __FCB_LIVE_CONTEXT_INJECT__
      مع الحفاظ على التوافق مع AI_ContextEngine القائم
+     🛠️ Phase 3: كانت تُطبَّق على window.fcbSend، لكنه اتشال مع الواجهة
+     القديمة. الـ orb الجديد بينده مباشرة على window.fcbAskOpenAI، فهو
+     نقطة الـ hook الصحيحة الآن (نفس ترتيب التطبيق القديم بالظبط —
+     بعد AI_ContextEngine بـ200ms إضافية لضمان بقاء Builder هو الأخير).
      ══════════════════════════════════════════════════════════════════════════ */
   function applyBuilderPatch() {
-    if (typeof window.fcbSend !== "function") return;
-    if (window.fcbSend.__dcbPatch) return; // لا تُطبّق مرتين
+    if (typeof window.fcbAskOpenAI !== "function") return;
+    if (window.fcbAskOpenAI.__dcbPatch) return; // لا تُطبّق مرتين
 
-    var _prev = window.fcbSend;
+    var _prev = window.fcbAskOpenAI;
 
-    window.fcbSend = async function(presetText) {
+    window.fcbAskOpenAI = async function(userText) {
       try {
-        var inputEl = document.getElementById("fcbInput");
-        var rawText = (typeof presetText === "string"
-          ? presetText
-          : (inputEl ? inputEl.value : "")
-        ).trim();
+        var rawText = (typeof userText === "string" ? userText : "").trim();
 
         if (rawText) {
           /* ── بناء السياق المنقّح ── */
@@ -24042,26 +23473,26 @@ setTimeout(function tellUserStillTrying() {
       return _prev.apply(this, arguments);
     };
 
-    window.fcbSend.__dcbPatch = true;
-    window.fcbSend.__dcbOriginal = _prev;
+    window.fcbAskOpenAI.__dcbPatch = true;
+    window.fcbAskOpenAI.__dcbOriginal = _prev;
     console.log("[DashboardContextBuilder] ✅ تم تفعيل Dashboard Context Builder v1.0 — السياق المنقّح يُبنى قبل كل إرسال");
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
-     التهيئة: انتظار تحميل fcbSend ثم تطبيق الـ patch
+     التهيئة: انتظار تحميل fcbAskOpenAI ثم تطبيق الـ patch
      (يأتي بعد AI_ContextEngine لضمان أن Builder هو آخر من يعدّل السياق)
      ══════════════════════════════════════════════════════════════════════════ */
   var _initAttempts = 0;
   var _initInterval = setInterval(function() {
     _initAttempts++;
-    if (typeof window.fcbSend === "function") {
+    if (typeof window.fcbAskOpenAI === "function") {
       clearInterval(_initInterval);
       /* تأخير 500ms لأن AI_ContextEngine يأخذ 300ms — نتأكد أننا بعده */
       setTimeout(applyBuilderPatch, 500);
     }
     if (_initAttempts > 120) {
       clearInterval(_initInterval);
-      console.warn("[DashboardContextBuilder] لم يُعثر على window.fcbSend بعد 12 ثانية");
+      console.warn("[DashboardContextBuilder] لم يُعثر على window.fcbAskOpenAI بعد 12 ثانية");
     }
   }, 100);
 

@@ -36,6 +36,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>لوحة بيانات إدارة المرافق التعليمية | Educational Facilities Management Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="aicore-orb.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
@@ -465,6 +466,7 @@
     <div class="tab" data-evt="46">السيارات</div>
     <div class="tab" data-evt="47">برامج التدريب</div>
     <div class="tab" data-evt="48">تقييم الموظفين</div>
+    <div class="tab" data-evt="112">🦺 مؤشرات أداء فريق السلامة</div>
     <div class="tab" data-evt="49">📦 حصر الأصول</div>
   </div>
 
@@ -1726,6 +1728,21 @@
   </div>
 </div><!-- /tab-emp-kpi -->
 
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🦺  تبويب: مؤشرات أداء فريق السلامة                               ║
+║  ID: tab-safety-kpi                                                ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<div class="panel" id="tab-safety-kpi">
+  <div id="safety-kpi-content">
+    <div class="card loading-placeholder">
+      <div class="loading-placeholder-icon">🦺</div>
+      <div class="loading-placeholder-text">جاري التحميل…</div>
+    </div>
+  </div>
+</div><!-- /tab-safety-kpi -->
+
     </div><!-- /cat-main -->
   </div><!-- /cat-layout -->
   </div><!-- /legacyDashboardArea -->
@@ -1744,96 +1761,6 @@
     FACILITIES MANAGEMENT DASHBOARD
   </div>
 </footer>
-
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  💬  المساعد الذكي — واجهة شات بوت + ردود تجريبية مبرمجة
-╠════════════════════════════════════════════════════════════════════╣
-║  التصميم متطابق مع هوية اللوحة. الردود هنا مبرمجة بقواعد بسيطة
-║  (Rule-based / كلمات مفتاحية) للمعاينة فقط — وليست ذكاءً اصطناعياً
-║  حقيقياً ولا متصلة ببيانات اللوحة الفعلية أو بأي خادم خارجي.
-╚════════════════════════════════════════════════════════════════════╝
--->
-
-<!-- ═══════════════ 🤖 المساعد التنفيذي v6 — Premium Executive Assistant ═══════════════
-     تصميم فاخر بروح ChatGPT / Vision Pro / Tesla UI:
-     • حركات دقيقة فقط: تنفّس (1→1.03)، طفو ±4px، رمش عشوائي كل 4-8 ثوانٍ، رأس ±2°
-     • العيون تتبع المؤشر عند الاقتراب + ابتسامة + تكبير 1.05
-     • حالة الاستماع (أثناء الكتابة): توهج سماوي + عيون أوسع + مواجهة للأمام
-     • حالة التفكير (أثناء معالجة الرد): جسيمات مدارية مضيئة حول الرأس
-     • حالة التحدّث (عند وصول الرد): حركة فم بسيطة + إيماءة رأس لطيفة
-     • منصة زجاجية Glassmorphism + جسيمات محيطية هادئة
-     • GPU فقط (transform/opacity) — لا يمس أي منطق JS موجود، يراقب DOM فقط -->
-
-<div id="fcbFab" style="display:none" aria-hidden="true"></div><!-- عنصر وهمي حتى لا يتعطل fcbToggle -->
-
-<div id="fmbotWalker" title="اضغط علي للمحادثة" role="button" aria-label="فتح مساعد إدارة المرافق الذكي">
-  <div id="fmbotBubble">
-    <span class="bbl-line1">أنا مساعد إدارة المرافق الذكي</span>
-    <span class="bbl-line2">اضغط لتسألني</span>
-  </div>
-  <i class="amb" style="left:14px;bottom:44px;width:5px;height:5px;--d:8s;--dl:0s"></i>
-  <i class="amb" style="left:118px;bottom:60px;width:4px;height:4px;--d:11s;--dl:2.5s"></i>
-  <i class="amb" style="left:34px;bottom:96px;width:3px;height:3px;--d:9.5s;--dl:5s"></i>
-  <i class="amb" style="left:104px;bottom:118px;width:4px;height:4px;--d:12s;--dl:1.2s"></i>
-  <i class="amb" style="left:66px;bottom:30px;width:3px;height:3px;--d:10s;--dl:3.8s"></i>
-</div>
-
-
-<div class="fcb-panel" id="fcbPanel">
-  <div class="fcb-head">
-    <div class="fcb-avatar">
-      <svg class="fcb-robot-svg" viewBox="0 0 24 24" width="25" height="25" fill="none">
-        <g class="fcb-robot-antenna">
-          <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
-          <line x1="12" y1="4.05" x2="12" y2="5.5" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
-        </g>
-        <rect x="4" y="5.5" width="16" height="13.6" rx="4.8" stroke="#fff" stroke-width="1.9"/>
-        <rect x="1.3" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
-        <rect x="19.9" y="10.5" width="2.8" height="3.9" rx="1.4" fill="#fff" fill-opacity="0.95"/>
-        <circle class="fcb-robot-eye" cx="8.6" cy="11.7" r="2.15" fill="#fff"/>
-        <circle class="fcb-robot-eye" cx="15.4" cy="11.7" r="2.15" fill="#fff"/>
-        <path d="M7.9 16.1c1.8 1.7 6.4 1.7 8.2 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <div class="fcb-head-text">
-      <div class="fcb-head-title">مساعد إدارة المرافق الذكي 🏫</div>
-      <div class="fcb-head-sub"><span class="dot"></span> متخصص في المرافق التعليمية</div>
-    </div>
-    <div class="fcb-head-close" id="fcbMaxBtn" title="تكبير/تصغير النافذة" style="margin-left:4px;font-size:13px;">⛶</div>
-    <div class="fcb-head-close" data-evt="104">✕</div>
-  </div>
-  <!-- 🛠️ حُذف زر ⚙️ إعدادات API ولوحته بالكامل بناءً على طلب صاحب المشروع
-       (المساعد يعمل عبر خادم آمن ولا يحتاج أي إعداد من المستخدم) -->
-
-  <div class="fcb-body" id="fcbBody">
-    <div id="fcbMessages">
-      <div class="fcb-row bot">
-        <div class="fcb-msg-avatar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M12 3.2c-5.1 0-9.3 3.55-9.3 7.95 0 2.3 1.15 4.4 3.05 5.9-.18 1.15-.6 2.45-1.25 3.6a.55.55 0 0 0 .65.8c1.85-.6 3.3-1.35 4.3-1.95a11.4 11.4 0 0 0 2.55.3c5.1 0 9.3-3.55 9.3-7.95s-4.2-7.95-9.3-7.95Z" fill="#ffffff" fill-opacity="0.13" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.1 6.6 9.05v.9h10.8v-.9L12 6.1Z" fill="#fff"/><rect x="7.35" y="9.95" width="9.3" height="4.65" rx="0.3" fill="#fff"/><rect x="10.85" y="11.55" width="2.3" height="3.05" fill="#0a2530"/><rect x="6.6" y="14.6" width="10.8" height="0.95" rx="0.25" fill="#fff"/></svg></div>
-        <div class="fcb-col">
-          <div class="fcb-bubble">مرحباً 👋 أنا <strong>مساعد إدارة المرافق الذكي</strong> المتخصص في تحليل بيانات المرافق ....</div>
-          <div class="fcb-time">10:24 ص</div>
-        </div>
-      </div>
-      <div id="fcbQuickReplies" class="fcb-quick-replies">
-        <button type="button" class="fcb-qr-pill">أعطني أسوأ 10 مدارس في FCA</button>
-        <button type="button" class="fcb-qr-pill">كم عدد المدارس حسب المحافظة؟</button>
-        <button type="button" class="fcb-qr-pill">ما متوسط درجة البيئة المدرسية؟</button>
-        <button type="button" class="fcb-qr-pill">لخّص أهم المؤشرات في العرض الحالي</button>
-      </div>
-    </div>
-
-  </div>
-
-  <div class="fcb-foot">
-    <textarea class="fcb-input" id="fcbInput" rows="1" placeholder="اكتب رسالتك هنا..." data-evt="108"></textarea>
-    <button class="fcb-send" id="fcbSendBtn" type="button" data-evt="109">
-      <svg viewBox="0 0 24 24" fill="#fff"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg>
-    </button>
-  </div>
-</div>
-
-
 
 <!-- ══════════════════════════════════════════════════════════════
      Modal: تصفح الأنظمة الرئيسية ← الفرعية
@@ -1879,70 +1806,11 @@
 
 <script src="dashboard.js" defer></script>
 
-<script>
-/* ══════════════════════════════════════════════════════════════
-   🛠️ إصلاح شامل لموضع وفتح المساعد الذكي — لا يعتمد على أي ملف خارجي
-
-   المشكلة 1 (الموضع): بسبب وسوم <div> غير مغلقة في أماكن أخرى من
-   الصفحة، كانت عناصر الشات بوت تنتهي متداخلة داخل قسم تبويب مخفي،
-   فتظهر المحادثة كجزء من تدفق الصفحة (أسفل الداشبورد/الفوتر) بدل
-   نافذة عائمة ثابتة. → الحل: نقل العنصرين ليكونا أبناء مباشرين
-   لـ <body>، مع حقن CSS حرج هنا مباشرة يضمن position:fixed حتى لو
-   كانت نسخة dashboard.css على الخادم قديمة (Cache).
-
-   المشكلة 2 (الفتح بالنقر): ربط النقر على الروبوت كان يعيش داخل
-   موديول Three.js في dashboard.js الذي ينسحب مبكراً إذا فشل تحميل
-   مكتبة three.js من الـ CDN — فيصبح النقر بلا تأثير. → الحل: ربط
-   احتياطي هنا يفتح/يغلق اللوحة دائماً مهما حدث للـ CDN.
-   ══════════════════════════════════════════════════════════════ */
-(function fixChatbot() {
-
-  /* CSS حرج — يضمن أن اللوحة نافذة عائمة ثابتة بحجم متوسط موحّد
-     مهما كانت حالة dashboard.css على الخادم (حماية من الكاش القديم). */
-  var critical = document.createElement('style');
-  critical.textContent =
-    '.fcb-panel{position:fixed !important;bottom:22px !important;left:24px !important;' +
-    'top:auto !important;right:auto !important;width:390px !important;' +
-    'max-width:calc(100vw - 32px) !important;' +
-    'height:min(480px,75vh) !important;max-height:min(480px,75vh) !important;}' +
-    '.fcb-panel.maximized{height:min(85vh,900px) !important;max-height:min(85vh,900px) !important;' +
-    'width:min(620px,calc(100vw - 32px)) !important;}' +
-    '.fcb-panel:not(.open){opacity:0 !important;pointer-events:none !important;}' +
-    '.fcb-panel.open{opacity:1 !important;pointer-events:auto !important;}' +
-    '@media (max-width:640px){.fcb-panel{width:100vw !important;max-width:100vw !important;' +
-    'left:0 !important;bottom:0 !important;height:70vh !important;max-height:70vh !important;}}';
-  document.head.appendChild(critical);
-
-  function run() {
-    var walker = document.getElementById('fmbotWalker');
-    var panel = document.getElementById('fcbPanel');
-
-    /* 1) النقل إلى body مباشرة — يصلح التموضع نهائياً */
-    if (walker && walker.parentElement !== document.body) {
-      document.body.appendChild(walker);
-    }
-    if (panel && panel.parentElement !== document.body) {
-      document.body.appendChild(panel);
-    }
-
-    /* 2) ربط احتياطي للنقر — يعمل حتى لو فشل موديول Three.js */
-    if (walker && panel && !walker.__fcbClickBound) {
-      walker.__fcbClickBound = true;
-      walker.addEventListener('click', function () {
-        if (typeof window.fcbToggle === 'function') {
-          if (!panel.classList.contains('open')) window.fcbToggle();
-        } else {
-          panel.classList.toggle('open');
-        }
-      });
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
-  }
-})();
-</script>
+<!-- ══════════════════════════════════════════════════════════════
+     Executive AI Assistant — AI Core Orb (Phase 4)
+     الواجهة فقط حالياً — لا يوجد ربط ببيانات حية أو نموذج تحليل.
+     API عامة للربط لاحقاً: window.AICore.{open, close, setState,
+     setPresenceText, showAlert}
+     ══════════════════════════════════════════════════════════════ -->
+<script src="aicore-orb.js" defer></script>
 </body></html>

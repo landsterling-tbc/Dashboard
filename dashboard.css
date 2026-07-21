@@ -1587,472 +1587,6 @@ tbody tr:last-child td { border-bottom: none; }
 .pay-tip { cursor: help; }
 
 /* ══════════════════════════════════════════════════════════════
-   32. CHATBOT PANEL (fcb)
-   ══════════════════════════════════════════════════════════════ */
-.fcb-fab { display: none !important; }
-
-.fcb-panel {
-  position: fixed;
-  bottom: 22px;
-  left: 24px;
-  width: 390px;
-  max-width: calc(100vw - 32px);
-  /* 🛠️ حجم واحد متوسط ثابت للوحة (طلب صاحب المشروع):
-     البنية أصبحت سليمة (الجسم والفوتر داخل اللوحة)، فالارتفاع الثابت
-     الآن خيار تصميمي نظيف — الجسم يملؤه والرسائل تتمرر داخلياً. */
-  height: min(480px, 75vh);
-  max-height: min(480px, 75vh);
-  background: var(--bg-3);
-  border: 1px solid var(--bd-light);
-  border-radius: 22px;
-  box-shadow: 0 32px 80px rgba(8,45,60,.26), 0 8px 24px rgba(8,45,60,.12), 0 0 0 1px rgba(13,132,156,.07);
-  z-index: 1500;
-  overflow: visible;
-  opacity: 0;
-  transform: translateY(20px) scale(.95);
-  transform-origin: bottom left;
-  transition: opacity .28s var(--ease-std), transform .32s var(--ease-std), height .32s var(--ease-std), width .32s var(--ease-std);
-  display: flex;
-  flex-direction: column;
-  pointer-events: none;
-}
-
-.fcb-panel.open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-
-.fcb-head {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px 16px;
-  background: linear-gradient(135deg, #05111a 0%, #082332 55%, #0b3d52 100%);
-  overflow: hidden;
-  border-radius: 20px 20px 0 0;
-  border-bottom: 1px solid rgba(13,132,156,.22);
-}
-
-.fcb-head::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(220px 110px at 90% -30%, rgba(13,132,156,.28), transparent 65%),
-    radial-gradient(160px 80px at -10% 110%, rgba(176,138,78,.10), transparent 60%);
-  pointer-events: none;
-}
-
-/* خط teal متوهج في الأعلى */
-.fcb-head::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1.5px;
-  background: linear-gradient(to left, transparent 5%, rgba(20,164,191,.7) 35%, rgba(255,255,255,.55) 50%, rgba(20,164,191,.7) 65%, transparent 95%);
-}
-
-.fcb-avatar {
-  position: relative;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--teal-3) 0%, var(--teal-2) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 19px;
-  box-shadow: 0 4px 16px rgba(13,132,156,.45), inset 0 1px 0 rgba(255,255,255,.25);
-  z-index: 1;
-}
-
-.fcb-head-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
-.fcb-head-title { color: #fff; font-size: 13.5px; font-weight: 800; letter-spacing: .015em; }
-.fcb-head-sub {
-  margin-top: 3px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: rgba(255,255,255,.52);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .02em;
-  text-transform: uppercase;
-}
-
-.fcb-head-sub .dot { background: var(--good-2); box-shadow: 0 0 0 2px rgba(14,148,136,.28); width: 6px; height: 6px; }
-
-.fcb-head-close {
-  position: relative;
-  z-index: 1;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.12);
-  color: rgba(255,255,255,.65);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all .16s ease;
-}
-
-.fcb-head-close:hover { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.22); }
-
-.fcb-body {
-  /* 🛠️ إصلاح الفراغ الأبيض (الجزء الثاني):
-     flex:1 1 auto → الجسم يأخذ حجم محتواه الطبيعي عندما يكون البانل
-     أصغر من السقف (لا تمدد قسري)، ويتقلص عند بلوغ السقف.
-     min-height:0 → النمط القياسي في Flexbox للسماح للعنصر بالانكماش
-     دون هذا السطر يتجاهل المتصفح overflow ويمدد الحاوية. */
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px 14px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  position: relative;
-  background:
-    radial-gradient(500px 260px at 100% 0%, rgba(13,132,156,.05), transparent 60%),
-    radial-gradient(400px 200px at 0% 100%, rgba(108,43,217,.025), transparent 60%),
-    var(--bg-2);
-  scroll-behavior: smooth;
-}
-
-.fcb-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 90%;
-  animation: fcb-rise .32s var(--ease-std);
-}
-
-@keyframes fcb-rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.fcb-row.bot { margin-inline-end: auto; }
-.fcb-row.user { margin-inline-start: auto; }
-
-.fcb-msg-avatar {
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--navy-2), var(--teal));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(8,61,79,.3);
-}
-
-.fcb-col { display: flex; flex-direction: column; min-width: 0; }
-
-.fcb-bubble {
-  padding: 11px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.75;
-  letter-spacing: .001em;
-  word-wrap: break-word;
-}
-
-.fcb-row.bot .fcb-bubble {
-  background: #fff;
-  color: var(--tx-main);
-  border: 1px solid var(--bd-light);
-  border-radius: 16px 5px 16px 16px;
-  box-shadow: 0 2px 8px rgba(8,45,60,.05);
-}
-
-.fcb-row.user .fcb-bubble {
-  background: var(--grad-teal);
-  color: #fff;
-  border-radius: 16px 16px 16px 5px;
-  box-shadow: 0 4px 12px rgba(13,132,156,.28);
-  font-weight: 600;
-}
-
-.fcb-bubble p { margin: 0 0 8px; }
-.fcb-bubble p:last-child { margin-bottom: 0; }
-.fcb-bubble strong { font-weight: 800; color: var(--navy-2); }
-.fcb-row.user .fcb-bubble strong { color: #fff; }
-.fcb-bubble em { font-style: normal; color: var(--teal-3); font-weight: 600; }
-.fcb-bubble ul, .fcb-bubble ol { margin: 4px 0 8px; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 4px; }
-.fcb-bubble li { line-height: 1.65; }
-.fcb-bubble li::marker { color: var(--teal); font-weight: 800; }
-.fcb-bubble code { background: rgba(13,132,156,.1); color: var(--teal-3); padding: 1px 6px; border-radius: 6px; font-size: 12px; font-family: ui-monospace,"SF Mono",Consolas,monospace; direction: ltr; display: inline-block; }
-.fcb-row.user .fcb-bubble code { background: rgba(255,255,255,.2); color: #fff; }
-.fcb-bubble h4 { font-size: 13px; font-weight: 800; color: var(--navy-2); margin: 2px 0 6px; }
-.fcb-bubble hr { border: none; border-top: 1px solid var(--bd-light); margin: 8px 0; }
-.fcb-bubble a { color: var(--teal-3); font-weight: 700; text-decoration: underline; text-decoration-color: rgba(13,132,156,.35); }
-
-/* جداول داخل المساعد */
-.fcb-table-wrap { margin: 6px 0 10px; border-radius: 12px; overflow: hidden; border: 1px solid var(--bd-light); max-width: 100%; overflow-x: auto; }
-.fcb-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-.fcb-table thead th { background: linear-gradient(135deg, var(--navy), var(--navy-2)); color: #fff; font-weight: 700; padding: 8px 10px; text-align: center; white-space: nowrap; }
-.fcb-table tbody td { padding: 7px 10px; text-align: center; border-bottom: 1px solid var(--bd-light); color: var(--tx-main); white-space: nowrap; }
-.fcb-table tbody tr:last-child td { border-bottom: none; }
-.fcb-table tbody tr:nth-child(even) { background: var(--bg-2); }
-.fcb-table tbody tr:hover { background: var(--teal-glow); }
-
-/* رسوم داخل المساعد */
-.fcb-chart-wrap { margin: 6px 0 10px; padding: 12px 10px 8px; background: #fff; border: 1px solid var(--bd-light); border-radius: 14px; box-shadow: 0 2px 8px rgba(8,45,60,.05); }
-.fcb-chart-title { font-size: 11.5px; font-weight: 800; color: var(--navy-2); margin-bottom: 8px; text-align: center; }
-.fcb-chart-canvas-box { position: relative; height: 200px; width: 100%; }
-.fcb-chart-error { font-size: 11px; color: var(--red-2); padding: 6px; text-align: center; }
-
-/* صف تصدير المساعد */
-.fcb-export-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--bd-light); }
-.fcb-chart-wrap .fcb-export-row, .fcb-table-wrap .fcb-export-row { margin: 8px 10px 0; padding: 8px 0 2px; }
-.fcb-export-row-msg { margin-top: 10px; }
-
-.fcb-export-btn {
-  background: rgba(13,132,156,.07);
-  border: 1px solid rgba(13,132,156,.2);
-  color: var(--teal-3);
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all .18s ease;
-  font-family: inherit;
-}
-
-.fcb-export-btn:hover { background: var(--grad-teal); border-color: transparent; color: #fff; }
-.fcb-export-btn:active { transform: scale(.96); }
-
-.fcb-time { margin-top: 5px; font-size: 9.5px; color: var(--tx-muted); font-weight: 600; padding: 0 2px; }
-.fcb-row.bot .fcb-time { text-align: right; }
-.fcb-row.user .fcb-time { text-align: left; }
-
-.fcb-quick { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 14px 16px; flex-shrink: 0; }
-
-.fcb-chip {
-  background: linear-gradient(135deg, rgba(13,132,156,.08), rgba(13,132,156,.04));
-  border: 1px solid rgba(13,132,156,.22);
-  color: var(--teal-3);
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 8px 13px;
-  border-radius: 999px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all .2s var(--ease-std);
-}
-
-.fcb-chip:hover { background: var(--grad-teal); border-color: transparent; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(13,132,156,.3); }
-
-/* مؤشر الكتابة — الهيكل: [نقطة نقطة نقطة] [نص] في سطر أفقي واحد */
-.fcb-typing {
-  display: inline-flex;
-  align-items: center;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 8px;            /* مسافة أكبر بين النقاط والنص */
-  padding: 12px 16px;
-  min-width: 160px;
-  box-sizing: border-box;
-  overflow: visible;
-}
-
-.fcb-typing span:not(.fcb-typing-txt) {
-  flex: 0 0 7px;
-  width: 7px !important;
-  height: 7px !important;
-  min-width: 7px;
-  border-radius: 50%;
-  background: var(--teal);
-  opacity: .55;
-  display: block;
-  animation: fcb-bounce 1.2s infinite ease-in-out;
-}
-.fcb-typing span:nth-child(2) { animation-delay: .15s; }
-.fcb-typing span:nth-child(3) { animation-delay: .3s; }
-.fcb-typing span { flex: 0 0 auto; width: 6.5px; height: 6.5px; border-radius: 50%; background: var(--teal); opacity: .55; animation: fcb-bounce 1.2s infinite ease-in-out; }
-.fcb-typing span:nth-child(2) { animation-delay: .15s; }
-.fcb-typing span:nth-child(3) { animation-delay: .3s; }
-
-@keyframes fcb-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: .35; }
-  40%            { transform: translateY(-5px); opacity: 1; }
-}
-
-.fcb-settings {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  background: var(--bg-3);
-  padding: 20px 18px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  animation: fcb-rise .22s ease;
-  border-radius: 18px;
-}
-
-.fcb-settings-title { font-size: 14.5px; font-weight: 800; color: var(--tx-main); margin-bottom: 4px; }
-.fcb-settings-lbl { font-size: 11.5px; font-weight: 700; color: var(--tx-sec); margin-top: 8px; }
-
-.fcb-settings-input {
-  border: 1.5px solid var(--bd-light);
-  background: var(--bg-2);
-  border-radius: 11px;
-  padding: 10px 13px;
-  font-size: 12.5px;
-  font-family: inherit;
-  color: var(--tx-main);
-  outline: none;
-  width: 100%;
-  direction: ltr;
-  text-align: left;
-  transition: border-color .18s ease, box-shadow .18s ease;
-}
-
-.fcb-settings-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); }
-.fcb-settings-actions { display: flex; gap: 8px; margin-top: 12px; }
-
-.fcb-settings-save,
-.fcb-settings-clear {
-  flex: 1;
-  border: none;
-  border-radius: 11px;
-  padding: 10px;
-  font-size: 12.5px;
-  font-weight: 700;
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform .16s ease, box-shadow .16s ease;
-}
-
-.fcb-settings-save { background: var(--grad-teal); color: #fff; box-shadow: 0 4px 12px rgba(13,132,156,.3); }
-.fcb-settings-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(13,132,156,.38); }
-.fcb-settings-clear { background: var(--bg-2); color: var(--tx-sec); border: 1.5px solid var(--bd-light); }
-.fcb-settings-clear:hover { background: var(--bg); }
-
-.fcb-settings-note {
-  font-size: 10.5px;
-  color: var(--tx-muted);
-  margin-top: 10px;
-  line-height: 1.7;
-  background: var(--bg-2);
-  border: 1px solid var(--bd-light);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.fcb-foot {
-  flex-shrink: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid rgba(13,132,156,.10);
-  background: linear-gradient(to bottom, var(--bg-2), var(--bg-3));
-  border-radius: 0 0 20px 20px;
-}
-
-.fcb-input {
-  flex: 1;
-  min-width: 0;
-  max-height: 88px;
-  border: 1.5px solid var(--bd-light);
-  background: var(--bg-3);
-  border-radius: 16px;
-  padding: 9px 14px;
-  font-size: 12.5px;
-  font-family: inherit;
-  color: var(--tx-main);
-  outline: none;
-  line-height: 1.55;
-  resize: none;
-  transition: border-color .18s ease, box-shadow .18s ease;
-  box-shadow: 0 1px 4px rgba(8,45,60,.06);
-}
-
-.fcb-input:focus {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(13,132,156,.12), 0 1px 4px rgba(8,45,60,.06);
-}
-.fcb-input::placeholder { color: var(--tx-muted); }
-
-.fcb-send {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  flex-shrink: 0;
-  border: none;
-  background: linear-gradient(135deg, var(--teal-2) 0%, var(--teal-3) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 10px rgba(13,132,156,.35);
-  cursor: pointer;
-  transition: transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s ease, opacity .18s ease;
-}
-
-.fcb-send:hover { transform: scale(1.07) translateY(-1px); box-shadow: 0 6px 16px rgba(13,132,156,.42); }
-.fcb-send:active { transform: scale(.94); }
-.fcb-send:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.fcb-send svg { width: 17px; height: 17px; transform: scaleX(-1); }
-
-/* الروبوت */
-.fcb-robot-svg { animation: fcb-robot-walk 10s ease-in-out infinite; transform-origin: center; }
-
-@keyframes fcb-robot-walk {
-  0%   { transform: translateY(0) rotate(0deg); }
-  8%   { transform: translateY(-2.5px) rotate(-3deg); }
-  16%  { transform: translateY(0) rotate(0deg); }
-  24%  { transform: translateY(-2.5px) rotate(3deg); }
-  32%  { transform: translateY(0) rotate(0deg); }
-  40%  { transform: translateY(-2.5px) rotate(-3deg); }
-  48%  { transform: translateY(0) rotate(0deg); }
-  56%  { transform: translateY(-1px) rotate(0deg); }
-  64%, 86% { transform: translateY(0) rotate(0deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-
-.fcb-robot-eye {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: fcb-robot-blink 4.2s ease-in-out infinite;
-}
-
-@keyframes fcb-robot-blink {
-  0%, 90%, 100% { transform: scaleY(1); }
-  94%           { transform: scaleY(.15); }
-}
-
-.fcb-robot-antenna { animation: fcb-robot-antenna-wiggle 10s ease-in-out infinite; }
-.fcb-fab-icon .fcb-robot-antenna { transform-origin: 12px 4px; }
-.fcb-avatar .fcb-robot-antenna   { transform-origin: 12px 5.5px; }
-
-@keyframes fcb-robot-antenna-wiggle {
-  0%   { transform: rotate(0deg); }
-  8%   { transform: rotate(8deg); }
-  16%  { transform: rotate(0deg); }
-  24%  { transform: rotate(-8deg); }
-  32%  { transform: rotate(0deg); }
-  40%  { transform: rotate(8deg); }
-  48%  { transform: rotate(0deg); }
-  64%, 86% { transform: rotate(0deg); }
-  100% { transform: rotate(0deg); }
-}
-
-/* ══════════════════════════════════════════════════════════════
    33. ROBOT WALKER
    ══════════════════════════════════════════════════════════════ */
 #fmbotWalker {
@@ -2149,14 +1683,6 @@ tbody tr:last-child td { border-bottom: none; }
 }
 #fmbotWalker::before {
   animation: fwGlowCycle 9s ease-in-out infinite;
-}
-
-.fcb-panel.open ~ #fmbotWalker,
-#fmbotWalker.over-panel {
-  bottom: calc(22px + 560px - 80px);
-  left: 198px;
-  z-index: 2147483646;
-  transition: bottom .32s var(--ease-std), left .32s var(--ease-std), transform .6s cubic-bezier(.22,1,.36,1);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2282,11 +1808,6 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 #fcbShowWalkerBtn:hover { background: rgba(13,132,156,.7); border-color: rgba(13,132,156,.6); color: #fff; }
-
-body.bot-hidden #fmbotWalker,
-body.bot-hidden .fcb-panel,
-body.bot-hidden #fcbHideWalkerBtn,
-body.bot-hidden #fmbotBubble { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s !important; }
 
 body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 
@@ -2444,24 +1965,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .map-stat { min-width: calc(50% - 6px); }
   #map-container { height: 440px; }
 
-  /* ── الشات بوت على الجوال — ملتصق بالأسفل، يكبر مع المحتوى حتى السقف ── */
-  .fcb-panel {
-    width: 100vw;
-    max-width: 100vw;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 20px 20px 0 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    /* 🛠️ حجم ثابت موحّد على الجوال أيضاً */
-    height: 70vh;
-    max-height: 70vh;
-    transform-origin: bottom center;
-    box-shadow: 0 -8px 40px rgba(8,45,60,.18);
-  }
-
   /* كروت الأمن والسلامة على الجوال */
   .sec-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .sec-kpi-card { padding: 14px 12px; min-height: 76px; }
@@ -2484,8 +1987,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   }
 
   /* foot input on mobile */
-  .fcb-foot { padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  .fcb-input { font-size: 16px; } /* 16px يمنع zoom في iOS */
 }
 
 /* ── جوال صغير (560px) ── */
@@ -2498,10 +1999,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   #btnPresentationMode { display: none; }
   .map-stat    { min-width: 100%; }
   .ix-kpi-modal { width: 96vw; max-height: 88vh; }
-
-  /* الشات بوت على الشاشات الصغيرة جداً — حجم ثابت موحّد */
-  .fcb-panel { height: 75vh; max-height: 75vh; }
-  .fcb-head-title { font-size: 13px; }
 
   /* الروبوت يصغر أكثر */
   .sec-kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -2522,7 +2019,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 /* ── safe area لأجهزة iPhone X+ ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 768px) {
-    .fcb-panel { padding-bottom: env(safe-area-inset-bottom); }
     .content   { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   }
 }
@@ -2548,71 +2044,6 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-
-/* ════════════════════════════════════════════════
-   تحسينات المساعد الذكي (Tasks 2,3,5,6)
-   ════════════════════════════════════════════════ */
-
-/* Task 2: أزرار الاقتراحات السريعة */
-.fcb-quick-replies {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 10px 6px 4px 6px;
-}
-.fcb-qr-pill {
-  border: 1px solid var(--bd-light);
-  background: var(--bg-2);
-  color: var(--tx-sec);
-  font: 600 12px Tajawal, sans-serif;
-  padding: 7px 13px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background .2s var(--ease-std), color .2s var(--ease-std), border-color .2s var(--ease-std);
-}
-.fcb-qr-pill:hover {
-  background: var(--grad-teal);
-  border-color: transparent;
-  color: #fff;
-}
-.fcb-qr-pill:active { transform: scale(.96); }
-
-/* Task 3: زر الإيقاف (نفس موضع وحجم زر الإرسال) */
-.fcb-send.fcb-send-stop { background: #b3392f; }
-.fcb-send.fcb-send-stop:hover { box-shadow: 0 6px 16px rgba(179,57,47,.4); }
-.fcb-send.fcb-send-stop svg { transform: none; }
-
-/* Task 6: نص مؤشر الكتابة */
-.fcb-typing-txt {
-  display: inline;
-  font: 600 12px/1 Tajawal, sans-serif;
-  color: var(--tx-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-right: 6px;  /* مسافة إضافية بين النقاط والنص */
-}
-
-/* Task 5: وضع التكبير — هنا الارتفاع الكبير مقصود (وضع ملء الشاشة) */
-.fcb-panel.maximized,
-.fcb-panel.maximized.open {
-  width: min(620px, calc(100vw - 32px));
-  height: min(85vh, 900px);
-  max-height: min(85vh, 900px);
-}
-@media (max-width: 640px) {
-  .fcb-panel.maximized,
-  .fcb-panel.maximized.open {
-    width: 100vw;
-    max-width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    bottom: 0;
-    left: 0;
-    border-radius: 0;
   }
 }
 
@@ -2706,11 +2137,7 @@ canvas {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .fcb-panel,
-  .fcb-typing span {
-    animation: none !important;
-    transition: opacity .1s linear !important;
-  }
+  
 }
 
 /* ── 12) Focus States — Keyboard Navigation مرئية ───────────────── */
@@ -2718,12 +2145,6 @@ canvas {
   outline: 2.5px solid var(--teal, #0891B2);
   outline-offset: 2px;
   border-radius: 4px;
-}
-
-/* ── 13) chat typing bubble: نص مسبق‐حجز الارتفاع ─────────────── */
-/* 🛠️ عرض أدنى يضمن سعة النص + النقاط في صف واحد مريح */
-.fcb-row.bot .fcb-bubble.fcb-typing {
-  min-width: 180px;
 }
 
 /* ── 14) منع Overflow في Tooltip الشارتات على الجوال ──────────── */

@@ -1004,7 +1004,7 @@ function renderKPIs() {
     dists = new Set(D.map((r) => r.district).filter((d) => d)).size,
     sectors = new Set(D.map((r) => r.sector).filter((s) => s)).size,
     classes = D.reduce((s, r) => s + (r.classrooms || 0), 0),
-    alertsTotal = D.reduce((s, r) => s + (r.alerts || 0), 0),
+    alertsTotal = window.__BALAGH_TOTAL_EXACT__ || D.reduce((s, r) => s + (r.alerts || 0), 0),
     acTotal = D.reduce((s, r) => s + (r.acUnits || 0), 0);
 
   // حساب آخر تاريخ تقييم FCA ظهر في البيانات (لعرضه كمرجع)
@@ -2036,8 +2036,11 @@ function renderStageCompareTab() {
   const stripAr  = (v) => normText(v).replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ـ/g,"").replace(/[\u064B-\u065F\u0670]/g,"");
   const schoolKey = (v) => stripAr(v).toLowerCase().replace(/[^\u0600-\u06FF0-9a-z]+/gi,"");
 
-  const normMinId = (v) => { let s=String(v??"").replace(/\uFEFF/g,"").trim(); if(!s||s==="—")return""; return s.replace(/\.0+$/,""); };
-  const getMinId  = (r) => normMinId(r["رقم_المدرسة_الوزاري"]??r["رقم_وزاري"]??r["رقم وزاري"]??r.minId??"");
+  // 🔑 نفس الدالة الموحّدة الوحيدة (window.normSchoolId) — كانت هنا نسخة
+  // محلية أضعف (تشيل ".0" بس) فكانت بتعامل نفس المدرسة كمدرستين لو
+  // ظهر رقمها بشكلين مختلفين (S-30721 مقابل 30721 مثلاً)، وده سبب اختلاف
+  // "إجمالي المدارس" هنا عن باقي تبويبات FCA.
+  const getMinId  = (r) => window.normSchoolId(r["رقم_المدرسة_الوزاري"]??r["رقم_وزاري"]??r["رقم وزاري"]??r.minId??"");
   const getSchool = (r) => normText(r["اسم_المدرسة"]??r.schoolName??r.name??"");
   const getSector = (r) => normText(r["المحافظة"]??r.sector??"");
   const getCity   = (r) => normText(r["المدينة_الرئيسية"]??r["المدينة"]??r.city??"");
@@ -2456,16 +2459,25 @@ function renderStageCompareTab() {
     // KPIs
     const kpisEl = document.getElementById("fcaRefKpis");
     if(kpisEl){
+      // 🔑 نحسب بالمدارس الفريدة (رقم وزاري موحّد) مش بعدد صفوف المباني —
+      // بعض الأرقام الوزارية عندها صفّين مبنى (نفس المدرسة)، فكانت بتتحسب
+      // مرتين. خليناها متطابقة مع تبويب "مقارنة مراحل FCA".
+      const uniqIdOf = (r) => window.normSchoolId(r.minId || r.schoolSeq);
+      const totalIds  = new Set(rows.map(uniqIdOf).filter(Boolean));
       const withFca = rows.filter(r=>r.fca!=null);
+      const withFcaIds = new Set(withFca.map(uniqIdOf).filter(Boolean));
+      const totalUnique   = totalIds.size;
+      const withFcaCount  = withFcaIds.size;
+      const withoutCount  = totalUnique - withFcaCount;
       const avgFca  = withFca.length ? avg(withFca.map(r=>r.fca)) : null;
       const low     = withFca.filter(r=>r.fca<50).length;
       const dates_dist = {};
       withFca.forEach(r=>{ const d=r.fcaDate||"غير محدد"; dates_dist[d]=(dates_dist[d]||0)+1; });
       const latestDate = Object.entries(dates_dist).sort((a,b)=>b[0].localeCompare(a[0])).map(e=>`${e[0]}: ${e[1]}`).slice(0,3).join(" · ");
       kpisEl.innerHTML=
-        `<div class="kpi kc-blue"><div class="kpi-val">${rows.length.toLocaleString()}</div><div class="kpi-lbl">إجمالي المدارس</div><div class="kpi-sub">بعد الفلاتر</div></div>`+
-        `<div class="kpi kc-green"><div class="kpi-val">${withFca.length.toLocaleString()}</div><div class="kpi-lbl">لديها تقييم FCA</div><div class="kpi-sub">متوسط: ${avgFca!=null?avgFca.toFixed(1)+"%":"—"}</div></div>`+
-        `<div class="kpi kc-amber"><div class="kpi-val">${(rows.length-withFca.length).toLocaleString()}</div><div class="kpi-lbl">بدون تقييم</div><div class="kpi-sub">لم يُقيَّم بعد</div></div>`+
+        `<div class="kpi kc-blue"><div class="kpi-val">${totalUnique.toLocaleString()}</div><div class="kpi-lbl">إجمالي المدارس</div><div class="kpi-sub">مدرسة فريدة بعد الفلاتر</div></div>`+
+        `<div class="kpi kc-green"><div class="kpi-val">${withFcaCount.toLocaleString()}</div><div class="kpi-lbl">لديها تقييم FCA</div><div class="kpi-sub">متوسط: ${avgFca!=null?avgFca.toFixed(1)+"%":"—"}</div></div>`+
+        `<div class="kpi kc-amber"><div class="kpi-val">${withoutCount.toLocaleString()}</div><div class="kpi-lbl">بدون تقييم</div><div class="kpi-sub">لم يُقيَّم بعد</div></div>`+
         `<div class="kpi kc-red"><div class="kpi-val">${low.toLocaleString()}</div><div class="kpi-lbl">FCA أقل من 50%</div><div class="kpi-sub">تحتاج تدخل</div></div>`;
     }
 
@@ -2687,6 +2699,37 @@ const _idb = {
     } catch (_) { return false; }
   },
 };
+window._idb = _idb; // متاح لباقي الموديولات المستقلة (زي تبويب التكلفة) عشان تستخدم نفس آلية الكاش
+
+/* ══════════════════════════════════════════════════════════════════
+   🔑 window.normSchoolId — الدالة الموحّدة الوحيدة لتطبيع "رقم المدرسة
+   الوزاري" في كل اللوحة بالكامل.
+
+   ⚠️ قاعدة إلزامية: أي مكان في الكود بيربط مدرسة بمدرسة (بلاغات، حصر
+   أصول، مصاعد، أي شيت تاني) لازم يستخدم الدالة دي بالظبط، ومفيش أي
+   نسخة تانية محلية تتعمل منها في أي مكان.
+
+   القاعدة: نتجاهل تمامًا أي حروف أو رموز زيادة عن الرقم نفسه — سواء
+   كانت S أو M أو الشرطة "-" أو أي تركيبة منهم (S- / M / S-M / .0 في
+   الآخر... إلخ) — ونعتبر إنها "مش موجودة" خالص، ونطابق بالأرقام الصافية
+   بس (بعد شيل الأصفار البادئة). مثال: "30721" و"S-30721" و"M0030721"
+   و"S-M30721" كلهم لازم يرجّعوا نفس المعرّف "30721".
+
+   السبب: نفس المدرسة بتظهر بصيغ مختلفة تمامًا في شيتات مختلفة (المباني
+   فيها الرقم صافي أو بـS- أو بـM بدون S-، والبلاغات دايمًا بـS- أو
+   S-M)، فالمطابقة الحرفية كانت بتضيع آلاف السجلات لمجرد اختلاف الشكل.
+
+   ⚠️ ملحوظة مقصودة: بما إننا بنشيل حرف M زي أي حرف تاني، فلو فيه احتمال
+   نظري إن رقم مدرسة عادي ورقم مدرسة بادئته M يتطابقوا بالصدفة في نفس
+   الأرقام، هيتم اعتبارهم نفس المدرسة (حسب طلب صريح من المستخدم). لو
+   ظهرت مشكلة تطابق خاطئ يومًا ما، هنا أول مكان تتراجع فيه.
+   ══════════════════════════════════════════════════════════════════ */
+window.normSchoolId = function (v) {
+  if (v == null) return "";
+  const digits = String(v).replace(/\uFEFF/g, "").replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  return digits.replace(/^0+(?=\d)/, ""); // شيل الأصفار البادئة بس، خلي رقم واحد "0" لوحده زي ما هو
+};
 
 let __loadDataInFlight = false;
 let __bgRevalidatedOnce = false;
@@ -2812,11 +2855,12 @@ let __bgRevalidatedOnce = false;
         return isNaN(d) ? null : d;
       }
       for (const row of fcaHistory) {
-        // مفتاح الربط الصحيح: رقم_المدرسة_الوزاري (يحتوي على S- prefix)
-        const rawId = String(
+        // 🔑 نفس الدالة الموحّدة (window.normSchoolId) — كانت المطابقة هنا
+        // بالنص الخام (.trim() بس) بدون شيل S-/M-/الأصفار البادئة.
+        const rawId = window.normSchoolId(
           row["رقم_المدرسة_الوزاري"] ?? row["رقم_وزاري"] ?? row["رقم وزاري"] ?? ""
-        ).replace(/\uFEFF/g, "").trim();
-        if (!rawId || rawId === "—") continue;
+        );
+        if (!rawId) continue;
 
         // اسم العمود الصحيح في ملف تقييمات_FCA_المراحل: تقييم_FCA
         const scoreRaw = row["تقييم_FCA"] ?? row["تقييم_FCA_المرحلة"] ?? row["قيمة_FCA"] ?? row["FCA"] ?? null;
@@ -2884,21 +2928,18 @@ let __bgRevalidatedOnce = false;
             lat: num(b["خط_العرض"]),
             fca: (() => {
               // آخر تقييم FCA من ملف تقييمات_FCA_المراحل
-              // مفتاح الربط: رقم_المدرسة_الوزاري (S-42671) أولاً — يطابق 3673 مدرسة
-              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
-                .replace(/\uFEFF/g, "").trim();
+              // 🔑 نفس الدالة الموحّدة (window.normSchoolId)
+              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
               const entry = latestFcaMap[id];
               return entry ? entry.score : null;
             })(),
             fcaDate: (() => {
-              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
-                .replace(/\uFEFF/g, "").trim();
+              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
               const entry = latestFcaMap[id];
               return entry ? (entry.dateRaw ?? null) : null;
             })(),
             fcaDateObj: (() => {
-              const id = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
-                .replace(/\uFEFF/g, "").trim();
+              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
               const entry = latestFcaMap[id];
               return entry ? (entry.dateObj ?? null) : null;
             })(),
@@ -2919,7 +2960,9 @@ let __bgRevalidatedOnce = false;
         .filter((r) => r.name && "—" !== r.name && "null" !== r.name && "" !== r.name)));
     const spareMap = {};
     for (const sp of spareParts) {
-      const bid = String(sp["رقم_وزاري"] ?? sp["رقم_المدرسة_الوزاري"] ?? "").trim();
+      // 🔑 نفس الدالة الموحّدة (window.normSchoolId) — كانت المطابقة هنا
+      // بالنص الخام بدون أي تطبيع، فكانت بتفشل لنفس سبب مشكلة البلاغات.
+      const bid = window.normSchoolId(sp["رقم_وزاري"] ?? sp["رقم_المدرسة_الوزاري"]);
       bid &&
         !spareMap[bid] &&
         (spareMap[bid] = {
@@ -2929,7 +2972,7 @@ let __bgRevalidatedOnce = false;
         });
     }
     (RAW.forEach((r) => {
-      const sp = spareMap[r.minId] || spareMap[r.schoolSeq];
+      const sp = spareMap[window.normSchoolId(r.minId)] || spareMap[window.normSchoolId(r.schoolSeq)];
       sp &&
         (sp.description && (r.description = sp.description),
         null != sp.quantity && (r.quantity = sp.quantity),
@@ -2953,42 +2996,24 @@ let __bgRevalidatedOnce = false;
         const balaghRaw = window.RAW_BALAGH;
         if (!Array.isArray(balaghRaw) || !balaghRaw.length) return;
 
-        // دالة تطبيع الرقم الوزاري (إزالة BOM + مسافات + ".0")
-        function normId(v) {
-          return String(v ?? "").replace(/\uFEFF/g, "").trim().replace(/\.0+$/, "").toUpperCase();
-        }
-        // نسخة بدون أي بادئة حروف (S- / M / S-M / أي حرفين أو حرف + شرطة) — يبقى الرقم الصافي فقط
-        // هذا يحل مشكلة أن نفس المدرسة قد تظهر بصيغ: 32427 / S-32427 / M32427 / S-M32427
-        function normIdPlain(v) {
-          const k = normId(v);
-          // نشيل أي بادئة غير رقمية بالكامل (S- / M / S-M ...) حتى يبقى الرقم الصافي فقط
-          return k.replace(/^[^0-9]+/, "");
-        }
-
-        // بناء خريطتين: بالرقم كما هو + بدون البادئة (الرقم الصافي هو المفتاح الأساسي للربط)
+        // 🔑 نفس الدالة الموحّدة الوحيدة (window.normSchoolId) — راجع تعريفها
+        // فوق لشرح القاعدة: نتجاهل S/M/الشرطة تمامًا ونطابق بالأرقام بس.
         const alertsMap = {};
-        const alertsMapPlain = {};
         balaghRaw.forEach((row) => {
-          const sn = normId(row["رقم المدرسة"]);
-          if (!sn) return;
-          alertsMap[sn] = (alertsMap[sn] || 0) + 1;
-          const plain = normIdPlain(row["رقم المدرسة"]);
-          if (plain) alertsMapPlain[plain] = (alertsMapPlain[plain] || 0) + 1;
+          const sn = window.normSchoolId(row["رقم المدرسة"]);
+          if (sn) alertsMap[sn] = (alertsMap[sn] || 0) + 1;
         });
 
-        // تحديث حقل alerts في كل مدرسة في RAW — نطابق أولاً بالرقم الصافي (بدون بادئة) ثم بالشكل الكامل
         let patched = 0;
         RAW.forEach((r) => {
-          const id = normId(r.minId || r.schoolSeq);
-          if (!id) { r.alerts = 0; return; }
-          const idPlain = normIdPlain(r.minId || r.schoolSeq);
-          const count = alertsMapPlain[idPlain] ?? alertsMap[id] ?? null;
+          const id = window.normSchoolId(r.minId || r.schoolSeq);
+          const count = id ? (alertsMap[id] ?? null) : null;
           r.alerts = count != null ? count : 0;
           if (count != null) patched++;
         });
 
         console.log(
-          `[COW Alerts] ربط ${patched} مدرسة · إجمالي البلاغات: ${Object.values(alertsMap).reduce((a, b) => a + b, 0)}`
+          `[COW Alerts] ربط ${patched} مدرسة · إجمالي البلاغات: ${balaghRaw.length}`
         );
       } catch (e) {
         console.warn("[COW Alerts] خطأ في حساب البلاغات:", e);
@@ -3014,8 +3039,10 @@ let __bgRevalidatedOnce = false;
     // نفس مبدأ التخزين بتاع البيانات الرئيسية: نعرض آخر نسخة محفوظة فورًا
     // (حتى بعد تحديث الصفحة بالكامل F5)، ثم نجيب نسخة حديثة بالخلفية.
     const BALAGH_CACHE_KEY = "tbc_balagh_cache_v1";
+    // 🔑 استخدام الدالة الموحّدة الوحيدة لتطبيع رقم المدرسة (window.normSchoolId)
+    // بدل أي نسخة محلية — راجع تعريفها فوق لشرح القاعدة والسبب بالتفصيل.
+    const normId_ = window.normSchoolId;
     const _linkBalaghToBuildings = () => {
-      const normId_ = (v) => String(v || "").replace(/\uFEFF/g, "").replace(/^S-0*/i, "S-").trim().toUpperCase();
       const aMap = {};
       window.RAW_BALAGH.forEach(r => {
         const sn = normId_(r["رقم المدرسة"]);
@@ -3025,6 +3052,12 @@ let __bgRevalidatedOnce = false;
         const id = normId_(r.minId || r.schoolSeq);
         r.alerts = aMap[id] || r.alerts || 0;
       });
+      // إجمالي البلاغات الحقيقي = عدد سجلات البلاغات الفعلي دايماً (مش مجموع
+      // البلاغات اللي نجحنا نربطها بمبنى) — عشان أي بلاغ برقم مدرسة مش متطابق
+      // (أو مدرسة اتشالت من قاعدة المباني) يفضل محسوب ضمن الإجمالي الصحيح.
+      window.__BALAGH_TOTAL_EXACT__ = window.RAW_BALAGH.length;
+      const totalEl = document.getElementById("k-alerts-total");
+      if (totalEl) totalEl.textContent = window.RAW_BALAGH.length.toLocaleString();
     };
     window.loadBalaghSeparate = async function(forceNetwork = false) {
       // 1) من الكاش أولاً (يشتغل حتى بعد F5) — عرض فوري بدون انتظار الشبكة
@@ -9400,8 +9433,29 @@ window.renderElevatorStatusTab = function () {
       if (msg) msg.textContent = "";
     }
   }
-  async function loadData(silent = false) {
+  const COST_CACHE_KEY = "tbc_cost_cache_v1";
+  async function loadData(silent = false, forceNetwork = false) {
     if (state.loading) return;
+
+    // 1) من الكاش أولاً (يشتغل حتى بعد تحديث الصفحة F5) — عرض فوري بدون شبكة
+    const hadDataAlready = state.loaded && Array.isArray(state.rows) && state.rows.length > 0;
+    if (!forceNetwork && !state.loaded && window._idb) {
+      try {
+        const cachedJson = await window._idb.get(COST_CACHE_KEY);
+        if (cachedJson) {
+          const rows = normalizeRows(cachedJson);
+          state.rows = rows;
+          const meta = groupData(rows);
+          state.schools = meta.schools;
+          state.loaded = true;
+          applyFilters();
+          // نجيب نسخة حديثة بصمت بالخلفية بعد العرض من الكاش
+          setTimeout(() => { try { loadData(true, true); } catch (_) {} }, 80);
+          return;
+        }
+      } catch (_) {}
+    }
+
     state.loading = true;
     state.error = "";
     setStatus("loading");
@@ -9410,13 +9464,16 @@ window.renderElevatorStatusTab = function () {
       reloadBtn.disabled = true;
       reloadBtn.textContent = "جاري التحميل...";
     }
-    const skeleton = $("cost-skeleton");
-    const body = $("cost-body");
-    const empty = $("cost-empty");
-    if (skeleton) skeleton.style.display = "block";
-    if (body) body.style.display = "none";
-    if (empty) empty.style.display = "none";
-    if (!silent) showToast("جاري تحميل بيانات التكلفة...", "info");
+    // لو عندنا بيانات معروضة بالفعل، التحديث ده صامت — ما نلمسش شاشة التحميل/الهيكل العظمي
+    if (!hadDataAlready) {
+      const skeleton = $("cost-skeleton");
+      const body = $("cost-body");
+      const empty = $("cost-empty");
+      if (skeleton) skeleton.style.display = "block";
+      if (body) body.style.display = "none";
+      if (empty) empty.style.display = "none";
+      if (!silent) showToast("جاري تحميل بيانات التكلفة...", "info");
+    }
     try {
       const resp = await fetch(COST_URL, { cache: "no-store", mode: "cors" });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -9427,6 +9484,7 @@ window.renderElevatorStatusTab = function () {
       } catch (e) {
         throw new Error("تعذر قراءة JSON");
       }
+      if (window._idb) window._idb.set(COST_CACHE_KEY, json); // بدون await — ما نأخّر العرض
       const rows = normalizeRows(json);
       state.rows = rows;
       const meta = groupData(rows);
@@ -9435,14 +9493,21 @@ window.renderElevatorStatusTab = function () {
       if (!silent) showToast("تم تحميل البيانات بنجاح", "ok");
       applyFilters();
     } catch (err) {
-      state.error = err && err.message ? err.message : "فشل التحميل";
-      setStatus("error");
-      showToast("لم يتم التحميل", "err");
-      console.error("[cost]", err);
-      if (empty) empty.style.display = "block";
-      if (body) body.style.display = "none";
-      const errBox = $("cost-error");
-      if (errBox) errBox.textContent = "خطأ: " + state.error;
+      // لو كان عندنا بيانات بالفعل، فشل التحديث الصامت بالخلفية ما يمسحش اللي شغال
+      if (!hadDataAlready) {
+        state.error = err && err.message ? err.message : "فشل التحميل";
+        setStatus("error");
+        showToast("لم يتم التحميل", "err");
+        console.error("[cost]", err);
+        const empty = $("cost-empty");
+        const body = $("cost-body");
+        if (empty) empty.style.display = "block";
+        if (body) body.style.display = "none";
+        const errBox = $("cost-error");
+        if (errBox) errBox.textContent = "خطأ: " + state.error;
+      } else {
+        console.warn("[cost] فشل التحديث الصامت بالخلفية:", err);
+      }
     } finally {
       state.loading = false;
       if (reloadBtn) {
@@ -9637,7 +9702,7 @@ window.renderElevatorStatusTab = function () {
     `;
 
     window.costReload = async function () {
-      await loadData(false);
+      await loadData(false, true);
     };
     window.costSearch = function (v) {
       state.search = clean(v);

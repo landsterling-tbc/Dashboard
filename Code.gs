@@ -12,7 +12,7 @@ const SHEET_NAMES = {
   fmContracts       : 'عقود_عدا_المجال',
   allSystems        : 'المدارس_والأنظمة',
   elevators         : 'المصاعد',
-  elevatorStatus    : 'حالة_المصاعد',    // ★ جديد — حالة المصاعد حسب المنطقة
+  elevatorStatus    : 'حالة_المصاعد',
   tajheezInventory  : 'التجهيزات_منظف',
   gatekeepers       : 'قائمة_البوابين_منظفة',
   kpiContractor     : 'مؤشرات_الأداء_للمقاول',
@@ -21,16 +21,17 @@ const SHEET_NAMES = {
   recruitment       : 'التوظيف',
   balaghReports     : 'البلاغات',        // تُقرأ بشكل منفصل عبر ?sheet=balaghReports
   securitySafety    : 'بلاغات_أمن_وسلامة',
+  correctionsEscalations: 'تصحيحات_وتصعيدات_الأمن_والسلامة',  // ★ جديد — تصحيحات وتصعيدات الأمن والسلامة
   fuelConsumption   : 'استهلاك_الوقود',
   vehicles          : 'السيارات',
   training          : 'برامج_التدريب',
   employeeKpi       : 'تقييم_الموظفين',
-  safetyTeamKpi     : 'مؤشرات_أداء_فريق_السلامة',  // ★ جديد — مؤشرات أداء فريق السلامة الأسبوعية
+  safetyTeamKpi     : 'مؤشرات_أداء_فريق_السلامة',
 };
 
 // ── إعدادات الكاش ───────────────────────────────────────────────
 const CACHE_SECONDS  = 600;
-const CACHE_KEY_FULL = 'tbc_sheet_v6';   // ★ رُفِّع الإصدار لتفادي تعارض كاش قديم (بسبب إضافة مؤشرات_أداء_فريق_السلامة)
+const CACHE_KEY_FULL = 'tbc_sheet_v7';   // ★ رُفِّع الإصدار بسبب إضافة تصحيحات_وتصعيدات_الأمن_والسلامة
 const CACHE_CHUNK_MAX = 95 * 1024;
 
 // ══════════════════════════════════════════════════════════════════
@@ -41,12 +42,10 @@ function doGet(e) {
     const params = (e && e.parameter) ? e.parameter : {};
     const cache  = CacheService.getScriptCache();
 
-    // تفريغ الكاش يدويًا: ...exec?refresh=1
     if (String(params.refresh || '') === '1') {
       clearCache_(cache);
     }
 
-    // Endpoint لشيت واحدة فقط (للتجربة): ?sheet=buildings
     if (params.sheet) {
       const key = String(params.sheet).trim();
       if (!SHEET_NAMES[key]) {
@@ -67,7 +66,6 @@ function doGet(e) {
       });
     }
 
-    // ── 1) جرّب الكاش أولاً ─────────────────────────────────────
     if (String(params.refresh || '') !== '1') {
       const cached = readFromCache_(cache);
       if (cached) {
@@ -77,12 +75,9 @@ function doGet(e) {
       }
     }
 
-    // ── 2) لا يوجد كاش → اقرأ كل الشيتات ──────────────────────
     const ss     = SpreadsheetApp.getActiveSpreadsheet();
     const result = {};
     const errors = {};
-
-    // الشيتات التي تُستثنى من التحميل الجماعي (تُحمَّل بشكل منفصل فقط)
     const SKIP_KEYS = new Set(['balaghReports']);
 
     for (const key of Object.keys(SHEET_NAMES)) {
@@ -120,9 +115,6 @@ function doGet(e) {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// قراءة شيت واحدة وتحويلها لمصفوفة objects
-// ══════════════════════════════════════════════════════════════════
 function readSheet_(ss, key) {
   const sheetName = SHEET_NAMES[key];
   const sheet = ss.getSheetByName(sheetName);
@@ -154,9 +146,6 @@ function readSheet_(ss, key) {
   return result;
 }
 
-// ══════════════════════════════════════════════════════════════════
-// طبقة الكاش
-// ══════════════════════════════════════════════════════════════════
 function writeToCache_(cache, jsonText) {
   try {
     if (jsonText.length <= CACHE_CHUNK_MAX) {
@@ -202,21 +191,18 @@ function clearCache_(cache) {
       const n = parseInt(meta, 10) || 0;
       for (let i = 0; i < n; i++) keys.push(CACHE_KEY_FULL + '_' + i);
     }
-    // امسح الإصدارات القديمة
     keys.push(
       'tbc_sheet_v1', 'tbc_sheet_v1_chunks',
       'tbc_sheet_v2', 'tbc_sheet_v2_chunks',
       'tbc_sheet_v3', 'tbc_sheet_v3_chunks',
       'tbc_sheet_v4', 'tbc_sheet_v4_chunks',
-      'tbc_sheet_v5', 'tbc_sheet_v5_chunks'
+      'tbc_sheet_v5', 'tbc_sheet_v5_chunks',
+      'tbc_sheet_v6', 'tbc_sheet_v6_chunks'
     );
     cache.removeAll(keys);
   } catch (err) {}
 }
 
-// ══════════════════════════════════════════════════════════════════
-// مساعدات
-// ══════════════════════════════════════════════════════════════════
 function cleanHeader_(header, index) {
   let h = String(header == null ? '' : header);
   if (index === 0) h = h.replace(/^\uFEFF/, '');
@@ -243,9 +229,6 @@ function jsonResponse_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ══════════════════════════════════════════════════════════════════
-// تدفئة الكاش تلقائيًا كل 5 دقائق
-// ══════════════════════════════════════════════════════════════════
 function warmCache_() {
   const cache  = CacheService.getScriptCache();
   const ss     = SpreadsheetApp.getActiveSpreadsheet();
@@ -272,9 +255,6 @@ function warmCache_() {
   Logger.log('[warmCache_] ✅ Updated at ' + new Date().toISOString());
 }
 
-// ══════════════════════════════════════════════════════════════════
-// تحديث تلقائي عند تغيير الشيت (On Edit Trigger)
-// ══════════════════════════════════════════════════════════════════
 function onSheetEdit_(e) {
   try {
     const cache = CacheService.getScriptCache();
@@ -286,9 +266,6 @@ function onSheetEdit_(e) {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// اختبار سريع من الـ Logs
-// ══════════════════════════════════════════════════════════════════
 function testScript() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   Logger.log('📊 Spreadsheet: ' + ss.getName());

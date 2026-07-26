@@ -972,6 +972,7 @@ function applyFilters() {
     }
     if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
+    if (activeId === "tab-corrections-escalations") safeRun(renderCorrectionsEscalationsTab, "corrections-escalations");
     if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
     if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
     if (activeId === "tab-training") safeRun(renderTrainingTab, "training");
@@ -1177,6 +1178,7 @@ function showTab(name, el) {
     "mag-kpi" === name && renderMagKpiTab(),
     "consultant-kpi" === name && renderConsultantKpiTab(),
     "security-safety" === name && renderSecuritySafetyTab(),
+    "corrections-escalations" === name && renderCorrectionsEscalationsTab(),
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
     "training"        === name && renderTrainingTab(),
@@ -2792,6 +2794,7 @@ let __bgRevalidatedOnce = false;
       (window.RAW_RECRUITMENT      = sa(d.recruitment)),
       (window.RAW_PAYMENTS         = sa(d.payments)),
       (window.RAW_SECURITY_SAFETY  = sa(d.securitySafety)),
+      (window.RAW_CORRECTIONS_ESCALATIONS = sa(d.correctionsEscalations)),
       (window.RAW_FUEL             = sa(d.fuelConsumption)),
       (window.RAW_VEHICLES         = sa(d.vehicles)),
       (window.RAW_TRAINING         = sa(d.training)),
@@ -4577,6 +4580,204 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
       });
     }
   });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🧾 JS تبويب: تصحيحات وتصعيدات الأمن والسلامة
+   ║  (tab-corrections-escalations)
+   ║  المصدر: شيت "تصحيحات_وتصعيدات_الأمن_والسلامة"
+   ║  يُقرأ تلقائيًا عبر مفتاح correctionsEscalations في الـ Apps Script
+   ║  أعمدة الشيت: رقم المرجع، التاريخ والوقت، المنطقة، الرقم الوزاري،
+   ║               إسم المدرسة، اسم المشرف، التصنيف الرئيسي، مصدر الملاحظة،
+   ║               الوصف، مستوى الخطورة، تاريخ الإرسال للمقاول، رد المقاول،
+   ║               التاريخ المتوقع للإغلاق، تاريخ إغلاق الملاحظة، حالة الملاحظة،
+   ║               هل تم التصعيد؟، تاريخ التصعيد، سبب التصعيد،
+   ║               هل تم إتخاذ إجراء تعاقدي، الإجراء المتخذ
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderCorrectionsEscalationsTab() {
+  const el = document.getElementById("corrections-escalations-content");
+  if (!el) return;
+
+  const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pct = (n, t) => t ? ((n / t) * 100).toFixed(1) + "%" : "0.0%";
+
+  const allRows = window.RAW_CORRECTIONS_ESCALATIONS || [];
+  if (!allRows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات تصحيحات وتصعيدات</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "تصحيحات_وتصعيدات_الأمن_والسلامة" وأن الـ Apps Script يقرأها</div>
+    </div>`;
+    return;
+  }
+
+  const F_REF = "رقم المرجع", F_DATE = "التاريخ والوقت", F_REGION = "المنطقة",
+        F_SCHOOL = "إسم المدرسة", F_SUP = "اسم المشرف", F_CAT = "التصنيف الرئيسي",
+        F_SRC = "مصدر الملاحظة", F_DESC = "وصف الملاحظة / المخالفة ( في حالة المخالفات يذكر إسم مشرف مجموعة العمل )",
+        F_RISK = "مستوى الخطورة", F_SENT = "تاريخ الإرسال للمقاول", F_REPLY = "رد المقاول",
+        F_STATUS = "حالة الملاحظة", F_ESC = "هل تم التصعيد؟", F_ESCDATE = "تاريخ التصعيد",
+        F_ESCREASON = "سبب التصعيد", F_CONTRACT_ACT = "هل تم إتخاذ إجراء تعاقدي", F_ACTION = "الإجراء المتخذ";
+
+  // ── فلاتر ──
+  const regions = [...new Set(allRows.map(r => r[F_REGION]).filter(Boolean))].sort();
+  const statuses = [...new Set(allRows.map(r => r[F_STATUS]).filter(Boolean))].sort();
+
+  const regionSel = document.getElementById("ce-filter-region");
+  const statusSel = document.getElementById("ce-filter-status");
+  const curRegion = regionSel ? regionSel.value : "";
+  const curStatus = statusSel ? statusSel.value : "";
+
+  let rows = allRows.slice();
+  if (curRegion) rows = rows.filter(r => r[F_REGION] === curRegion);
+  if (curStatus) rows = rows.filter(r => r[F_STATUS] === curStatus);
+
+  // ── KPIs ──
+  const total = rows.length;
+  const escalated = rows.filter(r => String(r[F_ESC] || "").trim() && String(r[F_ESC]).trim() !== "0").length;
+  const closed = rows.filter(r => String(r[F_STATUS] || "").includes("مغلق")).length;
+  const open = rows.filter(r => {
+    const s = String(r[F_STATUS] || "");
+    return s && !s.includes("مغلق");
+  }).length;
+  const noStatus = rows.filter(r => !String(r[F_STATUS] || "").trim()).length;
+
+  // ── تجميعات للرسوم ──
+  const countBy = (field) => {
+    const m = {};
+    rows.forEach(r => {
+      const k = String(r[field] || "غير محدد").trim() || "غير محدد";
+      m[k] = (m[k] || 0) + 1;
+    });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  };
+  const statusCounts = countBy(F_STATUS);
+  const srcCounts = countBy(F_SRC);
+  const riskCounts = countBy(F_RISK);
+  const regionCounts = countBy(F_REGION);
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <select id="ce-filter-region" style="padding:8px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--bg-card);color:var(--tx-main)">
+          <option value="">كل المناطق</option>
+          ${regions.map(r => `<option value="${esc(r)}" ${r === curRegion ? "selected" : ""}>${esc(r)}</option>`).join("")}
+        </select>
+        <select id="ce-filter-status" style="padding:8px 12px;border-radius:8px;border:1px solid var(--bd);background:var(--bg-card);color:var(--tx-main)">
+          <option value="">كل الحالات</option>
+          ${statuses.map(s => `<option value="${esc(s)}" ${s === curStatus ? "selected" : ""}>${esc(s)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">
+        <span>لوحة تصحيحات وتصعيدات الأمن والسلامة</span>
+        <span class="sub">${total.toLocaleString()} ملاحظة</span>
+      </div>
+      <div class="g4" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0">
+        <div class="kpi kc-amber">
+          <div class="kpi-val">${total.toLocaleString()}</div>
+          <div class="kpi-lbl">إجمالي الملاحظات</div>
+          <div class="kpi-sub">بعد الفلترة الحالية</div>
+        </div>
+        <div class="kpi kc-navy">
+          <div class="kpi-val">${open.toLocaleString()}</div>
+          <div class="kpi-lbl">مفتوحة</div>
+          <div class="kpi-sub">${pct(open,total)} من الإجمالي</div>
+        </div>
+        <div class="kpi kc-green">
+          <div class="kpi-val">${closed.toLocaleString()}</div>
+          <div class="kpi-lbl">مغلقة</div>
+          <div class="kpi-sub">${pct(closed,total)} من الإجمالي</div>
+        </div>
+      </div>
+      <div class="g4" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px">
+        <div class="kpi kc-red">
+          <div class="kpi-val">${escalated.toLocaleString()}</div>
+          <div class="kpi-lbl">تم تصعيدها</div>
+          <div class="kpi-sub">${pct(escalated,total)} من الإجمالي</div>
+        </div>
+        <div class="kpi kc-info">
+          <div class="kpi-val">${noStatus.toLocaleString()}</div>
+          <div class="kpi-lbl">بدون حالة مسجّلة</div>
+          <div class="kpi-sub">${pct(noStatus,total)} من الإجمالي</div>
+        </div>
+        <div class="kpi kc-teal">
+          <div class="kpi-val">${pct(closed,total)}</div>
+          <div class="kpi-lbl">نسبة الإغلاق</div>
+          <div class="kpi-sub">${closed} من ${total}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px">
+      <div class="card"><div style="font-weight:700;margin-bottom:8px">حالة الملاحظات</div><div style="height:260px"><canvas id="ch-ce-status"></canvas></div></div>
+      <div class="card"><div style="font-weight:700;margin-bottom:8px">مصدر الملاحظة</div><div style="height:260px"><canvas id="ch-ce-source"></canvas></div></div>
+      <div class="card"><div style="font-weight:700;margin-bottom:8px">مستوى الخطورة</div><div style="height:260px"><canvas id="ch-ce-risk"></canvas></div></div>
+      <div class="card"><div style="font-weight:700;margin-bottom:8px">الملاحظات حسب المنطقة</div><div style="height:260px"><canvas id="ch-ce-region"></canvas></div></div>
+    </div>
+
+    <div class="card" style="overflow:auto">
+      <div style="font-weight:700;margin-bottom:8px">تفاصيل الملاحظات (${rows.length})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="text-align:right;border-bottom:2px solid var(--bd)">
+            <th style="padding:6px">رقم المرجع</th><th style="padding:6px">التاريخ</th><th style="padding:6px">المنطقة</th>
+            <th style="padding:6px">المدرسة</th><th style="padding:6px">المشرف</th><th style="padding:6px">المصدر</th>
+            <th style="padding:6px">الخطورة</th><th style="padding:6px">الوصف</th><th style="padding:6px">رد المقاول</th>
+            <th style="padding:6px">الحالة</th><th style="padding:6px">تصعيد؟</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid var(--bd)">
+              <td style="padding:6px">${esc(r[F_REF])}</td>
+              <td style="padding:6px">${esc(String(r[F_DATE] || "").slice(0,10))}</td>
+              <td style="padding:6px">${esc(r[F_REGION])}</td>
+              <td style="padding:6px">${esc(r[F_SCHOOL])}</td>
+              <td style="padding:6px">${esc(r[F_SUP])}</td>
+              <td style="padding:6px">${esc(r[F_SRC])}</td>
+              <td style="padding:6px">${esc(r[F_RISK])}</td>
+              <td style="padding:6px;max-width:280px;white-space:normal">${esc(r[F_DESC])}</td>
+              <td style="padding:6px">${esc(r[F_REPLY])}</td>
+              <td style="padding:6px">${esc(r[F_STATUS] || "—")}</td>
+              <td style="padding:6px">${String(r[F_ESC] || "").trim() ? "✅ " + esc(r[F_ESCREASON] || "") : "—"}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById("ce-filter-region")?.addEventListener("change", renderCorrectionsEscalationsTab);
+  document.getElementById("ce-filter-status")?.addEventListener("change", renderCorrectionsEscalationsTab);
+
+  const mkPie = (id, entries) => {
+    const cv = document.getElementById(id);
+    if (!cv) return;
+    killChart(id);
+    CHARTS[id] = new Chart(cv, {
+      type: "doughnut",
+      data: {
+        labels: entries.map(e => e[0]),
+        datasets: [{ data: entries.map(e => e[1]), backgroundColor: [CSS_TOKENS.info(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive ? CSS_TOKENS.positive() : "#2e9e5b", "#8884d8", "#82ca9d"] }]
+      },
+      options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
+    });
+  };
+  const mkBar = (id, entries) => {
+    const cv = document.getElementById(id);
+    if (!cv) return;
+    killChart(id);
+    CHARTS[id] = new Chart(cv, {
+      type: "bar",
+      data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: CSS_TOKENS.info(), borderRadius: 4 }] },
+      options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }, maintainAspectRatio: false }
+    });
+  };
+
+  mkPie("ch-ce-status", statusCounts);
+  mkPie("ch-ce-source", srcCounts);
+  mkPie("ch-ce-risk", riskCounts);
+  mkBar("ch-ce-region", regionCounts);
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -17071,6 +17272,16 @@ window.addEventListener('load', function () {
       ],
       charts: ['توزيع بلاغات الأمن والسلامة حسب نوع الحادث','البلاغات حسب المنطقة','اتجاه البلاغات الشهري'],
       kpis: ['إجمالي البلاغات','إجمالي الإصابات','الحالات الحرجة','تحقيقات مكتملة']
+    },
+    {
+      id: 'corrections-escalations', label: 'تصحيحات وتصعيدات الأمن والسلامة',
+      keywords: [
+        'تصحيحات','تصعيدات','تصعيد','ملاحظات HSEQ','HSEQ','ملاحظات السلامة','مخالفات',
+        'إغلاق ملاحظة','رد المقاول','تفتيش السلامة','بلاغات الدعم الموحد','حالة الملاحظة',
+        'corrections','escalations','findings','observations','مستوى الخطورة','إجراء تعاقدي'
+      ],
+      charts: ['حالة الملاحظات','مستوى الخطورة','مصدر الملاحظة','الملاحظات المصعدة حسب المنطقة'],
+      kpis: ['إجمالي الملاحظات','ملاحظات مفتوحة','ملاحظات مغلقة','عدد التصعيدات']
     }
   ];
 
@@ -21462,7 +21673,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(48, 'click', function (event) { showTab('emp-kpi',this) });
   bind(112, 'click', function (event) { showTab('safety-kpi',this) });
   bind(49, 'click', function (event) { showTab('hasr',this) });
-  bind(50, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(50, 'click', function (event) { showTab('corrections-escalations',this) });
   bind(51, 'click', function (event) { showTab('NEW_ID',this) });
   bind(52, 'click', function (event) { showTab('NEW_ID',this) });
   bind(53, 'click', function (event) { showTab('NEW_ID',this) });
@@ -21646,6 +21857,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ["mag-kpi",         function(){ renderMagKpiTab(); }],
     ["consultant-kpi",  function(){ renderConsultantKpiTab(); }],
     ["security-safety", function(){ renderSecuritySafetyTab(); }],
+    ["corrections-escalations", function(){ renderCorrectionsEscalationsTab(); }],
     ["fuel",            function(){ renderFuelTab(); }],
     ["vehicles",        function(){ renderVehiclesTab(); }],
     ["training",        function(){ renderTrainingTab(); }],
@@ -21773,6 +21985,7 @@ var PORTAL_CATEGORIES = {
     tabs: [
       { name: "balagh",          label: "البلاغات" },
       { name: "security-safety", label: "الأمن والسلامة" },
+      { name: "corrections-escalations", label: "تصحيحات وتصعيدات الأمن والسلامة" },
       { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
       { name: "training",        label: "برامج التدريب" },

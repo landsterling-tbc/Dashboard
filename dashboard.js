@@ -15618,20 +15618,38 @@ ${googleFonts}
 ${cssLinks}
 ${cssStyles}
 <style>
-  * { box-sizing: border-box; }
-  body {
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  html, body {
     margin: 0; padding: 16px;
     background: #ffffff;
     font-family: 'IBM Plex Sans Arabic', Tajawal, Arial, sans-serif;
     direction: rtl;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
   canvas { display: none !important; }
   .topbar, .filters-row, .prog-bar, #toast-area,
   .tb-btn, #btnDownloadTab, #btnReload, #btnAuto, #btnPresentationMode,
   .tbl-auto-dl-bar, .tbl-auto-dl-btn, .pag-bar { display: none !important; }
   @media print {
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     body { padding: 0; }
     @page { margin: 10mm; size: A3 landscape; }
+    .card, .kpi-card, canvas, img, table, tr,
+    .chart-wrap, .chart-container, .tbl-wrap {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
   }
 </style>
 </head>

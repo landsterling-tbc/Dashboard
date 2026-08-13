@@ -1445,6 +1445,26 @@ tbody tr:last-child td { border-bottom: none; }
 
 .ix-panel-close:hover { background: rgba(255,255,255,.25); transform: rotate(90deg); }
 
+/* ★ زر "رجوع" داخل بانل التفاصيل — يظهر فقط لو فيه سجل تنقل نرجع له */
+.ix-panel-back {
+  position: absolute;
+  inset-inline-start: 26px;
+  top: 22px;
+  height: 30px;
+  padding: 0 14px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: var(--r-pill);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s, transform .15s;
+  backdrop-filter: blur(4px);
+}
+
+.ix-panel-back:hover { background: rgba(255,255,255,.25); transform: translateX(2px); }
+
 .ix-panel-body { padding: 20px 22px 28px; }
 .ix-panel-body::-webkit-scrollbar { width: 8px; }
 .ix-panel-body::-webkit-scrollbar-thumb { background: #c3d2dc; border-radius: 999px; }

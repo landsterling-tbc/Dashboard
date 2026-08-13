@@ -2538,8 +2538,11 @@ function renderStageCompareTab() {
     });
     const blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8;"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-    a.download="FCA_المرجعي_"+new Date().toISOString().slice(0,10)+".csv"; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    a.download="FCA_المرجعي_"+new Date().toISOString().slice(0,10)+".csv";
+    a.style.display="none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
   };
 })();
 
@@ -6848,10 +6851,12 @@ function getExportData() {
     const blob = new Blob(["\ufeff" + csvRows.join("\r\n")], { type: "text/csv;charset=utf-8;" }),
       url = URL.createObjectURL(blob),
       a = document.createElement("a");
-    ((a.href = url),
-      (a.download = "schools_data_" + new Date().toISOString().slice(0, 10) + ".csv"),
-      a.click(),
-      URL.revokeObjectURL(url));
+    a.href = url;
+    a.download = "schools_data_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
   }),
   (window.exportTableExcel = function () {
     const rows = getExportData(),
@@ -7057,6 +7062,11 @@ function _sysDownloadFile(filename, content, mime) {
     متوسط: 2,
     منخفض: 1,
   };
+
+  // ── "عالية الخطورة" = أولوية حرج أو مرتفع (تدعم القيم العربية والإنجليزية) ──
+  function isHighRiskPriority(p) {
+    return (BALAGH_PRIORITY_RANK[p] || 0) >= 3;
+  }
 
   // ترتيب السجلات حسب الخيار المختار
   function sortBalaghRows(list, sortKey) {
@@ -7345,6 +7355,11 @@ function _sysDownloadFile(filename, content, mime) {
   }
 
   function exportCSV(rows) {
+    if (!rows || !rows.length) {
+      if (typeof showToast === "function") showToast("لا توجد بيانات مطابقة للتصدير", "error");
+      else alert("لا توجد بيانات مطابقة للتصدير");
+      return;
+    }
     const headers = [
       "مُعرّف الحالة",
       "تاريخ الإنشاء",
@@ -7381,13 +7396,150 @@ function _sysDownloadFile(filename, content, mime) {
       ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`);
       csv.push(vals.join(","));
     });
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\ufeff" + csv.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = `بلاغات_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
   }
+
+  // ── تصدير: عدد البلاغات لكل مدرسة (Excel — يحترم كل الفلاتر الحالية بما فيها نطاق التاريخ) ──
+  // نستخدم Excel بدل CSV لتفادي مشاكل عرض النصوص العربية عند فتح CSV في بعض إصدارات Excel
+  function exportSchoolCountsCSV(rows) {
+    try {
+      if (!rows || !rows.length) { alert("لا توجد بيانات للتصدير ضمن الفلاتر الحالية"); return; }
+      if (typeof XLSX === "undefined") { alert("مكتبة Excel لم تُحمَّل بعد، جرّب تحديث الصفحة والمحاولة مرة أخرى"); return; }
+
+      const counts = {};      // schoolKey -> عدد
+      const names = {};       // schoolKey -> اسم المدرسة المعروض
+      const numbers = {};     // schoolKey -> رقم المدرسة المعروض
+
+      rows.forEach((r) => {
+        const key = r.schoolKey || "NM::" + (r.schoolName || "غير معروف");
+        counts[key] = (counts[key] || 0) + 1;
+        if (!names[key]) {
+          names[key] = r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || key);
+        }
+        if (!numbers[key]) {
+          numbers[key] = r.isLinked ? r.linkedMinId : r.schoolNumber;
+        }
+      });
+
+      const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+      const dataArr = [["رقم المدرسة", "اسم المدرسة", "عدد البلاغات"]];
+      keys.forEach((k) => {
+        dataArr.push([numbers[k] || "", names[k] || k, counts[k]]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(dataArr);
+      ws["!cols"] = [{ wch: 14 }, { wch: 42 }, { wch: 16 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "عدد البلاغات لكل مدرسة");
+
+      const ST = window.__BALAGH_STATE__ || {};
+      const rangeTag = (ST.dateFrom || ST.dateTo)
+        ? `_${ST.dateFrom || "بداية"}_الى_${ST.dateTo || "اليوم"}`
+        : "";
+      XLSX.writeFile(wb, `عدد_البلاغات_لكل_مدرسة${rangeTag}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      console.warn("[exportSchoolCountsCSV] خطأ:", err);
+      alert("حصل خطأ أثناء التصدير، جرّب تحديث الصفحة");
+    }
+  }
+  window.exportBalaghSchoolCountsCSV = function () {
+    exportSchoolCountsCSV(filteredRows(normalizeRows()));
+  };
+
+  // ── تصدير Excel: كل مدرسة × كل فئة × كل أولوية (يحترم الفلاتر الحالية بما فيها نطاق التاريخ) ──
+  function exportSchoolBreakdownExcel(rows) {
+   try {
+    if (!rows || !rows.length) { alert("لا توجد بيانات للتصدير ضمن الفلاتر الحالية"); return; }
+    if (typeof XLSX === "undefined") { alert("مكتبة Excel لم تُحمَّل بعد، جرّب تحديث الصفحة والمحاولة مرة أخرى"); return; }
+
+    const map = {};
+    const allCategories = new Set();
+    const allPriorities = new Set();
+
+    rows.forEach((r) => {
+      const key = r.schoolKey || "NM::" + (r.schoolName || "غير معروف");
+      if (!map[key]) {
+        map[key] = {
+          number: r.isLinked ? r.linkedMinId : r.schoolNumber,
+          name: r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || key),
+          total: 0,
+          highRisk: 0,
+          byCategory: {},
+          byPriority: {},
+        };
+      }
+      const b = map[key];
+      b.total++;
+      if (isHighRiskPriority(r.priority)) b.highRisk++;
+      const cat = r.category || "غير مصنّف";
+      b.byCategory[cat] = (b.byCategory[cat] || 0) + 1;
+      allCategories.add(cat);
+      const pr = balaghPriorityLabel(r.priority);
+      b.byPriority[pr] = (b.byPriority[pr] || 0) + 1;
+      allPriorities.add(pr);
+    });
+
+    const categoriesSorted = [...allCategories].sort();
+    // ترتيب الأولويات من الأعلى خطورة للأقل بدل الترتيب الأبجدي
+    const priorityOrder = ["حرج", "مرتفع", "متوسط", "منخفض"];
+    const prioritiesSorted = [...allPriorities].sort(
+      (a, b) => (priorityOrder.indexOf(a) === -1 ? 99 : priorityOrder.indexOf(a)) -
+                (priorityOrder.indexOf(b) === -1 ? 99 : priorityOrder.indexOf(b))
+    );
+
+    const schoolsSorted = Object.values(map).sort((a, b) => b.total - a.total);
+
+    const header = [
+      "رقم المدرسة",
+      "اسم المدرسة",
+      "إجمالي البلاغات",
+      "عالية الخطورة (حرج + مرتفع)",
+      ...prioritiesSorted.map((p) => "أولوية: " + p),
+      ...categoriesSorted.map((c) => "فئة: " + c),
+    ];
+
+    const dataArr = [header];
+    schoolsSorted.forEach((b) => {
+      dataArr.push([
+        b.number || "",
+        b.name || "",
+        b.total,
+        b.highRisk,
+        ...prioritiesSorted.map((p) => b.byPriority[p] || 0),
+        ...categoriesSorted.map((c) => b.byCategory[c] || 0),
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(dataArr);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 42 }, { wch: 16 }, { wch: 22 },
+      ...prioritiesSorted.map(() => ({ wch: 14 })),
+      ...categoriesSorted.map(() => ({ wch: 18 })),
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "تفصيل البلاغات حسب المدرسة");
+    const ST = window.__BALAGH_STATE__ || {};
+    const rangeTag = (ST.dateFrom || ST.dateTo)
+      ? `_${ST.dateFrom || "بداية"}_الى_${ST.dateTo || "اليوم"}`
+      : "";
+    XLSX.writeFile(wb, `تفصيل_البلاغات_حسب_المدرسة${rangeTag}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+   } catch (err) {
+     console.warn("[exportSchoolBreakdownExcel] خطأ:", err);
+     alert("حصل خطأ أثناء التصدير، جرّب تحديث الصفحة");
+   }
+  }
+  window.exportBalaghSchoolBreakdownExcel = function () {
+    exportSchoolBreakdownExcel(filteredRows(normalizeRows()));
+  };
 
   function renderBalaghTab() {
     const el = document.getElementById("balagh-content");
@@ -7424,6 +7576,7 @@ function _sysDownloadFile(filename, content, mime) {
     const all = normalizeRows();
     const rows = sortBalaghRows(filteredRows(all), STATE.sort || "date_desc");
     const total = all.length;
+    try {
     const filteredTotal = rows.length;
     // الكروت أعلى الصفحة تُحسب من السجلات بعد تطبيق الفلاتر (rows)
     // حتى تتأثر بالفلاتر (الحالة / الفئة / الأولوية / المنطقة / البحث)
@@ -7464,6 +7617,32 @@ function _sysDownloadFile(filename, content, mime) {
     const categoryCounts = topCounts(rows, "category", 6);
     const priorityCounts = topCounts(rows, "priority", 6);
     const locationCounts = topCounts(rows, "location", 6);
+
+    // ── تفصيل البلاغات لكل مدرسة: الإجمالي، عالية الخطورة، وتوزيع الفئات ──
+    // يُبنى من نفس rows (بعد الفلاتر + نطاق التاريخ) فيتحدث تلقائياً مع أي فلتر
+    const schoolBreakdownMap = {};
+    rows.forEach((r) => {
+      const key = r.schoolKey || "NM::" + (r.schoolName || "غير معروف");
+      if (!schoolBreakdownMap[key]) {
+        schoolBreakdownMap[key] = {
+          number: r.isLinked ? r.linkedMinId : r.schoolNumber,
+          name: r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || key),
+          total: 0,
+          highRisk: 0,
+          byCategory: {},
+          byPriority: {},
+        };
+      }
+      const b = schoolBreakdownMap[key];
+      b.total++;
+      if (isHighRiskPriority(r.priority)) b.highRisk++;
+      const cat = r.category || "غير مصنّف";
+      b.byCategory[cat] = (b.byCategory[cat] || 0) + 1;
+      const pr = balaghPriorityLabel(r.priority);
+      b.byPriority[pr] = (b.byPriority[pr] || 0) + 1;
+    });
+    const schoolBreakdownList = Object.values(schoolBreakdownMap).sort((a, b) => b.total - a.total);
+    const schoolBreakdownShowN = STATE.breakdownShowN || 15;
 
     const list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
     const totalForBars = Math.max(1, filteredTotal);
@@ -7592,7 +7771,8 @@ function _sysDownloadFile(filename, content, mime) {
             onchange="window.__BALAGH_STATE__.dateTo=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
         </div>
         <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
-        <button class="export-btn export-btn-csv" onclick="exportCSV(filteredRows(normalizeRows()))">⬇ تصدير CSV</button>
+        <button class="export-btn export-btn-csv" onclick="window.balaghExportCSV()">⬇ تصدير CSV</button>
+        <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolCountsCSV()">⬇ عدد البلاغات لكل مدرسة (Excel)</button>
       </div>
 
       <div class="g21" style="align-items:start">
@@ -7622,6 +7802,53 @@ function _sysDownloadFile(filename, content, mime) {
             <span>الأولوية</span>
           </div>
           ${renderBarList(priorityCounts, totalForBars, CSS_TOKENS.danger(), balaghPriorityLabel)}
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#FDF2F8;color:#BE185D">🏫</span>
+          <span>تفصيل البلاغات حسب المدرسة — الفئة والأولوية</span>
+          <span class="sub">${fmt(schoolBreakdownList.length)} مدرسة ضمن الفلاتر الحالية</span>
+          <span style="margin-right:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="font-size:11px;color:var(--tx-muted);font-weight:600">عرض:</label>
+            <select style="font-family:inherit;font-size:11px;padding:4px 10px;border:1px solid var(--bd-light);border-radius:8px;background:var(--bg-2);cursor:pointer"
+              onchange="window.__BALAGH_STATE__.breakdownShowN=parseInt(this.value);renderBalaghTab()">
+              ${[10, 15, 25, 50, schoolBreakdownList.length].map((n) => `<option value="${n}" ${schoolBreakdownShowN == n ? "selected" : ""}>${n >= schoolBreakdownList.length ? "الكل" : n + " مدرسة"}</option>`).join("")}
+            </select>
+            <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolBreakdownExcel()" title="ملف Excel: كل مدرسة، إجمالي البلاغات، عالية الخطورة، وعدد البلاغات لكل فئة ولكل أولوية — لكل المدارس ضمن الفترة المحددة">⬇ تصدير Excel (كل الفئات والأولويات)</button>
+          </span>
+        </div>
+        <div style="font-size:11.5px;color:var(--tx-muted);padding:0 14px 10px;line-height:1.7">
+          الجدول يعرض أعلى المدارس من حيث عدد البلاغات ضمن الفترة والفلاتر المحددة حالياً. عمود "عالية الخطورة" = مجموع بلاغات الأولوية (حرج + مرتفع). لتفصيل كل الفئات (صيانة، نظافة، إلخ) لكل مدرسة، استخدم زر تصدير Excel.
+        </div>
+        <div class="tbl-wrap" style="max-height:520px">
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align:right">المدرسة</th>
+                <th style="text-align:center;white-space:nowrap">إجمالي البلاغات</th>
+                <th style="text-align:center;white-space:nowrap">عالية الخطورة</th>
+                <th style="text-align:right">أكثر فئة تكرارًا</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${schoolBreakdownList
+                .slice(0, schoolBreakdownShowN)
+                .map((b) => {
+                  const topCat = Object.entries(b.byCategory).sort((x, y) => y[1] - x[1])[0];
+                  const topCatStr = topCat ? `${escText(topCat[0])} (${fmt(topCat[1])})` : "—";
+                  return `<tr>
+                    <td style="text-align:right">${escText(b.name || b.number || "—")}</td>
+                    <td style="text-align:center;font-weight:700">${fmt(b.total)}</td>
+                    <td style="text-align:center;font-weight:700;color:${b.highRisk > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(b.highRisk)}</td>
+                    <td style="text-align:right">${topCatStr}</td>
+                  </tr>`;
+                })
+                .join("")}
+              ${!schoolBreakdownList.length ? `<tr><td colspan="4" style="text-align:center;color:var(--tx-muted);padding:20px">لا توجد بيانات ضمن الفلاتر الحالية</td></tr>` : ""}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -7682,6 +7909,9 @@ function _sysDownloadFile(filename, content, mime) {
           <span class="card-title-icon" style="background:#EEF2FF;color:#4338CA">🧾</span>
           <span>تفاصيل البلاغات</span>
           <span class="sub">${fmt(filteredTotal)} سجل</span>
+          <span style="margin-right:auto">
+            <button class="export-btn export-btn-csv" onclick="window.balaghExportCSV()" title="يحمّل كل السجلات ضمن الفترة والفلاتر المحددة، وليس فقط الصفحة الظاهرة">⬇ تحميل كل السجلات ضمن الفترة المحددة (${fmt(filteredTotal)})</button>
+          </span>
         </div>
 
         <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;padding:14px">
@@ -7772,6 +8002,7 @@ function _sysDownloadFile(filename, content, mime) {
 
     // === رسم الشارتات الزمنية — مرتبطة بالفلاتر ===
     requestAnimationFrame(() => {
+     try {
       const allRowsForTime = rows; // البيانات المفلترة بالكامل (ليس فقط الصفحة الحالية)
 
       // دوال مساعدة لاستخراج مفاتيح التاريخ
@@ -7815,7 +8046,6 @@ function _sysDownloadFile(filename, content, mime) {
         "balagh-monthly-chart",
         "balagh-status-monthly-chart",
         "balagh-weekly-chart",
-        "balagh-sla-monthly-chart",
         "balagh-cat-trend-chart",
       ];
       if (!allRowsForTime.length) {
@@ -8113,8 +8343,21 @@ function _sysDownloadFile(filename, content, mime) {
           },
         );
       }
+     } catch (err) {
+       console.warn("[balagh charts] خطأ أثناء رسم الشارتات الزمنية:", err);
+     }
     });
     // === نهاية الشارتات الزمنية ===
+    } catch (err) {
+      console.warn("[renderBalaghTab] خطأ أثناء بناء تبويب البلاغات:", err);
+      el.innerHTML = `
+        <div class="card" style="text-align:center;padding:40px">
+          <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+          <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">حصل خطأ أثناء عرض بيانات البلاغات</div>
+          <div style="font-size:12px;color:var(--tx-muted);margin-bottom:14px">جرّب مسح الفلاتر أو تحديث الصفحة. إن استمرت المشكلة أبلغ الدعم الفني.</div>
+          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
+        </div>`;
+    }
   }
 
   window.renderBalaghTab = renderBalaghTab;
@@ -10770,25 +11013,16 @@ function renderKhanadeqTab() {
 /* ══════════════════════════════════════════════════════════
    تبويب التجهيزات — نظام إدارة المخزون والاحتياجات
    يقرأ من: window.RAW_TAJHEEZ_INV (key: tajheezInventory في GAS)
+   ★ الشيت الجديد: كل الأقسام (مخصص/احتياج/PPP) موحّدة على 4 مدن رئيسية فقط
+     (مكة تشمل القنفذة+الليث، المدينة تشمل ينبع+العلا+المهد)
    أعمدة: القسم، اسم_الصنف، سعر_الوحدة،
-           مخصص_{مكة,جدة,الطائف,القنفذة,الليث,المدينة,ينبع,العلا,المهد}،
-           مخصص_الكمية_الكلية، مخصص_القيمة_الكلية،
-           احتياج_{مكة,جدة,الطائف,المدينة}،
-           احتياج_الكمية_الكلية، احتياج_القيمة_الكلية،
+           مخصص_{مكة,جدة,الطائف,المدينة}، مخصص_الكمية_الكلية، مخصص_القيمة_الكلية،
+           احتياج_{مكة,جدة,الطائف,المدينة}، احتياج_الكمية_الكلية، احتياج_القيمة_الكلية،
+           PPP_{مكة,جدة,الطائف,المدينة}، PPP_الكمية_الكلية، PPP_القيمة_الكلية،
            فرق_الكمية، فرق_القيمة، نسبة_الاحتياج
 ══════════════════════════════════════════════════════════ */
 
-const TAJHEEZ_CITIES = [
-  "مكة",
-  "جدة",
-  "الطائف",
-  "القنفذة",
-  "الليث",
-  "المدينة",
-  "ينبع",
-  "العلا",
-  "المهد",
-];
+const TAJHEEZ_CITIES = ["مكة", "جدة", "الطائف", "المدينة"];
 const TAJHEEZ_NEED_CITIES = ["مكة", "جدة", "الطائف", "المدينة"];
 
 function getTajheezRaw() {
@@ -10818,18 +11052,14 @@ function parseTajheezRow(r) {
   };
   return {
     قسم: s("القسم"),
+    مورد: s("المورد"),
     صنف: s("اسم_الصنف"),
     سعر: n("سعر_الوحدة"),
     مخصص: {
       مكة: n("مخصص_مكة"),
       جدة: n("مخصص_جدة"),
       الطائف: n("مخصص_الطائف"),
-      القنفذة: n("مخصص_القنفذة"),
-      الليث: n("مخصص_الليث"),
       المدينة: n("مخصص_المدينة"),
-      ينبع: n("مخصص_ينبع"),
-      العلا: n("مخصص_العلا"),
-      المهد: n("مخصص_المهد"),
       كلي: n("مخصص_الكمية_الكلية"),
       قيمة: n("مخصص_القيمة_الكلية"),
     },
@@ -10840,6 +11070,14 @@ function parseTajheezRow(r) {
       المدينة: n("احتياج_المدينة"),
       كلي: n("احتياج_الكمية_الكلية"),
       قيمة: n("احتياج_القيمة_الكلية"),
+    },
+    ppp: {
+      مكة: n("PPP_مكة"),
+      جدة: n("PPP_جدة"),
+      الطائف: n("PPP_الطائف"),
+      المدينة: n("PPP_المدينة"),
+      كلي: n("PPP_الكمية_الكلية"),
+      قيمة: n("PPP_القيمة_الكلية"),
     },
     فرق_كمية: n("فرق_الكمية"),
     فرق_قيمة: n("فرق_القيمة"),
@@ -10889,13 +11127,17 @@ function getTajheezFiltered() {
   const fQ = (document.getElementById("taj-f-qism")?.value || "").trim();
   const fS = (document.getElementById("taj-f-sanf")?.value || "").trim().toLowerCase();
   const fC = (document.getElementById("taj-f-city")?.value || "").trim();
+  const fM = (document.getElementById("taj-f-mored")?.value || "").trim();
   return all.filter((r) => {
     if (fQ && r.قسم !== fQ) return false;
     if (fS && !r.صنف.toLowerCase().includes(fS)) return false;
+    if (fM && r.مورد !== fM) return false;
     if (fC) {
       const mc = r.مخصص[fC],
         nc = r.احتياج[fC];
-      if (mc === null && nc === null) return false;
+      // ★ إصلاح فلتر المدينة: نستبعد الصنف لو مفيش له مخصص ولا احتياج فعلي (>0) في المدينة المختارة.
+      // قديمًا كان الشرط يتحقق من null فقط، وبما إن القيم الفاضية بتترجم لـ 0 مش null، كان الفلتر فعليًا مايستبعدش أي صف.
+      if (!mc && !nc) return false;
     }
     return true;
   });
@@ -10987,12 +11229,15 @@ function renderTajheezTable(tableId, rows, cols, pagState, pagBarId, onPageChang
 function exportTajheezCSV(rows) {
   const headers = [
     "القسم",
+    "المورد",
     "اسم_الصنف",
     "سعر_الوحدة",
     "مخصص_الكمية_الكلية",
     "مخصص_القيمة_الكلية",
     "احتياج_الكمية_الكلية",
     "احتياج_القيمة_الكلية",
+    "PPP_الكمية_الكلية",
+    "PPP_القيمة_الكلية",
     "فرق_الكمية",
     "فرق_القيمة",
     "نسبة_الاحتياج",
@@ -11002,12 +11247,15 @@ function exportTajheezCSV(rows) {
     csv.push(
       [
         r.قسم,
+        r.مورد,
         r.صنف,
         r.سعر ?? "",
         r.مخصص.كلي ?? "",
         r.مخصص.قيمة ?? "",
         r.احتياج.كلي ?? "",
         r.احتياج.قيمة ?? "",
+        r.ppp?.كلي ?? "",
+        r.ppp?.قيمة ?? "",
         r.فرق_كمية ?? "",
         r.فرق_قيمة ?? "",
         r.نسبة ?? "",
@@ -11017,21 +11265,28 @@ function exportTajheezCSV(rows) {
     );
   });
   const blob = new Blob(["\ufeff" + csv.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = "tajheez_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
 }
 
 function exportTajheezExcel(rows) {
   const headers = [
     "القسم",
+    "المورد",
     "اسم الصنف",
     "سعر الوحدة",
     "مخصص الكمية الكلية",
     "مخصص القيمة الكلية",
     "احتياج الكمية الكلية",
     "احتياج القيمة الكلية",
+    "PPP الكمية الكلية",
+    "PPP القيمة الكلية",
     "فرق الكمية",
     "فرق القيمة",
     "نسبة الاحتياج",
@@ -11040,12 +11295,15 @@ function exportTajheezExcel(rows) {
   rows.forEach((r) => {
     dataArr.push([
       r.قسم ?? "",
+      r.مورد ?? "",
       r.صنف ?? "",
       r.سعر ?? "",
       r.مخصص?.كلي ?? "",
       r.مخصص?.قيمة ?? "",
       r.احتياج?.كلي ?? "",
       r.احتياج?.قيمة ?? "",
+      r.ppp?.كلي ?? "",
+      r.ppp?.قيمة ?? "",
       r.فرق_كمية ?? "",
       r.فرق_قيمة ?? "",
       r.نسبة ?? "",
@@ -11087,17 +11345,23 @@ function renderTajheezInventoryTab() {
   const أقسام = [...new Set(all.map((r) => r.قسم).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, "ar"),
   );
+  const موردون = [...new Set(all.map((r) => r.مورد).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "ar"),
+  );
   const fQ = (document.getElementById("taj-f-qism")?.value || "").trim();
   const fS = (document.getElementById("taj-f-sanf")?.value || "").trim().toLowerCase();
   const fC = (document.getElementById("taj-f-city")?.value || "").trim();
+  const fM = (document.getElementById("taj-f-mored")?.value || "").trim();
 
   const filtered = all.filter((r) => {
     if (fQ && r.قسم !== fQ) return false;
     if (fS && !r.صنف.toLowerCase().includes(fS)) return false;
+    if (fM && r.مورد !== fM) return false;
     if (fC) {
       const mc = r.مخصص[fC],
         nc = r.احتياج[fC];
-      if (mc === null && nc === null) return false;
+      // ★ نفس إصلاح فلتر المدينة (راجع getTajheezFiltered أعلاه لنفس الملاحظة)
+      if (!mc && !nc) return false;
     }
     return true;
   });
@@ -11106,6 +11370,7 @@ function renderTajheezInventoryTab() {
   const totalItems = filtered.length;
   const totalAllocVal = filtered.reduce((s, r) => s + (r.مخصص.قيمة || 0), 0);
   const totalNeedVal = filtered.reduce((s, r) => s + (r.احتياج.قيمة || 0), 0);
+  const totalPppVal = filtered.reduce((s, r) => s + (r.ppp?.قيمة || 0), 0);
   const totalDiffVal = filtered.reduce((s, r) => s + (r.فرق_قيمة || 0), 0);
   const surplus = filtered.filter((r) => r.فرق_قيمة !== null && r.فرق_قيمة > 0);
   const deficit = filtered.filter((r) => r.فرق_قيمة !== null && r.فرق_قيمة < 0);
@@ -11113,6 +11378,7 @@ function renderTajheezInventoryTab() {
     (r) => r.احتياج.كلي !== null && r.مخصص.كلي !== null && r.مخصص.كلي >= r.احتياج.كلي,
   );
   const coverPct = totalItems > 0 ? Math.round((covered.length / totalItems) * 100) : 0;
+  const موردونَ_فيَ_النتيجة = new Set(filtered.map((r) => r.مورد).filter(Boolean));
 
   // بيانات الرسم البياني — قيمة الاحتياج حسب القسم
   const byQismNeed = {},
@@ -11126,6 +11392,33 @@ function renderTajheezInventoryTab() {
   const qismEntries = Object.entries(byQismNeed)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12);
+
+  // بيانات تحليل الموردين
+  const byMoredAgg = {};
+  filtered.forEach((r) => {
+    const key = r.مورد || "غير محدد";
+    if (!byMoredAgg[key])
+      byMoredAgg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, ppp_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0 };
+    const g = byMoredAgg[key];
+    g.أصناف++;
+    g.مخصص_قيمة += r.مخصص.قيمة || 0;
+    g.احتياج_قيمة += r.احتياج.قيمة || 0;
+    g.ppp_قيمة += r.ppp?.قيمة || 0;
+    g.مخصص_كلي += r.مخصص.كلي || 0;
+    g.احتياج_كلي += r.احتياج.كلي || 0;
+  });
+  const moredRows = Object.values(byMoredAgg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
+
+  // بيانات تحليل المدن (مخصص مقابل احتياج مقابل PPP لكل مدينة)
+  const cityAgg = {};
+  TAJHEEZ_CITIES.forEach((c) => (cityAgg[c] = { مخصص: 0, احتياج: 0, ppp: 0 }));
+  filtered.forEach((r) => {
+    TAJHEEZ_CITIES.forEach((c) => {
+      cityAgg[c].مخصص += r.مخصص[c] || 0;
+      cityAgg[c].احتياج += r.احتياج[c] || 0;
+      cityAgg[c].ppp += r.ppp?.[c] || 0;
+    });
+  });
 
   // أعلى أصناف احتياجاً
   const needSorted = [...filtered]
@@ -11159,7 +11452,14 @@ function renderTajheezInventoryTab() {
         ${TAJHEEZ_CITIES.map((c) => `<option value="${esc(c)}" ${fC === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
       </select>
     </div>
-    <button class="f-clear" onclick="document.getElementById('taj-f-qism').value='';document.getElementById('taj-f-sanf').value='';document.getElementById('taj-f-city').value='';renderTajheezInventoryTab()">✕ مسح</button>
+    <div class="fg">
+      <div class="fg-lbl">المورد</div>
+      <select class="fsel" id="taj-f-mored" onchange="renderTajheezInventoryTab()" style="min-width:170px">
+        <option value="">الكل</option>
+        ${موردون.map((m) => `<option value="${esc(m)}" ${fM === m ? "selected" : ""}>${esc(m)}</option>`).join("")}
+      </select>
+    </div>
+    <button class="f-clear" onclick="document.getElementById('taj-f-qism').value='';document.getElementById('taj-f-sanf').value='';document.getElementById('taj-f-city').value='';document.getElementById('taj-f-mored').value='';renderTajheezInventoryTab()">✕ مسح</button>
     <div style="margin-right:auto;display:flex;gap:8px;align-items:center">
       <button class="export-btn export-btn-csv" onclick="exportTajheezCSV(getTajheezFiltered())">⬇ CSV</button>
       <button class="export-btn export-btn-excel" onclick="exportTajheezExcel(getTajheezFiltered())">⬇ Excel</button>
@@ -11168,35 +11468,53 @@ function renderTajheezInventoryTab() {
 
   <!-- ══ KPIs ══ -->
   <div class="kpi-grid" style="margin-bottom:18px">
-    <div class="kpi kc-navy">
+    <div class="kpi kc-navy hasr-clickable" onclick="openTajheezItemsPanel()" title="اضغط لعرض كل الأصناف بالتفصيل">
       <div class="kpi-icon">🏗️</div>
       <div class="kpi-val">${numFmt(totalItems)}</div>
       <div class="kpi-lbl">إجمالي الأصناف</div>
-      <div class="kpi-sub">${أقسام.length} قسم</div>
+      <div class="kpi-sub">${أقسام.length} قسم · اضغط للتفاصيل ↗</div>
     </div>
-    <div class="kpi kc-blue">
+    <div class="kpi kc-teal hasr-clickable" style="background:#ECFEFF" onclick="openTajheezDeptPanel()" title="اضغط لعرض الأصناف الرئيسية (الأقسام)">
+      <div class="kpi-icon">🗂️</div>
+      <div class="kpi-val">${أقسام.length}</div>
+      <div class="kpi-lbl">الأصناف الرئيسية</div>
+      <div class="kpi-sub">حسب الأقسام · اضغط للتفاصيل ↗</div>
+    </div>
+    <div class="kpi kc-blue hasr-clickable" onclick="openTajheezAllocPanel()" title="اضغط لعرض كل الأصناف حسب المخصصات">
       <div class="kpi-icon">📦</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalAllocVal)}</div>
       <div class="kpi-lbl">إجمالي المخصصات</div>
-      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.مخصص.كلي || 0), 0))} وحدة</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.مخصص.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber hasr-clickable" onclick="openTajheezNeedPanel()" title="اضغط لعرض كل الأصناف حسب الاحتياج">
       <div class="kpi-icon">📋</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalNeedVal)}</div>
       <div class="kpi-lbl">إجمالي الاحتياج</div>
-      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.احتياج.كلي || 0), 0))} وحدة</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.احتياج.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
     </div>
-    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"}">
+    <div class="kpi kc-teal hasr-clickable" style="background:#F5F3FF" onclick="openTajheezPppPanel()" title="اضغط لعرض كل الأصناف حسب PPP">
+      <div class="kpi-icon">🧮</div>
+      <div class="kpi-val" style="font-size:18px">${sarFmt(totalPppVal)}</div>
+      <div class="kpi-lbl">إجمالي PPP</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.ppp?.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
+    </div>
+    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"} hasr-clickable" onclick="openTajheezDiffPanel()" title="اضغط لعرض كل الأصناف حسب الفائض/العجز">
       <div class="kpi-icon">${totalDiffVal >= 0 ? "📈" : "📉"}</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(Math.abs(totalDiffVal))}</div>
       <div class="kpi-lbl">${totalDiffVal >= 0 ? "إجمالي الفائض" : "إجمالي العجز"}</div>
-      <div class="kpi-sub">فرق القيمة الكلية</div>
+      <div class="kpi-sub">فرق القيمة الكلية · اضغط للتفاصيل ↗</div>
     </div>
-    <div class="kpi kc-teal">
+    <div class="kpi kc-teal hasr-clickable" onclick="openTajheezCoveragePanel()" title="اضغط لعرض كل الأصناف حسب نسبة التغطية">
       <div class="kpi-icon">✅</div>
       <div class="kpi-val">${coverPct}%</div>
       <div class="kpi-lbl">نسبة تغطية التجهيزات</div>
-      <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى</div>
+      <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى · اضغط للتفاصيل ↗</div>
+    </div>
+    <div class="kpi kc-navy hasr-clickable" style="background:#EEF2FF" onclick="openTajheezSuppliersPanel()" title="اضغط لعرض كل الموردين بالتفصيل">
+      <div class="kpi-icon">🏭</div>
+      <div class="kpi-val">${numFmt(موردونَ_فيَ_النتيجة.size)}</div>
+      <div class="kpi-lbl">عدد الموردين</div>
+      <div class="kpi-sub">من إجمالي ${موردون.length} مورد · اضغط للتفاصيل ↗</div>
     </div>
   </div>
 
@@ -11234,6 +11552,66 @@ function renderTajheezInventoryTab() {
     </div>
   </div>
 
+  <!-- ══ تحليل المدن الأربعة ══ -->
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EFF6FF;color:#2563EB">🗺️</span>
+        مخصص × احتياج × PPP لكل مدينة
+      </div>
+      <div class="chart-box" style="height:300px"><canvas id="ch-taj-city"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5">🏭</span>
+        أكبر الموردين من حيث قيمة الاحتياج
+        <span class="sub">${moredRows.length} مورد</span>
+      </div>
+      <div class="chart-box" style="height:300px"><canvas id="ch-taj-mored"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ══ جدول تحليل الموردين ══ -->
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5">🏭</span>
+      تحليل الموردين
+      <span class="sub">${moredRows.length} مورد</span>
+    </div>
+    <div class="tbl-wrap" style="max-height:360px">
+      <table>
+        <thead><tr>
+          <th style="text-align:right;padding-right:14px;min-width:200px">المورد</th>
+          <th>عدد الأصناف</th>
+          <th>مخصص (كمية)</th>
+          <th>مخصص (قيمة)</th>
+          <th>احتياج (كمية)</th>
+          <th>احتياج (قيمة)</th>
+          <th>PPP (قيمة)</th>
+          <th>نسبة التغطية</th>
+        </tr></thead>
+        <tbody>
+          ${moredRows
+            .map((m) => {
+              const pct = m.احتياج_كلي > 0 ? Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
+              const pctColor = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+              return `<tr>
+                <td style="text-align:right;padding-right:14px;font-weight:700;font-size:12px">${esc(m.مورد)}</td>
+                <td style="text-align:center">${numFmt(m.أصناف)}</td>
+                <td style="text-align:center;color:var(--tx-muted)">${numFmt(m.مخصص_كلي)}</td>
+                <td style="font-weight:700">${sarFmt(m.مخصص_قيمة)}</td>
+                <td style="text-align:center;color:var(--tx-muted)">${numFmt(m.احتياج_كلي)}</td>
+                <td style="font-weight:700;color:#D97706">${sarFmt(m.احتياج_قيمة)}</td>
+                <td style="color:#7C3AED">${sarFmt(m.ppp_قيمة)}</td>
+                <td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;color:${pctColor};background:${pctColor}18;border:1px solid ${pctColor}33">${pct}%</span></td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- ══ جدول أكثر الأصناف احتياجاً ══ -->
   <div class="card mb14">
     <div class="card-title">
@@ -11252,6 +11630,7 @@ function renderTajheezInventoryTab() {
         <thead><tr>
           <th style="text-align:right;padding-right:14px;min-width:160px">اسم الصنف</th>
           <th style="min-width:100px">القسم</th>
+          <th style="min-width:130px">المورد</th>
           <th style="min-width:90px">سعر الوحدة</th>
           <th style="min-width:100px">الاحتياج (كمية)</th>
           <th style="min-width:120px">الاحتياج (قيمة)</th>
@@ -11350,11 +11729,14 @@ function renderTajheezInventoryTab() {
         <thead><tr>
           <th style="text-align:right;padding-right:14px;min-width:160px">اسم الصنف</th>
           <th>القسم</th>
+          <th>المورد</th>
           <th>سعر الوحدة</th>
           <th>مخصص كلي</th>
           <th>قيمة المخصص</th>
           <th>احتياج كلي</th>
           <th>قيمة الاحتياج</th>
+          <th>PPP كلي</th>
+          <th>قيمة PPP</th>
           <th>فرق الكمية</th>
           <th>فرق القيمة</th>
           <th>نسبة الاحتياج</th>
@@ -11518,6 +11900,86 @@ function renderTajheezInventoryTab() {
       },
     });
 
+    // رسم 5: مخصص × احتياج × PPP لكل مدينة
+    killChart("ch-taj-city");
+    CHARTS["ch-taj-city"] = new Chart(document.getElementById("ch-taj-city"), {
+      type: "bar",
+      data: {
+        labels: TAJHEEZ_CITIES,
+        datasets: [
+          {
+            label: "المخصص",
+            data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].مخصص.toFixed(0)),
+            backgroundColor: "#0891B288",
+            borderColor: CSS_TOKENS.info(),
+            borderWidth: 1.5,
+            borderRadius: 4,
+          },
+          {
+            label: "الاحتياج",
+            data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].احتياج.toFixed(0)),
+            backgroundColor: "#D9770688",
+            borderColor: CSS_TOKENS.warning(),
+            borderWidth: 1.5,
+            borderRadius: 4,
+          },
+          {
+            label: "PPP",
+            data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].ppp.toFixed(0)),
+            backgroundColor: "#7C3AED88",
+            borderColor: "#7C3AED",
+            borderWidth: 1.5,
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top", labels: { font: { size: 10 }, boxWidth: 10, padding: 10 } },
+          tooltip: { callbacks: { label: (ctx) => `  ${ctx.dataset.label}: ${numFmt(ctx.raw)} وحدة` } },
+        },
+        scales: {
+          x: { ticks: { font: { size: 11, weight: "bold" } } },
+          y: { beginAtZero: true, ticks: { callback: (v) => numFmt(v) } },
+        },
+      },
+    });
+
+    // رسم 6: أكبر الموردين حسب قيمة الاحتياج
+    killChart("ch-taj-mored");
+    const topMored = moredRows.slice(0, 10);
+    if (topMored.length) {
+      CHARTS["ch-taj-mored"] = new Chart(document.getElementById("ch-taj-mored"), {
+        type: "bar",
+        data: {
+          labels: topMored.map((m) => (m.مورد.length > 18 ? m.مورد.slice(0, 18) + "…" : m.مورد)),
+          datasets: [
+            {
+              label: "قيمة الاحتياج",
+              data: topMored.map((m) => +m.احتياج_قيمة.toFixed(0)),
+              backgroundColor: "#4F46E588",
+              borderColor: "#4F46E5",
+              borderWidth: 1.5,
+              borderRadius: 5,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `  ${sarFmt(ctx.raw)}` } },
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { callback: (v) => sarFmt(v) } },
+            y: { ticks: { font: { size: 10 } } },
+          },
+        },
+      });
+    }
+
     renderTajheezNeedTable();
     renderTajheezFaedTable();
     renderTajheezAjzTable();
@@ -11540,6 +12002,7 @@ function renderTajheezNeedTable() {
       (r) =>
         `<td style="text-align:right;padding-right:14px"><div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.صنف)}</div></td>`,
       (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>`,
+      (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>`,
       (r) => `<td style="font-weight:700;color:#0891B2">${sarFmt2(r.سعر)}</td>`,
       (r) => `<td style="font-weight:700;color:#D97706">${numFmt(r.احتياج.كلي)}</td>`,
       (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
@@ -11622,11 +12085,14 @@ function renderTajheezAllTable() {
       (r) =>
         `<td style="text-align:right;padding-right:14px"><div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.صنف)}</div></td>`,
       (r) => `<td style="font-size:10px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>`,
+      (r) => `<td style="font-size:10px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>`,
       (r) => `<td style="font-size:11px">${sarFmt2(r.سعر)}</td>`,
       (r) => `<td style="font-weight:700;text-align:center">${numFmt(r.مخصص.كلي)}</td>`,
       (r) => `<td style="font-weight:700">${sarFmt(r.مخصص.قيمة)}</td>`,
       (r) => `<td style="font-weight:700;text-align:center">${numFmt(r.احتياج.كلي)}</td>`,
       (r) => `<td style="font-weight:700;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
+      (r) => `<td style="text-align:center;color:#7C3AED">${numFmt(r.ppp?.كلي)}</td>`,
+      (r) => `<td style="font-weight:700;color:#7C3AED">${sarFmt(r.ppp?.قيمة)}</td>`,
       (r) =>
         `<td style="text-align:center;font-weight:700;color:${r.فرق_كمية !== null ? (r.فرق_كمية >= 0 ? CSS_TOKENS.positive() : CSS_TOKENS.danger()) : "#ccc"}">${numFmt(r.فرق_كمية)}</td>`,
       (r) =>
@@ -11642,6 +12108,578 @@ function renderTajheezAllTable() {
     "taj-all-pag",
     renderTajheezAllTable,
   );
+}
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  ✨ بانلات تبويب التجهيزات — الأصناف + الأصناف الرئيسية      ║
+   ║  ★ نفس هوية بانل "حصر الأصول" بالظبط (ix-kpi-overlay/modal/table)
+   ║  بانل 1: كل الأصناف (تُفتح من كارت "إجمالي الأصناف")         ║
+   ║  بانل 2: الأصناف الرئيسية/الأقسام (كارت "الأصناف الرئيسية")  ║
+   ╚════════════════════════════════════════════════════════════╝ */
+
+function _injectTajKpiModal_() {
+  if (document.getElementById("taj-kpi-overlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "taj-kpi-overlay";
+  overlay.className = "ix-kpi-overlay";
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeTajKpiModal();
+  });
+  overlay.innerHTML = `
+    <div class="ix-kpi-modal" id="taj-kpi-modal">
+      <div class="ix-kpi-modal-head">
+        <div>
+          <div class="ix-kpi-modal-title" id="taj-kpi-modal-title">—</div>
+          <div class="ix-kpi-modal-sub" id="taj-kpi-modal-sub"></div>
+        </div>
+        <button class="ix-kpi-modal-close" onclick="closeTajKpiModal()">✕</button>
+      </div>
+      <div class="ix-kpi-modal-body" id="taj-kpi-modal-body"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("ix-open")) closeTajKpiModal();
+  });
+}
+
+function closeTajKpiModal() {
+  document.getElementById("taj-kpi-overlay")?.classList.remove("ix-open");
+}
+
+function _buildTajKpiTable_(bodyEl, rows, allRows, columns, onRowClick) {
+  const headerRow = columns.map((c) => `<th>${esc(c.label)}</th>`).join("");
+  const dataRows = rows
+    .map((r) => {
+      const idx = allRows.indexOf(r);
+      const cells = columns.map((c) => c.render(r)).join("");
+      return `<tr data-taj-idx="${idx}" style="cursor:pointer">${cells}</tr>`;
+    })
+    .join("");
+  const existing = bodyEl.querySelector("#taj-kpi-table-inner");
+  if (existing) {
+    existing.querySelector("tbody").innerHTML = dataRows;
+  } else {
+    const tbl = document.createElement("table");
+    tbl.className = "ix-kpi-table";
+    tbl.id = "taj-kpi-table-inner";
+    tbl.innerHTML = `<thead><tr>${headerRow}</tr></thead><tbody>${dataRows}</tbody>`;
+    bodyEl.appendChild(tbl);
+  }
+  bodyEl.querySelectorAll("tr[data-taj-idx]").forEach((tr) => {
+    tr.onclick = () => {
+      const idx = parseInt(tr.getAttribute("data-taj-idx"));
+      const row = allRows[idx];
+      if (row && onRowClick) onRowClick(row);
+    };
+  });
+}
+
+/* بانل موحّد — نفس تصميم/سلوك openKpiModal المستخدم في حصر الأصول بالظبط */
+function _openTajKpiModal_(title, subtitle, rows, columns, searchFn, onRowClick) {
+  _injectTajKpiModal_();
+  const overlay = document.getElementById("taj-kpi-overlay");
+  const titleEl = document.getElementById("taj-kpi-modal-title");
+  const subEl = document.getElementById("taj-kpi-modal-sub");
+  const bodyEl = document.getElementById("taj-kpi-modal-body");
+
+  titleEl.textContent = title;
+  overlay.classList.add("ix-open");
+  window._tajKpiRows = rows || [];
+  window._tajKpiCols = columns;
+
+  if (!rows || !rows.length) {
+    subEl.textContent = subtitle || "";
+    bodyEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:13px">لا توجد بيانات تنطبق عليها هذه المعايير</div>`;
+    return;
+  }
+  subEl.textContent = subtitle;
+
+  bodyEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="taj-kpi-search-input" type="text" class="finp" placeholder="🔍 بحث…" style="flex:1;min-width:200px">
+    </div>`;
+
+  const searchInp = bodyEl.querySelector("#taj-kpi-search-input");
+  searchInp.addEventListener("input", function () {
+    const q = this.value.trim().toLowerCase();
+    const filtered = q ? window._tajKpiRows.filter((r) => searchFn(r, q)) : window._tajKpiRows;
+    subEl.textContent = q ? `${filtered.length} من ${window._tajKpiRows.length}` : subtitle;
+    _buildTajKpiTable_(bodyEl, filtered, window._tajKpiRows, window._tajKpiCols, onRowClick);
+  });
+
+  _buildTajKpiTable_(bodyEl, rows, rows, columns, onRowClick);
+}
+
+/* ── بانل 1: كل الأصناف (مخصص/احتياج) ─────────────────────────── */
+function openTajheezItemsPanel() {
+  window._tajNavStack = []; // ★ نقطة دخول جديدة من كارت الـ KPI — تصفير سجل الرجوع
+  const rows = getTajheezFiltered().sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+  const cols = [
+    {
+      label: "اسم الصنف",
+      render: (r) =>
+        `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>`,
+    },
+    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
+    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
+    { label: "مخصص (كمية)", render: (r) => `<td style="color:#0891B2;font-weight:700">${numFmt(r.مخصص.كلي)}</td>` },
+    { label: "احتياج (كمية)", render: (r) => `<td style="color:#D97706;font-weight:700">${numFmt(r.احتياج.كلي)}</td>` },
+    { label: "قيمة الاحتياج", render: (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
+    {
+      label: "الحالة",
+      render: (r) => {
+        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
+      },
+    },
+  ];
+  _openTajKpiModal_(
+    "كل الأصناف — المخصص والاحتياج",
+    rows.length + " صنف",
+    rows,
+    cols,
+    (r, q) =>
+      r.صنف.toLowerCase().includes(q) ||
+      (r.قسم || "").toLowerCase().includes(q) ||
+      (r.مورد || "").toLowerCase().includes(q),
+    (r) => {
+      closeTajKpiModal();
+      _tajPushNav_(() => openTajheezItemsPanel());
+      setTimeout(() => openTajItemDetailPanel(r), 100);
+    },
+  );
+}
+
+/* ── بانل 2: الأصناف الرئيسية (الأقسام) — تجميع مخصص/احتياج ────── */
+function openTajheezDeptPanel() {
+  window._tajNavStack = []; // ★ نقطة دخول جديدة من كارت الـ KPI — تصفير سجل الرجوع
+  const rows = getTajheezFiltered();
+  const agg = {};
+  rows.forEach((r) => {
+    const k = r.قسم || "غير مصنف";
+    if (!agg[k])
+      agg[k] = { قسم: k, أصناف: 0, مخصص_كلي: 0, مخصص_قيمة: 0, احتياج_كلي: 0, احتياج_قيمة: 0 };
+    const g = agg[k];
+    g.أصناف++;
+    g.مخصص_كلي += r.مخصص.كلي || 0;
+    g.مخصص_قيمة += r.مخصص.قيمة || 0;
+    g.احتياج_كلي += r.احتياج.كلي || 0;
+    g.احتياج_قيمة += r.احتياج.قيمة || 0;
+  });
+  const list = Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
+  const cols = [
+    { label: "القسم", render: (g) => `<td><span class="ix-school-clickable">🗂️ ${esc(g.قسم)}</span></td>` },
+    { label: "عدد الأصناف", render: (g) => `<td style="text-align:center">${numFmt(g.أصناف)}</td>` },
+    { label: "مخصص (كمية)", render: (g) => `<td style="color:#0891B2;font-weight:700">${numFmt(g.مخصص_كلي)}</td>` },
+    { label: "احتياج (كمية)", render: (g) => `<td style="color:#D97706;font-weight:700">${numFmt(g.احتياج_كلي)}</td>` },
+    { label: "قيمة الاحتياج", render: (g) => `<td style="font-weight:800;color:#D97706">${sarFmt(g.احتياج_قيمة)}</td>` },
+    {
+      label: "نسبة التغطية",
+      render: (g) => {
+        const pct = g.احتياج_كلي > 0 ? Math.min(999, Math.round((g.مخصص_كلي / g.احتياج_كلي) * 100)) : g.مخصص_كلي > 0 ? 100 : 0;
+        const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>`;
+      },
+    },
+  ];
+  _openTajKpiModal_(
+    "الأصناف الرئيسية — الأقسام",
+    list.length + " قسم",
+    list,
+    cols,
+    (g, q) => g.قسم.toLowerCase().includes(q),
+    (g) => {
+      closeTajKpiModal();
+      _tajPushNav_(() => openTajheezDeptPanel());
+      setTimeout(() => openTajDeptDetailPanel(g), 100);
+    },
+  );
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🔎 بانل التفاصيل (صنف / قسم) — نفس بانل "تفاصيل المدرسة"    ║
+   ║  في حصر الأصول بالظبط (ix-school-overlay/ix-school-panel)   ║
+   ║  بيفتح جنب الشاشة، مبيفلترش أي حاجة — عرض تفاصيل بس          ║
+   ╚════════════════════════════════════════════════════════════╝ */
+
+function _injectTajDetailPanel_() {
+  if (document.getElementById("taj-detail-overlay")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "taj-detail-overlay";
+  overlay.className = "ix-school-overlay";
+  overlay.addEventListener("click", closeTajDetailPanel);
+
+  const panel = document.createElement("div");
+  panel.id = "taj-detail-panel";
+  panel.className = "ix-school-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.innerHTML = `
+    <div class="ix-panel-head" id="taj-detail-head">
+      <button class="ix-panel-close" onclick="closeTajDetailPanel()">✕</button>
+      <button class="ix-panel-back" id="taj-detail-back" onclick="tajGoBack()" style="display:none">← رجوع</button>
+      <div class="ix-panel-school-name" id="taj-detail-title">—</div>
+      <div class="ix-panel-badges" id="taj-detail-badges"></div>
+    </div>
+    <div class="ix-panel-body" id="taj-detail-body"></div>`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("ix-open")) closeTajDetailPanel();
+  });
+}
+
+function closeTajDetailPanel() {
+  document.getElementById("taj-detail-overlay")?.classList.remove("ix-open");
+  document.getElementById("taj-detail-panel")?.classList.remove("ix-open");
+}
+
+/* ★ زر "رجوع" في بانل التجهيزات — بيرجع للشاشة اللي فتحت منها التفاصيل
+   (سواء قائمة الأصناف/الأقسام أو بانل تفاصيل قسم سابق) بدل ما يقفل خالص */
+function _tajPushNav_(fn) {
+  window._tajNavStack = window._tajNavStack || [];
+  window._tajNavStack.push(fn);
+}
+
+function _tajUpdateBackBtn_() {
+  const btn = document.getElementById("taj-detail-back");
+  if (!btn) return;
+  const hasHistory = (window._tajNavStack || []).length > 0;
+  btn.style.display = hasHistory ? "" : "none";
+}
+
+function tajGoBack() {
+  const stack = window._tajNavStack || [];
+  const fn = stack.pop();
+  closeTajDetailPanel();
+  if (fn) setTimeout(fn, 100);
+}
+
+/* تفاصيل صنف بعينه */
+function openTajItemDetailPanel(r) {
+  _injectTajDetailPanel_();
+  document.getElementById("taj-detail-overlay").classList.add("ix-open");
+  document.getElementById("taj-detail-panel").classList.add("ix-open");
+  document.getElementById("taj-detail-title").textContent = r.صنف;
+  _tajUpdateBackBtn_();
+
+  const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+  document.getElementById("taj-detail-badges").innerHTML = `
+    <span class="ix-panel-badge">🗂️ ${esc(r.قسم) || "—"}</span>
+    ${r.مورد ? `<span class="ix-panel-badge">🏭 ${esc(r.مورد)}</span>` : ""}
+    <span class="ix-panel-badge">${cb.label}</span>`;
+
+  const need = r.احتياج.كلي || 0,
+    alloc = r.مخصص.كلي || 0;
+  const pct = need > 0 ? Math.min(100, Math.round((alloc / need) * 100)) : alloc > 0 ? 100 : 0;
+  const cityItems = TAJHEEZ_CITIES.map(
+    (c) => `
+    <div class="ix-info-item">
+      <div class="ix-info-lbl">${esc(c)}</div>
+      <div class="ix-info-val" style="font-size:12px">مخصص ${numFmt(r.مخصص[c])} · احتياج ${numFmt(r.احتياج[c])}</div>
+    </div>`,
+  ).join("");
+
+  document.getElementById("taj-detail-body").innerHTML = `
+    <div class="ix-section-title">ℹ️ معلومات الصنف</div>
+    <div class="ix-info-grid">
+      <div class="ix-info-item"><div class="ix-info-lbl">سعر الوحدة</div><div class="ix-info-val">${sarFmt2(r.سعر)}</div></div>
+      <div class="ix-info-item"><div class="ix-info-lbl">نسبة الاحتياج</div><div class="ix-info-val">${pctFmt(r.نسبة)}</div></div>
+      <div class="ix-info-item ix-full"><div class="ix-info-lbl">القسم</div><div class="ix-info-val">${esc(r.قسم) || "—"}</div></div>
+      ${r.مورد ? `<div class="ix-info-item ix-full"><div class="ix-info-lbl">المورد</div><div class="ix-info-val">${esc(r.مورد)}</div></div>` : ""}
+    </div>
+
+    <div class="ix-section-title">📊 المخصص مقابل الاحتياج (الإجمالي)</div>
+    <div class="ix-info-grid">
+      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(alloc)} وحدة · ${sarFmt(r.مخصص.قيمة)}</div></div>
+      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(need)} وحدة · ${sarFmt(r.احتياج.قيمة)}</div></div>
+    </div>
+    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${cb.color}"></div></div>
+    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${cb.color}">${pct}%</strong></div>
+
+    <div class="ix-section-title">🗺️ التفصيل حسب المدينة</div>
+    <div class="ix-info-grid">${cityItems}</div>
+  `;
+}
+
+/* تفاصيل قسم (أصناف رئيسية) — إجمالي + قائمة أصنافه، كل صنف قابل للضغط لعرض تفاصيله */
+function openTajDeptDetailPanel(g) {
+  _injectTajDetailPanel_();
+  document.getElementById("taj-detail-overlay").classList.add("ix-open");
+  document.getElementById("taj-detail-panel").classList.add("ix-open");
+  document.getElementById("taj-detail-title").textContent = g.قسم;
+  window._tajDeptCurrentGroup = g; // ★ لازم لحفظ حالة القسم عند الرجوع إليه من تفاصيل صنف
+  _tajUpdateBackBtn_();
+
+  const pct = g.احتياج_كلي > 0 ? Math.min(100, Math.round((g.مخصص_كلي / g.احتياج_كلي) * 100)) : g.مخصص_كلي > 0 ? 100 : 0;
+  const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  document.getElementById("taj-detail-badges").innerHTML = `
+    <span class="ix-panel-badge">📦 ${numFmt(g.أصناف)} صنف</span>
+    <span class="ix-panel-badge">تغطية ${pct}%</span>`;
+
+  const items = getTajheezFiltered()
+    .filter((r) => (r.قسم || "غير مصنف") === g.قسم)
+    .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+  window._tajDeptItemsCache = items;
+
+  const itemsHtml = items
+    .slice(0, 100)
+    .map((r, i) => {
+      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+      return `<div class="ix-info-item ix-full" style="cursor:pointer" onclick="tajOpenItemFromDept(${i})">
+        <div class="ix-info-lbl">${esc(r.صنف)}</div>
+        <div class="ix-info-val" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:12px">مخصص ${numFmt(r.مخصص.كلي)} · احتياج ${numFmt(r.احتياج.كلي)}</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${cb.bg};color:${cb.color};white-space:nowrap">${cb.label}</span>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  document.getElementById("taj-detail-body").innerHTML = `
+    <div class="ix-section-title">📊 إجمالي القسم</div>
+    <div class="ix-info-grid">
+      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(g.مخصص_كلي)} وحدة · ${sarFmt(g.مخصص_قيمة)}</div></div>
+      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(g.احتياج_كلي)} وحدة · ${sarFmt(g.احتياج_قيمة)}</div></div>
+    </div>
+    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${color}">${pct}%</strong></div>
+
+    <div class="ix-section-title">📋 أصناف القسم (${items.length})</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${itemsHtml || `<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:20px">لا توجد أصناف</div>`}</div>
+    ${items.length > 100 ? `<div style="text-align:center;font-size:11px;color:var(--tx-muted);margin-top:8px">و${items.length - 100} صنف إضافي</div>` : ""}
+  `;
+}
+/* فتح تفاصيل صنف من داخل بانل تفاصيل القسم — مع حفظ نقطة الرجوع لنفس بانل القسم */
+function tajOpenItemFromDept(i) {
+  const g = window._tajDeptCurrentGroup;
+  const r = window._tajDeptItemsCache && window._tajDeptItemsCache[i];
+  if (!r) return;
+  if (g) _tajPushNav_(() => openTajDeptDetailPanel(g));
+  openTajItemDetailPanel(r);
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  ✨ بانلات إضافية لباقي كروت KPI — نفس هوية بانل حصر الأصول   ║
+   ║  (المخصصات / الاحتياج / PPP / الفائض-العجز / التغطية / الموردين)
+   ╚════════════════════════════════════════════════════════════╝ */
+
+/* أعمدة موحّدة تُستخدم في كل بانلات "قائمة الأصناف" */
+function _tajStdItemCols_() {
+  return [
+    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
+    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
+    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
+    { label: "مخصص (كمية)", render: (r) => `<td style="color:#0891B2;font-weight:700">${numFmt(r.مخصص.كلي)}</td>` },
+    { label: "احتياج (كمية)", render: (r) => `<td style="color:#D97706;font-weight:700">${numFmt(r.احتياج.كلي)}</td>` },
+    { label: "قيمة الاحتياج", render: (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
+    {
+      label: "الحالة",
+      render: (r) => {
+        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
+      },
+    },
+  ];
+}
+
+/* بانل عام لأي "قائمة أصناف" — يفتح مودال ثم عند الضغط على صف يفتح تفاصيله مع حفظ نقطة الرجوع */
+function _openTajItemsListPanel_(title, rows, cols) {
+  window._tajNavStack = []; // نقطة دخول جديدة من كارت KPI
+  _openTajKpiModal_(
+    title,
+    rows.length + " صنف",
+    rows,
+    cols,
+    (r, q) =>
+      r.صنف.toLowerCase().includes(q) ||
+      (r.قسم || "").toLowerCase().includes(q) ||
+      (r.مورد || "").toLowerCase().includes(q),
+    (r) => {
+      closeTajKpiModal();
+      _tajPushNav_(() => _openTajItemsListPanel_(title, rows, cols));
+      setTimeout(() => openTajItemDetailPanel(r), 100);
+    },
+  );
+}
+
+/* ── كارت "إجمالي المخصصات" ─────────────────────────────────── */
+function openTajheezAllocPanel() {
+  const rows = getTajheezFiltered().sort((a, b) => (b.مخصص.قيمة || 0) - (a.مخصص.قيمة || 0));
+  _openTajItemsListPanel_("إجمالي المخصصات — كل الأصناف", rows, _tajStdItemCols_());
+}
+
+/* ── كارت "إجمالي الاحتياج" ─────────────────────────────────── */
+function openTajheezNeedPanel() {
+  const rows = getTajheezFiltered().sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+  _openTajItemsListPanel_("إجمالي الاحتياج — كل الأصناف", rows, _tajStdItemCols_());
+}
+
+/* ── كارت "إجمالي PPP" ──────────────────────────────────────── */
+function openTajheezPppPanel() {
+  const rows = getTajheezFiltered().sort((a, b) => (b.ppp?.قيمة || 0) - (a.ppp?.قيمة || 0));
+  const cols = [
+    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
+    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
+    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
+    { label: "PPP (كمية)", render: (r) => `<td style="color:#7C3AED;font-weight:700">${numFmt(r.ppp?.كلي)}</td>` },
+    { label: "قيمة PPP", render: (r) => `<td style="font-weight:800;color:#7C3AED">${sarFmt(r.ppp?.قيمة)}</td>` },
+    { label: "احتياج (قيمة)", render: (r) => `<td style="font-weight:700;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
+    {
+      label: "الحالة",
+      render: (r) => {
+        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
+      },
+    },
+  ];
+  _openTajItemsListPanel_("إجمالي PPP — كل الأصناف", rows, cols);
+}
+
+/* ── كارت "إجمالي الفائض/العجز" ─────────────────────────────── */
+function openTajheezDiffPanel() {
+  const rows = getTajheezFiltered()
+    .filter((r) => r.فرق_قيمة !== null)
+    .sort((a, b) => Math.abs(b.فرق_قيمة || 0) - Math.abs(a.فرق_قيمة || 0));
+  const cols = [
+    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
+    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
+    { label: "مخصص (قيمة)", render: (r) => `<td style="color:#0891B2;font-weight:700">${sarFmt(r.مخصص.قيمة)}</td>` },
+    { label: "احتياج (قيمة)", render: (r) => `<td style="color:#D97706;font-weight:700">${sarFmt(r.احتياج.قيمة)}</td>` },
+    {
+      label: "فرق القيمة",
+      render: (r) => {
+        const isSurplus = (r.فرق_قيمة || 0) >= 0;
+        return `<td style="font-weight:800;color:${isSurplus ? CSS_TOKENS.positive() : CSS_TOKENS.danger()}">${isSurplus ? "+" : "−"}${sarFmt(Math.abs(r.فرق_قيمة))}</td>`;
+      },
+    },
+    {
+      label: "الحالة",
+      render: (r) => {
+        const isSurplus = (r.فرق_قيمة || 0) >= 0;
+        const color = isSurplus ? CSS_TOKENS.positive() : CSS_TOKENS.danger();
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33;white-space:nowrap">${isSurplus ? "فائض" : "عجز"}</span></td>`;
+      },
+    },
+  ];
+  _openTajItemsListPanel_("إجمالي الفائض والعجز — كل الأصناف", rows, cols);
+}
+
+/* ── كارت "نسبة تغطية التجهيزات" ─────────────────────────────── */
+function openTajheezCoveragePanel() {
+  const rows = getTajheezFiltered().sort((a, b) => (a.نسبة ?? 999) - (b.نسبة ?? 999));
+  _openTajItemsListPanel_("نسبة تغطية التجهيزات — كل الأصناف", rows, _tajStdItemCols_());
+}
+
+/* ── كارت "عدد الموردين" — قائمة الموردين مجمّعة ─────────────── */
+function _tajMoredAgg_() {
+  const rows = getTajheezFiltered();
+  const agg = {};
+  rows.forEach((r) => {
+    const k = r.مورد || "غير محدد";
+    if (!agg[k])
+      agg[k] = { مورد: k, أصناف: 0, مخصص_كلي: 0, مخصص_قيمة: 0, احتياج_كلي: 0, احتياج_قيمة: 0, ppp_قيمة: 0 };
+    const g = agg[k];
+    g.أصناف++;
+    g.مخصص_كلي += r.مخصص.كلي || 0;
+    g.مخصص_قيمة += r.مخصص.قيمة || 0;
+    g.احتياج_كلي += r.احتياج.كلي || 0;
+    g.احتياج_قيمة += r.احتياج.قيمة || 0;
+    g.ppp_قيمة += r.ppp?.قيمة || 0;
+  });
+  return Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
+}
+
+function openTajheezSuppliersPanel() {
+  window._tajNavStack = []; // نقطة دخول جديدة من كارت KPI
+  const list = _tajMoredAgg_();
+  const cols = [
+    { label: "المورد", render: (m) => `<td><span class="ix-school-clickable">🏭 ${esc(m.مورد)}</span></td>` },
+    { label: "عدد الأصناف", render: (m) => `<td style="text-align:center">${numFmt(m.أصناف)}</td>` },
+    { label: "مخصص (كمية)", render: (m) => `<td style="color:#0891B2;font-weight:700">${numFmt(m.مخصص_كلي)}</td>` },
+    { label: "احتياج (كمية)", render: (m) => `<td style="color:#D97706;font-weight:700">${numFmt(m.احتياج_كلي)}</td>` },
+    { label: "قيمة الاحتياج", render: (m) => `<td style="font-weight:800;color:#D97706">${sarFmt(m.احتياج_قيمة)}</td>` },
+    { label: "قيمة PPP", render: (m) => `<td style="font-weight:700;color:#7C3AED">${sarFmt(m.ppp_قيمة)}</td>` },
+    {
+      label: "نسبة التغطية",
+      render: (m) => {
+        const pct = m.احتياج_كلي > 0 ? Math.min(999, Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100)) : m.مخصص_كلي > 0 ? 100 : 0;
+        const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>`;
+      },
+    },
+  ];
+  _openTajKpiModal_(
+    "عدد الموردين — التفاصيل",
+    list.length + " مورد",
+    list,
+    cols,
+    (m, q) => m.مورد.toLowerCase().includes(q),
+    (m) => {
+      closeTajKpiModal();
+      _tajPushNav_(() => openTajheezSuppliersPanel());
+      setTimeout(() => openTajSupplierDetailPanel(m), 100);
+    },
+  );
+}
+
+/* تفاصيل مورد بعينه — إجمالي + قائمة أصنافه، كل صنف قابل للضغط لعرض تفاصيله */
+function openTajSupplierDetailPanel(m) {
+  _injectTajDetailPanel_();
+  document.getElementById("taj-detail-overlay").classList.add("ix-open");
+  document.getElementById("taj-detail-panel").classList.add("ix-open");
+  document.getElementById("taj-detail-title").textContent = "🏭 " + m.مورد;
+  window._tajSupplierCurrentGroup = m; // لازم لحفظ حالة المورد عند الرجوع إليه من تفاصيل صنف
+  _tajUpdateBackBtn_();
+
+  const pct = m.احتياج_كلي > 0 ? Math.min(100, Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100)) : m.مخصص_كلي > 0 ? 100 : 0;
+  const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  document.getElementById("taj-detail-badges").innerHTML = `
+    <span class="ix-panel-badge">📦 ${numFmt(m.أصناف)} صنف</span>
+    <span class="ix-panel-badge">تغطية ${pct}%</span>`;
+
+  const items = getTajheezFiltered()
+    .filter((r) => (r.مورد || "غير محدد") === m.مورد)
+    .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+  window._tajSupplierItemsCache = items;
+
+  const itemsHtml = items
+    .slice(0, 100)
+    .map((r, i) => {
+      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+      return `<div class="ix-info-item ix-full" style="cursor:pointer" onclick="tajOpenItemFromSupplier(${i})">
+        <div class="ix-info-lbl">${esc(r.صنف)}</div>
+        <div class="ix-info-val" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:12px">مخصص ${numFmt(r.مخصص.كلي)} · احتياج ${numFmt(r.احتياج.كلي)}</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${cb.bg};color:${cb.color};white-space:nowrap">${cb.label}</span>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  document.getElementById("taj-detail-body").innerHTML = `
+    <div class="ix-section-title">📊 إجمالي المورد</div>
+    <div class="ix-info-grid">
+      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(m.مخصص_كلي)} وحدة · ${sarFmt(m.مخصص_قيمة)}</div></div>
+      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(m.احتياج_كلي)} وحدة · ${sarFmt(m.احتياج_قيمة)}</div></div>
+      <div class="ix-info-item ix-full"><div class="ix-info-lbl">قيمة PPP</div><div class="ix-info-val" style="color:#7C3AED">${sarFmt(m.ppp_قيمة)}</div></div>
+    </div>
+    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${color}">${pct}%</strong></div>
+
+    <div class="ix-section-title">📋 أصناف المورد (${items.length})</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${itemsHtml || `<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:20px">لا توجد أصناف</div>`}</div>
+    ${items.length > 100 ? `<div style="text-align:center;font-size:11px;color:var(--tx-muted);margin-top:8px">و${items.length - 100} صنف إضافي</div>` : ""}
+  `;
+}
+
+/* فتح تفاصيل صنف من داخل بانل تفاصيل المورد — مع حفظ نقطة الرجوع لنفس بانل المورد */
+function tajOpenItemFromSupplier(i) {
+  const m = window._tajSupplierCurrentGroup;
+  const r = window._tajSupplierItemsCache && window._tajSupplierItemsCache[i];
+  if (!r) return;
+  if (m) _tajPushNav_(() => openTajSupplierDetailPanel(m));
+  openTajItemDetailPanel(r);
 }
 /* ══════════════════════════════════ نهاية تبويب التجهيزات ══════════════════════════════════ */
 
@@ -11907,6 +12945,8 @@ function renderTajheezAllTable() {
         const إجمالي_مخصص_قيمة = fcbSum(taj.map((r) => ({ v: r.مخصص?.قيمة })), "v");
         const إجمالي_احتياج_كمية = fcbSum(taj.map((r) => ({ v: r.احتياج?.كلي })), "v");
         const إجمالي_احتياج_قيمة = fcbSum(taj.map((r) => ({ v: r.احتياج?.قيمة })), "v");
+        const إجمالي_PPP_كمية = fcbSum(taj.map((r) => ({ v: r.ppp?.كلي })), "v");
+        const إجمالي_PPP_قيمة = fcbSum(taj.map((r) => ({ v: r.ppp?.قيمة })), "v");
         // تجميع الاحتياج بالقيمة حسب القسم (أكبر الأقسام احتياجاً)
         const احتياجَ_حسب_القسم = {};
         taj.forEach((r) => {
@@ -11929,7 +12969,7 @@ function renderTajheezAllTable() {
           .slice(0, 20)
           .map((r) => ({ القسم: r.قسم, الصنف: r.صنف, فرق_القيمة: r.فرق_قيمة, فرق_الكمية: r.فرق_كمية }));
         summary.تجهيزات_المخزون = {
-          مصدر: "تبويب التجهيزات — ملف التجهيزات_منظف.csv (مخصص حالي مقابل احتياج فعلي لكل مدينة)",
+          مصدر: "تبويب التجهيزات — شيت التجهيزات_منظف (مخصص/احتياج/PPP موحّدة على 4 مدن رئيسية: مكة تشمل القنفذة والليث، المدينة تشمل ينبع والعلا والمهد)",
           عدد_الأصناف_الإجمالي: taj.length,
           الأقسام: أقسام,
           عدد_الأقسام: أقسام.length,
@@ -11937,6 +12977,8 @@ function renderTajheezAllTable() {
           إجمالي_قيمة_المخصص_حالياً_ريال: +إجمالي_مخصص_قيمة.toFixed(2),
           إجمالي_الكمية_المطلوبة_احتياج: +إجمالي_احتياج_كمية.toFixed(2),
           إجمالي_قيمة_الاحتياج_ريال: +إجمالي_احتياج_قيمة.toFixed(2),
+          إجمالي_الكمية_PPP: +إجمالي_PPP_كمية.toFixed(2),
+          إجمالي_قيمة_PPP_ريال: +إجمالي_PPP_قيمة.toFixed(2),
           الفرق_الإجمالي_قيمة_ريال: +(إجمالي_مخصص_قيمة - إجمالي_احتياج_قيمة).toFixed(2),
           كل_الأقسام_احتياجاً_بالقيمة: كل_الأقسام_احتياجاً_بالقيمة,
           أعلى_25_صنف_احتياجاً_بالقيمة: أعلى_25_صنف_احتياجاً_بالقيمة,
@@ -11945,18 +12987,19 @@ function renderTajheezAllTable() {
             مكة: fcbSum(taj.map((r) => ({ v: r.مخصص?.مكة })), "v"),
             جدة: fcbSum(taj.map((r) => ({ v: r.مخصص?.جدة })), "v"),
             الطائف: fcbSum(taj.map((r) => ({ v: r.مخصص?.الطائف })), "v"),
-            القنفذة: fcbSum(taj.map((r) => ({ v: r.مخصص?.القنفذة })), "v"),
-            الليث: fcbSum(taj.map((r) => ({ v: r.مخصص?.الليث })), "v"),
             المدينة: fcbSum(taj.map((r) => ({ v: r.مخصص?.المدينة })), "v"),
-            ينبع: fcbSum(taj.map((r) => ({ v: r.مخصص?.ينبع })), "v"),
-            العلا: fcbSum(taj.map((r) => ({ v: r.مخصص?.العلا })), "v"),
-            المهد: fcbSum(taj.map((r) => ({ v: r.مخصص?.المهد })), "v"),
           },
           توزيع_الاحتياج_حسب_المدينة: {
             مكة: fcbSum(taj.map((r) => ({ v: r.احتياج?.مكة })), "v"),
             جدة: fcbSum(taj.map((r) => ({ v: r.احتياج?.جدة })), "v"),
             الطائف: fcbSum(taj.map((r) => ({ v: r.احتياج?.الطائف })), "v"),
             المدينة: fcbSum(taj.map((r) => ({ v: r.احتياج?.المدينة })), "v"),
+          },
+          توزيع_PPP_حسب_المدينة: {
+            مكة: fcbSum(taj.map((r) => ({ v: r.ppp?.مكة })), "v"),
+            جدة: fcbSum(taj.map((r) => ({ v: r.ppp?.جدة })), "v"),
+            الطائف: fcbSum(taj.map((r) => ({ v: r.ppp?.الطائف })), "v"),
+            المدينة: fcbSum(taj.map((r) => ({ v: r.ppp?.المدينة })), "v"),
           },
         };
       } else if (tajRaw.length) {
@@ -14364,11 +15407,14 @@ ${(() => {
       csv.push(vals.join(","));
     });
     var blob = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = "البوابين_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 150);
   }
 
   function showErrorState(el, message) {
@@ -14661,11 +15707,14 @@ ${(() => {
       csv.push(vals.join(","));
     });
     var blob = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = "التوظيف_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 150);
   }
 
   function showErrorState(el, message) {
@@ -15479,6 +16528,13 @@ ${(() => {
     if (table.dataset.dlBtnAdded) return;
     if (!table.querySelector("tr")) return;
 
+    // لو الجدول جوّه كارد فيها بالفعل زرار تصدير مخصّص (زي "تحميل كل السجلات ضمن
+    // الفترة المحددة" في تبويب البلاغات) — متضيفش زرار تاني هنا. الزرار الجاهز
+    // بيصدّر كل البيانات المفلترة، أما الزرار العام ده بيقرأ من الجدول المعروض
+    // بس (يعني صفحة واحدة من الـ pagination) فبيدي بيانات ناقصة.
+    var hostCard = table.closest(".card, .panel");
+    if (hostCard && hostCard.querySelector(".export-btn")) return;
+
     table.dataset.dlBtnAdded = "1";
 
     var btn = document.createElement("button");
@@ -15821,6 +16877,15 @@ ${panelHTML}
         transition: background .18s;
       }
       .ix-panel-close:hover { background: rgba(255,255,255,.22); }
+      .ix-panel-back {
+        position: absolute; top: 16px; left: 58px;
+        height: 32px; padding: 0 14px; border-radius: 20px;
+        background: rgba(255,255,255,.1); border: none; color: #fff;
+        font-size: 12px; font-weight: 700; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background .18s;
+      }
+      .ix-panel-back:hover { background: rgba(255,255,255,.22); }
       .ix-panel-school-name {
         font-size: 17px; font-weight: 800; line-height: 1.4;
         max-width: calc(100% - 50px); color: #fff;
@@ -18283,9 +19348,9 @@ function renderFuelTab(_fromDate, _toDate) {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🚗  JS تبويب: السيارات
    ║  (tab-vehicles)
-   ║  أعمدة الشيت: رقم اللوحة، الماركة، الطراز، سنة الصنع،
-   ║               اللون، اسم المستخدم، رقم الهوية، رقم الجوال،
-   ║               موقع السيارة، اعطال/حوادث، ملاحظات، المستخدم البديل
+   ║  أعمدة الشيت الجديدة: رقم اللوحة، الطراز، سنة الصنع،
+   ║               رقم هوية المستخدم الفعلي، اسم المستخدم الفعلي،
+   ║               حالة التفويض، ملاحظات / الموقع
    ╚════════════════════════════════════════════════════════════╝ */
 /* 📏 ملاحظة/برومبت ثابت: أي جدول بيانات (table) داخل أي تبويب لازم يكون
    بحجم صغير ومحدود الارتفاع (overflow:auto + max-height ~420px) زي باقي
@@ -18305,25 +19370,54 @@ function renderVehiclesTab() {
     return;
   }
 
+  function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
   const total        = rows.length;
-  const withFaults   = rows.filter(r => r["اعطال/حوادث"] && r["اعطال/حوادث"] !== "لا يوجد").length;
-  const uniqueUsers  = new Set(rows.map(r=>r["اسم المستخدم"]||"").filter(Boolean)).size;
-  const uniqueLoc    = new Set(rows.map(r=>r["موقع السيارة"]||"").filter(Boolean)).size;
+  const activeUsers   = rows.filter(r => (r["حالة التفويض"]||"").trim() === "مستخدم فعلي").length;
+  const pendingAuth   = rows.filter(r => (r["حالة التفويض"]||"").trim().includes("تفويض حتى")).length;
+  const unauthorized  = rows.filter(r => !(r["حالة التفويض"]||"").trim()).length;
+  const uniqueUsers   = new Set(rows.map(r=>r["اسم المستخدم الفعلي"]||"").filter(Boolean)).size;
 
-  // توزيع حسب الماركة
-  const byMake = {};
-  rows.forEach(r => { const m = r["الماركة"]||"غير محدد"; byMake[m]=(byMake[m]||0)+1; });
-  const makeEntries = Object.entries(byMake).sort((a,b)=>b[1]-a[1]).slice(0,10);
-
-  // توزيع حسب الموقع
-  const byLoc = {};
-  rows.forEach(r => { const l = r["موقع السيارة"]||"غير محدد"; byLoc[l]=(byLoc[l]||0)+1; });
-  const locEntries = Object.entries(byLoc).sort((a,b)=>b[1]-a[1]);
+  // توزيع حسب الطراز
+  const byModel = {};
+  rows.forEach(r => { const m = r["الطراز"]||"غير محدد"; byModel[m]=(byModel[m]||0)+1; });
+  const modelEntries = Object.entries(byModel).sort((a,b)=>b[1]-a[1]);
 
   // توزيع حسب سنة الصنع
   const byYear = {};
   rows.forEach(r => { const y = r["سنة الصنع"]||"غير محدد"; byYear[y]=(byYear[y]||0)+1; });
   const yearEntries = Object.entries(byYear).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+
+  // توزيع حسب حالة التفويض
+  const byStatus = {};
+  rows.forEach(r => {
+    let s = (r["حالة التفويض"]||"").trim();
+    if (!s) s = "بدون تفويض/مستخدم";
+    else if (s.includes("تفويض حتى")) s = "تفويض بتاريخ انتهاء";
+    byStatus[s] = (byStatus[s]||0)+1;
+  });
+  const statusEntries = Object.entries(byStatus).sort((a,b)=>b[1]-a[1]);
+
+  function vehStatusBadge(r) {
+    const st = (r["حالة التفويض"]||"").trim();
+    if (!st) return '<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ بدون تفويض/مستخدم</span>';
+    if (st.includes("تفويض حتى")) return '<span style="background:#FEF3C7;color:#B45309;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⏳ '+esc(st)+'</span>';
+    return '<span style="background:#DCFCE7;color:#15803D;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ '+esc(st)+'</span>';
+  }
+
+  function vehRowHtml(r) {
+    const st = (r["حالة التفويض"]||"").trim();
+    const rowBg = !st ? 'background:#FEF2F2' : (st.includes("تفويض حتى") ? 'background:#FFFBEB' : '');
+    return `<tr style="border-bottom:1px solid var(--brd);${rowBg}">
+      <td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
+      <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
+      <td style="padding:6px 10px;text-align:center">${esc(r["سنة الصنع"])||"—"}</td>
+      <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(r["رقم هوية المستخدم الفعلي"])||"—"}</td>
+      <td style="padding:6px 10px;font-size:11px">${esc(r["اسم المستخدم الفعلي"])||"—"}</td>
+      <td style="padding:6px 10px;text-align:center">${vehStatusBadge(r)}</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:220px">${esc(r["ملاحظات / الموقع"])||"—"}</td>
+    </tr>`;
+  }
 
   el.innerHTML = `
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
@@ -18332,31 +19426,31 @@ function renderVehiclesTab() {
       <div class="kpi-lbl">إجمالي السيارات</div>
       <div class="kpi-sub">سيارة مسجلة</div>
     </div>
-    <div class="kpi kc-red">
-      <div class="kpi-val">${withFaults.toLocaleString()}</div>
-      <div class="kpi-lbl">لديها أعطال/حوادث</div>
-      <div class="kpi-sub">${total ? ((withFaults/total)*100).toFixed(1) : 0}% من الأسطول</div>
-    </div>
     <div class="kpi kc-green">
-      <div class="kpi-val">${uniqueUsers.toLocaleString()}</div>
-      <div class="kpi-lbl">المستخدمون</div>
-      <div class="kpi-sub">مستخدم نشط</div>
+      <div class="kpi-val">${activeUsers.toLocaleString()}</div>
+      <div class="kpi-lbl">مستخدم فعلي</div>
+      <div class="kpi-sub">${total ? ((activeUsers/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
     <div class="kpi kc-purple">
-      <div class="kpi-val">${uniqueLoc.toLocaleString()}</div>
-      <div class="kpi-lbl">المواقع</div>
-      <div class="kpi-sub">موقع مختلف</div>
+      <div class="kpi-val">${pendingAuth.toLocaleString()}</div>
+      <div class="kpi-lbl">تفويض بتاريخ انتهاء</div>
+      <div class="kpi-sub">يحتاج متابعة التجديد</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${unauthorized.toLocaleString()}</div>
+      <div class="kpi-lbl">بدون تفويض/مستخدم</div>
+      <div class="kpi-sub">${total ? ((unauthorized/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
   </div>
 
   <div class="g2 mb14">
     <div class="card">
-      <div class="card-title">توزيع السيارات حسب الماركة</div>
-      <div class="chart-box" style="height:260px"><canvas id="ch-veh-make"></canvas></div>
+      <div class="card-title">توزيع السيارات حسب الطراز</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-model"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">السيارات حسب الموقع</div>
-      <div class="chart-box" style="height:260px"><canvas id="ch-veh-loc"></canvas></div>
+      <div class="card-title">توزيع السيارات حسب حالة التفويض</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-status"></canvas></div>
     </div>
   </div>
 
@@ -18370,11 +19464,11 @@ function renderVehiclesTab() {
       <div class="card-title" style="margin:0;padding:0;border:0">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
       <select class="fsel" id="veh-sort" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
         <option value="plate">رقم اللوحة (أبجدي)</option>
-        <option value="make">الماركة (أبجدي)</option>
+        <option value="model">الطراز (أبجدي)</option>
         <option value="year_desc" selected>السنة ↓ الأحدث</option>
         <option value="year_asc">السنة ↑ الأقدم</option>
-        <option value="loc">الموقع (أبجدي)</option>
-        <option value="fault">الأعطال أولاً</option>
+        <option value="user">اسم المستخدم (أبجدي)</option>
+        <option value="unauth">بدون تفويض أولاً</option>
       </select>
     </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
@@ -18382,30 +19476,15 @@ function renderVehiclesTab() {
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="veh-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
-          <th style="padding:8px 10px;text-align:right">الماركة</th>
           <th style="padding:8px 10px;text-align:right">الطراز</th>
           <th style="padding:8px 10px;text-align:center">السنة</th>
-          <th style="padding:8px 10px;text-align:right">المستخدم</th>
-          <th style="padding:8px 10px;text-align:right">الموقع</th>
-          <th style="padding:8px 10px;text-align:center">أعطال/حوادث</th>
-          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
+          <th style="padding:8px 10px;text-align:right">رقم هوية المستخدم الفعلي</th>
+          <th style="padding:8px 10px;text-align:right">اسم المستخدم الفعلي</th>
+          <th style="padding:8px 10px;text-align:center">حالة التفويض</th>
+          <th style="padding:8px 10px;text-align:right">ملاحظات / الموقع</th>
         </tr></thead>
         <tbody id="veh-tbody">
-          ${rows.map(r => {
-            const hasFault = r["اعطال/حوادث"] && r["اعطال/حوادث"] !== "لا يوجد";
-            return `<tr style="border-bottom:1px solid var(--brd);${hasFault?'background:#FEF2F2':''}">
-              <td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
-              <td style="padding:6px 10px">${esc(r["الماركة"])||"—"}</td>
-              <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
-              <td style="padding:6px 10px;text-align:center">${esc(r["سنة الصنع"])||"—"}</td>
-              <td style="padding:6px 10px;font-size:11px">${esc(r["اسم المستخدم"])||"—"}</td>
-              <td style="padding:6px 10px;font-size:11px">${esc(r["موقع السيارة"])||"—"}</td>
-              <td style="padding:6px 10px;text-align:center">${hasFault
-                ? `<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ ${esc(r["اعطال/حوادث"])}</span>`
-                : '<span style="color:var(--tx-muted);font-size:11px">—</span>'}</td>
-              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">${esc(r["ملاحظات"])||"—"}</td>
-            </tr>`;
-          }).join('')}
+          ${rows.map(r => vehRowHtml(r)).join('')}
         </tbody>
       </table>
     </div>
@@ -18414,22 +19493,22 @@ function renderVehiclesTab() {
   requestAnimationFrame(() => {
     const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info(),CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.info()];
 
-    const cMake = document.getElementById("ch-veh-make");
-    if (cMake && typeof Chart !== "undefined") {
-      killChart("ch-veh-make");
-      CHARTS["ch-veh-make"] = new Chart(cMake, {
+    const cModel = document.getElementById("ch-veh-model");
+    if (cModel && typeof Chart !== "undefined") {
+      killChart("ch-veh-model");
+      CHARTS["ch-veh-model"] = new Chart(cModel, {
         type:"doughnut",
-        data:{ labels:makeEntries.map(e=>e[0]), datasets:[{ data:makeEntries.map(e=>e[1]), backgroundColor:PAL, borderWidth:2 }] },
+        data:{ labels:modelEntries.map(e=>e[0]), datasets:[{ data:modelEntries.map(e=>e[1]), backgroundColor:PAL, borderWidth:2 }] },
         options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}} }
       });
     }
 
-    const cLoc = document.getElementById("ch-veh-loc");
-    if (cLoc && typeof Chart !== "undefined") {
-      killChart("ch-veh-loc");
-      CHARTS["ch-veh-loc"] = new Chart(cLoc, {
+    const cStatus = document.getElementById("ch-veh-status");
+    if (cStatus && typeof Chart !== "undefined") {
+      killChart("ch-veh-status");
+      CHARTS["ch-veh-status"] = new Chart(cStatus, {
         type:"bar",
-        data:{ labels:locEntries.map(e=>e[0]), datasets:[{ data:locEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.special(), borderRadius:4 }] },
+        data:{ labels:statusEntries.map(e=>e[0]), datasets:[{ data:statusEntries.map(e=>e[1]), backgroundColor:[CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.danger()], borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
       });
     }
@@ -18450,32 +19529,21 @@ function renderVehiclesTab() {
     var sort = document.getElementById('veh-sort') ? document.getElementById('veh-sort').value : 'year_desc';
     var tbody = document.getElementById('veh-tbody');
     if (!tbody) return;
-    var rows = window.RAW_VEHICLES ? [...window.RAW_VEHICLES] : [];
-    rows.sort(function(a,b){
+    var vrows = window.RAW_VEHICLES ? [...window.RAW_VEHICLES] : [];
+    vrows.sort(function(a,b){
       if (sort==='plate') return String(a['رقم اللوحة']||'').localeCompare(String(b['رقم اللوحة']||''),'ar');
-      if (sort==='make') return String(a['الماركة']||'').localeCompare(String(b['الماركة']||''),'ar');
+      if (sort==='model') return String(a['الطراز']||'').localeCompare(String(b['الطراز']||''),'ar');
       if (sort==='year_desc') return Number(b['سنة الصنع']||0) - Number(a['سنة الصنع']||0);
       if (sort==='year_asc') return Number(a['سنة الصنع']||0) - Number(b['سنة الصنع']||0);
-      if (sort==='loc') return String(a['موقع السيارة']||'').localeCompare(String(b['موقع السيارة']||''),'ar');
-      if (sort==='fault') { var fa=a['اعطال/حوادث']&&a['اعطال/حوادث']!=='لا يوجد'?0:1; var fb=b['اعطال/حوادث']&&b['اعطال/حوادث']!=='لا يوجد'?0:1; return fa-fb; }
+      if (sort==='user') return String(a['اسم المستخدم الفعلي']||'').localeCompare(String(b['اسم المستخدم الفعلي']||''),'ar');
+      if (sort==='unauth') {
+        var fa = (a['حالة التفويض']||'').trim() ? 1 : 0;
+        var fb = (b['حالة التفويض']||'').trim() ? 1 : 0;
+        return fa-fb;
+      }
       return 0;
     });
-    function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-    tbody.innerHTML = rows.map(function(r){
-      var hasFault = r['اعطال/حوادث'] && r['اعطال/حوادث'] !== 'لا يوجد';
-      return '<tr style="border-bottom:1px solid var(--brd);'+(hasFault?'background:#FEF2F2':'')+'">'+
-        '<td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">'+esc(r['رقم اللوحة']||'—')+'</td>'+
-        '<td style="padding:6px 10px">'+esc(r['الماركة']||'—')+'</td>'+
-        '<td style="padding:6px 10px">'+esc(r['الطراز']||'—')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center">'+esc(r['سنة الصنع']||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px">'+esc(r['اسم المستخدم']||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px">'+esc(r['موقع السيارة']||'—')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center">'+(hasFault
-          ?'<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ '+esc(r['اعطال/حوادث'])+'</span>'
-          :'<span style="color:var(--tx-muted);font-size:11px">—</span>')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">'+esc(r['ملاحظات']||'—')+'</td>'+
-        '</tr>';
-    }).join('');
+    tbody.innerHTML = vrows.map(function(r){ return vehRowHtml(r); }).join('');
   };
 }
 

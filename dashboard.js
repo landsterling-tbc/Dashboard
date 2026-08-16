@@ -24792,3 +24792,88 @@ setTimeout(function tellUserStillTrying() {
 
 })();
 /* ══ نهاية Dashboard Context Builder v1.0 ══ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Portal Home — ساعة حية + شريط إحصائيات سريعة (Wall-Screen Enhancements)
+   ────────────────────────────────────────────────────────────────────────
+   إضافة مستقلة تماماً — بدون أي لمس لمنطق أو IDs الداشبورد الأصلي:
+   • تُنشئ عنصر ساعة حية داخل .portal-hero-meta (تحديث كل ثانية)
+   • تُنشئ شريط إحصائيات سريعة (مدارس / أصول / بلاغات / آخر تحديث)
+     أسفل الـ Hero مباشرة، وتُحدّثه بقراءة نصوص العناصر الموجودة
+     أصلاً (k-total / k-assets-total / k-alerts-total / portalLastUpdate)
+     — قراءة فقط، لا تُعدّل أو تحسب أي شيء بنفسها.
+   • كل شيء داخل try/catch ولا يفشل بصمت إن لم توجد العناصر بعد.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  function mirrorText(fromId, toId) {
+    try {
+      var src = document.getElementById(fromId);
+      var dst = document.getElementById(toId);
+      if (src && dst) {
+        var t = (src.textContent || "").trim();
+        if (t && t !== "—" && t !== "-") dst.textContent = t;
+      }
+    } catch (e) {}
+  }
+
+  function initPortalWallScreen() {
+    try {
+      /* ── الساعة الحية ── */
+      var heroMeta = document.querySelector(".portal-hero-meta");
+      if (heroMeta && !document.getElementById("portalLiveClock")) {
+        var clock = document.createElement("span");
+        clock.id = "portalLiveClock";
+        clock.className = "portal-live-clock";
+        heroMeta.insertBefore(clock, heroMeta.firstChild);
+        var tick = function () {
+          try {
+            clock.textContent = new Date().toLocaleTimeString("ar-SA", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+          } catch (e) {}
+        };
+        tick();
+        setInterval(tick, 1000);
+      }
+
+      /* ── شريط الإحصائيات السريعة ── */
+      var grid = document.getElementById("portalCardsGrid");
+      if (grid && grid.parentElement && !document.getElementById("portalQuickStats")) {
+        var strip = document.createElement("div");
+        strip.id = "portalQuickStats";
+        strip.className = "portal-quick-stats";
+        strip.innerHTML =
+          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-schools">—</div><div class="portal-stat-lbl">🏫 عدد المدارس</div></div>' +
+          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-assets">—</div><div class="portal-stat-lbl">📦 إجمالي الأصول</div></div>' +
+          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-reports">—</div><div class="portal-stat-lbl">📢 إجمالي البلاغات</div></div>' +
+          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-updated">—</div><div class="portal-stat-lbl">🕐 آخر تحديث بيانات</div></div>';
+        grid.parentElement.insertBefore(strip, grid);
+
+        var refresh = function () {
+          try {
+            mirrorText("k-total", "pqs-schools");
+            mirrorText("k-assets-total", "pqs-assets");
+            mirrorText("k-alerts-total", "pqs-reports");
+            mirrorText("portalLastUpdate", "pqs-updated");
+          } catch (e) {}
+        };
+        refresh();
+        setInterval(refresh, 5000);
+      }
+    } catch (e) {
+      console.warn("[PortalWallScreen]", e);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initPortalWallScreen);
+  } else {
+    initPortalWallScreen();
+  }
+  // إعادة محاولة لاحقاً في حال لم تكن عناصر الـ Portal جاهزة بعد عند أول تشغيل
+  setTimeout(initPortalWallScreen, 1200);
+  setTimeout(initPortalWallScreen, 3500);
+})();
+/* ══ نهاية Portal Home Wall-Screen Enhancements ══ */

@@ -4996,3 +4996,222 @@ tbody tr:last-child td:last-child {
   border: 1px solid rgba(13,132,156,.22);
   margin: 0 auto;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 13 — PORTAL HOME: رفع بصري أكبر (Hero + Cards + Watermarks)
+   ──────────────────────────────────────────────────────────────
+   إضافات CSS بحتة فقط — بدون أي تعديل على HTML/JS أو IDs:
+   1) Hero بنمط شبكي خفيف + توهج خلف الشعار
+   2) أيقونات الكروت بحجم أكبر داخل مربع متدرّج بلون الفئة
+   3) علامة مائية (emoji الفئة نفسه) شفافة جداً خلف كل كارت لعمق بصري
+   4) عناوين أكبر ووصف أوضح + hover أكثر ثراءً (رفع + توهج + ظل ملوّن)
+   5) الشريط اللوني أعلى الكارت أسمك بأطراف دائرية
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 13-A: Hero — عمق ونمط شبكي خفيف ─────────────────────────── */
+.portal-hero {
+  padding: 26px 32px;         /* ↑ من 18px 26px — حضور أكبر */
+  background:
+    radial-gradient(ellipse 55% 140% at 3% 50%, rgba(13,132,156,.22), transparent),
+    radial-gradient(ellipse 35% 90% at 97% 20%, rgba(176,138,78,.14), transparent),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, transparent 1px, transparent 34px),
+    linear-gradient(135deg, #0a2535 0%, #0e3347 45%, #123b52 100%);
+}
+
+.portal-hero-brand { gap: 16px; }
+
+.portal-logo { height: 22px; }
+.portal-logo-tbc { height: 29px; }
+
+.portal-title {
+  font-size: 18px;            /* ↑ من 16px */
+}
+
+.portal-sub {
+  font-size: 10.5px;
+}
+
+.portal-updated-val {
+  background: rgba(255,255,255,.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+
+/* ── 13-B: Cards Grid — تنفّس أكبر ───────────────────────────── */
+.portal-cards-grid { gap: 22px; }
+
+/* ── 13-C: Cards — حجم وثراء بصري أكبر ──────────────────────── */
+.portal-card {
+  padding: 28px 24px 26px;    /* ↑ من 22px 20px */
+  gap: 14px;                  /* ↑ من 10px */
+}
+
+.portal-card::before {
+  height: 4px;                /* ↑ من 3px */
+  border-radius: 4px 4px 0 0;
+}
+
+.portal-card-icon {
+  width: 58px;                /* ↑ من 48px */
+  height: 58px;
+  font-size: 34px;             /* ↑ من 30px */
+  border-radius: 18px;         /* مربّع دائري ناعم (squircle) بدل الدائرة الكاملة */
+}
+
+.portal-card-title {
+  font-size: 16.5px;           /* ↑ من 15px */
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.portal-card-desc {
+  font-size: 12px;             /* ↑ من 11.5px */
+}
+
+/* علامة مائية خفيفة جداً — نفس أيقونة الفئة مكبّرة وشفافة في خلفية الكارت */
+.portal-card { isolation: isolate; }
+.portal-card::after {
+  content: attr(data-wm);
+  position: absolute;
+  left: -10px;
+  bottom: -22px;
+  font-size: 92px;
+  line-height: 1;
+  opacity: .05;
+  filter: grayscale(1);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity .25s ease, transform .3s ease;
+}
+.portal-card:hover::after {
+  opacity: .09;
+  transform: scale(1.06) rotate(-3deg);
+}
+.portal-card > * { position: relative; z-index: 1; }
+
+/* ── 13-D: Hover — رفع أوضح مع توهّج ملوّن أقوى ───────────────── */
+.portal-card:hover {
+  transform: translateY(-6px) scale(1.012);
+}
+
+/* ── 13-E: كارت المفضلة — تكبير متسق مع باقي الكروت ─────────── */
+.portal-favorites-card { padding: 26px 22px; }
+.portal-favorites-empty { gap: 18px; }
+.portal-favorites-empty::before { width: 52px; height: 52px; font-size: 24px; }
+.portal-favorites-empty-text { font-size: 13px; }
+.portal-favorites-cta-btn {
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(13,47,64,.22);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.portal-favorites-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(13,47,64,.28);
+}
+
+@media (max-width: 640px) {
+  .portal-hero { padding: 20px; }
+  .portal-card { padding: 22px 18px; }
+  .portal-card-icon { width: 50px; height: 50px; font-size: 28px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 14 — شاشة عرض دائمة (Wall Screen): حياة بصرية + ساعة حية
+   + إحصائيات سريعة
+   ──────────────────────────────────────────────────────────────
+   بما إن هذه الصفحة ستُترك مفتوحة على شاشة العمل أغلب الوقت،
+   نضيف: (1) حركة خلفية بطيئة جداً في الـ hero تخلي الشاشة "حية"
+   بدل ثابتة تماماً، (2) ساعة حية، (3) شريط إحصائيات سريعة
+   (مدارس/أصول/بلاغات/آخر تحديث) يُقرأ من نفس الأرقام الموجودة
+   بالفعل في الداشبورد (بدون حساب مزدوج)، (4) نبضة هادئة جداً على
+   أيقونة كل كارت بلون الفئة نفسها لجذب الانتباه بلطف مع الوقت.
+   كل شيء هنا CSS بحت + JS إضافي منفصل يقرأ فقط ولا يعدّل أي شيء
+   من منطق الداشبورد الأصلي.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 14-A: حركة خلفية بطيئة في الـ Hero ─────────────────────── */
+@keyframes heroAmbient {
+  0%, 100% { background-position: 0% 50%, 100% 20%, 0 0, 0 0; }
+  50%      { background-position: 10% 55%, 90% 26%, 40px 22px, 0 0; }
+}
+.portal-hero {
+  background-size: 150% 150%, 150% 150%, auto, auto;
+  animation: heroAmbient 16s ease-in-out infinite;
+}
+
+/* ── 14-B: ساعة حية داخل الـ Hero ────────────────────────────── */
+.portal-live-clock {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .03em;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  padding: 5px 16px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1);
+}
+
+/* ── 14-C: شريط إحصائيات سريعة تحت الـ Hero ─────────────────── */
+.portal-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  animation: portalCardIn .4s var(--ease-std) both;
+  animation-delay: .02s;
+}
+.portal-stat {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  border: 1px solid rgba(185,208,219,.6);
+  border-radius: var(--r-md);
+  padding: 18px 12px 16px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(8,45,60,.05), 0 6px 18px rgba(8,45,60,.07);
+  transition: transform .2s var(--ease-std), box-shadow .2s ease;
+}
+.portal-stat:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(8,45,60,.06), 0 14px 28px rgba(8,45,60,.1); }
+.portal-stat::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--c-info), var(--c-accent));
+  opacity: .55;
+}
+.portal-stat-val {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 27px;
+  font-weight: 900;
+  color: var(--c-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.portal-stat-lbl {
+  font-size: 11px;
+  color: var(--tx-muted);
+  font-weight: 700;
+  margin-top: 5px;
+}
+
+@media (max-width: 900px) {
+  .portal-quick-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── 14-D: نبضة هادئة على أيقونة كل كارت بلون الفئة (currentColor) ── */
+@keyframes iconBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 0 7px color-mix(in srgb, currentColor 16%, transparent); }
+}
+.portal-card-icon { animation: iconBreathe 3.8s ease-in-out infinite; }
+.portal-card:nth-child(2) .portal-card-icon { animation-delay: .5s; }
+.portal-card:nth-child(3) .portal-card-icon { animation-delay: 1s; }
+.portal-card:nth-child(4) .portal-card-icon { animation-delay: 1.5s; }
+.portal-card:nth-child(5) .portal-card-icon { animation-delay: 2s; }
+.portal-card:nth-child(6) .portal-card-icon { animation-delay: 2.5s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-hero, .portal-card-icon { animation: none !important; }
+}

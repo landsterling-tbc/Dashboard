@@ -761,9 +761,15 @@
 
       <!-- جدول ديناميكي -->
       <div class="card">
-        <div class="card-title">
-          <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">📋</span>
-          جدول المدارس — كل المراحل
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span>
+            <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">📋</span>
+            جدول المدارس — كل المراحل
+          </span>
+          <span style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="export-btn export-btn-csv" onclick="exportStageCompareCSV()">⬇ CSV</button>
+            <button type="button" class="export-btn export-btn-excel" onclick="exportStageCompareExcel()">⬇ Excel</button>
+          </span>
         </div>
         <div id="stageCompareEmpty" class="empty-msg" style="display:none;margin-bottom:14px">
           لا توجد بيانات كافية لعرضها.

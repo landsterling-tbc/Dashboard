@@ -2174,6 +2174,11 @@ function renderStageCompareTab() {
     return a.school.localeCompare(b.school,"ar");
   });
 
+  /* ── حفظ نسخة كاملة (بدون أي قصّ) لاستخدامها في التنزيل ── */
+  window._stageCompareRows   = rows;
+  window._stageCompareStages = allStages;
+  window._stageCompareLabel  = stageLabel;
+
   /* ── KPIs ── */
   const kpisEl = document.getElementById("stageCompareKpis");
   if(kpisEl){
@@ -2368,8 +2373,7 @@ function renderStageCompareTab() {
     tbody.innerHTML="";
     if(rows.length){
       const frag=document.createDocumentFragment();
-      // pagination simple: show all (could add paging later)
-      rows.slice(0,500).forEach(r=>{
+      rows.forEach(r=>{
         const tr=document.createElement("tr");
         const stageCells=allStages.map((s,i)=>{
           const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
@@ -2394,6 +2398,81 @@ function renderStageCompareTab() {
     }
   }
 }
+
+/* ── تنزيل جدول "مقارنة مراحل FCA" كاملاً (بدون أي قصّ) ── */
+window.exportStageCompareCSV = function () {
+  try {
+    const rows   = window._stageCompareRows   || [],
+      stages     = window._stageCompareStages || [],
+      stageLabel = window._stageCompareLabel  || ((s) => s);
+    const headers = [
+      "اسم المدرسة", "الرقم الوزاري", "المنطقة", "المحافظة",
+      ...stages.map(stageLabel),
+      "متوسط",
+    ];
+    const csv = [headers.map(_sysCsvCell).join(",")];
+    rows.forEach((r) => {
+      csv.push(
+        [
+          r.school || "",
+          r.minId || "",
+          r.city || "",
+          r.sector || "",
+          ...stages.map((s) => {
+            const sd = r.stageData[s];
+            return sd && sd.avg != null ? sd.avg.toFixed(1) : "";
+          }),
+          r.overallAvg != null ? r.overallAvg.toFixed(1) : "",
+        ]
+          .map(_sysCsvCell)
+          .join(","),
+      );
+    });
+    _sysDownloadFile(
+      `مقارنة_مراحل_FCA_${new Date().toISOString().slice(0, 10)}.csv`,
+      `\ufeff${csv.join("\r\n")}`,
+      "text/csv;charset=utf-8;",
+    );
+  } catch (err) {
+    console.warn("[exportStageCompareCSV] خطأ:", err);
+  }
+};
+
+window.exportStageCompareExcel = function () {
+  try {
+    const rows   = window._stageCompareRows   || [],
+      stages     = window._stageCompareStages || [],
+      stageLabel = window._stageCompareLabel  || ((s) => s);
+    const headers = [
+      "اسم المدرسة", "الرقم الوزاري", "المنطقة", "المحافظة",
+      ...stages.map(stageLabel),
+      "متوسط",
+    ];
+    const dataArr = [headers];
+    rows.forEach((r) => {
+      dataArr.push([
+        r.school || "",
+        r.minId || "",
+        r.city || "",
+        r.sector || "",
+        ...stages.map((s) => {
+          const sd = r.stageData[s];
+          return sd && sd.avg != null ? +sd.avg.toFixed(1) : "";
+        }),
+        r.overallAvg != null ? +r.overallAvg.toFixed(1) : "",
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(dataArr);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "مقارنة مراحل FCA");
+    XLSX.writeFile(
+      wb,
+      `مقارنة_مراحل_FCA_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  } catch (err) {
+    console.warn("[exportStageCompareExcel] خطأ:", err);
+  }
+};
 
 // ════════════════════════════════════════════════════════════════════════
 // renderFcaRefTab — جدول FCA المرجعي (آخر تقييم لكل مدرسة)
@@ -6992,10 +7071,6 @@ function _sysDownloadFile(filename, content, mime) {
       .trim();
   }
 
-  function toLower(v) {
-    return norm(v).toLowerCase();
-  }
-
   const BALAGH_STATUS_LABELS = {
     Open: "مفتوح",
     New: "جديد",
@@ -7037,14 +7112,6 @@ function _sysDownloadFile(filename, content, mime) {
 
   function balaghIsClosed(status) {
     return BALAGH_CLOSED_STATUSES.has(
-      String(status ?? "")
-        .trim()
-        .toLowerCase(),
-    );
-  }
-
-  function balaghIsInProgress(status) {
-    return BALAGH_INPROGRESS_STATUSES.has(
       String(status ?? "")
         .trim()
         .toLowerCase(),
@@ -7119,11 +7186,6 @@ function _sysDownloadFile(filename, content, mime) {
   function balaghPriorityLabel(v) {
     const k = norm(v);
     return BALAGH_PRIORITY_LABELS[k] || k || "—";
-  }
-
-  function parseNumFromText(v) {
-    const m = String(v ?? "").match(/-?\d+/);
-    return m ? Number(m[0]) : null;
   }
 
   // يحاول تفسير تاريخ من نصوص بصيغ مختلفة (YYYY-MM-DD أو DD/MM/YYYY أو غيرها)
@@ -7904,6 +7966,59 @@ function _sysDownloadFile(filename, content, mime) {
           <div class="chart-box" style="height:220px"><canvas id="balagh-cat-trend-chart"></canvas></div>
       </div>
 
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F0FDFA;color:#0F766E">🧭</span>
+          <span>تحليل متقدم — الحالة، الأولوية، والتزام SLA</span>
+          <span class="sub">${fmt(filteredTotal)} سجل ضمن الفلاتر الحالية</span>
+        </div>
+        <div class="g3" style="margin-bottom:0">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--tx-sec);margin-bottom:8px;text-align:center">توزيع الحالة</div>
+            <div class="chart-box" style="height:230px"><canvas id="balagh-status-donut"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--tx-sec);margin-bottom:8px;text-align:center">توزيع الأولوية</div>
+            <div class="chart-box" style="height:230px"><canvas id="balagh-priority-donut"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--tx-sec);margin-bottom:8px;text-align:center">التزام SLA</div>
+            <div class="chart-box" style="height:230px"><canvas id="balagh-sla-donut"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#FFF1F2;color:#9F1239">🔥</span>
+          <span>أعلى الفئات حسب الأولوية</span>
+          <span class="sub">أعلى 8 فئات — توزيع درجات الأولوية داخل كل فئة</span>
+        </div>
+        <div class="chart-box" style="height:320px"><canvas id="balagh-cat-priority-stacked"></canvas></div>
+      </div>
+
+      <div class="g2 mb14" style="align-items:start">
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-icon" style="background:#EFF6FF;color:#1E3A8A">🎯</span>
+            <span>مصفوفة مخاطر المدارس</span>
+            <span class="sub">إجمالي مقابل عالية الخطورة</span>
+          </div>
+          <div style="font-size:11px;color:var(--tx-muted);padding:0 14px 6px;line-height:1.7">
+            كل نقطة = مدرسة. المحور الأفقي: إجمالي البلاغات. المحور الرأسي: البلاغات عالية الخطورة (حرج + مرتفع). المدارس في أعلى يمين الرسم هي الأكثر احتياجاً للمتابعة.
+          </div>
+          <div class="chart-box" style="height:300px"><canvas id="balagh-school-risk-scatter"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-icon" style="background:#F0FDF4;color:#15803D">⏱️</span>
+            <span>متوسط زمن الحل شهرياً</span>
+            <span class="sub">للبلاغات المغلقة فقط (أيام)</span>
+          </div>
+          <div class="chart-box" style="height:300px"><canvas id="balagh-resolution-trend-chart"></canvas></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">
           <span class="card-title-icon" style="background:#EEF2FF;color:#4338CA">🧾</span>
@@ -8047,6 +8162,12 @@ function _sysDownloadFile(filename, content, mime) {
         "balagh-status-monthly-chart",
         "balagh-weekly-chart",
         "balagh-cat-trend-chart",
+        "balagh-status-donut",
+        "balagh-priority-donut",
+        "balagh-sla-donut",
+        "balagh-cat-priority-stacked",
+        "balagh-school-risk-scatter",
+        "balagh-resolution-trend-chart",
       ];
       if (!allRowsForTime.length) {
         timeChartsIds.forEach((id) => {
@@ -8342,6 +8463,300 @@ function _sysDownloadFile(filename, content, mime) {
             },
           },
         );
+      }
+
+      // ═══ 6. توزيع الحالة (Donut) ═══
+      function destroyChart_(id) {
+        if (typeof CHARTS !== "undefined" && CHARTS[id]) {
+          try { CHARTS[id].destroy(); } catch (e) {}
+          delete CHARTS[id];
+        }
+      }
+      const donutOpts = (title) => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: {
+          legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 9, boxHeight: 9 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const ds = ctx.dataset.data;
+                const sum = ds.reduce((a, b) => a + b, 0) || 1;
+                const v = ds[ctx.dataIndex];
+                return ` ${ctx.label}: ${fmt(v)} (${((v / sum) * 100).toFixed(1)}%)`;
+              },
+            },
+          },
+        },
+      });
+
+      if (document.getElementById("balagh-status-donut")) {
+        destroyChart_("balagh-status-donut");
+        const openN = allRowsForTime.filter((r) => r.isOpen).length;
+        const closedN = allRowsForTime.filter((r) => r.isClosed).length;
+        CHARTS["balagh-status-donut"] = new Chart(document.getElementById("balagh-status-donut"), {
+          type: "doughnut",
+          data: {
+            labels: ["مفتوحة", "مغلقة"],
+            datasets: [
+              {
+                data: [openN, closedN],
+                backgroundColor: [CSS_TOKENS.danger(), CSS_TOKENS.positive()],
+                borderColor: "var(--bg-2)",
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: donutOpts(),
+        });
+      }
+
+      // ═══ 7. توزيع الأولوية (Donut) ═══
+      if (document.getElementById("balagh-priority-donut")) {
+        destroyChart_("balagh-priority-donut");
+        const prMap = new Map();
+        allRowsForTime.forEach((r) => {
+          const label = balaghPriorityLabel(r.priority);
+          prMap.set(label, (prMap.get(label) || 0) + 1);
+        });
+        const prOrder = ["حرج", "مرتفع", "متوسط", "منخفض"];
+        const prLabels = [...prMap.keys()].sort(
+          (a, b) => (prOrder.indexOf(a) === -1 ? 99 : prOrder.indexOf(a)) - (prOrder.indexOf(b) === -1 ? 99 : prOrder.indexOf(b)),
+        );
+        const prColors = {
+          حرج: CSS_TOKENS.danger(),
+          مرتفع: CSS_TOKENS.warning(),
+          متوسط: CSS_TOKENS.info(),
+          منخفض: CSS_TOKENS.positive(),
+        };
+        CHARTS["balagh-priority-donut"] = new Chart(document.getElementById("balagh-priority-donut"), {
+          type: "doughnut",
+          data: {
+            labels: prLabels,
+            datasets: [
+              {
+                data: prLabels.map((l) => prMap.get(l) || 0),
+                backgroundColor: prLabels.map((l, i) => prColors[l] || PALETTE[i % PALETTE.length]),
+                borderColor: "var(--bg-2)",
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: donutOpts(),
+        });
+      }
+
+      // ═══ 8. التزام SLA (Donut) ═══
+      if (document.getElementById("balagh-sla-donut")) {
+        destroyChart_("balagh-sla-donut");
+        const overdueN = allRowsForTime.filter((r) => r.isOverdue).length;
+        const okN = allRowsForTime.length - overdueN;
+        CHARTS["balagh-sla-donut"] = new Chart(document.getElementById("balagh-sla-donut"), {
+          type: "doughnut",
+          data: {
+            labels: ["ضمن SLA", "متأخر (تم اختراقه)"],
+            datasets: [
+              {
+                data: [okN, overdueN],
+                backgroundColor: [CSS_TOKENS.positive(), CSS_TOKENS.danger()],
+                borderColor: "var(--bg-2)",
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: donutOpts(),
+        });
+      }
+
+      // ═══ 9. أعلى الفئات حسب الأولوية (Stacked horizontal bar) ═══
+      if (document.getElementById("balagh-cat-priority-stacked")) {
+        destroyChart_("balagh-cat-priority-stacked");
+        const catPrMap = {};
+        allRowsForTime.forEach((r) => {
+          const cat = r.category || "غير مصنّف";
+          const pr = balaghPriorityLabel(r.priority);
+          if (!catPrMap[cat]) catPrMap[cat] = {};
+          catPrMap[cat][pr] = (catPrMap[cat][pr] || 0) + 1;
+        });
+        const topCats = Object.entries(catPrMap)
+          .map(([cat, m]) => ({ cat, total: Object.values(m).reduce((a, b) => a + b, 0), m }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 8);
+        const prLevels = ["حرج", "مرتفع", "متوسط", "منخفض"];
+        const prColors2 = {
+          حرج: CSS_TOKENS.danger(),
+          مرتفع: CSS_TOKENS.warning(),
+          متوسط: CSS_TOKENS.info(),
+          منخفض: CSS_TOKENS.positive(),
+        };
+        CHARTS["balagh-cat-priority-stacked"] = new Chart(
+          document.getElementById("balagh-cat-priority-stacked"),
+          {
+            type: "bar",
+            data: {
+              labels: topCats.map((c) => c.cat),
+              datasets: prLevels.map((pr) => ({
+                label: pr,
+                data: topCats.map((c) => c.m[pr] || 0),
+                backgroundColor: CSS_TOKENS.α(prColors2[pr], 0.75),
+                borderColor: prColors2[pr],
+                borderWidth: 1.5,
+              })),
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 9, boxHeight: 9 } },
+                tooltip: { mode: "index", intersect: false },
+                tbcPremiumValueLabels: false,
+              },
+              scales: {
+                x: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } },
+                y: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
+              },
+            },
+          },
+        );
+      }
+
+      // ═══ 10. مصفوفة مخاطر المدارس (Scatter) ═══
+      if (document.getElementById("balagh-school-risk-scatter")) {
+        destroyChart_("balagh-school-risk-scatter");
+        const schMap = {};
+        allRowsForTime.forEach((r) => {
+          const key = r.schoolKey || "NM::" + (r.schoolName || "غير معروف");
+          if (!schMap[key]) {
+            schMap[key] = { name: r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || key), total: 0, highRisk: 0 };
+          }
+          schMap[key].total++;
+          if (isHighRiskPriority(r.priority)) schMap[key].highRisk++;
+        });
+        const schoolPoints = Object.values(schMap)
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 40)
+          .map((s) => ({ x: s.total, y: s.highRisk, name: s.name }));
+        CHARTS["balagh-school-risk-scatter"] = new Chart(
+          document.getElementById("balagh-school-risk-scatter"),
+          {
+            type: "scatter",
+            data: {
+              datasets: [
+                {
+                  label: "مدرسة",
+                  data: schoolPoints,
+                  backgroundColor: CSS_TOKENS.α(CSS_TOKENS.special(), 0.65),
+                  borderColor: CSS_TOKENS.special(),
+                  borderWidth: 1.5,
+                  pointRadius: 6,
+                  pointHoverRadius: 9,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const p = ctx.raw;
+                      return ` ${p.name}: إجمالي ${fmt(p.x)} · عالية الخطورة ${fmt(p.y)}`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  title: { display: true, text: "إجمالي البلاغات", color: CSS_TOKENS.txMuted(), font: { size: 10, weight: "700" } },
+                  ticks: { font: { size: 10 } },
+                  grid: { color: "rgba(168,195,214,.15)" },
+                },
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: "بلاغات عالية الخطورة", color: CSS_TOKENS.txMuted(), font: { size: 10, weight: "700" } },
+                  ticks: { font: { size: 10 } },
+                  grid: { color: "rgba(168,195,214,.15)" },
+                },
+              },
+            },
+          },
+        );
+      }
+
+      // ═══ 11. متوسط زمن الحل شهرياً (خط) ═══
+      if (document.getElementById("balagh-resolution-trend-chart")) {
+        destroyChart_("balagh-resolution-trend-chart");
+        const resMonthMap = new Map(); // monthKey -> [days...]
+        allRowsForTime.forEach((r) => {
+          if (!r.isClosed) return;
+          const startD = r.creationDateObj;
+          const endD = parseBalaghDate(r.finishDate);
+          if (!startD || !endD) return;
+          const days = (endD.getTime() - startD.getTime()) / 86400000;
+          if (!isFinite(days) || days < 0) return;
+          const k = parseMonthKey(startD);
+          if (!k) return;
+          if (!resMonthMap.has(k)) resMonthMap.set(k, []);
+          resMonthMap.get(k).push(days);
+        });
+        const resMonths = [...resMonthMap.keys()].sort().slice(-12);
+        if (!resMonths.length) {
+          const el3 = document.getElementById("balagh-resolution-trend-chart");
+          el3.parentElement.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:var(--tx-muted);font-size:12px;font-weight:600">لا توجد بيانات كافية (تاريخ حل) لحساب متوسط زمن الإغلاق</div>';
+        } else {
+          const resLabels = resMonths.map(monthKeyToLabel);
+          const resVals = resMonths.map((k) => {
+            const arr = resMonthMap.get(k);
+            return +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+          });
+          CHARTS["balagh-resolution-trend-chart"] = new Chart(
+            document.getElementById("balagh-resolution-trend-chart"),
+            {
+              type: "line",
+              data: {
+                labels: resLabels,
+                datasets: [
+                  {
+                    label: "متوسط أيام الحل",
+                    data: resVals,
+                    backgroundColor: CSS_TOKENS.α(CSS_TOKENS.info2(), 0.14),
+                    borderColor: CSS_TOKENS.info2(),
+                    borderWidth: 2.5,
+                    pointBackgroundColor: CSS_TOKENS.info2(),
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    fill: true,
+                    tension: 0.35,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: { label: (ctx) => ` متوسط ${ctx.parsed.y} يوم` },
+                  },
+                },
+                scales: {
+                  x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { color: "rgba(168,195,214,.15)" } },
+                  y: {
+                    beginAtZero: true,
+                    ticks: { font: { size: 10 } },
+                    title: { display: true, text: "أيام", color: CSS_TOKENS.txMuted(), font: { size: 10, weight: "700" } },
+                  },
+                },
+              },
+            },
+          );
+        }
       }
      } catch (err) {
        console.warn("[balagh charts] خطأ أثناء رسم الشارتات الزمنية:", err);
@@ -10283,11 +10698,6 @@ window.renderElevatorStatusTab = function () {
     return Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " SAR";
   }
 
-  function payPct(n) {
-    if (n === null || n === undefined || isNaN(n)) return "—";
-    return (Number(n) * 100 > 1 ? Number(n).toFixed(1) : (Number(n) * 100).toFixed(1) + "%");
-  }
-
   let PAY_CHART = null;
 
   function killPayChart() {
@@ -11135,9 +11545,7 @@ function getTajheezFiltered() {
     if (fC) {
       const mc = r.مخصص[fC],
         nc = r.احتياج[fC];
-      // ★ إصلاح فلتر المدينة: نستبعد الصنف لو مفيش له مخصص ولا احتياج فعلي (>0) في المدينة المختارة.
-      // قديمًا كان الشرط يتحقق من null فقط، وبما إن القيم الفاضية بتترجم لـ 0 مش null، كان الفلتر فعليًا مايستبعدش أي صف.
-      if (!mc && !nc) return false;
+      if (mc === null && nc === null) return false;
     }
     return true;
   });
@@ -11360,8 +11768,7 @@ function renderTajheezInventoryTab() {
     if (fC) {
       const mc = r.مخصص[fC],
         nc = r.احتياج[fC];
-      // ★ نفس إصلاح فلتر المدينة (راجع getTajheezFiltered أعلاه لنفس الملاحظة)
-      if (!mc && !nc) return false;
+      if (mc === null && nc === null) return false;
     }
     return true;
   });
@@ -11468,53 +11875,47 @@ function renderTajheezInventoryTab() {
 
   <!-- ══ KPIs ══ -->
   <div class="kpi-grid" style="margin-bottom:18px">
-    <div class="kpi kc-navy hasr-clickable" onclick="openTajheezItemsPanel()" title="اضغط لعرض كل الأصناف بالتفصيل">
+    <div class="kpi kc-navy">
       <div class="kpi-icon">🏗️</div>
       <div class="kpi-val">${numFmt(totalItems)}</div>
       <div class="kpi-lbl">إجمالي الأصناف</div>
-      <div class="kpi-sub">${أقسام.length} قسم · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">${أقسام.length} قسم</div>
     </div>
-    <div class="kpi kc-teal hasr-clickable" style="background:#ECFEFF" onclick="openTajheezDeptPanel()" title="اضغط لعرض الأصناف الرئيسية (الأقسام)">
-      <div class="kpi-icon">🗂️</div>
-      <div class="kpi-val">${أقسام.length}</div>
-      <div class="kpi-lbl">الأصناف الرئيسية</div>
-      <div class="kpi-sub">حسب الأقسام · اضغط للتفاصيل ↗</div>
-    </div>
-    <div class="kpi kc-blue hasr-clickable" onclick="openTajheezAllocPanel()" title="اضغط لعرض كل الأصناف حسب المخصصات">
+    <div class="kpi kc-blue">
       <div class="kpi-icon">📦</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalAllocVal)}</div>
       <div class="kpi-lbl">إجمالي المخصصات</div>
-      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.مخصص.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.مخصص.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-amber hasr-clickable" onclick="openTajheezNeedPanel()" title="اضغط لعرض كل الأصناف حسب الاحتياج">
+    <div class="kpi kc-amber">
       <div class="kpi-icon">📋</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalNeedVal)}</div>
       <div class="kpi-lbl">إجمالي الاحتياج</div>
-      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.احتياج.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.احتياج.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-teal hasr-clickable" style="background:#F5F3FF" onclick="openTajheezPppPanel()" title="اضغط لعرض كل الأصناف حسب PPP">
+    <div class="kpi kc-teal" style="background:#F5F3FF">
       <div class="kpi-icon">🧮</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalPppVal)}</div>
       <div class="kpi-lbl">إجمالي PPP</div>
-      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.ppp?.كلي || 0), 0))} وحدة · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.ppp?.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"} hasr-clickable" onclick="openTajheezDiffPanel()" title="اضغط لعرض كل الأصناف حسب الفائض/العجز">
+    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"}">
       <div class="kpi-icon">${totalDiffVal >= 0 ? "📈" : "📉"}</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(Math.abs(totalDiffVal))}</div>
       <div class="kpi-lbl">${totalDiffVal >= 0 ? "إجمالي الفائض" : "إجمالي العجز"}</div>
-      <div class="kpi-sub">فرق القيمة الكلية · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">فرق القيمة الكلية</div>
     </div>
-    <div class="kpi kc-teal hasr-clickable" onclick="openTajheezCoveragePanel()" title="اضغط لعرض كل الأصناف حسب نسبة التغطية">
+    <div class="kpi kc-teal">
       <div class="kpi-icon">✅</div>
       <div class="kpi-val">${coverPct}%</div>
       <div class="kpi-lbl">نسبة تغطية التجهيزات</div>
-      <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى</div>
     </div>
-    <div class="kpi kc-navy hasr-clickable" style="background:#EEF2FF" onclick="openTajheezSuppliersPanel()" title="اضغط لعرض كل الموردين بالتفصيل">
+    <div class="kpi kc-navy" style="background:#EEF2FF">
       <div class="kpi-icon">🏭</div>
       <div class="kpi-val">${numFmt(موردونَ_فيَ_النتيجة.size)}</div>
       <div class="kpi-lbl">عدد الموردين</div>
-      <div class="kpi-sub">من إجمالي ${موردون.length} مورد · اضغط للتفاصيل ↗</div>
+      <div class="kpi-sub">من إجمالي ${موردون.length} مورد</div>
     </div>
   </div>
 
@@ -12109,578 +12510,6 @@ function renderTajheezAllTable() {
     renderTajheezAllTable,
   );
 }
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  ✨ بانلات تبويب التجهيزات — الأصناف + الأصناف الرئيسية      ║
-   ║  ★ نفس هوية بانل "حصر الأصول" بالظبط (ix-kpi-overlay/modal/table)
-   ║  بانل 1: كل الأصناف (تُفتح من كارت "إجمالي الأصناف")         ║
-   ║  بانل 2: الأصناف الرئيسية/الأقسام (كارت "الأصناف الرئيسية")  ║
-   ╚════════════════════════════════════════════════════════════╝ */
-
-function _injectTajKpiModal_() {
-  if (document.getElementById("taj-kpi-overlay")) return;
-  const overlay = document.createElement("div");
-  overlay.id = "taj-kpi-overlay";
-  overlay.className = "ix-kpi-overlay";
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeTajKpiModal();
-  });
-  overlay.innerHTML = `
-    <div class="ix-kpi-modal" id="taj-kpi-modal">
-      <div class="ix-kpi-modal-head">
-        <div>
-          <div class="ix-kpi-modal-title" id="taj-kpi-modal-title">—</div>
-          <div class="ix-kpi-modal-sub" id="taj-kpi-modal-sub"></div>
-        </div>
-        <button class="ix-kpi-modal-close" onclick="closeTajKpiModal()">✕</button>
-      </div>
-      <div class="ix-kpi-modal-body" id="taj-kpi-modal-body"></div>
-    </div>`;
-  document.body.appendChild(overlay);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.classList.contains("ix-open")) closeTajKpiModal();
-  });
-}
-
-function closeTajKpiModal() {
-  document.getElementById("taj-kpi-overlay")?.classList.remove("ix-open");
-}
-
-function _buildTajKpiTable_(bodyEl, rows, allRows, columns, onRowClick) {
-  const headerRow = columns.map((c) => `<th>${esc(c.label)}</th>`).join("");
-  const dataRows = rows
-    .map((r) => {
-      const idx = allRows.indexOf(r);
-      const cells = columns.map((c) => c.render(r)).join("");
-      return `<tr data-taj-idx="${idx}" style="cursor:pointer">${cells}</tr>`;
-    })
-    .join("");
-  const existing = bodyEl.querySelector("#taj-kpi-table-inner");
-  if (existing) {
-    existing.querySelector("tbody").innerHTML = dataRows;
-  } else {
-    const tbl = document.createElement("table");
-    tbl.className = "ix-kpi-table";
-    tbl.id = "taj-kpi-table-inner";
-    tbl.innerHTML = `<thead><tr>${headerRow}</tr></thead><tbody>${dataRows}</tbody>`;
-    bodyEl.appendChild(tbl);
-  }
-  bodyEl.querySelectorAll("tr[data-taj-idx]").forEach((tr) => {
-    tr.onclick = () => {
-      const idx = parseInt(tr.getAttribute("data-taj-idx"));
-      const row = allRows[idx];
-      if (row && onRowClick) onRowClick(row);
-    };
-  });
-}
-
-/* بانل موحّد — نفس تصميم/سلوك openKpiModal المستخدم في حصر الأصول بالظبط */
-function _openTajKpiModal_(title, subtitle, rows, columns, searchFn, onRowClick) {
-  _injectTajKpiModal_();
-  const overlay = document.getElementById("taj-kpi-overlay");
-  const titleEl = document.getElementById("taj-kpi-modal-title");
-  const subEl = document.getElementById("taj-kpi-modal-sub");
-  const bodyEl = document.getElementById("taj-kpi-modal-body");
-
-  titleEl.textContent = title;
-  overlay.classList.add("ix-open");
-  window._tajKpiRows = rows || [];
-  window._tajKpiCols = columns;
-
-  if (!rows || !rows.length) {
-    subEl.textContent = subtitle || "";
-    bodyEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--tx-muted);font-size:13px">لا توجد بيانات تنطبق عليها هذه المعايير</div>`;
-    return;
-  }
-  subEl.textContent = subtitle;
-
-  bodyEl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <input id="taj-kpi-search-input" type="text" class="finp" placeholder="🔍 بحث…" style="flex:1;min-width:200px">
-    </div>`;
-
-  const searchInp = bodyEl.querySelector("#taj-kpi-search-input");
-  searchInp.addEventListener("input", function () {
-    const q = this.value.trim().toLowerCase();
-    const filtered = q ? window._tajKpiRows.filter((r) => searchFn(r, q)) : window._tajKpiRows;
-    subEl.textContent = q ? `${filtered.length} من ${window._tajKpiRows.length}` : subtitle;
-    _buildTajKpiTable_(bodyEl, filtered, window._tajKpiRows, window._tajKpiCols, onRowClick);
-  });
-
-  _buildTajKpiTable_(bodyEl, rows, rows, columns, onRowClick);
-}
-
-/* ── بانل 1: كل الأصناف (مخصص/احتياج) ─────────────────────────── */
-function openTajheezItemsPanel() {
-  window._tajNavStack = []; // ★ نقطة دخول جديدة من كارت الـ KPI — تصفير سجل الرجوع
-  const rows = getTajheezFiltered().sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
-  const cols = [
-    {
-      label: "اسم الصنف",
-      render: (r) =>
-        `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>`,
-    },
-    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
-    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
-    { label: "مخصص (كمية)", render: (r) => `<td style="color:#0891B2;font-weight:700">${numFmt(r.مخصص.كلي)}</td>` },
-    { label: "احتياج (كمية)", render: (r) => `<td style="color:#D97706;font-weight:700">${numFmt(r.احتياج.كلي)}</td>` },
-    { label: "قيمة الاحتياج", render: (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
-    {
-      label: "الحالة",
-      render: (r) => {
-        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
-      },
-    },
-  ];
-  _openTajKpiModal_(
-    "كل الأصناف — المخصص والاحتياج",
-    rows.length + " صنف",
-    rows,
-    cols,
-    (r, q) =>
-      r.صنف.toLowerCase().includes(q) ||
-      (r.قسم || "").toLowerCase().includes(q) ||
-      (r.مورد || "").toLowerCase().includes(q),
-    (r) => {
-      closeTajKpiModal();
-      _tajPushNav_(() => openTajheezItemsPanel());
-      setTimeout(() => openTajItemDetailPanel(r), 100);
-    },
-  );
-}
-
-/* ── بانل 2: الأصناف الرئيسية (الأقسام) — تجميع مخصص/احتياج ────── */
-function openTajheezDeptPanel() {
-  window._tajNavStack = []; // ★ نقطة دخول جديدة من كارت الـ KPI — تصفير سجل الرجوع
-  const rows = getTajheezFiltered();
-  const agg = {};
-  rows.forEach((r) => {
-    const k = r.قسم || "غير مصنف";
-    if (!agg[k])
-      agg[k] = { قسم: k, أصناف: 0, مخصص_كلي: 0, مخصص_قيمة: 0, احتياج_كلي: 0, احتياج_قيمة: 0 };
-    const g = agg[k];
-    g.أصناف++;
-    g.مخصص_كلي += r.مخصص.كلي || 0;
-    g.مخصص_قيمة += r.مخصص.قيمة || 0;
-    g.احتياج_كلي += r.احتياج.كلي || 0;
-    g.احتياج_قيمة += r.احتياج.قيمة || 0;
-  });
-  const list = Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
-  const cols = [
-    { label: "القسم", render: (g) => `<td><span class="ix-school-clickable">🗂️ ${esc(g.قسم)}</span></td>` },
-    { label: "عدد الأصناف", render: (g) => `<td style="text-align:center">${numFmt(g.أصناف)}</td>` },
-    { label: "مخصص (كمية)", render: (g) => `<td style="color:#0891B2;font-weight:700">${numFmt(g.مخصص_كلي)}</td>` },
-    { label: "احتياج (كمية)", render: (g) => `<td style="color:#D97706;font-weight:700">${numFmt(g.احتياج_كلي)}</td>` },
-    { label: "قيمة الاحتياج", render: (g) => `<td style="font-weight:800;color:#D97706">${sarFmt(g.احتياج_قيمة)}</td>` },
-    {
-      label: "نسبة التغطية",
-      render: (g) => {
-        const pct = g.احتياج_كلي > 0 ? Math.min(999, Math.round((g.مخصص_كلي / g.احتياج_كلي) * 100)) : g.مخصص_كلي > 0 ? 100 : 0;
-        const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>`;
-      },
-    },
-  ];
-  _openTajKpiModal_(
-    "الأصناف الرئيسية — الأقسام",
-    list.length + " قسم",
-    list,
-    cols,
-    (g, q) => g.قسم.toLowerCase().includes(q),
-    (g) => {
-      closeTajKpiModal();
-      _tajPushNav_(() => openTajheezDeptPanel());
-      setTimeout(() => openTajDeptDetailPanel(g), 100);
-    },
-  );
-}
-
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  🔎 بانل التفاصيل (صنف / قسم) — نفس بانل "تفاصيل المدرسة"    ║
-   ║  في حصر الأصول بالظبط (ix-school-overlay/ix-school-panel)   ║
-   ║  بيفتح جنب الشاشة، مبيفلترش أي حاجة — عرض تفاصيل بس          ║
-   ╚════════════════════════════════════════════════════════════╝ */
-
-function _injectTajDetailPanel_() {
-  if (document.getElementById("taj-detail-overlay")) return;
-  const overlay = document.createElement("div");
-  overlay.id = "taj-detail-overlay";
-  overlay.className = "ix-school-overlay";
-  overlay.addEventListener("click", closeTajDetailPanel);
-
-  const panel = document.createElement("div");
-  panel.id = "taj-detail-panel";
-  panel.className = "ix-school-panel";
-  panel.setAttribute("role", "dialog");
-  panel.setAttribute("aria-modal", "true");
-  panel.innerHTML = `
-    <div class="ix-panel-head" id="taj-detail-head">
-      <button class="ix-panel-close" onclick="closeTajDetailPanel()">✕</button>
-      <button class="ix-panel-back" id="taj-detail-back" onclick="tajGoBack()" style="display:none">← رجوع</button>
-      <div class="ix-panel-school-name" id="taj-detail-title">—</div>
-      <div class="ix-panel-badges" id="taj-detail-badges"></div>
-    </div>
-    <div class="ix-panel-body" id="taj-detail-body"></div>`;
-
-  document.body.appendChild(overlay);
-  document.body.appendChild(panel);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.classList.contains("ix-open")) closeTajDetailPanel();
-  });
-}
-
-function closeTajDetailPanel() {
-  document.getElementById("taj-detail-overlay")?.classList.remove("ix-open");
-  document.getElementById("taj-detail-panel")?.classList.remove("ix-open");
-}
-
-/* ★ زر "رجوع" في بانل التجهيزات — بيرجع للشاشة اللي فتحت منها التفاصيل
-   (سواء قائمة الأصناف/الأقسام أو بانل تفاصيل قسم سابق) بدل ما يقفل خالص */
-function _tajPushNav_(fn) {
-  window._tajNavStack = window._tajNavStack || [];
-  window._tajNavStack.push(fn);
-}
-
-function _tajUpdateBackBtn_() {
-  const btn = document.getElementById("taj-detail-back");
-  if (!btn) return;
-  const hasHistory = (window._tajNavStack || []).length > 0;
-  btn.style.display = hasHistory ? "" : "none";
-}
-
-function tajGoBack() {
-  const stack = window._tajNavStack || [];
-  const fn = stack.pop();
-  closeTajDetailPanel();
-  if (fn) setTimeout(fn, 100);
-}
-
-/* تفاصيل صنف بعينه */
-function openTajItemDetailPanel(r) {
-  _injectTajDetailPanel_();
-  document.getElementById("taj-detail-overlay").classList.add("ix-open");
-  document.getElementById("taj-detail-panel").classList.add("ix-open");
-  document.getElementById("taj-detail-title").textContent = r.صنف;
-  _tajUpdateBackBtn_();
-
-  const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-  document.getElementById("taj-detail-badges").innerHTML = `
-    <span class="ix-panel-badge">🗂️ ${esc(r.قسم) || "—"}</span>
-    ${r.مورد ? `<span class="ix-panel-badge">🏭 ${esc(r.مورد)}</span>` : ""}
-    <span class="ix-panel-badge">${cb.label}</span>`;
-
-  const need = r.احتياج.كلي || 0,
-    alloc = r.مخصص.كلي || 0;
-  const pct = need > 0 ? Math.min(100, Math.round((alloc / need) * 100)) : alloc > 0 ? 100 : 0;
-  const cityItems = TAJHEEZ_CITIES.map(
-    (c) => `
-    <div class="ix-info-item">
-      <div class="ix-info-lbl">${esc(c)}</div>
-      <div class="ix-info-val" style="font-size:12px">مخصص ${numFmt(r.مخصص[c])} · احتياج ${numFmt(r.احتياج[c])}</div>
-    </div>`,
-  ).join("");
-
-  document.getElementById("taj-detail-body").innerHTML = `
-    <div class="ix-section-title">ℹ️ معلومات الصنف</div>
-    <div class="ix-info-grid">
-      <div class="ix-info-item"><div class="ix-info-lbl">سعر الوحدة</div><div class="ix-info-val">${sarFmt2(r.سعر)}</div></div>
-      <div class="ix-info-item"><div class="ix-info-lbl">نسبة الاحتياج</div><div class="ix-info-val">${pctFmt(r.نسبة)}</div></div>
-      <div class="ix-info-item ix-full"><div class="ix-info-lbl">القسم</div><div class="ix-info-val">${esc(r.قسم) || "—"}</div></div>
-      ${r.مورد ? `<div class="ix-info-item ix-full"><div class="ix-info-lbl">المورد</div><div class="ix-info-val">${esc(r.مورد)}</div></div>` : ""}
-    </div>
-
-    <div class="ix-section-title">📊 المخصص مقابل الاحتياج (الإجمالي)</div>
-    <div class="ix-info-grid">
-      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(alloc)} وحدة · ${sarFmt(r.مخصص.قيمة)}</div></div>
-      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(need)} وحدة · ${sarFmt(r.احتياج.قيمة)}</div></div>
-    </div>
-    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${cb.color}"></div></div>
-    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${cb.color}">${pct}%</strong></div>
-
-    <div class="ix-section-title">🗺️ التفصيل حسب المدينة</div>
-    <div class="ix-info-grid">${cityItems}</div>
-  `;
-}
-
-/* تفاصيل قسم (أصناف رئيسية) — إجمالي + قائمة أصنافه، كل صنف قابل للضغط لعرض تفاصيله */
-function openTajDeptDetailPanel(g) {
-  _injectTajDetailPanel_();
-  document.getElementById("taj-detail-overlay").classList.add("ix-open");
-  document.getElementById("taj-detail-panel").classList.add("ix-open");
-  document.getElementById("taj-detail-title").textContent = g.قسم;
-  window._tajDeptCurrentGroup = g; // ★ لازم لحفظ حالة القسم عند الرجوع إليه من تفاصيل صنف
-  _tajUpdateBackBtn_();
-
-  const pct = g.احتياج_كلي > 0 ? Math.min(100, Math.round((g.مخصص_كلي / g.احتياج_كلي) * 100)) : g.مخصص_كلي > 0 ? 100 : 0;
-  const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-  document.getElementById("taj-detail-badges").innerHTML = `
-    <span class="ix-panel-badge">📦 ${numFmt(g.أصناف)} صنف</span>
-    <span class="ix-panel-badge">تغطية ${pct}%</span>`;
-
-  const items = getTajheezFiltered()
-    .filter((r) => (r.قسم || "غير مصنف") === g.قسم)
-    .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
-  window._tajDeptItemsCache = items;
-
-  const itemsHtml = items
-    .slice(0, 100)
-    .map((r, i) => {
-      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-      return `<div class="ix-info-item ix-full" style="cursor:pointer" onclick="tajOpenItemFromDept(${i})">
-        <div class="ix-info-lbl">${esc(r.صنف)}</div>
-        <div class="ix-info-val" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <span style="font-size:12px">مخصص ${numFmt(r.مخصص.كلي)} · احتياج ${numFmt(r.احتياج.كلي)}</span>
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${cb.bg};color:${cb.color};white-space:nowrap">${cb.label}</span>
-        </div>
-      </div>`;
-    })
-    .join("");
-
-  document.getElementById("taj-detail-body").innerHTML = `
-    <div class="ix-section-title">📊 إجمالي القسم</div>
-    <div class="ix-info-grid">
-      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(g.مخصص_كلي)} وحدة · ${sarFmt(g.مخصص_قيمة)}</div></div>
-      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(g.احتياج_كلي)} وحدة · ${sarFmt(g.احتياج_قيمة)}</div></div>
-    </div>
-    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${color}"></div></div>
-    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${color}">${pct}%</strong></div>
-
-    <div class="ix-section-title">📋 أصناف القسم (${items.length})</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${itemsHtml || `<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:20px">لا توجد أصناف</div>`}</div>
-    ${items.length > 100 ? `<div style="text-align:center;font-size:11px;color:var(--tx-muted);margin-top:8px">و${items.length - 100} صنف إضافي</div>` : ""}
-  `;
-}
-/* فتح تفاصيل صنف من داخل بانل تفاصيل القسم — مع حفظ نقطة الرجوع لنفس بانل القسم */
-function tajOpenItemFromDept(i) {
-  const g = window._tajDeptCurrentGroup;
-  const r = window._tajDeptItemsCache && window._tajDeptItemsCache[i];
-  if (!r) return;
-  if (g) _tajPushNav_(() => openTajDeptDetailPanel(g));
-  openTajItemDetailPanel(r);
-}
-
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  ✨ بانلات إضافية لباقي كروت KPI — نفس هوية بانل حصر الأصول   ║
-   ║  (المخصصات / الاحتياج / PPP / الفائض-العجز / التغطية / الموردين)
-   ╚════════════════════════════════════════════════════════════╝ */
-
-/* أعمدة موحّدة تُستخدم في كل بانلات "قائمة الأصناف" */
-function _tajStdItemCols_() {
-  return [
-    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
-    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
-    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
-    { label: "مخصص (كمية)", render: (r) => `<td style="color:#0891B2;font-weight:700">${numFmt(r.مخصص.كلي)}</td>` },
-    { label: "احتياج (كمية)", render: (r) => `<td style="color:#D97706;font-weight:700">${numFmt(r.احتياج.كلي)}</td>` },
-    { label: "قيمة الاحتياج", render: (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
-    {
-      label: "الحالة",
-      render: (r) => {
-        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
-      },
-    },
-  ];
-}
-
-/* بانل عام لأي "قائمة أصناف" — يفتح مودال ثم عند الضغط على صف يفتح تفاصيله مع حفظ نقطة الرجوع */
-function _openTajItemsListPanel_(title, rows, cols) {
-  window._tajNavStack = []; // نقطة دخول جديدة من كارت KPI
-  _openTajKpiModal_(
-    title,
-    rows.length + " صنف",
-    rows,
-    cols,
-    (r, q) =>
-      r.صنف.toLowerCase().includes(q) ||
-      (r.قسم || "").toLowerCase().includes(q) ||
-      (r.مورد || "").toLowerCase().includes(q),
-    (r) => {
-      closeTajKpiModal();
-      _tajPushNav_(() => _openTajItemsListPanel_(title, rows, cols));
-      setTimeout(() => openTajItemDetailPanel(r), 100);
-    },
-  );
-}
-
-/* ── كارت "إجمالي المخصصات" ─────────────────────────────────── */
-function openTajheezAllocPanel() {
-  const rows = getTajheezFiltered().sort((a, b) => (b.مخصص.قيمة || 0) - (a.مخصص.قيمة || 0));
-  _openTajItemsListPanel_("إجمالي المخصصات — كل الأصناف", rows, _tajStdItemCols_());
-}
-
-/* ── كارت "إجمالي الاحتياج" ─────────────────────────────────── */
-function openTajheezNeedPanel() {
-  const rows = getTajheezFiltered().sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
-  _openTajItemsListPanel_("إجمالي الاحتياج — كل الأصناف", rows, _tajStdItemCols_());
-}
-
-/* ── كارت "إجمالي PPP" ──────────────────────────────────────── */
-function openTajheezPppPanel() {
-  const rows = getTajheezFiltered().sort((a, b) => (b.ppp?.قيمة || 0) - (a.ppp?.قيمة || 0));
-  const cols = [
-    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
-    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
-    { label: "المورد", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>` },
-    { label: "PPP (كمية)", render: (r) => `<td style="color:#7C3AED;font-weight:700">${numFmt(r.ppp?.كلي)}</td>` },
-    { label: "قيمة PPP", render: (r) => `<td style="font-weight:800;color:#7C3AED">${sarFmt(r.ppp?.قيمة)}</td>` },
-    { label: "احتياج (قيمة)", render: (r) => `<td style="font-weight:700;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>` },
-    {
-      label: "الحالة",
-      render: (r) => {
-        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
-      },
-    },
-  ];
-  _openTajItemsListPanel_("إجمالي PPP — كل الأصناف", rows, cols);
-}
-
-/* ── كارت "إجمالي الفائض/العجز" ─────────────────────────────── */
-function openTajheezDiffPanel() {
-  const rows = getTajheezFiltered()
-    .filter((r) => r.فرق_قيمة !== null)
-    .sort((a, b) => Math.abs(b.فرق_قيمة || 0) - Math.abs(a.فرق_قيمة || 0));
-  const cols = [
-    { label: "اسم الصنف", render: (r) => `<td><span class="ix-school-clickable">${esc(r.صنف)}</span></td>` },
-    { label: "القسم", render: (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>` },
-    { label: "مخصص (قيمة)", render: (r) => `<td style="color:#0891B2;font-weight:700">${sarFmt(r.مخصص.قيمة)}</td>` },
-    { label: "احتياج (قيمة)", render: (r) => `<td style="color:#D97706;font-weight:700">${sarFmt(r.احتياج.قيمة)}</td>` },
-    {
-      label: "فرق القيمة",
-      render: (r) => {
-        const isSurplus = (r.فرق_قيمة || 0) >= 0;
-        return `<td style="font-weight:800;color:${isSurplus ? CSS_TOKENS.positive() : CSS_TOKENS.danger()}">${isSurplus ? "+" : "−"}${sarFmt(Math.abs(r.فرق_قيمة))}</td>`;
-      },
-    },
-    {
-      label: "الحالة",
-      render: (r) => {
-        const isSurplus = (r.فرق_قيمة || 0) >= 0;
-        const color = isSurplus ? CSS_TOKENS.positive() : CSS_TOKENS.danger();
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33;white-space:nowrap">${isSurplus ? "فائض" : "عجز"}</span></td>`;
-      },
-    },
-  ];
-  _openTajItemsListPanel_("إجمالي الفائض والعجز — كل الأصناف", rows, cols);
-}
-
-/* ── كارت "نسبة تغطية التجهيزات" ─────────────────────────────── */
-function openTajheezCoveragePanel() {
-  const rows = getTajheezFiltered().sort((a, b) => (a.نسبة ?? 999) - (b.نسبة ?? 999));
-  _openTajItemsListPanel_("نسبة تغطية التجهيزات — كل الأصناف", rows, _tajStdItemCols_());
-}
-
-/* ── كارت "عدد الموردين" — قائمة الموردين مجمّعة ─────────────── */
-function _tajMoredAgg_() {
-  const rows = getTajheezFiltered();
-  const agg = {};
-  rows.forEach((r) => {
-    const k = r.مورد || "غير محدد";
-    if (!agg[k])
-      agg[k] = { مورد: k, أصناف: 0, مخصص_كلي: 0, مخصص_قيمة: 0, احتياج_كلي: 0, احتياج_قيمة: 0, ppp_قيمة: 0 };
-    const g = agg[k];
-    g.أصناف++;
-    g.مخصص_كلي += r.مخصص.كلي || 0;
-    g.مخصص_قيمة += r.مخصص.قيمة || 0;
-    g.احتياج_كلي += r.احتياج.كلي || 0;
-    g.احتياج_قيمة += r.احتياج.قيمة || 0;
-    g.ppp_قيمة += r.ppp?.قيمة || 0;
-  });
-  return Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
-}
-
-function openTajheezSuppliersPanel() {
-  window._tajNavStack = []; // نقطة دخول جديدة من كارت KPI
-  const list = _tajMoredAgg_();
-  const cols = [
-    { label: "المورد", render: (m) => `<td><span class="ix-school-clickable">🏭 ${esc(m.مورد)}</span></td>` },
-    { label: "عدد الأصناف", render: (m) => `<td style="text-align:center">${numFmt(m.أصناف)}</td>` },
-    { label: "مخصص (كمية)", render: (m) => `<td style="color:#0891B2;font-weight:700">${numFmt(m.مخصص_كلي)}</td>` },
-    { label: "احتياج (كمية)", render: (m) => `<td style="color:#D97706;font-weight:700">${numFmt(m.احتياج_كلي)}</td>` },
-    { label: "قيمة الاحتياج", render: (m) => `<td style="font-weight:800;color:#D97706">${sarFmt(m.احتياج_قيمة)}</td>` },
-    { label: "قيمة PPP", render: (m) => `<td style="font-weight:700;color:#7C3AED">${sarFmt(m.ppp_قيمة)}</td>` },
-    {
-      label: "نسبة التغطية",
-      render: (m) => {
-        const pct = m.احتياج_كلي > 0 ? Math.min(999, Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100)) : m.مخصص_كلي > 0 ? 100 : 0;
-        const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-        return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>`;
-      },
-    },
-  ];
-  _openTajKpiModal_(
-    "عدد الموردين — التفاصيل",
-    list.length + " مورد",
-    list,
-    cols,
-    (m, q) => m.مورد.toLowerCase().includes(q),
-    (m) => {
-      closeTajKpiModal();
-      _tajPushNav_(() => openTajheezSuppliersPanel());
-      setTimeout(() => openTajSupplierDetailPanel(m), 100);
-    },
-  );
-}
-
-/* تفاصيل مورد بعينه — إجمالي + قائمة أصنافه، كل صنف قابل للضغط لعرض تفاصيله */
-function openTajSupplierDetailPanel(m) {
-  _injectTajDetailPanel_();
-  document.getElementById("taj-detail-overlay").classList.add("ix-open");
-  document.getElementById("taj-detail-panel").classList.add("ix-open");
-  document.getElementById("taj-detail-title").textContent = "🏭 " + m.مورد;
-  window._tajSupplierCurrentGroup = m; // لازم لحفظ حالة المورد عند الرجوع إليه من تفاصيل صنف
-  _tajUpdateBackBtn_();
-
-  const pct = m.احتياج_كلي > 0 ? Math.min(100, Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100)) : m.مخصص_كلي > 0 ? 100 : 0;
-  const color = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-  document.getElementById("taj-detail-badges").innerHTML = `
-    <span class="ix-panel-badge">📦 ${numFmt(m.أصناف)} صنف</span>
-    <span class="ix-panel-badge">تغطية ${pct}%</span>`;
-
-  const items = getTajheezFiltered()
-    .filter((r) => (r.مورد || "غير محدد") === m.مورد)
-    .sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
-  window._tajSupplierItemsCache = items;
-
-  const itemsHtml = items
-    .slice(0, 100)
-    .map((r, i) => {
-      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
-      return `<div class="ix-info-item ix-full" style="cursor:pointer" onclick="tajOpenItemFromSupplier(${i})">
-        <div class="ix-info-lbl">${esc(r.صنف)}</div>
-        <div class="ix-info-val" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <span style="font-size:12px">مخصص ${numFmt(r.مخصص.كلي)} · احتياج ${numFmt(r.احتياج.كلي)}</span>
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${cb.bg};color:${cb.color};white-space:nowrap">${cb.label}</span>
-        </div>
-      </div>`;
-    })
-    .join("");
-
-  document.getElementById("taj-detail-body").innerHTML = `
-    <div class="ix-section-title">📊 إجمالي المورد</div>
-    <div class="ix-info-grid">
-      <div class="ix-info-item"><div class="ix-info-lbl">مخصص</div><div class="ix-info-val" style="color:#0891B2">${numFmt(m.مخصص_كلي)} وحدة · ${sarFmt(m.مخصص_قيمة)}</div></div>
-      <div class="ix-info-item"><div class="ix-info-lbl">احتياج</div><div class="ix-info-val" style="color:#D97706">${numFmt(m.احتياج_كلي)} وحدة · ${sarFmt(m.احتياج_قيمة)}</div></div>
-      <div class="ix-info-item ix-full"><div class="ix-info-lbl">قيمة PPP</div><div class="ix-info-val" style="color:#7C3AED">${sarFmt(m.ppp_قيمة)}</div></div>
-    </div>
-    <div class="ix-score-bar"><div class="ix-score-fill" style="width:${pct}%;background:${color}"></div></div>
-    <div style="font-size:11px;color:var(--tx-muted);margin-top:6px">نسبة التغطية: <strong style="color:${color}">${pct}%</strong></div>
-
-    <div class="ix-section-title">📋 أصناف المورد (${items.length})</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${itemsHtml || `<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:20px">لا توجد أصناف</div>`}</div>
-    ${items.length > 100 ? `<div style="text-align:center;font-size:11px;color:var(--tx-muted);margin-top:8px">و${items.length - 100} صنف إضافي</div>` : ""}
-  `;
-}
-
-/* فتح تفاصيل صنف من داخل بانل تفاصيل المورد — مع حفظ نقطة الرجوع لنفس بانل المورد */
-function tajOpenItemFromSupplier(i) {
-  const m = window._tajSupplierCurrentGroup;
-  const r = window._tajSupplierItemsCache && window._tajSupplierItemsCache[i];
-  if (!r) return;
-  if (m) _tajPushNav_(() => openTajSupplierDetailPanel(m));
-  openTajItemDetailPanel(r);
-}
 /* ══════════════════════════════════ نهاية تبويب التجهيزات ══════════════════════════════════ */
 
 
@@ -12843,20 +12672,6 @@ function tajOpenItemFromSupplier(i) {
     if (v === null || v === undefined || v === "" || v === "—" || v === "#N/A") return null;
     const f = parseFloat(String(v).replace(/,/g, ""));
     return isFinite(f) ? f : null;
-  }
-  // يجمع قيمة عددية (numKey) مجمّعة حسب مفتاح فئة (groupKey)، ويرجع أعلى n فئات
-  function fcbGroupBySum(arr, groupKey, numKey, n = 10) {
-    const map = {};
-    arr.forEach((r) => {
-      const g = (r[groupKey] ?? "").toString().trim();
-      const v = fcbNum(r[numKey]);
-      if (!g || g === "—" || v === null) return;
-      map[g] = (map[g] || 0) + v;
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, n)
-      .map(([k, v]) => ({ name: k, value: +v.toFixed(2) }));
   }
   // ⚡ كاش الملخص الثقيل — يُعاد حسابه فقط لما تتغيّر البيانات فعلياً
   // (window.__DATA_REV__)، مش مع كل رسالة شات. ده أكبر مصدر بطء وتكلفة
@@ -16877,15 +16692,6 @@ ${panelHTML}
         transition: background .18s;
       }
       .ix-panel-close:hover { background: rgba(255,255,255,.22); }
-      .ix-panel-back {
-        position: absolute; top: 16px; left: 58px;
-        height: 32px; padding: 0 14px; border-radius: 20px;
-        background: rgba(255,255,255,.1); border: none; color: #fff;
-        font-size: 12px; font-weight: 700; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        transition: background .18s;
-      }
-      .ix-panel-back:hover { background: rgba(255,255,255,.22); }
       .ix-panel-school-name {
         font-size: 17px; font-weight: 800; line-height: 1.4;
         max-width: calc(100% - 50px); color: #fff;

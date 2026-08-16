@@ -4889,3 +4889,110 @@ tbody tr:last-child td:last-child {
   height: 5px;
   opacity: 1;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 12 — PORTAL HOME: تلوين الفئات + تحسين كارت المفضلة
+   ──────────────────────────────────────────────────────────────
+   إضافة بصرية بحتة (CSS فقط — بدون لمس أي HTML/JS): كل فئة من
+   فئات البوابة الرئيسية (data-category) تاخد لوناً مميزاً لها من
+   نفس نظام ألوان الداشبورد (--c-info / --c-positive / --c-accent /
+   --c-warning / --c-special / --c-info-2) بدل ما تكون كل الكروت
+   بنفس اللون التيل الموحّد — يسهّل على المستخدم يميّز الفئات
+   بسرعة بصرية، وفي نفس الوقت يفضل كل شيء متسق مع هوية الداشبورد.
+   ══════════════════════════════════════════════════════════════ */
+
+/* أيقونة كل كارت — دائرة ملوّنة بلون الفئة بدل المربع التيل الموحّد */
+.portal-card-icon {
+  border-radius: 50%;
+  transition: transform .22s var(--ease-std), background .22s ease;
+}
+.portal-card:hover .portal-card-icon {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+/* الخط اللوني أعلى كل كارت — يتحول من التدرج الموحّد للون الفئة عند hover */
+.portal-card::before {
+  transition: opacity .22s ease, background .22s ease;
+}
+
+[data-category="assessment"] .portal-card-icon { background: rgba(13,132,156,.12);  color: #0d849c; border: 1px solid rgba(13,132,156,.25); }
+[data-category="assessment"]:hover::before      { background: linear-gradient(90deg,#0d849c,#3fb5cc); opacity: 1; }
+[data-category="assessment"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
+
+[data-category="assets"] .portal-card-icon { background: rgba(6,106,82,.12);  color: #066a52; border: 1px solid rgba(6,106,82,.25); }
+[data-category="assets"]:hover::before      { background: linear-gradient(90deg,#066a52,#2fa082); opacity: 1; }
+[data-category="assets"]:hover               { border-color: rgba(6,106,82,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(6,106,82,.16), inset 0 1px 0 #fff; }
+
+[data-category="contracts"] .portal-card-icon { background: rgba(176,138,78,.16); color: #8a6a37; border: 1px solid rgba(176,138,78,.3); }
+[data-category="contracts"]:hover::before      { background: linear-gradient(90deg,#b08a4e,#d4af6a); opacity: 1; }
+[data-category="contracts"]:hover               { border-color: rgba(176,138,78,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(176,138,78,.18), inset 0 1px 0 #fff; }
+
+[data-category="operations"] .portal-card-icon { background: rgba(192,122,20,.14); color: #a3660f; border: 1px solid rgba(192,122,20,.28); }
+[data-category="operations"]:hover::before      { background: linear-gradient(90deg,#c07a14,#e0a33f); opacity: 1; }
+[data-category="operations"]:hover               { border-color: rgba(192,122,20,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(192,122,20,.16), inset 0 1px 0 #fff; }
+
+[data-category="geo"] .portal-card-icon { background: rgba(108,43,217,.12); color: #6c2bd9; border: 1px solid rgba(108,43,217,.25); }
+[data-category="geo"]:hover::before      { background: linear-gradient(90deg,#6c2bd9,#9b6ef0); opacity: 1; }
+[data-category="geo"]:hover               { border-color: rgba(108,43,217,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(108,43,217,.16), inset 0 1px 0 #fff; }
+
+[data-category="explore"] .portal-card-icon { background: rgba(11,107,126,.12); color: #0b6b7e; border: 1px solid rgba(11,107,126,.25); }
+[data-category="explore"]:hover::before      { background: linear-gradient(90deg,#0b6b7e,#3fa3b8); opacity: 1; }
+[data-category="explore"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
+
+/* سهم صغير يظهر بجانب عنوان الكارت عند hover — إشارة بصرية لطيفة إنه قابل للفتح
+   (CSS بحت عبر ::after — بدون أي تعديل على الـ HTML) */
+.portal-card-title {
+  position: relative;
+  padding-left: 18px;
+}
+.portal-card-title::after {
+  content: "‹";
+  position: absolute;
+  right: auto;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  opacity: 0;
+  font-weight: 800;
+  color: var(--tx-muted);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.portal-card:hover .portal-card-title::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ── كارت المفضلة الفارغ — شكل أوضح كـ"دعوة للفعل" بدل نص عادي وسط الكارت ── */
+.portal-favorites-card {
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  border: 1.5px dashed rgba(13,132,156,.32);
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.04),
+    0 6px 18px rgba(8,45,60,.06);
+}
+
+.portal-favorites-empty {
+  border-radius: 12px;
+  padding: 18px 14px;
+}
+.portal-favorites-empty:hover {
+  background: rgba(13,132,156,.05);
+}
+.portal-favorites-empty-text {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--tx-sec);
+}
+.portal-favorites-empty::before {
+  content: "⭐";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  border-radius: 50%;
+  background: rgba(13,132,156,.1);
+  border: 1px solid rgba(13,132,156,.22);
+  margin: 0 auto;
+}

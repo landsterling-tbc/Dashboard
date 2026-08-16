@@ -7618,7 +7618,15 @@ function _sysDownloadFile(filename, content, mime) {
       </div>`;
   }
 
+  // ── رقم تسلسلي لكل استدعاء renderBalaghTab — يمنع استدعاءً قديماً (متأخر
+  // بسبب requestAnimationFrame) من رسم شارتات فوق نسخة أحدث من التبويب،
+  // وهو ما كان يظهر كأن الشارتات "تختفي" أحياناً عند تحديث الفلاتر بسرعة
+  // أو وصول تحديث بيانات بالخلفية أثناء رسم الشارتات ──
+  let __balaghRenderSeq = window.__balaghRenderSeq || 0;
+
   function renderBalaghTab() {
+    const mySeq = ++__balaghRenderSeq;
+    window.__balaghRenderSeq = __balaghRenderSeq;
     const el = document.getElementById("balagh-content");
     if (!el) return;
 
@@ -8134,6 +8142,10 @@ function _sysDownloadFile(filename, content, mime) {
 
     // === رسم الشارتات الزمنية — مرتبطة بالفلاتر ===
     requestAnimationFrame(() => {
+     // لو صدر استدعاء أحدث لـ renderBalaghTab في نفس اللحظة (فلتر جديد / تحديث
+     // بيانات بالخلفية) — نتجاهل هذا الاستدعاء القديم بدل ما يرسم شارتات
+     // بأرقام قديمة فوق نسخة جديدة من الصفحة (وهو ما كان يظهر كاختفاء الشارتات)
+     if (mySeq !== __balaghRenderSeq) return;
      try {
       const allRowsForTime = rows; // البيانات المفلترة بالكامل (ليس فقط الصفحة الحالية)
 
@@ -8508,6 +8520,7 @@ function _sysDownloadFile(filename, content, mime) {
         },
       });
 
+      try {
       if (document.getElementById("balagh-status-donut")) {
         destroyChart_("balagh-status-donut");
         const openN = allRowsForTime.filter((r) => r.isOpen).length;
@@ -8528,8 +8541,10 @@ function _sysDownloadFile(filename, content, mime) {
           options: donutOpts(),
         });
       }
+      } catch (e) { console.warn("[balagh-status-donut]", e); }
 
       // ═══ 7. توزيع الأولوية (Donut) ═══
+      try {
       if (document.getElementById("balagh-priority-donut")) {
         destroyChart_("balagh-priority-donut");
         const prMap = new Map();
@@ -8563,8 +8578,10 @@ function _sysDownloadFile(filename, content, mime) {
           options: donutOpts(),
         });
       }
+      } catch (e) { console.warn("[balagh-priority-donut]", e); }
 
       // ═══ 8. التزام SLA (Donut) ═══
+      try {
       if (document.getElementById("balagh-sla-donut")) {
         destroyChart_("balagh-sla-donut");
         const overdueN = allRowsForTime.filter((r) => r.isOverdue).length;
@@ -8585,8 +8602,10 @@ function _sysDownloadFile(filename, content, mime) {
           options: donutOpts(),
         });
       }
+      } catch (e) { console.warn("[balagh-sla-donut]", e); }
 
       // ═══ 9. أعلى الفئات حسب الأولوية (Stacked horizontal bar) ═══
+      try {
       if (document.getElementById("balagh-cat-priority-stacked")) {
         destroyChart_("balagh-cat-priority-stacked");
         const catPrMap = {};
@@ -8638,8 +8657,10 @@ function _sysDownloadFile(filename, content, mime) {
           },
         );
       }
+      } catch (e) { console.warn("[balagh-cat-priority-stacked]", e); }
 
       // ═══ 10. مصفوفة مخاطر المدارس (Scatter) ═══
+      try {
       if (document.getElementById("balagh-school-risk-scatter")) {
         destroyChart_("balagh-school-risk-scatter");
         const schMap = {};
@@ -8704,8 +8725,10 @@ function _sysDownloadFile(filename, content, mime) {
           },
         );
       }
+      } catch (e) { console.warn("[balagh-school-risk-scatter]", e); }
 
       // ═══ 11. متوسط زمن الحل شهرياً (خط) ═══
+      try {
       if (document.getElementById("balagh-resolution-trend-chart")) {
         destroyChart_("balagh-resolution-trend-chart");
         const resMonthMap = new Map(); // monthKey -> [days...]
@@ -8775,6 +8798,7 @@ function _sysDownloadFile(filename, content, mime) {
           );
         }
       }
+      } catch (e) { console.warn("[balagh-resolution-trend-chart]", e); }
      } catch (err) {
        console.warn("[balagh charts] خطأ أثناء رسم الشارتات الزمنية:", err);
      }
@@ -22982,7 +23006,7 @@ function __renderPortalFavoritesCard() {
   if (!favs.length) {
     card.innerHTML =
       '<div class="portal-favorites-empty" onclick="openFavoritesModal()">' +
-      '  <div class="portal-favorites-empty-text">⭐ اختر ما تريد رؤيته — اعمل اختصارات سريعة لأهم التبويبات اللي بتستخدمها كل يوم</div>' +
+      '  <div class="portal-favorites-empty-text">اختر ما تريد رؤيته — اعمل اختصارات سريعة لأهم التبويبات اللي بتستخدمها كل يوم</div>' +
       '  <button type="button" class="portal-favorites-cta-btn" onclick="openFavoritesModal()">اختيار الآن</button>' +
       '</div>';
     return;

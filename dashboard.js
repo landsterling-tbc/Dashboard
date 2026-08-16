@@ -7603,6 +7603,21 @@ function _sysDownloadFile(filename, content, mime) {
     exportSchoolBreakdownExcel(filteredRows(normalizeRows()));
   };
 
+  // ── عنوان قسم موحّد لتنظيم تبويب البلاغات إلى مجموعات واضحة ──
+  function balaghSecHead(num, icon, title, sub) {
+    return `
+      <div style="display:flex;align-items:center;gap:10px;margin:26px 0 12px">
+        <div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+          background:linear-gradient(135deg,${CSS_TOKENS.info()},${CSS_TOKENS.primary()});color:#fff;
+          font-size:12px;font-weight:800;flex-shrink:0">${num}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--tx-main);display:flex;align-items:center;gap:6px">
+          <span>${icon}</span><span>${escText(title)}</span>
+        </div>
+        ${sub ? `<div style="font-size:11.5px;color:var(--tx-muted);font-weight:600">${escText(sub)}</div>` : ""}
+        <div style="flex:1;height:1px;background:var(--bd-light)"></div>
+      </div>`;
+  }
+
   function renderBalaghTab() {
     const el = document.getElementById("balagh-content");
     if (!el) return;
@@ -7710,6 +7725,7 @@ function _sysDownloadFile(filename, content, mime) {
     const totalForBars = Math.max(1, filteredTotal);
 
     el.innerHTML = `
+      ${balaghSecHead(1, "📊", "نظرة عامة", "أهم الأرقام ضمن الفلاتر الحالية")}
       <div class="card mb14">
         <div class="card-title">
           <span class="card-title-icon" style="background:#FFF7ED;color:#D97706">📢</span>
@@ -7764,6 +7780,7 @@ function _sysDownloadFile(filename, content, mime) {
         </div>
       </div>
 
+      ${balaghSecHead(2, "🔍", "التصفية والبحث", "حدّد الفلاتر لتحديث كل الأقسام تلقائياً")}
       <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="fg">
           <div class="fg-lbl">بحث</div>
@@ -7837,6 +7854,7 @@ function _sysDownloadFile(filename, content, mime) {
         <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolCountsCSV()">⬇ عدد البلاغات لكل مدرسة (Excel)</button>
       </div>
 
+      ${balaghSecHead(3, "🧭", "التوزيعات الرئيسية", "المدارس، الأولوية، الفئات، والمناطق الأكثر تكراراً")}
       <div class="g21" style="align-items:start">
         <div class="card">
           <div class="card-title">
@@ -7931,7 +7949,7 @@ function _sysDownloadFile(filename, content, mime) {
         </div>
       </div>
 
-
+      ${balaghSecHead(4, "📅", "الاتجاهات الزمنية", "كيف تتغيّر البلاغات شهرياً وأسبوعياً")}
       <div class="card mb14">
         <div class="card-title">
           <span class="card-title-icon" style="background:#EDE9FE;color:#7C3AED">📅</span>
@@ -7966,10 +7984,11 @@ function _sysDownloadFile(filename, content, mime) {
           <div class="chart-box" style="height:220px"><canvas id="balagh-cat-trend-chart"></canvas></div>
       </div>
 
+      ${balaghSecHead(5, "🎯", "تحليل متقدم ومخاطر", "الحالة، الأولوية، التزام SLA، وأكثر المدارس عرضة للمخاطر")}
       <div class="card mb14">
         <div class="card-title">
           <span class="card-title-icon" style="background:#F0FDFA;color:#0F766E">🧭</span>
-          <span>تحليل متقدم — الحالة، الأولوية، والتزام SLA</span>
+          <span>الحالة، الأولوية، والتزام SLA</span>
           <span class="sub">${fmt(filteredTotal)} سجل ضمن الفلاتر الحالية</span>
         </div>
         <div class="g3" style="margin-bottom:0">
@@ -8004,9 +8023,6 @@ function _sysDownloadFile(filename, content, mime) {
             <span>مصفوفة مخاطر المدارس</span>
             <span class="sub">إجمالي مقابل عالية الخطورة</span>
           </div>
-          <div style="font-size:11px;color:var(--tx-muted);padding:0 14px 6px;line-height:1.7">
-            كل نقطة = مدرسة. المحور الأفقي: إجمالي البلاغات. المحور الرأسي: البلاغات عالية الخطورة (حرج + مرتفع). المدارس في أعلى يمين الرسم هي الأكثر احتياجاً للمتابعة.
-          </div>
           <div class="chart-box" style="height:300px"><canvas id="balagh-school-risk-scatter"></canvas></div>
         </div>
         <div class="card">
@@ -8019,6 +8035,7 @@ function _sysDownloadFile(filename, content, mime) {
         </div>
       </div>
 
+      ${balaghSecHead(6, "🧾", "السجل التفصيلي", "كل البلاغات مع إمكانية البحث والترتيب والتصدير")}
       <div class="card">
         <div class="card-title">
           <span class="card-title-icon" style="background:#EEF2FF;color:#4338CA">🧾</span>

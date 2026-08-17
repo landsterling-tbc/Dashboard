@@ -2039,6 +2039,16 @@ function renderStageCharts() {
 // ════════════════════════════════════════════════════════════════════════
 // renderStageCompareTab — ديناميكي: يتكيف مع أي عدد من المراحل والأشهر
 // ════════════════════════════════════════════════════════════════════════
+// جدول هذا التبويب كان بيرسم كل المدارس دفعة واحدة من غير صفحات — مع بيانات
+// تاريخ FCA (كل شهر لكل مدرسة) ده ممكن يبقى آلاف الصفوف مرة واحدة، وده سبب
+// التهنيج عند فتح التبويب لأول مرة. رجّعنا نفس منطق الـ pagination المستخدم
+// أصلاً في تبويب "fca-ref" (نفس الفكرة، مفيش تغيير في الحسابات ولا التصدير).
+let __stageComparePage = 0;
+const __stageComparePageSize = 100;
+window.__stageCompareGo = function (p) {
+  __stageComparePage = p;
+  renderStageCompareTab();
+};
 function renderStageCompareTab() {
   /* ── helpers ── */
   const normText = (v) => String(v ?? "").replace(/\uFEFF/g, "").trim().replace(/\s+/g, " ");
@@ -2376,11 +2386,19 @@ function renderStageCompareTab() {
 
   if(emptyEl) emptyEl.style.display=rows.length?"none":"block";
 
+  // pagination — بنعرض صفحة واحدة بس في الجدول (نفس بيانات rows الكاملة
+  // لسه مستخدمة زي ما هي في الـ KPIs والتشارتات والتصدير، ده تأثيره بس على
+  // عدد الصفوف اللي بتترسم فعلياً كـ DOM)
+  const pages = Math.max(1, Math.ceil(rows.length / __stageComparePageSize));
+  __stageComparePage = Math.min(__stageComparePage, pages - 1);
+  if (__stageComparePage < 0) __stageComparePage = 0;
+  const pageRows = rows.slice(__stageComparePage * __stageComparePageSize, (__stageComparePage + 1) * __stageComparePageSize);
+
   if(tbody){
     tbody.innerHTML="";
-    if(rows.length){
+    if(pageRows.length){
       const frag=document.createDocumentFragment();
-      rows.forEach(r=>{
+      pageRows.forEach(r=>{
         const tr=document.createElement("tr");
         const stageCells=allStages.map((s,i)=>{
           const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
@@ -2402,6 +2420,21 @@ function renderStageCompareTab() {
       tbody.appendChild(frag);
     } else {
       tbody.innerHTML='<tr><td colspan="20" class="empty-msg">لا توجد بيانات مطابقة.</td></tr>';
+    }
+  }
+
+  const pagEl = document.getElementById("stageComparePag");
+  if (pagEl) {
+    if (pages <= 1) {
+      pagEl.innerHTML = "";
+    } else {
+      const prev = __stageComparePage > 0
+        ? `<button class="pag-btn" onclick="window.__stageCompareGo(${__stageComparePage - 1})">◀ السابق</button>`
+        : `<button class="pag-btn" disabled>◀ السابق</button>`;
+      const next = __stageComparePage < pages - 1
+        ? `<button class="pag-btn" onclick="window.__stageCompareGo(${__stageComparePage + 1})">التالي ▶</button>`
+        : `<button class="pag-btn" disabled>التالي ▶</button>`;
+      pagEl.innerHTML = `<span class="pag-info">الصفحة ${(__stageComparePage + 1).toLocaleString()} من ${pages.toLocaleString()} · ${rows.length.toLocaleString()} مدرسة</span><div class="pag-btns">${prev}<button class="pag-btn active">${__stageComparePage + 1}</button>${next}</div>`;
     }
   }
 }
@@ -7056,6 +7089,7 @@ function _sysDownloadFile(filename, content, mime) {
     location: "",
     dateFrom: "",
     dateTo: "",
+    month: "",
     sort: "date_desc",
     topSchoolN: 10,
   });
@@ -7255,9 +7289,22 @@ function _sysDownloadFile(filename, content, mime) {
     });
   }
 
+  // كاش بسيط: طالما مصدر بيانات البلاغات (RAW_BALAGH) وبيانات المدارس (RAW)
+  // لسه نفس الـ reference من آخر مرة (يعني محصلش تحميل بيانات جديد)، نرجّع
+  // نفس النتيجة الجاهزة بدل ما نعيد بناء/تحليل كل صف من جديد. أي تحميل بيانات
+  // جديد بيعمل reassign كامل للمصفوفة (مش تعديل داخلي)، فالمقارنة دي أمينة.
+  let __balaghNormCache = null;
   function normalizeRows() {
+    const rawBalagh = getRaw();
+    if (
+      __balaghNormCache &&
+      __balaghNormCache.srcBalagh === rawBalagh &&
+      __balaghNormCache.srcRaw === RAW
+    ) {
+      return __balaghNormCache.result;
+    }
     const schoolByMinId = buildSchoolByMinIdMap();
-    return getRaw()
+    const result = rawBalagh
       .map((r, idx) => {
         const created  = norm(r["تاريخ الإنشاء"]);
         const finished = norm(r["تاريخ الحل"]);
@@ -7309,6 +7356,9 @@ function _sysDownloadFile(filename, content, mime) {
         };
       })
       .filter((r) => r.recordNo || r.schoolName || r.problemDescription);
+
+    __balaghNormCache = { srcBalagh: rawBalagh, srcRaw: RAW, result };
+    return result;
   }
 
   function filteredRows(all) {
@@ -7323,6 +7373,7 @@ function _sysDownloadFile(filename, content, mime) {
     const location = ST.location || document.getElementById("balagh-location")?.value || "";
     const dateFrom = ST.dateFrom || document.getElementById("balagh-date-from")?.value || "";
     const dateTo = ST.dateTo || document.getElementById("balagh-date-to")?.value || "";
+    const month = ST.month || document.getElementById("balagh-month")?.value || "";
     const schoolKeyFilter = ST.schoolKeyFilter || "";
 
     return all.filter((r) => {
@@ -7333,6 +7384,9 @@ function _sysDownloadFile(filename, content, mime) {
       if (category && r.category !== category) return false;
       if (priority && r.priority !== priority) return false;
       if (location && r.location !== location) return false;
+      if (month) {
+        if (!r.creationDateObj || (r.creationDateObj.getMonth() + 1) !== +month) return false;
+      }
       if (dateFrom) {
         const from = new Date(dateFrom);
         if (!r.creationDateObj || r.creationDateObj < from) return false;
@@ -7860,6 +7914,15 @@ function _sysDownloadFile(filename, content, mime) {
           </select>
         </div>
         <div class="fg">
+          <div class="fg-lbl">الشهر</div>
+          <select class="fsel" id="balagh-month" onchange="window.__BALAGH_STATE__.month=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            <option value="">الكل</option>
+            ${["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
+              .map((name, i) => `<option value="${i + 1}"${String(STATE.month) === String(i + 1) ? " selected" : ""}>${name}</option>`)
+              .join("")}
+          </select>
+        </div>
+        <div class="fg">
           <div class="fg-lbl">من تاريخ</div>
           <input class="finp" type="date" id="balagh-date-from" value="${escText(STATE.dateFrom)}"
             onchange="window.__BALAGH_STATE__.dateFrom=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
@@ -7869,7 +7932,7 @@ function _sysDownloadFile(filename, content, mime) {
           <input class="finp" type="date" id="balagh-date-to" value="${escText(STATE.dateTo)}"
             onchange="window.__BALAGH_STATE__.dateTo=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
         </div>
-        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
+        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
         <button class="export-btn export-btn-csv" onclick="window.balaghExportCSV()">⬇ تصدير CSV</button>
         <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolCountsCSV()">⬇ عدد البلاغات لكل مدرسة (Excel)</button>
       </div>
@@ -8850,7 +8913,7 @@ function _sysDownloadFile(filename, content, mime) {
           <div style="font-size:40px;margin-bottom:10px">⚠️</div>
           <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">حصل خطأ أثناء عرض بيانات البلاغات</div>
           <div style="font-size:12px;color:var(--tx-muted);margin-bottom:14px">جرّب مسح الفلاتر أو تحديث الصفحة. إن استمرت المشكلة أبلغ الدعم الفني.</div>
-          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
+          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
         </div>`;
     }
   }
@@ -11812,6 +11875,240 @@ window._tajSortFaed = "val_desc";
 window._tajSortAjz = "val_desc";
 window._tajSortAll = "qism";
 
+/* ════════════════════════════════════════════════════════════════
+   📋 بانل تفصيلي لكروت الـ KPI في تبويب التجهيزات
+   نفس أسلوب البانل المنزلق المستخدم في تبويب "حصر الأصول" بالضبط —
+   بنعيد استخدام نفس كلاسات الشكل الجاهزة (hasr-head, hasr-ic,
+   hasr-srow, hasr-sbadge, hasr-open...) بدون تكرار أي CSS، وبس
+   بنضيف معرّفات DOM جديدة (taj-dp / taj-ov) حتى ميتعارضش مع بانل
+   حصر الأصول لو الاتنين اتفتحوا في نفس الجلسة.
+════════════════════════════════════════════════════════════════ */
+(function () {
+  if (document.getElementById("taj-panel-css")) return;
+  const s = document.createElement("style");
+  s.id = "taj-panel-css";
+  s.textContent = `
+    #taj-dp {
+      position:fixed; top:0; left:0; bottom:0; z-index:9200;
+      width:min(460px,96vw);
+      background:var(--bg-3);
+      box-shadow:4px 0 40px rgba(6,20,28,.26),12px 0 60px ${CSS_TOKENS.α(CSS_TOKENS.info(), 0.1)};
+      display:flex; flex-direction:column;
+      transform:translateX(-105%);
+      transition:transform .28s cubic-bezier(.22,.6,.34,1);
+      border-right:2px solid var(--teal,#0891B2);
+      overflow:hidden;
+    }
+    #taj-dp.hasr-open { transform:translateX(0); }
+    #taj-ov {
+      position:fixed; inset:0; z-index:9050;
+      background:rgba(6,20,28,.45); backdrop-filter:blur(3px);
+      opacity:0; transition:opacity .28s; display:none;
+    }
+    #taj-ov.hasr-open { display:block; opacity:1; }
+  `;
+  document.head.appendChild(s);
+})();
+
+function _tajInjectDOM() {
+  if (!document.getElementById("taj-ov")) {
+    const ov = document.createElement("div");
+    ov.id = "taj-ov";
+    ov.onclick = () => tajCloseDetail();
+    document.body.appendChild(ov);
+  }
+  if (!document.getElementById("taj-dp")) {
+    const dp = document.createElement("div");
+    dp.id = "taj-dp";
+    dp.innerHTML = `
+      <div class="hasr-head">
+        <button class="hasr-head-close" onclick="tajCloseDetail()">✕</button>
+        <div class="hasr-head-title" id="taj-dp-title">—</div>
+        <div class="hasr-head-sub"   id="taj-dp-sub">—</div>
+      </div>
+      <div class="hasr-body" id="taj-dp-body"></div>
+    `;
+    document.body.appendChild(dp);
+  }
+}
+
+function tajCloseDetail() {
+  document.getElementById("taj-dp")?.classList.remove("hasr-open");
+  document.getElementById("taj-ov")?.classList.remove("hasr-open");
+}
+
+const TAJ_TOPIC_META = {
+  total:     { icon: "🏗️", title: "إجمالي الأصناف" },
+  alloc:     { icon: "📦", title: "إجمالي المخصصات" },
+  need:      { icon: "📋", title: "إجمالي الاحتياج" },
+  ppp:       { icon: "🧮", title: "إجمالي PPP" },
+  diff:      { icon: "📊", title: "الفائض / العجز" },
+  coverage:  { icon: "✅", title: "نسبة تغطية التجهيزات" },
+  suppliers: { icon: "🏭", title: "الموردون" },
+  qism:      { icon: "🗂️", title: "القسم" },
+};
+
+/* tajOpenDetail(topic, qismName?) — يفتح البانل بمحتوى مبني حسب
+   الكارت اللي اتضغط، مستخدماً نفس getTajheezFiltered() الموجودة
+   بالفعل (تراعي كل الفلاتر النشطة حالياً في التبويب) */
+function tajOpenDetail(topic, qismName) {
+  _tajInjectDOM();
+  const meta = TAJ_TOPIC_META[topic] || TAJ_TOPIC_META.total;
+  const all = getTajheezFiltered();
+  const rows = topic === "qism" && qismName ? all.filter((r) => r.قسم === qismName) : all;
+
+  const totalItems = rows.length;
+  const totalAllocVal = rows.reduce((s, r) => s + (r.مخصص.قيمة || 0), 0);
+  const totalAllocQty = rows.reduce((s, r) => s + (r.مخصص.كلي || 0), 0);
+  const totalNeedVal = rows.reduce((s, r) => s + (r.احتياج.قيمة || 0), 0);
+  const totalNeedQty = rows.reduce((s, r) => s + (r.احتياج.كلي || 0), 0);
+  const totalPppVal = rows.reduce((s, r) => s + (r.ppp?.قيمة || 0), 0);
+  const totalPppQty = rows.reduce((s, r) => s + (r.ppp?.كلي || 0), 0);
+  const surplusVal = rows.filter((r) => (r.فرق_قيمة || 0) > 0).reduce((s, r) => s + r.فرق_قيمة, 0);
+  const deficitVal = rows.filter((r) => (r.فرق_قيمة || 0) < 0).reduce((s, r) => s + r.فرق_قيمة, 0);
+  const covered = rows.filter((r) => r.احتياج.كلي !== null && r.مخصص.كلي !== null && r.مخصص.كلي >= r.احتياج.كلي);
+  const notCoveredCount = totalItems - covered.length;
+  const coverPct = totalItems > 0 ? Math.round((covered.length / totalItems) * 100) : 0;
+  const suppliersCount = new Set(rows.map((r) => r.مورد).filter(Boolean)).size;
+
+  document.getElementById("taj-dp-title").textContent =
+    (topic === "qism" ? "🗂️ " + qismName : meta.icon + " " + meta.title);
+  document.getElementById("taj-dp-sub").textContent =
+    `${numFmt(totalItems)} صنف ضمن الفلاتر الحالية`;
+
+  // الكروت المصغّرة أعلى البانل — تختلف حسب الموضوع عشان تبقى الأرقام
+  // الأهم بالنسبة للكارت اللي اتضغط هي اللي تظهر الأول
+  let tiles;
+  if (topic === "alloc") {
+    tiles = [
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
+      { l: "كمية المخصصات", v: numFmt(totalAllocQty), c: "#1D4ED8" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+    ];
+  } else if (topic === "need") {
+    tiles = [
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
+      { l: "كمية الاحتياج", v: numFmt(totalNeedQty), c: "#D97706" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+    ];
+  } else if (topic === "ppp") {
+    tiles = [
+      { l: "قيمة PPP", v: sarFmt(totalPppVal), c: "#7C3AED" },
+      { l: "كمية PPP", v: numFmt(totalPppQty), c: "#7C3AED" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+    ];
+  } else if (topic === "diff") {
+    tiles = [
+      { l: "إجمالي الفائض", v: sarFmt(surplusVal), c: "#059669" },
+      { l: "إجمالي العجز", v: sarFmt(Math.abs(deficitVal)), c: "#DC2626" },
+      { l: "صافي الفرق", v: sarFmt(surplusVal + deficitVal), c: (surplusVal + deficitVal) >= 0 ? "#059669" : "#DC2626" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+    ];
+  } else if (topic === "coverage") {
+    tiles = [
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+      { l: "أصناف مغطاة", v: numFmt(covered.length), c: "#059669" },
+      { l: "أصناف غير مغطاة", v: numFmt(notCoveredCount), c: "#DC2626" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#1D4ED8" },
+    ];
+  } else if (topic === "suppliers") {
+    tiles = [
+      { l: "عدد الموردين", v: numFmt(suppliersCount), c: "#4F46E5" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
+    ];
+  } else {
+    // total / qism
+    tiles = [
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+    ];
+  }
+
+  const kpisHtml = `
+    <div class="hasr-igrid">
+      ${tiles.map((t) => `<div class="hasr-ic" style="--hc:${t.c}"><div class="hasr-ic-lbl">${esc(t.l)}</div><div class="hasr-ic-val" style="font-size:15px">${t.v}</div></div>`).join("")}
+    </div>`;
+
+  let bodyExtra;
+  if (topic === "suppliers") {
+    // جدول موردين بدل جدول أصناف — لأن الكارت ده أصلاً عن عدد الموردين
+    const agg = {};
+    rows.forEach((r) => {
+      const key = r.مورد || "غير محدد";
+      if (!agg[key]) agg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0 };
+      const g = agg[key];
+      g.أصناف++;
+      g.مخصص_قيمة += r.مخصص.قيمة || 0;
+      g.احتياج_قيمة += r.احتياج.قيمة || 0;
+      g.مخصص_كلي += r.مخصص.كلي || 0;
+      g.احتياج_كلي += r.احتياج.كلي || 0;
+    });
+    const supRows = Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
+    bodyExtra = `
+      <div class="hasr-sec">الموردون (${numFmt(supRows.length)})</div>
+      ${
+        supRows
+          .map((m) => {
+            const pct = m.احتياج_كلي > 0 ? Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
+            const pc = pct >= 100 ? "#059669" : pct >= 75 ? "#D97706" : "#DC2626";
+            return `<div class="hasr-srow" style="cursor:default">
+              <div style="flex:1;min-width:0">
+                <div class="hasr-sname">${esc(m.مورد)}</div>
+                <div class="hasr-smeta">${numFmt(m.أصناف)} صنف · احتياج ${sarFmt(m.احتياج_قيمة)}</div>
+              </div>
+              <span class="hasr-sbadge" style="background:${pc}18;color:${pc}">${pct}%</span>
+            </div>`;
+          })
+          .join("") || '<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:16px">لا يوجد موردون ضمن هذا العرض</div>'
+      }
+    `;
+  } else {
+    // جدول أصناف — الترتيب حسب الموضوع اللي اتضغط
+    let sorted = [...rows];
+    if (topic === "alloc") sorted.sort((a, b) => (b.مخصص.قيمة || 0) - (a.مخصص.قيمة || 0));
+    else if (topic === "need") sorted.sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+    else if (topic === "ppp") sorted.sort((a, b) => (b.ppp?.قيمة || 0) - (a.ppp?.قيمة || 0));
+    else if (topic === "diff") sorted.sort((a, b) => Math.abs(b.فرق_قيمة || 0) - Math.abs(a.فرق_قيمة || 0));
+    else if (topic === "coverage") sorted.sort((a, b) => (a.نسبة ?? 999) - (b.نسبة ?? 999));
+    else sorted.sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
+
+    const CAP = 200; // حماية من رسم آلاف الصفوف دفعة واحدة — لو أكتر بننبّه المستخدم يضيّق بالفلاتر
+    const shown = sorted.slice(0, CAP);
+    bodyExtra = `
+      <div class="hasr-sec" style="display:flex;justify-content:space-between;align-items:center">
+        <span>الأصناف (${numFmt(sorted.length)})</span>
+        ${sorted.length > CAP ? `<span style="font-size:9px;color:var(--tx-muted)">أعلى ${CAP} — ضيّق بالفلاتر لعرض الباقي</span>` : ""}
+      </div>
+      ${
+        shown
+          .map((r) => {
+            const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+            return `<div class="hasr-srow" style="cursor:default;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div class="hasr-sname">${esc(r.صنف || "—")}</div>
+                <div class="hasr-smeta">${esc(r.قسم || "—")} · ${esc(r.مورد || "—")}</div>
+                <div style="font-size:10px;color:var(--tx-muted);margin-top:3px">احتياج: ${sarFmt(r.احتياج.قيمة)} · مخصص: ${sarFmt(r.مخصص.قيمة)}</div>
+              </div>
+              <span class="hasr-sbadge" style="background:${cb.bg};color:${cb.color}">${esc(cb.label)}</span>
+            </div>`;
+          })
+          .join("") || '<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:16px">لا توجد أصناف ضمن هذا العرض</div>'
+      }
+    `;
+  }
+
+  document.getElementById("taj-dp-body").innerHTML = kpisHtml + bodyExtra;
+  document.getElementById("taj-dp").classList.add("hasr-open");
+  document.getElementById("taj-ov").classList.add("hasr-open");
+}
+
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🏗️  JS تبويب: التجهيزات
    ║  (tab-tajheez) — الدوال الخاصة بهذا التبويب تبدأ هنا
@@ -11879,6 +12176,12 @@ function renderTajheezInventoryTab() {
   const qismEntries = Object.entries(byQismNeed)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12);
+
+  // عدد الأصناف في كل قسم — لكارت "الأصناف الرئيسية"
+  const qismItemCount = {};
+  filtered.forEach((r) => {
+    if (r.قسم) qismItemCount[r.قسم] = (qismItemCount[r.قسم] || 0) + 1;
+  });
 
   // بيانات تحليل الموردين
   const byMoredAgg = {};
@@ -11953,49 +12256,83 @@ function renderTajheezInventoryTab() {
     </div>
   </div>
 
-  <!-- ══ KPIs ══ -->
+  <!-- ══ KPIs — كل كارت قابل للضغط ويفتح بانل تفصيلي (زي حصر الأصول) ══ -->
   <div class="kpi-grid" style="margin-bottom:18px">
-    <div class="kpi kc-navy">
+    <div class="kpi kc-navy hasr-clickable" onclick="tajOpenDetail('total')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">🏗️</div>
       <div class="kpi-val">${numFmt(totalItems)}</div>
       <div class="kpi-lbl">إجمالي الأصناف</div>
       <div class="kpi-sub">${أقسام.length} قسم</div>
     </div>
-    <div class="kpi kc-blue">
+    <div class="kpi kc-blue hasr-clickable" onclick="tajOpenDetail('alloc')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">📦</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalAllocVal)}</div>
       <div class="kpi-lbl">إجمالي المخصصات</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.مخصص.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber hasr-clickable" onclick="tajOpenDetail('need')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">📋</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalNeedVal)}</div>
       <div class="kpi-lbl">إجمالي الاحتياج</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.احتياج.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-teal" style="background:#F5F3FF">
+    <div class="kpi kc-teal hasr-clickable" style="background:#F5F3FF" onclick="tajOpenDetail('ppp')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">🧮</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalPppVal)}</div>
       <div class="kpi-lbl">إجمالي PPP</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + (r.ppp?.كلي || 0), 0))} وحدة</div>
     </div>
-    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"}">
+    <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"} hasr-clickable" onclick="tajOpenDetail('diff')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">${totalDiffVal >= 0 ? "📈" : "📉"}</div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(Math.abs(totalDiffVal))}</div>
       <div class="kpi-lbl">${totalDiffVal >= 0 ? "إجمالي الفائض" : "إجمالي العجز"}</div>
       <div class="kpi-sub">فرق القيمة الكلية</div>
     </div>
-    <div class="kpi kc-teal">
+    <div class="kpi kc-teal hasr-clickable" onclick="tajOpenDetail('coverage')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">✅</div>
       <div class="kpi-val">${coverPct}%</div>
       <div class="kpi-lbl">نسبة تغطية التجهيزات</div>
       <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى</div>
     </div>
-    <div class="kpi kc-navy" style="background:#EEF2FF">
+    <div class="kpi kc-navy hasr-clickable" style="background:#EEF2FF" onclick="tajOpenDetail('suppliers')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">🏭</div>
       <div class="kpi-val">${numFmt(موردونَ_فيَ_النتيجة.size)}</div>
       <div class="kpi-lbl">عدد الموردين</div>
       <div class="kpi-sub">من إجمالي ${موردون.length} مورد</div>
+    </div>
+  </div>
+
+  <!-- ══ كارت: الأصناف الرئيسية (توزيع حسب القسم) — كل قسم قابل للضغط ══ -->
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8">🗂️</span>
+      الأصناف الرئيسية
+      <span class="sub">حسب القسم — اضغط أي قسم لعرض تفاصيله</span>
+    </div>
+    <div style="padding:4px 2px">
+      ${
+        qismEntries.length
+          ? qismEntries
+              .map(([qism, needVal]) => {
+                const cnt = qismItemCount[qism] || 0;
+                const maxVal = qismEntries[0][1] || 1;
+                const pct = maxVal > 0 ? Math.round((needVal / maxVal) * 100) : 0;
+                return `<div class="hasr-clickable" onclick="tajOpenDetail('qism','${esc(qism)}')" style="cursor:pointer;padding:9px 6px;border-bottom:1px solid var(--bd-light)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:8px">
+                    <span style="font-size:12px;font-weight:700;color:var(--tx-main)">${esc(qism)}</span>
+                    <span style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+                      <span style="font-size:10px;color:var(--tx-muted);white-space:nowrap">${numFmt(cnt)} صنف</span>
+                      <span style="font-size:11px;font-weight:800;color:#1D4ED8;white-space:nowrap">${sarFmt(needVal)}</span>
+                    </span>
+                  </div>
+                  <div style="height:7px;border-radius:5px;background:var(--bd-light);overflow:hidden">
+                    <div style="height:100%;width:${pct}%;background:#1D4ED8;border-radius:5px"></div>
+                  </div>
+                </div>`;
+              })
+              .join("")
+          : '<div style="color:var(--tx-muted);font-size:12px;text-align:center;padding:20px">لا توجد بيانات ضمن الفلاتر الحالية</div>'
+      }
     </div>
   </div>
 
@@ -16469,7 +16806,29 @@ ${(() => {
     });
   }
 
-  setInterval(scanAllTables, 1000);
+  // بدل ما نفحص الصفحة كلها كل ثانية للأبد، نفحص فوراً لما في سبب فعلي
+  // (تبديل تبويب / تحديث فلاتر) + نسيب فحص دوري بس كـ"شبكة أمان" بفاصل
+  // أكبر بكتير (بدل كل ثانية) عشان أي حالة نادرة تفوت الهوكات.
+  if (typeof window.showTab === "function" && !window.__scanTablesShowTabPatched) {
+    window.__scanTablesShowTabPatched = true;
+    const origShowTab_scan = window.showTab;
+    window.showTab = function () {
+      const r = origShowTab_scan.apply(this, arguments);
+      setTimeout(scanAllTables, 60);
+      return r;
+    };
+  }
+  if (typeof window.applyFilters === "function" && !window.__scanTablesApplyFiltersPatched) {
+    window.__scanTablesApplyFiltersPatched = true;
+    const origApplyFilters_scan = window.applyFilters;
+    window.applyFilters = function () {
+      const r = origApplyFilters_scan.apply(this, arguments);
+      setTimeout(scanAllTables, 60);
+      return r;
+    };
+  }
+
+  setInterval(scanAllTables, 8000);
   document.addEventListener("DOMContentLoaded", scanAllTables);
   window.addEventListener("load", scanAllTables);
 })();
@@ -17794,8 +18153,9 @@ ${panelHTML}
      9. مراقبة تغيير البيانات لتفعيل روابط المدارس
   ────────────────────────────────────────────── */
   function observeDataUpdates() {
-    // نراقب تغيير جدول المدارس الرئيسي
-    const observer = new MutationObserver(function (mutations) {
+    // منطق المراقبة موحّد (نفسه القديم بالضبط) — بس بقى مستخدم من مراقبَين
+    // منفصلين بدل واحد يراقب كل تبويبات الداشبورد مع بعض طول الوقت
+    function handleSchoolLinkMutations(mutations) {
       mutations.forEach(function (m) {
         m.addedNodes.forEach(function (node) {
           if (node.nodeType !== 1) return;
@@ -17809,17 +18169,34 @@ ${panelHTML}
           }
         });
       });
-    });
+    }
 
-    // راقب tbody الجدول الرئيسي
+    // راقب tbody الجدول الرئيسي (نفس القديم — بدون تغيير)
     const tbody = document.getElementById("tbl-body");
-    if (tbody) observer.observe(tbody, { childList: true, subtree: true });
+    const tbodyObserver = new MutationObserver(handleSchoolLinkMutations);
+    if (tbody) tbodyObserver.observe(tbody, { childList: true, subtree: true });
 
-    // راقب المناطق التي تظهر فيها قوائم المدارس
-    const panels = document.querySelectorAll(".panel");
-    panels.forEach(p => {
-      observer.observe(p, { childList: true, subtree: true });
-    });
+    // راقب التبويب الفعّال بس (بدل كل .panel مع بعض دايماً) — وأعد توجيه
+    // المراقبة للتبويب الجديد كل ما المستخدم يبدّل تبويب. ده بيوفر نفس
+    // النتيجة (روابط أسماء المدارس تشتغل في أي تبويب) من غير ما نراقب
+    // تبويبات مخفية مالهاش داعي طول الوقت.
+    const panelObserver = new MutationObserver(handleSchoolLinkMutations);
+    function observeActivePanel() {
+      panelObserver.disconnect();
+      const active = document.querySelector(".panel.active");
+      if (active) panelObserver.observe(active, { childList: true, subtree: true });
+    }
+    observeActivePanel();
+
+    if (typeof window.showTab === "function" && !window.__schoolLinkShowTabPatched) {
+      window.__schoolLinkShowTabPatched = true;
+      const origShowTab = window.showTab;
+      window.showTab = function () {
+        const r = origShowTab.apply(this, arguments);
+        try { observeActivePanel(); } catch (_) {}
+        return r;
+      };
+    }
 
     // Patch renderTable مباشرة بعد أول تحميل للبيانات
     patchRenderTable();
@@ -19890,6 +20267,30 @@ function renderTrainingTab(_fromDate, _toDate) {
           '- "خنادق/drainage/صرف" → تبويب خنادق الصرف' + extraRules
         );
 
+        /* ⚠️ تنبيه إلزامي — كلمة "وقود" لها معنيان مختلفان تماماً في هذا النظام،
+           ولازم تتعامل معاهم كموضوعين منفصلين مش موضوع واحد:
+           1) وقود السيارات/الأسطول — بيانات فعلية حية موجودة في تبويب "استهلاك
+              الوقود" (اللترات/التكلفة/رقم اللوحة)، مرفقة أسفل كـ"بيانات الوقود".
+           2) منظومة وقود مولدات الطوارئ — موضوع مختلف تماماً بيُغطّى في الدليل
+              الوطني (صيانة/سلامة/امتثال)، ومفيهوش بيانات استهلاك فعلية أصلاً.
+           أي سؤال عام زي "بيانات استهلاك وتكلفة الوقود" أو "كام لتر اتصرف" أو
+           "تكلفة الوقود" — من غير ما يذكر صراحة "مولدات" أو "طوارئ" أو "توليد
+           كهرباء" — لازم يتفسّر افتراضياً كسؤال عن (1) وقود السيارات، ويُجاب من
+           بيانات "بيانات الوقود" المرفقة تحت مباشرة. ممنوع تقول "البيانات غير
+           متاحة في اللوحة الحالية" وانت عندك أرقام فعلية لوقود السيارات تحت —
+           لو السؤال فعلاً عن مولدات الطوارئ (اتذكر صراحة)، وقتها بس ارجع
+           للدليل الوطني ووضّح إن ده نوع بيانات مختلف عن وقود الأسطول. */
+        prompt += `
+
+════════════════════════════════════════
+⚠️ توضيح إلزامي: "وقود السيارات" ≠ "وقود مولدات الطوارئ"
+════════════════════════════════════════
+دول موضوعين مختلفين تماماً. "بيانات الوقود" أسفل = وقود السيارات/الأسطول
+(بيانات حية فعلية من اللوحة). أما وقود مولدات الطوارئ فموضوع منفصل في الدليل
+الوطني بدون بيانات استهلاك فعلية. أي سؤال عن "استهلاك/تكلفة الوقود" بدون ذكر
+صريح لكلمة "مولدات" أو "طوارئ" = سؤال عن وقود السيارات → أجب من بيانات اللوحة
+أسفل، ولا تقل إن البيانات غير متاحة.`;
+
         /* إضافة snapshot للتبويبات الجديدة */
         const fuelRows = window.RAW_FUEL || [];
         const vehRows  = window.RAW_VEHICLES || [];
@@ -19897,9 +20298,29 @@ function renderTrainingTab(_fromDate, _toDate) {
 
         if (fuelRows.length || vehRows.length || trRows.length) {
           const n_ = v => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x)?0:x; };
+          const MM_AR_ = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+          // عمود "التاريخ" في شيت الوقود بقى رقم شهر فقط (1–12) من غير يوم أو سنة —
+          // نبني توزيع شهري بسيط عشان الـ AI يقدر يجاوب عن أسئلة زي "استهلاك شهر 5"
+          const fuelByMonth = {};
+          fuelRows.forEach(r => {
+            const raw = String(r['التاريخ'] ?? r['الشهر'] ?? '').trim();
+            const mo = /^\d{1,2}$/.test(raw) ? +raw : null;
+            if (!mo || mo < 1 || mo > 12) return;
+            const b = (fuelByMonth[mo] = fuelByMonth[mo] || { count: 0, liters: 0, cost: 0 });
+            b.count++;
+            b.liters += n_(r['اللترات']);
+            b.cost += n_(r['التكلفة (SAR)'] ?? r['التكلفة']);
+          });
+          const monthsSummary = Object.keys(fuelByMonth).map(Number).sort((a, b) => a - b)
+            .map(mo => `${MM_AR_[mo - 1]}: ${fuelByMonth[mo].count} سجل، ${fuelByMonth[mo].liters.toLocaleString(undefined, { maximumFractionDigits: 0 })} لتر، ${fuelByMonth[mo].cost.toLocaleString(undefined, { maximumFractionDigits: 0 })} ريال`)
+            .join(' · ');
+
           const fuelData = fuelRows.length ? `
-- بيانات الوقود: ${fuelRows.length.toLocaleString()} سجل · إجمالي اللترات: ${fuelRows.reduce((s,r)=>s+n_(r['اللترات']),0).toLocaleString(undefined,{maximumFractionDigits:0})} · إجمالي التكلفة: ${fuelRows.reduce((s,r)=>s+n_(r['التكلفة (SAR)']??r['التكلفة']),0).toLocaleString(undefined,{maximumFractionDigits:0})} ريال · ${new Set(fuelRows.map(r=>r['رقم اللوحة']||r['لوحة_السيارة']||'')).size} سيارة` : '';
-          const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة` : '';
+- بيانات الوقود: ${fuelRows.length.toLocaleString()} سجل · إجمالي اللترات: ${fuelRows.reduce((s,r)=>s+n_(r['اللترات']),0).toLocaleString(undefined,{maximumFractionDigits:0})} · إجمالي التكلفة: ${fuelRows.reduce((s,r)=>s+n_(r['التكلفة (SAR)']??r['التكلفة']),0).toLocaleString(undefined,{maximumFractionDigits:0})} ريال · ${new Set(fuelRows.map(r=>r['رقم اللوحة']||r['لوحة_السيارة']||'')).size} سيارة
+- ملحوظة: عمود "التاريخ" في شيت الوقود يحتوي رقم الشهر فقط (1-12) بدون يوم أو سنة.
+- ملحوظة مهمة: شيت الوقود ما فيهوش اسم السائق أو ماركة السيارة كأعمدة مباشرة. البيانات دي مرتبطة بشيت السيارات عن طريق "رقم اللوحة" المشترك بين الشيتين — لو السؤال عن سائق أو ماركة سيارة معينة بخصوص الوقود، اربط برقم اللوحة أولاً (القسم "استهلاك_الوقود.أعلى_10_سيارات_تكلفة" في السياق المنقّح مربوط بالفعل).
+- توزيع الوقود حسب الشهر: ${monthsSummary || '—'}` : '';
+          const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة (الأعمدة: رقم اللوحة، الماركة، سنة الصنع، رقم/اسم المستخدم الفعلي = السائق، تفويض حتى، الحالة) — "رقم اللوحة" هو مفتاح الربط مع شيت الوقود` : '';
           const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
 
           prompt += '\n' + (fuelData + vehData + trData).trim();
@@ -20468,49 +20889,75 @@ function _hasrRenderFilterBanner() {
     }
     .hasr-tab:hover  { color:rgba(255,255,255,.8); }
     .hasr-tab.active { color:#fff; border-bottom-color:#0891B2; }
-    .hasr-body { flex:1; overflow-y:auto; padding:16px 18px; }
+    .hasr-body { flex:1; overflow-y:auto; padding:16px 18px; scrollbar-width:thin; }
+    .hasr-body::-webkit-scrollbar { width:7px; }
+    .hasr-body::-webkit-scrollbar-track { background:transparent; }
+    .hasr-body::-webkit-scrollbar-thumb { background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.35)}; border-radius:10px; }
+    .hasr-body::-webkit-scrollbar-thumb:hover { background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.55)}; }
     .hasr-igrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
     .hasr-ic {
       background:var(--bg-2); border:1px solid var(--bd-light);
-      border-radius:10px; padding:11px 13px; position:relative; overflow:hidden;
+      border-radius:12px; padding:12px 14px; position:relative; overflow:hidden;
+      box-shadow:0 1px 3px rgba(6,20,28,.05);
+      transition:box-shadow .18s,transform .18s;
     }
+    .hasr-ic:hover { box-shadow:0 5px 16px rgba(6,20,28,.09); transform:translateY(-2px); }
     .hasr-ic::before {
       content:''; position:absolute; top:0; right:0;
       width:3px; height:100%; background:var(--hc,#94a3b8);
     }
     .hasr-ic.full { grid-column:1/-1; }
-    .hasr-ic-lbl  { font-size:10px; color:var(--tx-muted); font-weight:600; margin-bottom:3px; }
-    .hasr-ic-val  { font-size:18px; font-weight:900; color:var(--hc,var(--tx-main)); }
-    .hasr-ic-sub  { font-size:10px; color:var(--tx-muted); margin-top:2px; }
+    .hasr-ic-lbl  { font-size:10px; color:var(--tx-muted); font-weight:700; margin-bottom:4px; letter-spacing:.01em; }
+    .hasr-ic-val  { font-size:18.5px; font-weight:900; color:var(--hc,var(--tx-main)); line-height:1.25; }
+    .hasr-ic-sub  { font-size:10px; color:var(--tx-muted); margin-top:3px; }
     .hasr-prog    { height:6px; border-radius:4px; background:var(--bd-light); overflow:hidden; margin-top:7px; }
     .hasr-pfill   { height:100%; border-radius:4px; transition:width .7s cubic-bezier(.22,.6,.34,1); }
     .hasr-sec {
-      font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
-      color:var(--tx-muted); margin:16px 0 8px; padding-bottom:6px;
-      border-bottom:1px solid var(--bd-light);
+      display:flex; align-items:center; gap:7px;
+      font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+      color:var(--tx-muted); margin:20px 0 10px; padding-bottom:8px;
+      border-bottom:1.5px solid var(--bd-light);
+    }
+    .hasr-sec::before {
+      content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0;
+      background:var(--teal,#0891B2);
+      box-shadow:0 0 0 3px ${CSS_TOKENS.α(CSS_TOKENS.info(), 0.15)};
     }
     .hasr-sec:first-child { margin-top:0; }
     .hasr-srow {
       display:flex; align-items:center; justify-content:space-between;
-      padding:9px 10px; border-radius:8px; cursor:pointer; transition:background .14s;
-      margin-bottom:2px;
+      padding:11px 13px; border-radius:11px; cursor:pointer;
+      transition:background .16s,border-color .16s,box-shadow .16s;
+      margin-bottom:7px;
+      background:var(--bg-2);
+      border:1px solid var(--bd-light);
+      box-shadow:0 1px 2px rgba(6,20,28,.03);
     }
-    .hasr-srow:hover { background:var(--bg-2); }
-    .hasr-sname { font-size:12px; font-weight:700; color:var(--tx-main); }
-    .hasr-smeta { font-size:10px; color:var(--tx-muted); margin-top:2px; }
+    .hasr-srow:hover {
+      background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.1)};
+      border-color:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.45)};
+      box-shadow:0 3px 10px rgba(6,20,28,.07);
+    }
+    .hasr-srow:last-child { margin-bottom:0; }
+    .hasr-sname { font-size:12.5px; font-weight:800; color:var(--tx-main); line-height:1.35; }
+    .hasr-smeta { font-size:10.5px; color:var(--tx-muted); margin-top:3px; line-height:1.5; }
     .hasr-sbadge {
-      font-size:10px; font-weight:700; padding:2px 8px;
+      font-size:10px; font-weight:800; padding:3px 10px;
       border-radius:999px; background:#EFF6FF; color:#1D4ED8;
+      border:1px solid rgba(29,78,216,.15);
       flex-shrink:0; margin-right:6px; white-space:nowrap;
     }
     .hasr-cbar {
-      display:flex; border-radius:8px; overflow:hidden; height:28px;
+      display:flex; border-radius:9px; overflow:hidden; height:28px;
       border:1px solid var(--bd-light); margin-bottom:10px;
+      box-shadow:inset 0 1px 2px rgba(6,20,28,.06);
     }
     .hasr-cseg {
       display:flex; align-items:center; justify-content:center;
       font-size:10px; color:#fff; font-weight:700; min-width:0;
+      transition:filter .15s;
     }
+    .hasr-cseg:hover { filter:brightness(1.08); }
     .hasr-clickable {
       cursor:pointer !important;
       transition:transform .18s,box-shadow .18s !important;
@@ -24063,9 +24510,24 @@ setTimeout(function tellUserStillTrying() {
       /* 5) خزّن السياق الحي والتحليل المسبق في window.__FCB_LIVE_CONTEXT_INJECT__
              فقط. هذا الكائن يُقرأ لاحقاً داخل System Message عند بناء
              الطلب لـ OpenAI (fcbAskOpenAI) — ولا يُضاف أبداً إلى رسالة
-             المستخدم الظاهرة في واجهة المحادثة (Hidden Context). */
+             المستخدم الظاهرة في واجهة المحادثة (Hidden Context).
+
+             🛠️ إصلاح: DashboardContextBuilder (اللي بيتطبّق بعدنا بـ200ms
+             زيادة عشان "يفضل هو الأخير") فعلياً بيتنده هو الأول جوه نفس
+             السلسلة (بيلف حوالينا كطبقة خارجية)، فبيحط context الغني بتاعه
+             (فيه بيانات الوقود/السيارات/البلاغات المنقّحة) وبعدين بينده
+             علينا إحنا — وكنا بنكتب فوقه بالكامل بـ liveCtx (الأفقر، من
+             غير وقود/سيارات) قبل ما الطلب الحقيقي يتبعت لـ GPT. النتيجة:
+             بيانات Builder كانت بتتبني صح لكنها توصلش أبداً للموديل.
+             الإصلاح: لو Builder سبقنا وحط context/global_snapshot/
+             reasoning_guide طازة لنفس السؤال ده، نحافظ عليهم زي ما هم
+             ونضيف بس الـ insights/execInstr بتوعنا فوقهم، بدل الكتابة فوق
+             كل حاجة. */
+      var _existingInject = window.__FCB_LIVE_CONTEXT_INJECT__;
       window.__FCB_LIVE_CONTEXT_INJECT__ = {
-        context: liveCtx,
+        context: (_existingInject && _existingInject.context) || liveCtx,
+        global_snapshot: (_existingInject && _existingInject.global_snapshot) || null,
+        reasoning_guide: (_existingInject && _existingInject.reasoning_guide) || null,
         insights: insights,
         execInstr: execInstr,
         timestamp: Date.now()
@@ -24262,6 +24724,8 @@ setTimeout(function tellUserStillTrying() {
       rawAllSystems: window.RAW_ALL_SYSTEMS|| [],
       rawElevators:  window.RAW_ELEVATORS  || [],
       hasr:          window.HASR           || null,
+      rawFuel:       window.RAW_FUEL       || [],
+      rawVehicles:   window.RAW_VEHICLES   || [],
     };
 
     /* RAW + FILTERED من DataService أو المتغيرات العامة */
@@ -24316,6 +24780,8 @@ setTimeout(function tellUserStillTrying() {
         systems:    collected.rawAllSystems,
         elevators:  collected.rawElevators,
         hasr:       collected.hasr,
+        fuel:       collected.rawFuel,
+        vehicles:   collected.rawVehicles,
       }
     };
 
@@ -24730,6 +25196,91 @@ setTimeout(function tellUserStillTrying() {
       };
     }
 
+    /* ── ربط الوقود بالسيارات عبر رقم اللوحة (نفس منطق تبويب استهلاك الوقود
+       بالضبط) — بنبنيه هنا مرة واحدة عشان يُستخدم في قسمي "استهلاك_الوقود"
+       و"السيارات" مع بعض، فالـ AI يعرف إزاي البيانات مربوطة ببعضها ── */
+    var veh = sup.vehicles;
+    var plateInfo = {};
+    if (Array.isArray(veh)) {
+      veh.forEach(function (v) {
+        var p = String(v["رقم اللوحة"] || "").trim();
+        if (!p) return;
+        plateInfo[p] = {
+          الماركة:  v["الماركة"] || "",
+          السائق:   v["اسم المستخدم الفعلي"] || "",
+          الحالة:   v["الحالة"] || "",
+        };
+      });
+    }
+
+    /* استهلاك الوقود — عمود "التاريخ" هنا رقم شهر فقط (1-12) بدون يوم أو سنة */
+    var fuel = sup.fuel;
+    if (Array.isArray(fuel) && fuel.length) {
+      var n__ = function (v) { var x = parseFloat(String(v || "").replace(/,/g, "")); return isNaN(x) ? 0 : x; };
+      var MM_AR__ = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+      var fByMonth = {};
+      var fByPlate = {};
+      fuel.forEach(function (r) {
+        var raw = String(r["التاريخ"] ?? r["الشهر"] ?? "").trim();
+        var mo = /^\d{1,2}$/.test(raw) ? +raw : null;
+        if (mo && mo >= 1 && mo <= 12) {
+          var b = (fByMonth[mo] = fByMonth[mo] || { عدد_السجلات: 0, اللترات: 0, التكلفة_SAR: 0 });
+          b.عدد_السجلات++;
+          b.اللترات += n__(r["اللترات"]);
+          b.التكلفة_SAR += n__(r["التكلفة (SAR)"] ?? r["التكلفة"]);
+        }
+        var plate = String(r["رقم اللوحة"] || r["لوحة_السيارة"] || "").trim();
+        if (!plate) return;
+        var pb = (fByPlate[plate] = fByPlate[plate] || { عدد_السجلات: 0, اللترات: 0, التكلفة_SAR: 0 });
+        pb.عدد_السجلات++;
+        pb.اللترات += n__(r["اللترات"]);
+        pb.التكلفة_SAR += n__(r["التكلفة (SAR)"] ?? r["التكلفة"]);
+      });
+      var fByMonthNamed = {};
+      Object.keys(fByMonth).map(Number).sort(function (a, b) { return a - b; }).forEach(function (mo) {
+        fByMonthNamed[MM_AR__[mo - 1]] = fByMonth[mo];
+      });
+      // أعلى 10 سيارات استهلاكاً للتكلفة — مربوطة باسم السائق والماركة من شيت السيارات
+      var topPlates = Object.keys(fByPlate).sort(function (a, b) { return fByPlate[b].التكلفة_SAR - fByPlate[a].التكلفة_SAR; }).slice(0, 10);
+      var topPlatesOut = {};
+      topPlates.forEach(function (p) {
+        var info = plateInfo[p] || {};
+        topPlatesOut[p] = {
+          السائق: info.السائق || "غير معروف (رقم اللوحة غير موجود في شيت السيارات)",
+          الماركة: info.الماركة || "",
+          اللترات: fByPlate[p].اللترات,
+          التكلفة_SAR: fByPlate[p].التكلفة_SAR,
+          عدد_السجلات: fByPlate[p].عدد_السجلات,
+        };
+      });
+      sec.استهلاك_الوقود = {
+        _source:            "Statistics→Fuel",
+        _ملاحظة_1:          "عمود التاريخ في هذا الشيت رقم شهر فقط (1-12)، بدون يوم أو سنة",
+        _ملاحظة_2:          "شيت الوقود ما فيهوش عمود لاسم السائق أو ماركة السيارة مباشرة — كل سجل وقود مربوط برقم اللوحة (رقم اللوحة)، ولمعرفة اسم السائق أو الماركة أو حالة السيارة لازم تربطها بشيت السيارات عن طريق نفس رقم اللوحة. القسم 'أعلى_10_سيارات_تكلفة' تحت ده جاهز مربوط بالفعل.",
+        إجمالي_السجلات:     fuel.length,
+        إجمالي_اللترات:     fuel.reduce(function (s, r) { return s + n__(r["اللترات"]); }, 0),
+        إجمالي_التكلفة_SAR: fuel.reduce(function (s, r) { return s + n__(r["التكلفة (SAR)"] ?? r["التكلفة"]); }, 0),
+        عدد_السيارات:       new Set(fuel.map(function (r) { return r["رقم اللوحة"] || r["لوحة_السيارة"] || ""; }).filter(Boolean)).size,
+        توزيع_حسب_الشهر:    fByMonthNamed,
+        أعلى_10_سيارات_تكلفة: topPlatesOut,
+      };
+    }
+
+    /* السيارات */
+    if (Array.isArray(veh) && veh.length) {
+      var vStatKey = ["الحالة", "Status", "status"].find(function (k) { return k in (veh[0] || {}); });
+      var vDist = {};
+      if (vStatKey) {
+        veh.forEach(function (r) { var s = r[vStatKey] || "غير محدد"; vDist[s] = (vDist[s] || 0) + 1; });
+      }
+      sec.السيارات = {
+        _source:          "Statistics→Vehicles",
+        _ملاحظة:          "مفتاح الربط بين شيت السيارات وشيت استهلاك الوقود هو 'رقم اللوحة' — عمود 'اسم المستخدم الفعلي' هنا هو اسم السائق الفعلي للسيارة.",
+        إجمالي_السيارات: veh.length,
+        توزيع_الحالة:    vDist,
+      };
+    }
+
     return sec;
   }
 
@@ -24746,6 +25297,8 @@ setTimeout(function tellUserStillTrying() {
       بيانات_الأنظمة_متاحة: (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) ? "نعم" : "لا",
       بيانات_المصاعد_متاحة: (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) ? "نعم" : "لا",
       بيانات_الحصر_متاحة:  (window.HASR && window.HASR.loaded) ? "نعم" : "لا",
+      بيانات_الوقود_متاحة: (Array.isArray(window.RAW_FUEL) && window.RAW_FUEL.length) ? "نعم" : "لا",
+      بيانات_السيارات_متاحة: (Array.isArray(window.RAW_VEHICLES) && window.RAW_VEHICLES.length) ? "نعم" : "لا",
       تحذير_بيانات_غير_كافية:
         "إذا كانت البيانات المطلوبة تظهر 'لا' أعلاه، أبلغ المستخدم: " +
         "'البيانات الحالية لا تكفي لإثبات هذه العلاقة.' ولا تخترع أي نتائج.",

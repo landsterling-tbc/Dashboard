@@ -7198,10 +7198,15 @@ function _sysDownloadFile(filename, content, mime) {
   // يحاول تفسير تاريخ من نصوص بصيغ مختلفة (YYYY-MM-DD أو DD/MM/YYYY أو غيرها)
   function parseBalaghDate(v) {
     const s = norm(v).replace(/\u200f/g, "").replace(/\u200e/g, "").trim(); // شيل LRM/RLM
-    if (!s) return null;
+    if (!s || /^#+$/.test(s)) return null; // نص فاضي أو "######" (لصق من إكسل بعمود ضيق)
     // صيغة: 24/6/2026 23:15
     let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    if (m) {
+      let d = +m[1], mo = +m[2];
+      // نفس شبكة الأمان اللي ضفناها في تبويب الوقود: لو رقم الشهر مستحيل (>12) بينما اليوم صالح كشهر، نقلبهم
+      if (mo > 12 && d <= 12) [d, mo] = [mo, d];
+      if (mo >= 1 && mo <= 12) return new Date(+m[3], mo - 1, d);
+    }
     m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
     if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
     const d = new Date(s);
@@ -18973,9 +18978,13 @@ function renderFuelTab(_fromDate, _toDate) {
     let s = String(raw).trim();
     if (!s || /^#+$/.test(s)) return null; // نص فاضي أو "######" (لصق من إكسل بعمود ضيق)
     let m;
-    // YYYY-MM-DD أو YYYY/MM/DD
-    if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)))
-      return `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`;
+    // YYYY-MM-DD أو YYYY/MM/DD — ⚠️ الشيت بيخزّن الشهر واليوم مقلوبين في العمود ده (تأكدنا بالأمثلة:
+    // "2026-01-04" في الخام = 1 أبريل فعليًا) فبنرجعهم لترتيبهم الصح، إلا لو القلب هيطلع شهر مستحيل (>12)
+    if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/))) {
+      const y = m[1]; let mo = +m[2], d = +m[3];
+      if (d >= 1 && d <= 12) [mo, d] = [d, mo]; // اقلب لو القلب صالح (يوم أصلي ≤12 يقدر يبقى شهر)
+      return `${y}-${pad2(mo)}-${pad2(d)}`;
+    }
     // DD-MM-YYYY أو DD/MM/YYYY (نفس ترتيب الشيت الحالي — تأكدنا منه بالأمثلة)
     if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))) {
       let d = +m[1], mo = +m[2], y = +m[3];

@@ -1215,7 +1215,7 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
       const cx = left + width / 2, cy = top + height / 2;
       ctx.save();
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillStyle = "#0d2f40";
+      ctx.fillStyle = CSS_TOKENS.primary();
       ctx.font = `900 ${Math.max(16, Math.min(22, width * .13))}px Tajawal,sans-serif`;
       ctx.fillText(total.toLocaleString("ar"), cx, cy - 7);
       ctx.fillStyle = CSS_TOKENS.txMuted();
@@ -1312,7 +1312,7 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
         },
         y: {
           grid: { display: false },
-          ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: "#0d2f40", maxRotation: 0 },
+          ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.primary(), maxRotation: 0 },
           afterFit: (s) => { s.width = Math.max(s.width, 220); },
         },
       },
@@ -1356,7 +1356,7 @@ function makeVBar(id, labels, datasets) {
       },
       scales: {
         y: { beginAtZero: true, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.txMuted(), callback: safeTickCallback } },
-        x: { grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: "#0d2f40", maxRotation: 30, callback: safeTickCallback } },
+        x: { grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.primary(), maxRotation: 30, callback: safeTickCallback } },
       },
       animation: { duration: 500 },
     },
@@ -1421,7 +1421,9 @@ function renderOverviewCharts() {
           {
             label: "عدد المدارس",
             data: envBins,
-            backgroundColor: "#059669BB",
+            // PHASE 1 (توحيد الألوان): كان أخضر مختلف (#059669) عن اللون
+            // الموحّد في باقي الداشبورد (--c-positive #066a52)
+            backgroundColor: CSS_TOKENS.positive() + "BB",
             borderWidth: 1,
             borderRadius: 4,
           },
@@ -1520,7 +1522,10 @@ function renderFcaCharts() {
         {
           label: "متوسط FCA",
           data: stData.map((x) => +x.a.toFixed(1)),
-          backgroundColor: "#0891B2BB",
+          // PHASE 1 (توحيد الألوان): الخلفية كانت لون تيل مختلف شوية عن
+          // borderColor نفسه (اللي بالفعل بيستخدم CSS_TOKENS.info()) —
+          // وحّدناهم لنفس اللون
+          backgroundColor: CSS_TOKENS.info() + "BB",
           borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
@@ -1828,7 +1833,8 @@ function renderEnvCharts() {
         {
           label: "متوسط البيئة",
           data: eData.map((x) => +x.a.toFixed(1)),
-          backgroundColor: "#059669BB",
+          // PHASE 1 (توحيد الألوان): وحّدنا الخلفية مع borderColor
+          backgroundColor: CSS_TOKENS.positive() + "BB",
           borderColor: CSS_TOKENS.positive(),
           borderWidth: 1,
           borderRadius: 4,
@@ -1924,7 +1930,8 @@ function renderStageCharts() {
           {
             label: "بنات",
             data: stages.map((s) => D.filter((r) => r.stage === s && "بنات" === r.gender).length),
-            backgroundColor: "#DC262688",
+            // PHASE 1 (توحيد الألوان): وحّدنا الخلفية مع borderColor
+            backgroundColor: CSS_TOKENS.danger() + "88",
             borderColor: CSS_TOKENS.danger(),
             borderWidth: 1,
             borderRadius: 3,
@@ -1932,7 +1939,7 @@ function renderStageCharts() {
           {
             label: "بنين",
             data: stages.map((s) => D.filter((r) => r.stage === s && "بنين" === r.gender).length),
-            backgroundColor: "#0891B288",
+            backgroundColor: CSS_TOKENS.info() + "88",
             borderColor: CSS_TOKENS.info(),
             borderWidth: 1,
             borderRadius: 3,
@@ -1956,7 +1963,7 @@ function renderStageCharts() {
     {
       label: "بنات",
       data: girlAvg.map((v) => (v ? +v.toFixed(1) : null)),
-      backgroundColor: "#DC262688",
+      backgroundColor: CSS_TOKENS.danger() + "88",
       borderColor: CSS_TOKENS.danger(),
       borderWidth: 1,
       borderRadius: 3,
@@ -1964,7 +1971,7 @@ function renderStageCharts() {
     {
       label: "بنين",
       data: boyAvg.map((v) => (v ? +v.toFixed(1) : null)),
-      backgroundColor: "#0891B288",
+      backgroundColor: CSS_TOKENS.info() + "88",
       borderColor: CSS_TOKENS.info(),
       borderWidth: 1,
       borderRadius: 3,
@@ -1991,7 +1998,7 @@ function renderStageCharts() {
         {
           label: "مدارس",
           data: clData,
-          backgroundColor: "#0891B2BB",
+          backgroundColor: CSS_TOKENS.info() + "BB",
           borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
@@ -2019,7 +2026,7 @@ function renderStageCharts() {
         {
           label: "مدارس",
           data: acData,
-          backgroundColor: "#0E7490BB",
+          backgroundColor: CSS_TOKENS.info() + "BB",
           borderColor: CSS_TOKENS.info(),
           borderWidth: 1,
           borderRadius: 4,
@@ -3479,7 +3486,7 @@ function renderStudentsTab() {
               {
                 label: "عدد الطلاب",
                 data: top20stud.map((r) => r.students),
-                backgroundColor: "#05966988",
+                backgroundColor: CSS_TOKENS.positive() + "88",
                 borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -3515,10 +3522,10 @@ function renderStudentsTab() {
                 data: top20age.map((r) => r.buildingAge),
                 backgroundColor: top20age.map((r) =>
                   r.buildingAge >= 40
-                    ? "#DC262688"
+                    ? CSS_TOKENS.danger() + "88"
                     : r.buildingAge >= 25
-                      ? "#D9770688"
-                      : "#05966988",
+                      ? CSS_TOKENS.warning() + "88"
+                      : CSS_TOKENS.positive() + "88",
                 ),
                 borderColor: top20age.map((r) =>
                   r.buildingAge >= 40 ? CSS_TOKENS.danger() : r.buildingAge >= 25 ? CSS_TOKENS.warning() : CSS_TOKENS.positive(),
@@ -3555,7 +3562,7 @@ function renderStudentsTab() {
               {
                 label: "عدد المدارس",
                 data: studBinData,
-                backgroundColor: "#0891B2BB",
+                backgroundColor: CSS_TOKENS.info() + "BB",
                 borderColor: CSS_TOKENS.info(),
                 borderWidth: 1,
                 borderRadius: 4,
@@ -3580,13 +3587,13 @@ function renderStudentsTab() {
                 backgroundColor: ageBins.map(
                   (_, i) =>
                     [
-                      "#05966988",
-                      "#0891B288",
-                      "#D9770688",
-                      "#D9770688",
-                      "#DC262688",
-                      "#DC262688",
-                      "#7C3AED88",
+                      CSS_TOKENS.positive() + "88",
+                      CSS_TOKENS.info() + "88",
+                      CSS_TOKENS.warning() + "88",
+                      CSS_TOKENS.warning() + "88",
+                      CSS_TOKENS.danger() + "88",
+                      CSS_TOKENS.danger() + "88",
+                      CSS_TOKENS.special() + "88",
                     ][i],
                 ),
                 borderColor: ageBins.map(
@@ -3640,7 +3647,7 @@ function renderStudentsTab() {
               {
                 label: "متوسط عمر المبنى",
                 data: stageAgeData.map((x) => +x.avg.toFixed(1)),
-                backgroundColor: ["#D97706BB", "#DC2626BB", "#0891B2BB", "#059669BB"],
+                backgroundColor: [CSS_TOKENS.warning() + "BB", CSS_TOKENS.danger() + "BB", CSS_TOKENS.info() + "BB", CSS_TOKENS.positive() + "BB"],
                 borderColor: [CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.info(), CSS_TOKENS.positive()],
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -3662,7 +3669,7 @@ function renderStudentsTab() {
               {
                 label: "إجمالي الطلاب",
                 data: distStudData.map((x) => x.total),
-                backgroundColor: "#05966988",
+                backgroundColor: CSS_TOKENS.positive() + "88",
                 borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1,
                 borderRadius: 4,
@@ -3693,7 +3700,7 @@ function renderStudentsTab() {
               label: "المدارس",
               data: scatterPts1,
               backgroundColor: scatterPts1.map((p) =>
-                p.age >= 40 ? "#DC262666" : p.age >= 25 ? "#D9770666" : "#05966666",
+                p.age >= 40 ? CSS_TOKENS.danger() + "66" : p.age >= 25 ? CSS_TOKENS.warning() + "66" : CSS_TOKENS.positive() + "66",
               ),
               borderColor: scatterPts1.map((p) =>
                 p.age >= 40 ? CSS_TOKENS.danger() : p.age >= 25 ? CSS_TOKENS.warning() : CSS_TOKENS.positive(),
@@ -3737,7 +3744,7 @@ function renderStudentsTab() {
             {
               label: "المدارس",
               data: scatterPts2,
-              backgroundColor: "#0891B266",
+              backgroundColor: CSS_TOKENS.info() + "66",
               borderColor: CSS_TOKENS.info(),
               borderWidth: 1,
               pointRadius: 4,
@@ -4840,7 +4847,7 @@ function renderCorrectionsEscalationsTab() {
       type: "doughnut",
       data: {
         labels: entries.map(e => e[0]),
-        datasets: [{ data: entries.map(e => e[1]), backgroundColor: [CSS_TOKENS.info(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive ? CSS_TOKENS.positive() : "#2e9e5b", "#8884d8", "#82ca9d"] }]
+        datasets: [{ data: entries.map(e => e[1]), backgroundColor: [CSS_TOKENS.info(), CSS_TOKENS.warning(), CSS_TOKENS.danger(), CSS_TOKENS.positive ? CSS_TOKENS.positive() : "#2e9e5b", CSS_TOKENS.special() + "BB", CSS_TOKENS.info2() + "BB"] }]
       },
       options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
     });
@@ -4918,7 +4925,7 @@ function renderSpareTab() {
               {
                 label: "الكمية",
                 data: top20qty.map((r) => r.quantity),
-                backgroundColor: "#05966999",
+                backgroundColor: CSS_TOKENS.positive() + "99",
                 borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5172,7 +5179,7 @@ function renderAyenTab() {
   });
   const worst10 = scored.slice(0, 10),
     best10 = [...scored].reverse().slice(0, 10);
-  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="margin-bottom:16px">\n      <div class="kpi kc-teal">\n        <div class="kpi-val">${avgAyen.toFixed(1)}%</div>\n        <div class="kpi-lbl">متوسط تقييم عاين</div>\n        <div class="kpi-sub">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${critical.toLocaleString()}</div>\n        <div class="kpi-lbl">حرج · أقل من 25%</div>\n        <div class="kpi-sub">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${needWork.toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط · 25–49%</div>\n        <div class="kpi-sub">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${good.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد · 50–74%</div>\n        <div class="kpi-sub">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${excellent.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد جداً · 75–100%</div>\n        <div class="kpi-sub">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
+  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="margin-bottom:16px">\n      <div class="kpi kc-teal">\n        <div class="kpi-val">${avgAyen.toFixed(1)}%</div>\n        <div class="kpi-lbl">متوسط تقييم عاين</div>\n        <div class="kpi-sub">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${critical.toLocaleString()}</div>\n        <div class="kpi-lbl">حرج · أقل من 25%</div>\n        <div class="kpi-sub">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${needWork.toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط · 25–49%</div>\n        <div class="kpi-sub">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${good.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد · 50–74%</div>\n        <div class="kpi-sub">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${excellent.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد جداً · 75–100%</div>\n        <div class="kpi-sub">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">🔍</span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card" style="display:flex;flex-direction:column">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="flex:1;min-height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
     (window._AYEN_ROWS = scored),
     (window._AYEN_PAGE = { cur: 0, SIZE: 50 }),
     requestAnimationFrame(() => {
@@ -5201,7 +5208,7 @@ function renderAyenTab() {
           k: k,
           avg: v.reduce((a, b) => a + b, 0) / v.length,
         })),
-        gColors = { بنات: "#DC262688", بنين: "#0891B288" };
+        gColors = { بنات: CSS_TOKENS.danger() + "88", بنين: CSS_TOKENS.info() + "88" };
       (killChart("ch-ayen-gender"),
         (CHARTS["ch-ayen-gender"] = new Chart(document.getElementById("ch-ayen-gender"), {
           type: "bar",
@@ -5211,7 +5218,7 @@ function renderAyenTab() {
               {
                 label: "متوسط عاين",
                 data: genderData.map((x) => +x.avg.toFixed(1)),
-                backgroundColor: genderData.map((x) => gColors[x.k] || "#083D4F88"),
+                backgroundColor: genderData.map((x) => gColors[x.k] || CSS_TOKENS.primary() + "88"),
                 borderColor: genderData.map((x) => (gColors[x.k] || CSS_TOKENS.primary()).replace("88", "FF")),
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -5228,7 +5235,7 @@ function renderAyenTab() {
           k: k,
           avg: v.reduce((a, b) => a + b, 0) / v.length,
         })),
-        oColors = { حكومي: "#0891B288", مستأجر: "#D9770688" };
+        oColors = { حكومي: CSS_TOKENS.info() + "88", مستأجر: CSS_TOKENS.warning() + "88" };
       (killChart("ch-ayen-owner"),
         (CHARTS["ch-ayen-owner"] = new Chart(document.getElementById("ch-ayen-owner"), {
           type: "bar",
@@ -5238,7 +5245,7 @@ function renderAyenTab() {
               {
                 label: "متوسط عاين",
                 data: ownerData.map((x) => +x.avg.toFixed(1)),
-                backgroundColor: ownerData.map((x) => oColors[x.k] || "#083D4F88"),
+                backgroundColor: ownerData.map((x) => oColors[x.k] || CSS_TOKENS.primary() + "88"),
                 borderColor: ownerData.map((x) => (oColors[x.k] || CSS_TOKENS.primary()).replace("88", "FF")),
                 borderWidth: 1.5,
                 borderRadius: 5,
@@ -5804,7 +5811,7 @@ function renderAllContractsBody() {
               {
                 label: "جارية",
                 data: regionActive,
-                backgroundColor: "#05966988",
+                backgroundColor: CSS_TOKENS.positive() + "88",
                 borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5812,7 +5819,7 @@ function renderAllContractsBody() {
               {
                 label: "منتهية",
                 data: regionExpired,
-                backgroundColor: "#DC262688",
+                backgroundColor: CSS_TOKENS.danger() + "88",
                 borderColor: CSS_TOKENS.danger(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5862,7 +5869,7 @@ function renderAllContractsBody() {
               {
                 label: "عدد العقود",
                 data: ctrData,
-                backgroundColor: "#0891B299",
+                backgroundColor: CSS_TOKENS.info() + "99",
                 borderColor: CSS_TOKENS.info(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5891,7 +5898,7 @@ function renderAllContractsBody() {
               {
                 label: "قيمة العقد المحدثة",
                 data: topValRows.map((c) => c.updated),
-                backgroundColor: "#7C3AED99",
+                backgroundColor: CSS_TOKENS.special() + "99",
                 borderColor: CSS_TOKENS.special(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5899,7 +5906,7 @@ function renderAllContractsBody() {
               {
                 label: "المستخلصات المصروفة",
                 data: topValRows.map((c) => c.spent),
-                backgroundColor: "#0E749099",
+                backgroundColor: CSS_TOKENS.info() + "99",
                 borderColor: CSS_TOKENS.info(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5907,7 +5914,7 @@ function renderAllContractsBody() {
               {
                 label: "القيمة المستحقة",
                 data: topValRows.map((c) => c.due),
-                backgroundColor: "#DC262699",
+                backgroundColor: CSS_TOKENS.danger() + "99",
                 borderColor: CSS_TOKENS.danger(),
                 borderWidth: 1.5,
                 borderRadius: 4,
@@ -5959,13 +5966,13 @@ function renderAllContractsBody() {
    القسم 4: الأنظمة الرئيسية والتفصيلية
    ════════════════════════════════════════════════════════════ */
 const SYS_TIER = {
-  حرج: { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), border: "#DC262644" },
-  متوسط: { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), border: "#D9770644" },
-  جيد: { color: CSS_TOKENS.positive(), bg: CSS_TOKENS.bgPositive(), border: "#05966944" },
-  "جيد جداً": { color: CSS_TOKENS.info(), bg: CSS_TOKENS.bgInfo(), border: "#0891B244" },
+  حرج: { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), border: CSS_TOKENS.danger() + "44" },
+  متوسط: { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), border: CSS_TOKENS.warning() + "44" },
+  جيد: { color: CSS_TOKENS.positive(), bg: CSS_TOKENS.bgPositive(), border: CSS_TOKENS.positive() + "44" },
+  "جيد جداً": { color: CSS_TOKENS.info(), bg: CSS_TOKENS.bgInfo(), border: CSS_TOKENS.info() + "44" },
 };
 function sysBadge(cat) {
-  const t = SYS_TIER[cat] || { color: CSS_TOKENS.txMuted(), bg: "#f1f5f9", border: "#64748b44" };
+  const t = SYS_TIER[cat] || { color: CSS_TOKENS.txMuted(), bg: "#f1f5f9", border: CSS_TOKENS.txMuted() + "44" };
   return `<span style="padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;\n    background:${t.bg};color:${t.color};border:1px solid ${t.border}">${cat || "—"}</span>`;
 }
 function sysScoreDot(score) {
@@ -6679,7 +6686,7 @@ function renderSysDetail() {
         ),
         subVals = subAvg.map((s) => +s.avg.toFixed(2)),
         subColors = subVals.map((v) =>
-          v >= 4 ? "#0891B299" : v >= 3 ? "#05966999" : v >= 2 ? "#D9770699" : "#DC262699",
+          v >= 4 ? CSS_TOKENS.info() + "99" : v >= 3 ? CSS_TOKENS.positive() + "99" : v >= 2 ? CSS_TOKENS.warning() + "99" : CSS_TOKENS.danger() + "99",
         );
       (killChart("ch-syd-avg"),
         (CHARTS["ch-syd-avg"] = new Chart(document.getElementById("ch-syd-avg"), {
@@ -6730,7 +6737,7 @@ function renderSysDetail() {
           return s.cnt ? +(((cats["حرج"] || 0) / s.cnt) * 100).toFixed(1) : 0;
         }),
         critColors = critVals.map((v) =>
-          v >= 40 ? "#DC262699" : v >= 20 ? "#D9770699" : "#05966999",
+          v >= 40 ? CSS_TOKENS.danger() + "99" : v >= 20 ? CSS_TOKENS.warning() + "99" : CSS_TOKENS.positive() + "99",
         );
       (killChart("ch-syd-crit"),
         (CHARTS["ch-syd-crit"] = new Chart(document.getElementById("ch-syd-crit"), {
@@ -8021,7 +8028,7 @@ function _sysDownloadFile(filename, content, mime) {
           <span>أعلى الفئات حسب الأولوية</span>
           <span class="sub">أعلى 8 فئات — توزيع درجات الأولوية داخل كل فئة</span>
         </div>
-        <div class="chart-box" style="height:320px"><canvas id="balagh-cat-priority-stacked"></canvas></div>
+        <div class="chart-box" style="height:300px"><canvas id="balagh-cat-priority-stacked"></canvas></div>
       </div>
 
       <div class="g2 mb14" style="align-items:start">
@@ -8249,7 +8256,7 @@ function _sysDownloadFile(filename, content, mime) {
                   data: monthVals,
                   backgroundColor: PALETTE.map((c) => c + "BB")
                     .slice(0, monthVals.length)
-                    .map((_, i) => (i === monthVals.length - 1 ? "#D97706BB" : "#0891B2BB")),
+                    .map((_, i) => (i === monthVals.length - 1 ? CSS_TOKENS.warning() + "BB" : CSS_TOKENS.info() + "BB")),
                   borderColor: CSS_TOKENS.info(),
                   borderWidth: 1.5,
                   borderRadius: 6,
@@ -8309,7 +8316,7 @@ function _sysDownloadFile(filename, content, mime) {
                 {
                   label: "مغلقة",
                   data: last18Months.map((k) => monthClosedMap.get(k) || 0),
-                  backgroundColor: "#05966999",
+                  backgroundColor: CSS_TOKENS.positive() + "99",
                   borderColor: CSS_TOKENS.positive(),
                   borderWidth: 1.5,
                   borderRadius: 4,
@@ -8317,7 +8324,7 @@ function _sysDownloadFile(filename, content, mime) {
                 {
                   label: "قيد التنفيذ",
                   data: last18Months.map((k) => monthProgMap.get(k) || 0),
-                  backgroundColor: "#0891B299",
+                  backgroundColor: CSS_TOKENS.info() + "99",
                   borderColor: CSS_TOKENS.info(),
                   borderWidth: 1.5,
                   borderRadius: 4,
@@ -8325,7 +8332,7 @@ function _sysDownloadFile(filename, content, mime) {
                 {
                   label: "مفتوحة",
                   data: last18Months.map((k) => monthOpenMap.get(k) || 0),
-                  backgroundColor: "#DC262699",
+                  backgroundColor: CSS_TOKENS.danger() + "99",
                   borderColor: CSS_TOKENS.danger(),
                   borderWidth: 1.5,
                   borderRadius: 4,
@@ -8626,6 +8633,14 @@ function _sysDownloadFile(filename, content, mime) {
           متوسط: CSS_TOKENS.info(),
           منخفض: CSS_TOKENS.positive(),
         };
+
+        // ارتفاع الرسم يتناسب مع عدد الفئات الفعلي بدل ارتفاع ثابت —
+        // يمنع المساحة الفارغة الكبيرة أسفل الرسم لما تكون الفئات أقل من 8
+        const catBox2 = document.getElementById("balagh-cat-priority-stacked").parentElement;
+        if (catBox2) {
+          catBox2.style.height = Math.max(200, Math.min(420, topCats.length * 46 + 90)) + "px";
+        }
+
         CHARTS["balagh-cat-priority-stacked"] = new Chart(
           document.getElementById("balagh-cat-priority-stacked"),
           {
@@ -8638,20 +8653,39 @@ function _sysDownloadFile(filename, content, mime) {
                 backgroundColor: CSS_TOKENS.α(prColors2[pr], 0.75),
                 borderColor: prColors2[pr],
                 borderWidth: 1.5,
+                // فيه إعداد عام في الملف يضيف زوايا دائرية (borderRadius 7-8)
+                // على كل الرسوم من نوع bar — ده كان يخلي أجزاء الشرائح
+                // الرفيعة (لما القيمة صغيرة) تبان كـ"حبة/كبسولة" مشوّهة بدل
+                // مستطيل. هنا نلغي هذا التأثير صراحة على هذا الرسم فقط
+                // (Stacked) عشان تبقى الشرائح مستطيلة نظيفة بدون ما نلمس أي
+                // رسم تاني في الداشبورد.
+                borderRadius: 0,
+                borderSkipped: false,
               })),
             },
             options: {
               indexAxis: "y",
               responsive: true,
               maintainAspectRatio: false,
+              scales: {
+                x: {
+                  stacked: true,
+                  beginAtZero: true,
+                  ticks: { font: { size: 10 } },
+                },
+                y: {
+                  stacked: true,
+                  ticks: { font: { size: 10 } },
+                  grid: { display: false },
+                },
+              },
               plugins: {
-                legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 9, boxHeight: 9 } },
+                legend: {
+                  position: "bottom",
+                  labels: { font: { size: 10 }, boxWidth: 9, boxHeight: 9 },
+                },
                 tooltip: { mode: "index", intersect: false },
                 tbcPremiumValueLabels: false,
-              },
-              scales: {
-                x: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } },
-                y: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
               },
             },
           },
@@ -11044,8 +11078,8 @@ window.renderElevatorStatusTab = function () {
       data: {
         labels,
         datasets: [
-          { label: "المدفوع", data: paid,      backgroundColor: "#05966988", borderColor: CSS_TOKENS.positive(), borderWidth: 1.5, borderRadius: 4 },
-          { label: "المتبقي", data: remaining, backgroundColor: "#D9770644", borderColor: CSS_TOKENS.warning(), borderWidth: 1.5, borderRadius: 4 },
+          { label: "المدفوع", data: paid,      backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive(), borderWidth: 1.5, borderRadius: 4 },
+          { label: "المتبقي", data: remaining, backgroundColor: CSS_TOKENS.warning() + "44", borderColor: CSS_TOKENS.warning(), borderWidth: 1.5, borderRadius: 4 },
         ],
       },
       options: {
@@ -12216,7 +12250,7 @@ function renderTajheezInventoryTab() {
             {
               label: "قيمة الاحتياج",
               data: qismEntries.map(([, v]) => +v.toFixed(0)),
-              backgroundColor: "#D9770688",
+              backgroundColor: CSS_TOKENS.warning() + "88",
               borderColor: CSS_TOKENS.warning(),
               borderWidth: 1.5,
               borderRadius: 5,
@@ -12249,7 +12283,7 @@ function renderTajheezInventoryTab() {
             {
               label: "المخصصات",
               data: qismEntries.map(([k]) => +(byQismAlloc[k] || 0).toFixed(0)),
-              backgroundColor: "#0891B288",
+              backgroundColor: CSS_TOKENS.info() + "88",
               borderColor: CSS_TOKENS.info(),
               borderWidth: 1.5,
               borderRadius: 4,
@@ -12257,7 +12291,7 @@ function renderTajheezInventoryTab() {
             {
               label: "الاحتياج",
               data: qismEntries.map(([, v]) => +v.toFixed(0)),
-              backgroundColor: "#D9770688",
+              backgroundColor: CSS_TOKENS.warning() + "88",
               borderColor: CSS_TOKENS.warning(),
               borderWidth: 1.5,
               borderRadius: 4,
@@ -12326,7 +12360,7 @@ function renderTajheezInventoryTab() {
         datasets: [
           {
             data: [cov3.مغطى, cov3.قريب, cov3.عجز],
-            backgroundColor: ["#05966999", "#D9770699", "#DC262699"],
+            backgroundColor: [CSS_TOKENS.positive() + "99", CSS_TOKENS.warning() + "99", CSS_TOKENS.danger() + "99"],
             borderColor: [CSS_TOKENS.positive(), CSS_TOKENS.warning(), CSS_TOKENS.danger()],
             borderWidth: 2,
           },
@@ -12352,7 +12386,7 @@ function renderTajheezInventoryTab() {
           {
             label: "المخصص",
             data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].مخصص.toFixed(0)),
-            backgroundColor: "#0891B288",
+            backgroundColor: CSS_TOKENS.info() + "88",
             borderColor: CSS_TOKENS.info(),
             borderWidth: 1.5,
             borderRadius: 4,
@@ -12360,7 +12394,7 @@ function renderTajheezInventoryTab() {
           {
             label: "الاحتياج",
             data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].احتياج.toFixed(0)),
-            backgroundColor: "#D9770688",
+            backgroundColor: CSS_TOKENS.warning() + "88",
             borderColor: CSS_TOKENS.warning(),
             borderWidth: 1.5,
             borderRadius: 4,
@@ -24848,7 +24882,7 @@ setTimeout(function tellUserStillTrying() {
           '<div class="portal-stat"><div class="portal-stat-val" id="pqs-schools">—</div><div class="portal-stat-lbl">🏫 عدد المدارس</div></div>' +
           '<div class="portal-stat"><div class="portal-stat-val" id="pqs-assets">—</div><div class="portal-stat-lbl">📦 إجمالي الأصول</div></div>' +
           '<div class="portal-stat"><div class="portal-stat-val" id="pqs-reports">—</div><div class="portal-stat-lbl">📢 إجمالي البلاغات</div></div>' +
-          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-updated">—</div><div class="portal-stat-lbl">🕐 آخر تحديث بيانات</div></div>';
+          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-fca">—</div><div class="portal-stat-lbl">🏗️ متوسط تقييم FCA</div></div>';
         grid.parentElement.insertBefore(strip, grid);
 
         var refresh = function () {
@@ -24856,7 +24890,9 @@ setTimeout(function tellUserStillTrying() {
             mirrorText("k-total", "pqs-schools");
             mirrorText("k-assets-total", "pqs-assets");
             mirrorText("k-alerts-total", "pqs-reports");
-            mirrorText("portalLastUpdate", "pqs-updated");
+            // متوسط تقييم FCA العام — أهم مؤشر تنفيذي في هذا الداشبورد
+            // (آخر تحديث البيانات أصبح ظاهراً في الشريط العلوي فقط، فلا داعي لتكراره هنا)
+            mirrorText("k-fca-avg", "pqs-fca");
           } catch (e) {}
         };
         refresh();

@@ -211,7 +211,7 @@ b, strong { font-weight: 700; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: rgba(110,143,160,.45);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
@@ -509,7 +509,7 @@ b, strong { font-weight: 700; }
   min-height: 32px;
   padding: 5px 10px 5px 26px;
   border: 1px solid var(--bd-light);
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: #fff;
   color: var(--tx-main);
   direction: rtl;
@@ -898,10 +898,10 @@ tbody tr:last-child td { border-bottom: none; }
 .cond-bad       { color: var(--c-bad-cond);  font-weight: 700; }
 .cond-detr      { color: var(--c-detr);      font-weight: 700; }
 
-.badge-excellent { background: var(--bg-positive); color: var(--c-excellent); border: 1px solid var(--bd-positive); border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
-.badge-good      { background: var(--bg-info);     color: var(--c-good-cond); border: 1px solid var(--bd-info);     border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
-.badge-bad       { background: var(--bg-warning);  color: var(--c-bad-cond);  border: 1px solid var(--bd-warning);  border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
-.badge-detr      { background: var(--bg-danger);   color: var(--c-detr);      border: 1px solid var(--bd-danger);   border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-excellent { background: var(--bg-positive); color: var(--c-excellent); border: 1px solid var(--bd-positive); border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-good      { background: var(--bg-info);     color: var(--c-good-cond); border: 1px solid var(--bd-info);     border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-bad       { background: var(--bg-warning);  color: var(--c-bad-cond);  border: 1px solid var(--bd-warning);  border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-detr      { background: var(--bg-danger);   color: var(--c-detr);      border: 1px solid var(--bd-danger);   border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════════
    18. PAGINATION
@@ -1034,7 +1034,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 9px 0;
   border-bottom: 1px solid #eff5f9;
   font-size: 12px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   transition: background .12s ease, padding-right .12s ease;
 }
 
@@ -1053,14 +1053,14 @@ tbody tr:last-child td { border-bottom: none; }
 .mini-track {
   height: 4px;
   background: var(--bg-deep);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   overflow: hidden;
   flex: 1;
 }
 
 .mini-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   transition: width .6s cubic-bezier(.22,.61,.36,1);
 }
 
@@ -1214,7 +1214,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .leaflet-popup-content-wrapper {
-  border-radius: 14px;
+  border-radius: var(--r-md);
   box-shadow: 0 14px 34px rgba(8,35,48,.22);
 }
 
@@ -1467,7 +1467,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .ix-panel-body { padding: 20px 22px 28px; }
 .ix-panel-body::-webkit-scrollbar { width: 8px; }
-.ix-panel-body::-webkit-scrollbar-thumb { background: #c3d2dc; border-radius: 999px; }
+.ix-panel-body::-webkit-scrollbar-thumb { background: #c3d2dc; border-radius: var(--r-pill); }
 
 .ix-section-title {
   display: flex;
@@ -1515,7 +1515,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ix-score-card {
   background: #fff;
   border: 1px solid rgba(0,0,0,.05);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   box-shadow: var(--sh-d4);
   position: relative;
   overflow: hidden;
@@ -1533,8 +1533,8 @@ tbody tr:last-child td { border-bottom: none; }
 
 .ix-score-card:hover { box-shadow: var(--sh-d16); transform: translateY(-2px); }
 .ix-score-val { font-size: 22px; font-weight: 900; color: var(--ix-sc-color, var(--navy)); letter-spacing: -.4px; }
-.ix-score-bar2 { height: 7px; border-radius: 999px; background: #edf2f6; }
-.ix-score-fill2 { border-radius: 999px; background: var(--ix-sc-color, var(--teal)); }
+.ix-score-bar2 { height: 7px; border-radius: var(--r-pill); background: #edf2f6; }
+.ix-score-fill2 { border-radius: var(--r-pill); background: var(--ix-sc-color, var(--teal)); }
 
 .ix-contract-row {
   background: #fff;
@@ -1581,7 +1581,7 @@ tbody tr:last-child td { border-bottom: none; }
 .ix-btn-copied { background: #4fa084; color: #fff; border: none; }
 
 .ix-mini-map-wrap, .ix-mini-map {
-  border-radius: 14px;
+  border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid rgba(0,0,0,.06);
   box-shadow: var(--sh-d4);
@@ -1816,7 +1816,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-size: 11px;
   font-weight: 700;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   font-family: 'Tajawal','IBM Plex Sans Arabic',sans-serif;
   direction: rtl;
@@ -2207,7 +2207,7 @@ canvas {
   flex-wrap: wrap;
   gap: 10px;
   background: linear-gradient(135deg, #0d2f40 0%, #123b52 100%);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 12px 20px;
   color: #fff;
   box-shadow: 0 8px 24px rgba(13,47,64,.18);
@@ -2275,7 +2275,7 @@ canvas {
   color: #fff;
   background: rgba(255,255,255,.1);
   border: 1px solid rgba(255,255,255,.16);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 4px 12px;
 }
 
@@ -2296,7 +2296,7 @@ canvas {
 .portal-card {
   background: #fff;
   border: 1px solid rgba(13,47,64,.08);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 20px 18px;
   display: flex;
   flex-direction: column;
@@ -2507,7 +2507,7 @@ canvas {
   width: 100%;
   height: 6px;
   background: rgba(255,255,255,.12);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 
@@ -2515,7 +2515,7 @@ canvas {
   height: 100%;
   width: 6%;
   background: linear-gradient(90deg, #0d7490, #16b3c9);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   transition: width .32s linear;
 }
 
@@ -2584,7 +2584,7 @@ canvas {
   font-size: 10px;
   font-weight: 700;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .portal-card-status.pending { background: rgba(148,163,184,.15); color: #64748b; }
 .portal-card-status.loading { background: rgba(245,158,11,.14); color: #b45309; }
@@ -2832,7 +2832,7 @@ body.portal-active .prog-bar {
   z-index: auto;
   background: #fff;
   border: 1px solid rgba(13,47,64,.08);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 18px 16px;
   display: flex;
   flex-direction: column;
@@ -2847,7 +2847,7 @@ body.portal-active .prog-bar {
   flex: 1;
   gap: 14px;
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   padding: 10px 4px;
   transition: background .12s ease;
 }
@@ -2909,7 +2909,7 @@ body.portal-active .prog-bar {
   background: #f0f6f8;
   border: 1px solid rgba(13,47,64,.1);
   color: #0d2f40;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   padding: 8px 12px;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 12px;
@@ -3693,7 +3693,7 @@ tbody td {
 }
 .tabs::-webkit-scrollbar-thumb {
   background: rgba(13,132,156,.25);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .tabs::-webkit-scrollbar-track {
   background: transparent;
@@ -4463,8 +4463,13 @@ body {
     radial-gradient(1200px 600px at 92% -5%, rgba(13,132,156,.065), transparent 52%),
     radial-gradient(900px 500px at -4% 102%, rgba(176,138,78,.045), transparent 50%),
     radial-gradient(600px 400px at 50% 110%, rgba(13,132,156,.03), transparent 45%),
+    repeating-linear-gradient(0deg,  rgba(13,47,64,.022) 0px, rgba(13,47,64,.022) 1px, transparent 1px, transparent 44px),
+    repeating-linear-gradient(90deg, rgba(13,47,64,.022) 0px, rgba(13,47,64,.022) 1px, transparent 1px, transparent 44px),
     linear-gradient(180deg, #f5f9fb 0%, var(--bg) 60%, #eaf1f6 100%);
-  /* ↑ كان: 2 gradients + linear — زدنا gradient ثالث للعمق */
+  background-attachment: fixed;
+  /* ↑ زدنا نمط شبكي هندسي خفيف جداً على كامل الداشبورد (كل التبويبات) —
+     نفس هوية "Ink & Brass"، ثابت مع الصفحة (fixed) بحيث يبقى متسقاً
+     أثناء التمرير بدل ما يتكرر أو يتحرك مع المحتوى. */
 }
 
 /* ── 12-B: Scrollbar — تحسين موحّد ──────────────────────────────
@@ -4480,7 +4485,7 @@ body {
   background: rgba(13,132,156,.28); /* ↑ كان: rgba(110,143,160,.45) — لون النظام */
   border: 2px solid transparent;
   background-clip: padding-box;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   transition: background .18s ease;
 }
 
@@ -4773,9 +4778,14 @@ tbody tr:last-child td:last-child {
 .kpi.kc-amber::after                           { background: var(--warn); }
 .kpi.kc-amber .kpi-val                         { color: #92400e; }
 
-.kpi.kc-red::before, .kpi.kc-red .kpi-icon     { background: #dc2626; }
-.kpi.kc-red::after                             { background: #dc2626; }
-.kpi.kc-red .kpi-val                           { color: #991b1b; }
+/* ── PHASE 1 (توحيد الألوان): كان .kc-red بيستخدم أحمر ساطع (#dc2626)
+   مختلف تماماً عن لون "الخطر" الموحّد في باقي الداشبورد (--red / --c-danger
+   #7d1f2c) — حتى ظل الـ hover بتاعه (أسفل) كان بالفعل بيستخدم اللون
+   الصح! دلوقتي بقى نفس اللون في كل الحالات (راحة/hover) وفي كل تبويب
+   بيستخدم .kc-red (زي كروت "متأخرة SLA"، "بلاغات مفتوحة"، إلخ). ── */
+.kpi.kc-red::before, .kpi.kc-red .kpi-icon     { background: var(--red); }
+.kpi.kc-red::after                             { background: var(--red); }
+.kpi.kc-red .kpi-val                           { color: var(--red); }
 
 .kpi.kc-purple::before, .kpi.kc-purple .kpi-icon { background: var(--purple); }
 .kpi.kc-purple::after                            { background: var(--purple); }
@@ -4915,29 +4925,32 @@ tbody tr:last-child td:last-child {
   transition: opacity .22s ease, background .22s ease;
 }
 
+/* ── لوحة ألوان موحّدة "Ink & Brass" — بدل الألوان المتفرقة (أحمر/بنفسجي/أخضر)
+   كل الكروت الآن من نفس عائلة الداشبورد: درجات تيل + كحلي + لمسة برونزية
+   واحدة للعنصر المالي فقط — نفس فلسفة التصميم الموثّقة أعلى index.html ── */
 [data-category="assessment"] .portal-card-icon { background: rgba(13,132,156,.12);  color: #0d849c; border: 1px solid rgba(13,132,156,.25); }
 [data-category="assessment"]:hover::before      { background: linear-gradient(90deg,#0d849c,#3fb5cc); opacity: 1; }
 [data-category="assessment"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
 
-[data-category="assets"] .portal-card-icon { background: rgba(6,106,82,.12);  color: #066a52; border: 1px solid rgba(6,106,82,.25); }
-[data-category="assets"]:hover::before      { background: linear-gradient(90deg,#066a52,#2fa082); opacity: 1; }
-[data-category="assets"]:hover               { border-color: rgba(6,106,82,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(6,106,82,.16), inset 0 1px 0 #fff; }
+[data-category="assets"] .portal-card-icon { background: rgba(11,107,126,.12);  color: #0b6b7e; border: 1px solid rgba(11,107,126,.25); }
+[data-category="assets"]:hover::before      { background: linear-gradient(90deg,#0b6b7e,#3fa3b8); opacity: 1; }
+[data-category="assets"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
 
 [data-category="contracts"] .portal-card-icon { background: rgba(176,138,78,.16); color: #8a6a37; border: 1px solid rgba(176,138,78,.3); }
 [data-category="contracts"]:hover::before      { background: linear-gradient(90deg,#b08a4e,#d4af6a); opacity: 1; }
 [data-category="contracts"]:hover               { border-color: rgba(176,138,78,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(176,138,78,.18), inset 0 1px 0 #fff; }
 
-[data-category="operations"] .portal-card-icon { background: rgba(192,122,20,.14); color: #a3660f; border: 1px solid rgba(192,122,20,.28); }
-[data-category="operations"]:hover::before      { background: linear-gradient(90deg,#c07a14,#e0a33f); opacity: 1; }
-[data-category="operations"]:hover               { border-color: rgba(192,122,20,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(192,122,20,.16), inset 0 1px 0 #fff; }
+[data-category="operations"] .portal-card-icon { background: rgba(22,61,82,.12); color: #163d52; border: 1px solid rgba(22,61,82,.26); }
+[data-category="operations"]:hover::before      { background: linear-gradient(90deg,#163d52,#3d6f8c); opacity: 1; }
+[data-category="operations"]:hover               { border-color: rgba(22,61,82,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(22,61,82,.16), inset 0 1px 0 #fff; }
 
-[data-category="geo"] .portal-card-icon { background: rgba(108,43,217,.12); color: #6c2bd9; border: 1px solid rgba(108,43,217,.25); }
-[data-category="geo"]:hover::before      { background: linear-gradient(90deg,#6c2bd9,#9b6ef0); opacity: 1; }
-[data-category="geo"]:hover               { border-color: rgba(108,43,217,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(108,43,217,.16), inset 0 1px 0 #fff; }
+[data-category="geo"] .portal-card-icon { background: rgba(13,47,64,.1); color: #0d2f40; border: 1px solid rgba(13,47,64,.22); }
+[data-category="geo"]:hover::before      { background: linear-gradient(90deg,#0d2f40,#2a5878); opacity: 1; }
+[data-category="geo"]:hover               { border-color: rgba(13,47,64,.26); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,47,64,.14), inset 0 1px 0 #fff; }
 
-[data-category="explore"] .portal-card-icon { background: rgba(11,107,126,.12); color: #0b6b7e; border: 1px solid rgba(11,107,126,.25); }
-[data-category="explore"]:hover::before      { background: linear-gradient(90deg,#0b6b7e,#3fa3b8); opacity: 1; }
-[data-category="explore"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
+[data-category="explore"] .portal-card-icon { background: rgba(28,148,171,.12); color: #1c94ab; border: 1px solid rgba(28,148,171,.25); }
+[data-category="explore"]:hover::before      { background: linear-gradient(90deg,#1c94ab,#5cc3d6); opacity: 1; }
+[data-category="explore"]:hover               { border-color: rgba(28,148,171,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(28,148,171,.16), inset 0 1px 0 #fff; }
 
 /* سهم صغير يظهر بجانب عنوان الكارت عند hover — إشارة بصرية لطيفة إنه قابل للفتح
    (CSS بحت عبر ::after — بدون أي تعديل على الـ HTML) */
@@ -5054,7 +5067,7 @@ tbody tr:last-child td:last-child {
   width: 58px;                /* ↑ من 48px */
   height: 58px;
   font-size: 34px;             /* ↑ من 30px */
-  border-radius: 18px;         /* مربّع دائري ناعم (squircle) بدل الدائرة الكاملة */
+  border-radius: var(--r-lg);         /* مربّع دائري ناعم (squircle) بدل الدائرة الكاملة */
 }
 
 .portal-card-title {
@@ -5100,7 +5113,7 @@ tbody tr:last-child td:last-child {
 .portal-favorites-empty-text { font-size: 13px; }
 .portal-favorites-cta-btn {
   padding: 10px 22px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   font-size: 13px;
   box-shadow: 0 4px 14px rgba(13,47,64,.22);
   transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
@@ -5149,7 +5162,7 @@ tbody tr:last-child td:last-child {
   letter-spacing: .03em;
   background: rgba(255,255,255,.09);
   border: 1px solid rgba(255,255,255,.18);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 5px 16px;
   font-variant-numeric: tabular-nums;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.1);
@@ -5214,4 +5227,64 @@ tbody tr:last-child td:last-child {
 
 @media (prefers-reduced-motion: reduce) {
   .portal-hero, .portal-card-icon { animation: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 15 — الصفحة الخارجية: تحسين أكبر للألوان والشكل
+   ──────────────────────────────────────────────────────────────
+   بناءً على طلب صريح: مزيد من الثراء البصري بدون المساس بأي
+   منطق/IDs. بدل صورة مدرسة حرفية (تقلل التباين وتزاحم البطاقات
+   البيضاء فوقها) استخدمنا نمط "مخطط هندسي" (blueprint grid) خفيف
+   جداً يناسب هوية "إدارة المرافق" بشكل مجرّد وأنيق، ومحصور فقط
+   داخل .portal-home حتى لا يؤثر على أي تبويب آخر بالداشبورد.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 15-A: خلفية النمط الشبكي انتقلت لتطبّق على كامل الداشبورد ──
+   (كل التبويبات، مش بس صفحة البوابة) — عُدّلت مباشرة داخل قاعدة
+   body الأساسية بالأعلى (Phase 12-A) بدل تكرارها هنا. ── */
+
+/* ── 15-B: خلفية + حدود كل كارت بلون فئته بشكل دائم (مش hover بس) ── */
+[data-category="assessment"] { background: linear-gradient(160deg, #ffffff 0%, rgba(13,132,156,.055) 100%);  border-color: rgba(13,132,156,.24); }
+[data-category="assets"]     { background: linear-gradient(160deg, #ffffff 0%, rgba(11,107,126,.055) 100%);  border-color: rgba(11,107,126,.24); }
+[data-category="contracts"]  { background: linear-gradient(160deg, #ffffff 0%, rgba(176,138,78,.07) 100%);   border-color: rgba(176,138,78,.3); }
+[data-category="operations"] { background: linear-gradient(160deg, #ffffff 0%, rgba(22,61,82,.05) 100%);     border-color: rgba(22,61,82,.22); }
+[data-category="geo"]        { background: linear-gradient(160deg, #ffffff 0%, rgba(13,47,64,.045) 100%);    border-color: rgba(13,47,64,.2); }
+[data-category="explore"]    { background: linear-gradient(160deg, #ffffff 0%, rgba(28,148,171,.055) 100%);  border-color: rgba(28,148,171,.24); }
+
+/* ── 15-C: تباين أوضح لنص الوصف داخل كروت البوابة تحديداً ──────── */
+.portal-card .portal-card-desc { color: var(--tx-sec); }
+
+/* ── 15-D: الـ Hero — عمق أقوى قليلاً ───────────────────────────── */
+.portal-hero {
+  box-shadow:
+    0 6px 10px rgba(8,30,43,.14),
+    0 22px 52px rgba(8,30,43,.26),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* ── 15-E: كارت المفضلة — حضور بصري أقوى يوازي باقي الكروت ─────── */
+.portal-favorites-card {
+  background: linear-gradient(160deg, #ffffff 0%, rgba(13,132,156,.05) 100%);
+  border: 1.5px dashed rgba(13,132,156,.38);
+  box-shadow:
+    0 1px 3px rgba(8,45,60,.05),
+    0 10px 26px rgba(13,132,156,.09);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.portal-favorites-card:hover {
+  border-color: rgba(13,132,156,.55);
+  box-shadow: 0 1px 3px rgba(8,45,60,.06), 0 14px 34px rgba(13,132,156,.14);
+}
+.portal-favorites-empty::before {
+  background: linear-gradient(135deg, rgba(13,132,156,.16), rgba(176,138,78,.14));
+  border: 1px solid rgba(13,132,156,.3);
+  animation: iconBreathe 3.8s ease-in-out infinite;
+  color: #0d849c;
+}
+
+/* ── 15-F: توازن مسافات أكبر لشاشات العرض الكبيرة ──────────────── */
+@media (min-width: 1400px) {
+  .portal-home { gap: 24px; }
+  .portal-cards-grid { gap: 26px; }
+  .portal-card { padding: 32px 26px 28px; }
 }

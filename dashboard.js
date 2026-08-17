@@ -18957,8 +18957,61 @@ function renderFuelTab(_fromDate, _toDate) {
     return;
   }
 
+  // ── قراءة الحقول — أعمدة الشيت الحالية: رقم اللوحة، التاريخ، اللترات، التكلفة (SAR) ──
+  const getPlate = (r) => r["رقم اللوحة"] ?? r["رقم_اللوحة"] ?? r["لوحة_السيارة"] ?? "";
+  const getCost  = (r) => r["التكلفة (SAR)"] ?? r["التكلفة(SAR)"] ?? r["التكلفة"] ?? 0;
+  const getLiters = (r) => r["اللترات"] ?? 0;
+  const getDate  = (r) => r["التاريخ"] ?? r["الشهر"] ?? "";
+
+  // ── تطبيع أي شكل تاريخ ممكن يتكتب في الشيت إلى YYYY-MM-DD موحّد ──
+  // بيدعم: 2025-06-15 · 15/06/2025 · 15-6-2025 · 2025/06/15 · تاريخ إكسل الرقمي
+  // · "15 يونيو 2025" وأي صيغة تانية يقدر الـ Date يفهمها · أي نص مش تاريخ (زي "######") بيترفض
+  const AR_MONTHS_MAP = {"يناير":1,"فبراير":2,"مارس":3,"أبريل":4,"ابريل":4,"مايو":5,"يونيو":6,"يوليو":7,"أغسطس":8,"اغسطس":8,"سبتمبر":9,"أكتوبر":10,"اكتوبر":10,"نوفمبر":11,"ديسمبر":12};
+  const pad2 = (n) => String(n).padStart(2,"0");
+  const normDate = (raw) => {
+    if (raw == null) return null;
+    let s = String(raw).trim();
+    if (!s || /^#+$/.test(s)) return null; // نص فاضي أو "######" (لصق من إكسل بعمود ضيق)
+    let m;
+    // YYYY-MM-DD أو YYYY/MM/DD
+    if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/)))
+      return `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`;
+    // DD-MM-YYYY أو DD/MM/YYYY (نفس ترتيب الشيت الحالي — تأكدنا منه بالأمثلة)
+    if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))) {
+      let d = +m[1], mo = +m[2], y = +m[3];
+      if (mo > 12 && d <= 12) [d, mo] = [mo, d]; // لو الشهر مستحيل، اقلب مع اليوم
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${pad2(mo)}-${pad2(d)}`;
+    }
+    // "15 يونيو 2025" أو "يونيو 2025"
+    if ((m = s.match(/^(\d{1,2})?\s*([؀-ۿ]+)\s*(\d{4})$/))) {
+      const mo = AR_MONTHS_MAP[m[2]];
+      if (mo) return `${m[3]}-${pad2(mo)}-${pad2(m[1] ? +m[1] : 1)}`;
+    }
+    // رقم تاريخ إكسل التسلسلي (Serial Date)
+    if (/^\d{4,6}(\.\d+)?$/.test(s) && +s > 20000 && +s < 60000) {
+      const epoch = Date.UTC(1899, 11, 30);
+      const d = new Date(epoch + Math.round(+s) * 86400000);
+      if (!isNaN(d.getTime())) return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`;
+    }
+    // أي صيغة تانية يقدر الـ Date الأصلي يفهمها (زي "Jun 15, 2025")
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime()) && dt.getFullYear() > 1990 && dt.getFullYear() < 2100)
+      return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`;
+    return null;
+  };
+  const getDateISO = (r) => normDate(getDate(r));
+
+  // ── اسم السائق: مش عمود في شيت الوقود — بيتربط برقم اللوحة من شيت "السيارات" (المستخدم الفعلي) ──
+  const plateToDriver = {};
+  (window.RAW_VEHICLES || []).forEach(v => {
+    const p = v["رقم اللوحة"];
+    const u = (v["اسم المستخدم الفعلي"] || "").trim();
+    if (p && u) plateToDriver[String(p).trim()] = u;
+  });
+  const getDriver = (r) => plateToDriver[String(getPlate(r) || "").trim()] || "غير محدد";
+
   // ── استخراج نطاق التواريخ ──
-  const allDates = allRows.map(r => String(r["التاريخ"]||r["الشهر"]||"").slice(0,10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const allDates = allRows.map(r => getDateISO(r)).filter(Boolean).sort();
   const minDate  = allDates[0] || "";
   const maxDate  = allDates[allDates.length-1] || "";
 
@@ -18968,62 +19021,58 @@ function renderFuelTab(_fromDate, _toDate) {
   const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
 
   const rows = allRows.filter(r => {
-    const d = String(r["التاريخ"]||r["الشهر"]||"").slice(0,10);
-    if (!d) return true;
+    const d = getDateISO(r);
+    if (!d) return true; // نسيب الصفوف اللي تاريخها مش مفهوم بدل ما نخفيها بالغلط
     if (fromDate && d < fromDate) return false;
     if (toDate   && d > toDate)   return false;
     return true;
   });
 
   const n_ = (v) => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
-  const totalLiters   = rows.reduce((s,r) => s + n_(r["اللترات"]),0);
-  const totalCost     = rows.reduce((s,r) => s + n_(r["التكلفة"]),0);
+  const totalLiters   = rows.reduce((s,r) => s + n_(getLiters(r)),0);
+  const totalCost     = rows.reduce((s,r) => s + n_(getCost(r)),0);
   const avgCostPerL   = totalLiters ? (totalCost / totalLiters) : 0;
-  const uniqueCars    = new Set(rows.map(r=>r["لوحة_السيارة"]||r["مفتاح_اللوحة"]||"")).size;
+  const uniqueCars    = new Set(rows.map(r=>getPlate(r)).filter(Boolean)).size;
 
-  // توزيع حسب المنطقة
-  const byRegion = {};
+  // توزيع حسب رقم اللوحة (السيارة) — بديل التوزيع حسب الطراز/السائق/المنطقة (أعمدة غير متاحة حالياً)
+  const byPlate = {};
   rows.forEach(r => {
-    const g = r["المنطقة"] || r["المجموعة"] || "غير محدد";
-    if (!byRegion[g]) byRegion[g] = {liters:0, cost:0};
-    byRegion[g].liters += n_(r["اللترات"]);
-    byRegion[g].cost   += n_(r["التكلفة"]);
+    const p = getPlate(r) || "غير محدد";
+    if (!byPlate[p]) byPlate[p] = {liters:0, cost:0, count:0};
+    byPlate[p].liters += n_(getLiters(r));
+    byPlate[p].cost   += n_(getCost(r));
+    byPlate[p].count  += 1;
   });
-  const regionEntries = Object.entries(byRegion).sort((a,b)=>b[1].cost - a[1].cost);
+  const plateByCost   = Object.entries(byPlate).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
+  const plateByLiters = Object.entries(byPlate).sort((a,b)=>b[1].liters-a[1].liters).slice(0,10);
 
-  // توزيع حسب الطراز
-  const byModel = {};
-  rows.forEach(r => {
-    const m = r["الطراز"] || "غير محدد";
-    if (!byModel[m]) byModel[m] = {liters:0,cost:0,count:0};
-    byModel[m].liters += n_(r["اللترات"]);
-    byModel[m].cost   += n_(r["التكلفة"]);
-    byModel[m].count  += 1;
-  });
-  const modelEntries = Object.entries(byModel).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
-
-  // اتجاه شهري
-  const byMonth = {};
-  rows.forEach(r => {
-    const m = String(r["الشهر"]||r["التاريخ"]||"").slice(0,7);
-    if (!m) return;
-    if (!byMonth[m]) byMonth[m] = {liters:0,cost:0};
-    byMonth[m].liters += n_(r["اللترات"]);
-    byMonth[m].cost   += n_(r["التكلفة"]);
-  });
-  const monthKeys = Object.keys(byMonth).sort();
-  const monthLiters = monthKeys.map(k=>byMonth[k].liters);
-  const monthCosts  = monthKeys.map(k=>byMonth[k].cost);
-
-  // أعلى 10 سائقين استهلاكاً
+  // توزيع حسب السائق (مربوط من شيت السيارات عبر رقم اللوحة)
   const byDriver = {};
   rows.forEach(r => {
-    const d = r["اسم_السائق"] || "غير محدد";
-    if (!byDriver[d]) byDriver[d] = {liters:0,cost:0};
-    byDriver[d].liters += n_(r["اللترات"]);
-    byDriver[d].cost   += n_(r["التكلفة"]);
+    const d = getDriver(r);
+    if (!byDriver[d]) byDriver[d] = {liters:0, cost:0, count:0};
+    byDriver[d].liters += n_(getLiters(r));
+    byDriver[d].cost   += n_(getCost(r));
+    byDriver[d].count  += 1;
   });
   const topDrivers = Object.entries(byDriver).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
+
+  // اتجاه شهري — نتجاهل أي قيمة تاريخ غير صالحة (زي "######" الناتجة عن لصق من إكسل بعمود ضيق)
+  const byMonth = {};
+  rows.forEach(r => {
+    const dRaw = getDateISO(r);
+    if (!dRaw) return;
+    const m = dRaw.slice(0,7);
+    if (!byMonth[m]) byMonth[m] = {liters:0,cost:0};
+    byMonth[m].liters += n_(getLiters(r));
+    byMonth[m].cost   += n_(getCost(r));
+  });
+  const MM_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  const monthLabel = (k) => { const [y,m] = k.split("-").map(Number); return m>=1 && m<=12 ? `${MM_AR[m-1]} ${y}` : k; };
+  const monthKeys = Object.keys(byMonth).sort();
+  const monthLabels = monthKeys.map(monthLabel);
+  const monthLiters = monthKeys.map(k=>byMonth[k].liters);
+  const monthCosts  = monthKeys.map(k=>byMonth[k].cost);
 
   el.innerHTML = `
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
@@ -19062,30 +19111,35 @@ function renderFuelTab(_fromDate, _toDate) {
     <div class="kpi kc-purple">
       <div class="kpi-val">${uniqueCars.toLocaleString()}</div>
       <div class="kpi-lbl">عدد السيارات</div>
-      <div class="kpi-sub">سيارة نشطة</div>
+      <div class="kpi-sub">حسب رقم اللوحة</div>
     </div>
   </div>
 
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">الاتجاه الشهري — اللترات والتكلفة</div>
-      <div class="chart-box" style="height:240px"><canvas id="ch-fuel-trend"></canvas></div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-trend"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">التكلفة حسب المنطقة</div>
-      <div class="chart-box" style="height:240px"><canvas id="ch-fuel-region"></canvas></div>
+      <div class="card-title">أعلى 10 سيارات تكلفةً <span class="sub">حسب رقم اللوحة</span></div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-plate-cost"></canvas></div>
     </div>
   </div>
 
   <div class="g2 mb14">
     <div class="card">
-      <div class="card-title">الاستهلاك حسب طراز السيارة <span class="sub">أعلى 10</span></div>
-      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-model"></canvas></div>
+      <div class="card-title">أعلى 10 سيارات استهلاكاً <span class="sub">باللتر</span></div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-fuel-plate-liters"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">أعلى 10 سائقين تكلفةً</div>
+      <div class="card-title">أعلى 10 سائقين تكلفةً <span class="sub">مربوط من شيت السيارات</span></div>
       <div class="chart-box" style="height:280px"><canvas id="ch-fuel-driver"></canvas></div>
     </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">متوسط سعر اللتر شهرياً</div>
+    <div class="chart-box" style="height:220px"><canvas id="ch-fuel-price"></canvas></div>
   </div>
 
   <div class="card">
@@ -19098,8 +19152,8 @@ function renderFuelTab(_fromDate, _toDate) {
           <option value="cost_desc">التكلفة ↓</option>
           <option value="cost_asc">التكلفة ↑</option>
           <option value="liters_desc">اللترات ↓</option>
+          <option value="plate">رقم اللوحة (أبجدي)</option>
           <option value="driver">السائق (أبجدي)</option>
-          <option value="region">المنطقة (أبجدي)</option>
         </select>
         <select class="fsel" id="fuel-limit" onchange="window.__fuelSort && window.__fuelSort()" style="font-size:11px">
           <option value="30">آخر 30</option>
@@ -19113,22 +19167,18 @@ function renderFuelTab(_fromDate, _toDate) {
       <table style="width:100%;border-collapse:collapse;font-size:12px" id="fuel-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">التاريخ</th>
-          <th style="padding:8px 10px;text-align:right">لوحة السيارة</th>
-          <th style="padding:8px 10px;text-align:right">الطراز</th>
+          <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
           <th style="padding:8px 10px;text-align:right">السائق</th>
-          <th style="padding:8px 10px;text-align:right">المنطقة</th>
           <th style="padding:8px 10px;text-align:center">اللترات</th>
           <th style="padding:8px 10px;text-align:center">التكلفة (ر.س)</th>
         </tr></thead>
         <tbody id="fuel-tbody">
           ${[...rows].reverse().slice(0,30).map(r=>`<tr style="border-bottom:1px solid var(--brd)">
-            <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(r["التاريخ"])||"—"}</td>
-            <td style="padding:6px 10px;font-weight:600;color:#0891B2">${esc(r["لوحة_السيارة"])||"—"}</td>
-            <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
-            <td style="padding:6px 10px">${esc(r["اسم_السائق"])||"—"}</td>
-            <td style="padding:6px 10px;font-size:11px">${esc(r["المنطقة"]||r["المجموعة"])||"—"}</td>
-            <td style="padding:6px 10px;text-align:center;font-weight:600">${n_(r["اللترات"]).toFixed(1)}</td>
-            <td style="padding:6px 10px;text-align:center;font-weight:600;color:#059669">${n_(r["التكلفة"]).toLocaleString()}</td>
+            <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(getDate(r))||"—"}</td>
+            <td style="padding:6px 10px;font-weight:600;color:${CSS_TOKENS.info()}">${esc(getPlate(r))||"—"}</td>
+            <td style="padding:6px 10px">${esc(getDriver(r))}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:600">${n_(getLiters(r)).toFixed(1)}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:600;color:${CSS_TOKENS.positive()}">${n_(getCost(r)).toLocaleString()}</td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -19136,7 +19186,7 @@ function renderFuelTab(_fromDate, _toDate) {
   </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info(),CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.info()];
+    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info2(),CSS_TOKENS.accent(),CSS_TOKENS.secondary(),CSS_TOKENS.primary(),CSS_TOKENS.info()];
 
     // اتجاه شهري
     const cTrend = document.getElementById("ch-fuel-trend");
@@ -19145,47 +19195,67 @@ function renderFuelTab(_fromDate, _toDate) {
       CHARTS["ch-fuel-trend"] = new Chart(cTrend, {
         type: "bar",
         data: {
-          labels: monthKeys,
+          labels: monthLabels,
           datasets: [
-            { type:"bar",  label:"اللترات", data: monthLiters, backgroundColor:CSS_TOKENS.α(CSS_TOKENS.info(),0.6), borderColor:CSS_TOKENS.info(), borderWidth:1, borderRadius:4, yAxisID:"y" },
-            { type:"line", label:"التكلفة (ر.س)", data: monthCosts, borderColor:CSS_TOKENS.positive(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.positive(),0.1), borderWidth:2, yAxisID:"y1", fill:true, tension:0.3 }
+            { type:"bar",  label:"اللترات", data: monthLiters, backgroundColor:CSS_TOKENS.α(CSS_TOKENS.info(),0.55), borderColor:CSS_TOKENS.info(), borderWidth:1.5, borderRadius:6, maxBarThickness:38, yAxisID:"y" },
+            { type:"line", label:"التكلفة (ر.س)", data: monthCosts, borderColor:CSS_TOKENS.positive(), backgroundColor:CSS_TOKENS.positive(), borderWidth:3, yAxisID:"y1", fill:false, tension:0.35, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:"#fff", pointBorderColor:CSS_TOKENS.positive(), pointBorderWidth:2.5 }
           ]
         },
-        options: { maintainAspectRatio:false, plugins:{legend:{position:"top"}},
-          scales:{ y:{beginAtZero:true,position:"right",title:{display:true,text:"لتر"}}, y1:{beginAtZero:true,position:"left",title:{display:true,text:"ر.س"}} } }
+        options: {
+          maintainAspectRatio:false,
+          interaction:{ mode:"index", intersect:false },
+          plugins:{ legend:{ position:"top", labels:{ usePointStyle:true, boxWidth:8, font:{ size:11, weight:"600" } } } },
+          scales:{
+            y:  { beginAtZero:true, position:"right", title:{ display:true, text:"لتر", font:{ size:10, weight:"700" }, color:CSS_TOKENS.txMuted() }, grid:{ color:"rgba(8,45,60,.05)" }, ticks:{ font:{ size:10 } } },
+            y1: { beginAtZero:true, position:"left",  title:{ display:true, text:"ر.س", font:{ size:10, weight:"700" }, color:CSS_TOKENS.txMuted() }, grid:{ display:false }, ticks:{ font:{ size:10 } } },
+            x:  { grid:{ display:false }, ticks:{ font:{ size:10 } } }
+          }
+        }
       });
     }
 
-    // المنطقة
-    const cReg = document.getElementById("ch-fuel-region");
-    if (cReg && typeof Chart !== "undefined") {
-      killChart("ch-fuel-region");
-      CHARTS["ch-fuel-region"] = new Chart(cReg, {
-        type:"doughnut",
-        data:{ labels:regionEntries.map(e=>e[0]), datasets:[{ data:regionEntries.map(e=>e[1].cost), backgroundColor:PAL, borderWidth:2 }] },
-        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}} }
-      });
-    }
-
-    // الطراز
-    const cModel = document.getElementById("ch-fuel-model");
-    if (cModel && typeof Chart !== "undefined") {
-      killChart("ch-fuel-model");
-      CHARTS["ch-fuel-model"] = new Chart(cModel, {
+    // أعلى 10 سيارات تكلفةً
+    const cPlateCost = document.getElementById("ch-fuel-plate-cost");
+    if (cPlateCost && typeof Chart !== "undefined") {
+      killChart("ch-fuel-plate-cost");
+      CHARTS["ch-fuel-plate-cost"] = new Chart(cPlateCost, {
         type:"bar",
-        data:{ labels:modelEntries.map(e=>e[0]), datasets:[{ data:modelEntries.map(e=>e[1].liters), backgroundColor:PAL, borderRadius:4 }] },
+        data:{ labels:plateByCost.map(e=>e[0]), datasets:[{ data:plateByCost.map(e=>e[1].cost), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.warning(),0.75), borderColor:CSS_TOKENS.warning(), borderWidth:1, borderRadius:4 }] },
+        options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ر"}}} }
+      });
+    }
+
+    // أعلى 10 سيارات استهلاكاً
+    const cPlateLiters = document.getElementById("ch-fuel-plate-liters");
+    if (cPlateLiters && typeof Chart !== "undefined") {
+      killChart("ch-fuel-plate-liters");
+      CHARTS["ch-fuel-plate-liters"] = new Chart(cPlateLiters, {
+        type:"bar",
+        data:{ labels:plateByLiters.map(e=>e[0]), datasets:[{ data:plateByLiters.map(e=>e[1].liters), backgroundColor:PAL, borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ل"}}} }
       });
     }
 
-    // السائقين
+    // أعلى 10 سائقين تكلفةً
     const cDrv = document.getElementById("ch-fuel-driver");
     if (cDrv && typeof Chart !== "undefined") {
       killChart("ch-fuel-driver");
       CHARTS["ch-fuel-driver"] = new Chart(cDrv, {
         type:"bar",
-        data:{ labels:topDrivers.map(e=>e[0]), datasets:[{ data:topDrivers.map(e=>e[1].cost), backgroundColor:CSS_TOKENS.warning(), borderRadius:4 }] },
+        data:{ labels:topDrivers.map(e=>e[0]), datasets:[{ data:topDrivers.map(e=>e[1].cost), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.danger(),0.75), borderColor:CSS_TOKENS.danger(), borderWidth:1, borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{callback:v=>v.toLocaleString()+" ر"}}} }
+      });
+    }
+
+    // متوسط سعر اللتر شهرياً
+    const cPrice = document.getElementById("ch-fuel-price");
+    if (cPrice && typeof Chart !== "undefined") {
+      killChart("ch-fuel-price");
+      const monthPrice = monthKeys.map(k => byMonth[k].liters ? +(byMonth[k].cost / byMonth[k].liters).toFixed(2) : null);
+      CHARTS["ch-fuel-price"] = new Chart(cPrice, {
+        type:"line",
+        data:{ labels:monthLabels, datasets:[{ label:"ريال/لتر", data: monthPrice, borderColor:CSS_TOKENS.special(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.special(),0.1), borderWidth:2.5, pointRadius:4, pointBackgroundColor:CSS_TOKENS.special(), fill:true, tension:0.3, spanGaps:true }] },
+        options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:false,ticks:{callback:v=>v+" ر.س"}}} }
       });
     }
   });
@@ -19198,14 +19268,24 @@ function renderFuelTab(_fromDate, _toDate) {
     var cntEl = document.getElementById('fuel-tbl-cnt');
     if (!tbody) return;
     var rows = window.RAW_FUEL ? [...window.RAW_FUEL] : [];
+    var plateToDriver = {};
+    (window.RAW_VEHICLES || []).forEach(function(v){
+      var p = v['رقم اللوحة'], u = (v['اسم المستخدم الفعلي'] || '').trim();
+      if (p && u) plateToDriver[String(p).trim()] = u;
+    });
+    function gp(r){ return r['رقم اللوحة'] ?? r['رقم_اللوحة'] ?? r['لوحة_السيارة'] ?? ''; }
+    function gc(r){ return r['التكلفة (SAR)'] ?? r['التكلفة(SAR)'] ?? r['التكلفة'] ?? 0; }
+    function gl(r){ return r['اللترات'] ?? 0; }
+    function gd(r){ return r['التاريخ'] ?? r['الشهر'] ?? ''; }
+    function gdr(r){ return plateToDriver[String(gp(r) || '').trim()] || 'غير محدد'; }
     rows.sort(function(a,b){
-      if (sort==='date_desc') return String(b['التاريخ']||'').localeCompare(String(a['التاريخ']||''));
-      if (sort==='date_asc')  return String(a['التاريخ']||'').localeCompare(String(b['التاريخ']||''));
-      if (sort==='cost_desc') return Number(b['التكلفة']||0) - Number(a['التكلفة']||0);
-      if (sort==='cost_asc')  return Number(a['التكلفة']||0) - Number(b['التكلفة']||0);
-      if (sort==='liters_desc') return Number(b['اللترات']||0) - Number(a['اللترات']||0);
-      if (sort==='driver') return String(a['اسم_السائق']||'').localeCompare(String(b['اسم_السائق']||''),'ar');
-      if (sort==='region') return String(a['المنطقة']||a['المجموعة']||'').localeCompare(String(b['المنطقة']||b['المجموعة']||''),'ar');
+      if (sort==='date_desc') return String(normDate(gd(b))||'').localeCompare(String(normDate(gd(a))||''));
+      if (sort==='date_asc')  return String(normDate(gd(a))||'').localeCompare(String(normDate(gd(b))||''));
+      if (sort==='cost_desc') return Number(gc(b)||0) - Number(gc(a)||0);
+      if (sort==='cost_asc')  return Number(gc(a)||0) - Number(gc(b)||0);
+      if (sort==='liters_desc') return Number(gl(b)||0) - Number(gl(a)||0);
+      if (sort==='plate') return String(gp(a)||'').localeCompare(String(gp(b)||''),'ar');
+      if (sort==='driver') return String(gdr(a)||'').localeCompare(String(gdr(b)||''),'ar');
       return 0;
     });
     var limited = limit >= 99999 ? rows : rows.slice(0, limit);
@@ -19214,13 +19294,11 @@ function renderFuelTab(_fromDate, _toDate) {
     function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
     tbody.innerHTML = limited.map(function(r){
       return '<tr style="border-bottom:1px solid var(--brd)">'+
-        '<td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">'+esc(r['التاريخ']||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-weight:600;color:#0891B2">'+esc(r['لوحة_السيارة']||'—')+'</td>'+
-        '<td style="padding:6px 10px">'+esc(r['الطراز']||'—')+'</td>'+
-        '<td style="padding:6px 10px">'+esc(r['اسم_السائق']||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px">'+esc(r['المنطقة']||r['المجموعة']||'—')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:600">'+n_(r['اللترات']).toFixed(1)+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:600;color:#059669">'+n_(r['التكلفة']).toLocaleString()+'</td>'+
+        '<td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">'+esc(gd(r)||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-weight:600;color:'+CSS_TOKENS.info()+'">'+esc(gp(r)||'—')+'</td>'+
+        '<td style="padding:6px 10px">'+esc(gdr(r))+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:600">'+n_(gl(r)).toFixed(1)+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:600;color:'+CSS_TOKENS.positive()+'">'+n_(gc(r)).toLocaleString()+'</td>'+
         '</tr>';
     }).join('');
   };
@@ -19229,9 +19307,9 @@ function renderFuelTab(_fromDate, _toDate) {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🚗  JS تبويب: السيارات
    ║  (tab-vehicles)
-   ║  أعمدة الشيت الجديدة: رقم اللوحة، الطراز، سنة الصنع،
+   ║  أعمدة الشيت الجديدة: رقم اللوحة، الماركة، سنة الصنع،
    ║               رقم هوية المستخدم الفعلي، اسم المستخدم الفعلي،
-   ║               حالة التفويض، ملاحظات / الموقع
+   ║               تفويض حتى (اختياري)، الحالة
    ╚════════════════════════════════════════════════════════════╝ */
 /* 📏 ملاحظة/برومبت ثابت: أي جدول بيانات (table) داخل أي تبويب لازم يكون
    بحجم صغير ومحدود الارتفاع (overflow:auto + max-height ~420px) زي باقي
@@ -19253,15 +19331,19 @@ function renderVehiclesTab() {
 
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+  const getBrand  = (r) => r["الماركة"] ?? r["الطراز"] ?? "";
+  const getStatus = (r) => (r["الحالة"] ?? "").toString().trim();
+  const getAuthUntil = (r) => (r["تفويض حتى (اختياري)"] ?? r["تفويض حتى"] ?? "").toString().trim();
+
   const total        = rows.length;
-  const activeUsers   = rows.filter(r => (r["حالة التفويض"]||"").trim() === "مستخدم فعلي").length;
-  const pendingAuth   = rows.filter(r => (r["حالة التفويض"]||"").trim().includes("تفويض حتى")).length;
-  const unauthorized  = rows.filter(r => !(r["حالة التفويض"]||"").trim()).length;
+  const assignedUsers = rows.filter(r => (r["اسم المستخدم الفعلي"]||"").trim()).length;
+  const unassigned     = total - assignedUsers;
+  const pendingAuth    = rows.filter(r => getAuthUntil(r)).length;
   const uniqueUsers   = new Set(rows.map(r=>r["اسم المستخدم الفعلي"]||"").filter(Boolean)).size;
 
-  // توزيع حسب الطراز
+  // توزيع حسب الماركة
   const byModel = {};
-  rows.forEach(r => { const m = r["الطراز"]||"غير محدد"; byModel[m]=(byModel[m]||0)+1; });
+  rows.forEach(r => { const m = getBrand(r)||"غير محدد"; byModel[m]=(byModel[m]||0)+1; });
   const modelEntries = Object.entries(byModel).sort((a,b)=>b[1]-a[1]);
 
   // توزيع حسب سنة الصنع
@@ -19269,34 +19351,40 @@ function renderVehiclesTab() {
   rows.forEach(r => { const y = r["سنة الصنع"]||"غير محدد"; byYear[y]=(byYear[y]||0)+1; });
   const yearEntries = Object.entries(byYear).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
 
-  // توزيع حسب حالة التفويض
+  // توزيع حسب الحالة (بيانات الشيت مباشرة — بدون افتراض قيم معينة)
   const byStatus = {};
   rows.forEach(r => {
-    let s = (r["حالة التفويض"]||"").trim();
-    if (!s) s = "بدون تفويض/مستخدم";
-    else if (s.includes("تفويض حتى")) s = "تفويض بتاريخ انتهاء";
+    const s = getStatus(r) || "غير محدد";
     byStatus[s] = (byStatus[s]||0)+1;
   });
   const statusEntries = Object.entries(byStatus).sort((a,b)=>b[1]-a[1]);
 
+  function statusColor(s) {
+    const t = (s||"").trim();
+    if (!t || t === "غير محدد") return CSS_TOKENS.txMuted();
+    if (/نشط|فعال|سار|متاح/.test(t)) return CSS_TOKENS.positive();
+    if (/غير|منتهٍ|منتهي|موقوف|ملغ/.test(t)) return CSS_TOKENS.danger();
+    return CSS_TOKENS.warning();
+  }
+
   function vehStatusBadge(r) {
-    const st = (r["حالة التفويض"]||"").trim();
-    if (!st) return '<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⚠ بدون تفويض/مستخدم</span>';
-    if (st.includes("تفويض حتى")) return '<span style="background:#FEF3C7;color:#B45309;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">⏳ '+esc(st)+'</span>';
-    return '<span style="background:#DCFCE7;color:#15803D;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ '+esc(st)+'</span>';
+    const st = getStatus(r);
+    const c = statusColor(st);
+    const label = st || "غير محدد";
+    return `<span style="background:${CSS_TOKENS.α(c,0.12)};color:${c};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${esc(label)}</span>`;
   }
 
   function vehRowHtml(r) {
-    const st = (r["حالة التفويض"]||"").trim();
-    const rowBg = !st ? 'background:#FEF2F2' : (st.includes("تفويض حتى") ? 'background:#FFFBEB' : '');
+    const auth = getAuthUntil(r);
+    const rowBg = auth ? `background:${CSS_TOKENS.α(CSS_TOKENS.warning(),0.06)}` : '';
     return `<tr style="border-bottom:1px solid var(--brd);${rowBg}">
-      <td style="padding:6px 10px;font-weight:700;color:#0891B2;white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
-      <td style="padding:6px 10px">${esc(r["الطراز"])||"—"}</td>
+      <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
+      <td style="padding:6px 10px">${esc(getBrand(r))||"—"}</td>
       <td style="padding:6px 10px;text-align:center">${esc(r["سنة الصنع"])||"—"}</td>
       <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(r["رقم هوية المستخدم الفعلي"])||"—"}</td>
       <td style="padding:6px 10px;font-size:11px">${esc(r["اسم المستخدم الفعلي"])||"—"}</td>
+      <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(auth)||"—"}</td>
       <td style="padding:6px 10px;text-align:center">${vehStatusBadge(r)}</td>
-      <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:220px">${esc(r["ملاحظات / الموقع"])||"—"}</td>
     </tr>`;
   }
 
@@ -19308,29 +19396,29 @@ function renderVehiclesTab() {
       <div class="kpi-sub">سيارة مسجلة</div>
     </div>
     <div class="kpi kc-green">
-      <div class="kpi-val">${activeUsers.toLocaleString()}</div>
-      <div class="kpi-lbl">مستخدم فعلي</div>
-      <div class="kpi-sub">${total ? ((activeUsers/total)*100).toFixed(1) : 0}% من الأسطول</div>
+      <div class="kpi-val">${assignedUsers.toLocaleString()}</div>
+      <div class="kpi-lbl">لها مستخدم فعلي</div>
+      <div class="kpi-sub">${total ? ((assignedUsers/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
     <div class="kpi kc-purple">
       <div class="kpi-val">${pendingAuth.toLocaleString()}</div>
-      <div class="kpi-lbl">تفويض بتاريخ انتهاء</div>
+      <div class="kpi-lbl">تفويض له تاريخ انتهاء</div>
       <div class="kpi-sub">يحتاج متابعة التجديد</div>
     </div>
     <div class="kpi kc-red">
-      <div class="kpi-val">${unauthorized.toLocaleString()}</div>
-      <div class="kpi-lbl">بدون تفويض/مستخدم</div>
-      <div class="kpi-sub">${total ? ((unauthorized/total)*100).toFixed(1) : 0}% من الأسطول</div>
+      <div class="kpi-val">${unassigned.toLocaleString()}</div>
+      <div class="kpi-lbl">بدون مستخدم فعلي</div>
+      <div class="kpi-sub">${total ? ((unassigned/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
   </div>
 
   <div class="g2 mb14">
     <div class="card">
-      <div class="card-title">توزيع السيارات حسب الطراز</div>
+      <div class="card-title">توزيع السيارات حسب الماركة</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-veh-model"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">توزيع السيارات حسب حالة التفويض</div>
+      <div class="card-title">توزيع السيارات حسب الحالة</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-veh-status"></canvas></div>
     </div>
   </div>
@@ -19345,11 +19433,11 @@ function renderVehiclesTab() {
       <div class="card-title" style="margin:0;padding:0;border:0">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
       <select class="fsel" id="veh-sort" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
         <option value="plate">رقم اللوحة (أبجدي)</option>
-        <option value="model">الطراز (أبجدي)</option>
+        <option value="model">الماركة (أبجدي)</option>
         <option value="year_desc" selected>السنة ↓ الأحدث</option>
         <option value="year_asc">السنة ↑ الأقدم</option>
         <option value="user">اسم المستخدم (أبجدي)</option>
-        <option value="unauth">بدون تفويض أولاً</option>
+        <option value="unauth">بدون مستخدم أولاً</option>
       </select>
     </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
@@ -19357,12 +19445,12 @@ function renderVehiclesTab() {
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="veh-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
-          <th style="padding:8px 10px;text-align:right">الطراز</th>
+          <th style="padding:8px 10px;text-align:right">الماركة</th>
           <th style="padding:8px 10px;text-align:center">السنة</th>
           <th style="padding:8px 10px;text-align:right">رقم هوية المستخدم الفعلي</th>
           <th style="padding:8px 10px;text-align:right">اسم المستخدم الفعلي</th>
-          <th style="padding:8px 10px;text-align:center">حالة التفويض</th>
-          <th style="padding:8px 10px;text-align:right">ملاحظات / الموقع</th>
+          <th style="padding:8px 10px;text-align:right">تفويض حتى</th>
+          <th style="padding:8px 10px;text-align:center">الحالة</th>
         </tr></thead>
         <tbody id="veh-tbody">
           ${rows.map(r => vehRowHtml(r)).join('')}
@@ -19372,7 +19460,7 @@ function renderVehiclesTab() {
   </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info(),CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.info()];
+    const PAL = [CSS_TOKENS.info(),CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.special(),CSS_TOKENS.danger(),CSS_TOKENS.info2(),CSS_TOKENS.accent(),CSS_TOKENS.secondary(),CSS_TOKENS.primary(),CSS_TOKENS.info()];
 
     const cModel = document.getElementById("ch-veh-model");
     if (cModel && typeof Chart !== "undefined") {
@@ -19389,7 +19477,7 @@ function renderVehiclesTab() {
       killChart("ch-veh-status");
       CHARTS["ch-veh-status"] = new Chart(cStatus, {
         type:"bar",
-        data:{ labels:statusEntries.map(e=>e[0]), datasets:[{ data:statusEntries.map(e=>e[1]), backgroundColor:[CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.danger()], borderRadius:4 }] },
+        data:{ labels:statusEntries.map(e=>e[0]), datasets:[{ data:statusEntries.map(e=>e[1]), backgroundColor:statusEntries.map(e=>statusColor(e[0])), borderRadius:4 }] },
         options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
       });
     }
@@ -19411,15 +19499,16 @@ function renderVehiclesTab() {
     var tbody = document.getElementById('veh-tbody');
     if (!tbody) return;
     var vrows = window.RAW_VEHICLES ? [...window.RAW_VEHICLES] : [];
+    function gb(r){ return r['الماركة'] ?? r['الطراز'] ?? ''; }
     vrows.sort(function(a,b){
       if (sort==='plate') return String(a['رقم اللوحة']||'').localeCompare(String(b['رقم اللوحة']||''),'ar');
-      if (sort==='model') return String(a['الطراز']||'').localeCompare(String(b['الطراز']||''),'ar');
+      if (sort==='model') return String(gb(a)||'').localeCompare(String(gb(b)||''),'ar');
       if (sort==='year_desc') return Number(b['سنة الصنع']||0) - Number(a['سنة الصنع']||0);
       if (sort==='year_asc') return Number(a['سنة الصنع']||0) - Number(b['سنة الصنع']||0);
       if (sort==='user') return String(a['اسم المستخدم الفعلي']||'').localeCompare(String(b['اسم المستخدم الفعلي']||''),'ar');
       if (sort==='unauth') {
-        var fa = (a['حالة التفويض']||'').trim() ? 1 : 0;
-        var fb = (b['حالة التفويض']||'').trim() ? 1 : 0;
+        var fa = (a['اسم المستخدم الفعلي']||'').trim() ? 1 : 0;
+        var fb = (b['اسم المستخدم الفعلي']||'').trim() ? 1 : 0;
         return fa-fb;
       }
       return 0;
@@ -19812,7 +19901,7 @@ function renderTrainingTab(_fromDate, _toDate) {
         if (fuelRows.length || vehRows.length || trRows.length) {
           const n_ = v => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x)?0:x; };
           const fuelData = fuelRows.length ? `
-- بيانات الوقود: ${fuelRows.length.toLocaleString()} سجل · إجمالي اللترات: ${fuelRows.reduce((s,r)=>s+n_(r['اللترات']),0).toLocaleString(undefined,{maximumFractionDigits:0})} · إجمالي التكلفة: ${fuelRows.reduce((s,r)=>s+n_(r['التكلفة']),0).toLocaleString(undefined,{maximumFractionDigits:0})} ريال · ${new Set(fuelRows.map(r=>r['لوحة_السيارة']||r['مفتاح_اللوحة']||'')).size} سيارة` : '';
+- بيانات الوقود: ${fuelRows.length.toLocaleString()} سجل · إجمالي اللترات: ${fuelRows.reduce((s,r)=>s+n_(r['اللترات']),0).toLocaleString(undefined,{maximumFractionDigits:0})} · إجمالي التكلفة: ${fuelRows.reduce((s,r)=>s+n_(r['التكلفة (SAR)']??r['التكلفة']),0).toLocaleString(undefined,{maximumFractionDigits:0})} ريال · ${new Set(fuelRows.map(r=>r['رقم اللوحة']||r['لوحة_السيارة']||'')).size} سيارة` : '';
           const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة` : '';
           const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
 
@@ -19901,6 +19990,47 @@ function renderTrainingTab(_fromDate, _toDate) {
   } else {
     init();
   }
+})();
+
+/* ── حارس اختفاء التشارتات — Chart Watchdog ──────────────────────
+   المشكلة: أحياناً (سباق توقيت بين إعادة رسم وتحديث تلقائي، أو خطأ
+   عابر جوه requestAnimationFrame) تشارت أو اتنين بيفضلوا فاضيين
+   جوه التبويب المفتوح، من غير أي رسالة خطأ ظاهرة للمستخدم.
+   الحل: فحص دوري خفيف للتبويب النشط فقط — لو لقى canvas ظاهر
+   بدون Chart.js instance فعلي مربوط بيه، يعيد رسم التبويب الحالي
+   تلقائياً مرة واحدة (مع فترة تهدئة عشان ما يكررش المحاولة كل شوية). */
+(function () {
+  let lastHealAt = 0;
+  const HEAL_COOLDOWN_MS = 8000;
+
+  function checkAndHeal() {
+    try {
+      if (typeof Chart === "undefined" || !Chart.getChart) return;
+      const panel = document.querySelector(".panel.active");
+      if (!panel) return;
+      const canvases = panel.querySelectorAll("canvas[id]");
+      if (!canvases.length) return;
+
+      let broken = false;
+      canvases.forEach((cv) => {
+        if (cv.offsetParent === null) return; // مخفي فعلاً (مش المشكلة)
+        const rect = cv.getBoundingClientRect();
+        if (rect.width < 10 || rect.height < 10) return;
+        const inst = Chart.getChart(cv);
+        if (!inst) broken = true;
+      });
+
+      if (!broken) return;
+      const now = Date.now();
+      if (now - lastHealAt < HEAL_COOLDOWN_MS) return;
+      lastHealAt = now;
+
+      console.warn("[ChartWatchdog] لقيت تشارت فاضي في التبويب النشط — إعادة رسم تلقائية");
+      if (typeof applyFilters === "function") applyFilters();
+    } catch (_) {}
+  }
+
+  setInterval(checkAndHeal, 4000);
 })();
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -18948,7 +18948,7 @@ ${dataCtx}
    ║  أعمدة الشيت: التاريخ، الشهر، لوحة_السيارة، مفتاح_اللوحة،
    ║               الطراز، التكلفة، اللترات، المنطقة، المجموعة، اسم_السائق
    ╚════════════════════════════════════════════════════════════╝ */
-function renderFuelTab(_fromDate, _toDate) {
+function renderFuelTab(_fromMonth, _toMonth) {
   const el = document.getElementById("fuel-content");
   if (!el) return;
 
@@ -18962,53 +18962,39 @@ function renderFuelTab(_fromDate, _toDate) {
     return;
   }
 
-  // ── قراءة الحقول — أعمدة الشيت الحالية: رقم اللوحة، التاريخ، اللترات، التكلفة (SAR) ──
+  // ── قراءة الحقول — أعمدة الشيت الحالية: رقم اللوحة، التاريخ (رقم الشهر 1–12 بس)، اللترات، التكلفة (SAR) ──
   const getPlate = (r) => r["رقم اللوحة"] ?? r["رقم_اللوحة"] ?? r["لوحة_السيارة"] ?? "";
   const getCost  = (r) => r["التكلفة (SAR)"] ?? r["التكلفة(SAR)"] ?? r["التكلفة"] ?? 0;
   const getLiters = (r) => r["اللترات"] ?? 0;
-  const getDate  = (r) => r["التاريخ"] ?? r["الشهر"] ?? "";
+  const getDateRaw = (r) => r["التاريخ"] ?? r["الشهر"] ?? "";
 
-  // ── تطبيع أي شكل تاريخ ممكن يتكتب في الشيت إلى YYYY-MM-DD موحّد ──
-  // بيدعم: 2025-06-15 · 15/06/2025 · 15-6-2025 · 2025/06/15 · تاريخ إكسل الرقمي
-  // · "15 يونيو 2025" وأي صيغة تانية يقدر الـ Date يفهمها · أي نص مش تاريخ (زي "######") بيترفض
+  const MM_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
   const AR_MONTHS_MAP = {"يناير":1,"فبراير":2,"مارس":3,"أبريل":4,"ابريل":4,"مايو":5,"يونيو":6,"يوليو":7,"أغسطس":8,"اغسطس":8,"سبتمبر":9,"أكتوبر":10,"اكتوبر":10,"نوفمبر":11,"ديسمبر":12};
-  const pad2 = (n) => String(n).padStart(2,"0");
-  const normDate = (raw) => {
+
+  // ── تطبيع عمود "التاريخ" — دلوقتي مجرد رقم شهر (1–12) بدل تاريخ كامل ──
+  const getMonthNum = (r) => {
+    const raw = getDateRaw(r);
     if (raw == null) return null;
     let s = String(raw).trim();
-    if (!s || /^#+$/.test(s)) return null; // نص فاضي أو "######" (لصق من إكسل بعمود ضيق)
-    let m;
-    // YYYY-MM-DD أو YYYY/MM/DD — ⚠️ الشيت بيخزّن الشهر واليوم مقلوبين في العمود ده (تأكدنا بالأمثلة:
-    // "2026-01-04" في الخام = 1 أبريل فعليًا) فبنرجعهم لترتيبهم الصح، إلا لو القلب هيطلع شهر مستحيل (>12)
-    if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/))) {
-      const y = m[1]; let mo = +m[2], d = +m[3];
-      if (d >= 1 && d <= 12) [mo, d] = [d, mo]; // اقلب لو القلب صالح (يوم أصلي ≤12 يقدر يبقى شهر)
-      return `${y}-${pad2(mo)}-${pad2(d)}`;
+    if (!s || /^#+$/.test(s)) return null;
+    // رقم شهر مباشر: "4" أو "04"
+    if (/^\d{1,2}$/.test(s)) {
+      const n = +s;
+      return (n >= 1 && n <= 12) ? n : null;
     }
-    // DD-MM-YYYY أو DD/MM/YYYY (نفس ترتيب الشيت الحالي — تأكدنا منه بالأمثلة)
-    if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))) {
-      let d = +m[1], mo = +m[2], y = +m[3];
-      if (mo > 12 && d <= 12) [d, mo] = [mo, d]; // لو الشهر مستحيل، اقلب مع اليوم
-      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return `${y}-${pad2(mo)}-${pad2(d)}`;
+    // اسم شهر عربي
+    if (AR_MONTHS_MAP[s]) return AR_MONTHS_MAP[s];
+    // احتياطي: لو لسه فيه صفوف قديمة بتاريخ كامل (يوم/شهر/سنة)، ناخد رقم الشهر منها
+    let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if (m) { const mo = +m[2]; return (mo >= 1 && mo <= 12) ? mo : null; }
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (m) {
+      let d = +m[1], mo = +m[2];
+      if (mo > 12 && d <= 12) [d, mo] = [mo, d];
+      return (mo >= 1 && mo <= 12) ? mo : null;
     }
-    // "15 يونيو 2025" أو "يونيو 2025"
-    if ((m = s.match(/^(\d{1,2})?\s*([؀-ۿ]+)\s*(\d{4})$/))) {
-      const mo = AR_MONTHS_MAP[m[2]];
-      if (mo) return `${m[3]}-${pad2(mo)}-${pad2(m[1] ? +m[1] : 1)}`;
-    }
-    // رقم تاريخ إكسل التسلسلي (Serial Date)
-    if (/^\d{4,6}(\.\d+)?$/.test(s) && +s > 20000 && +s < 60000) {
-      const epoch = Date.UTC(1899, 11, 30);
-      const d = new Date(epoch + Math.round(+s) * 86400000);
-      if (!isNaN(d.getTime())) return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`;
-    }
-    // أي صيغة تانية يقدر الـ Date الأصلي يفهمها (زي "Jun 15, 2025")
-    const dt = new Date(s);
-    if (!isNaN(dt.getTime()) && dt.getFullYear() > 1990 && dt.getFullYear() < 2100)
-      return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`;
     return null;
   };
-  const getDateISO = (r) => normDate(getDate(r));
 
   // ── اسم السائق: مش عمود في شيت الوقود — بيتربط برقم اللوحة من شيت "السيارات" (المستخدم الفعلي) ──
   const plateToDriver = {};
@@ -19019,22 +19005,20 @@ function renderFuelTab(_fromDate, _toDate) {
   });
   const getDriver = (r) => plateToDriver[String(getPlate(r) || "").trim()] || "غير محدد";
 
-  // ── استخراج نطاق التواريخ ──
-  const allDates = allRows.map(r => getDateISO(r)).filter(Boolean).sort();
-  const minDate  = allDates[0] || "";
-  const maxDate  = allDates[allDates.length-1] || "";
+  // ── استخراج نطاق الشهور المتاحة ──
+  const allMonthNums = allRows.map(getMonthNum).filter(Boolean).sort((a,b)=>a-b);
+  const minMonth = allMonthNums[0] || 1;
+  const maxMonth = allMonthNums[allMonthNums.length-1] || 12;
 
-  const fromEl = document.getElementById("fuel-date-from");
-  const toEl   = document.getElementById("fuel-date-to");
-  const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
-  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+  const fromEl = document.getElementById("fuel-month-from");
+  const toEl   = document.getElementById("fuel-month-to");
+  const fromMonth = +(_fromMonth || (fromEl ? fromEl.value : "") || minMonth);
+  const toMonth   = +(_toMonth   || (toEl   ? toEl.value   : "") || maxMonth);
 
   const rows = allRows.filter(r => {
-    const d = getDateISO(r);
-    if (!d) return true; // نسيب الصفوف اللي تاريخها مش مفهوم بدل ما نخفيها بالغلط
-    if (fromDate && d < fromDate) return false;
-    if (toDate   && d > toDate)   return false;
-    return true;
+    const mo = getMonthNum(r);
+    if (!mo) return true; // نسيب الصفوف اللي شهرها مش مفهوم بدل ما نخفيها بالغلط
+    return mo >= fromMonth && mo <= toMonth;
   });
 
   const n_ = (v) => { const x = parseFloat(String(v||'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
@@ -19066,36 +19050,38 @@ function renderFuelTab(_fromDate, _toDate) {
   });
   const topDrivers = Object.entries(byDriver).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
 
-  // اتجاه شهري — نتجاهل أي قيمة تاريخ غير صالحة (زي "######" الناتجة عن لصق من إكسل بعمود ضيق)
+  // اتجاه شهري
   const byMonth = {};
   rows.forEach(r => {
-    const dRaw = getDateISO(r);
-    if (!dRaw) return;
-    const m = dRaw.slice(0,7);
-    if (!byMonth[m]) byMonth[m] = {liters:0,cost:0};
-    byMonth[m].liters += n_(getLiters(r));
-    byMonth[m].cost   += n_(getCost(r));
+    const mo = getMonthNum(r);
+    if (!mo) return;
+    if (!byMonth[mo]) byMonth[mo] = {liters:0,cost:0};
+    byMonth[mo].liters += n_(getLiters(r));
+    byMonth[mo].cost   += n_(getCost(r));
   });
-  const MM_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-  const monthLabel = (k) => { const [y,m] = k.split("-").map(Number); return m>=1 && m<=12 ? `${MM_AR[m-1]} ${y}` : k; };
-  const monthKeys = Object.keys(byMonth).sort();
-  const monthLabels = monthKeys.map(monthLabel);
-  const monthLiters = monthKeys.map(k=>byMonth[k].liters);
-  const monthCosts  = monthKeys.map(k=>byMonth[k].cost);
+  const monthKeys   = Object.keys(byMonth).map(Number).sort((a,b)=>a-b);
+  const monthLabels = monthKeys.map(mo => MM_AR[mo-1]);
+  const monthLiters = monthKeys.map(mo=>byMonth[mo].liters);
+  const monthCosts  = monthKeys.map(mo=>byMonth[mo].cost);
+
+  const monthOptions = (sel) => Array.from({length:12}, (_,i)=>i+1)
+    .map(n => `<option value="${n}"${n===sel?" selected":""}>${MM_AR[n-1]}</option>`).join('');
 
   el.innerHTML = `
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
-    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
+    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر الشهر</span>
     <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
       <label style="font-size:11px;color:var(--tx-muted)">من</label>
-      <input type="date" id="fuel-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
-        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-        onchange="renderFuelTab(this.value, document.getElementById('fuel-date-to').value)">
+      <select id="fuel-month-from" onchange="renderFuelTab(this.value, document.getElementById('fuel-month-to').value)"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit">
+        ${monthOptions(fromMonth)}
+      </select>
       <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
-      <input type="date" id="fuel-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
-        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-        onchange="renderFuelTab(document.getElementById('fuel-date-from').value, this.value)">
-      <button onclick="renderFuelTab('${minDate}','${maxDate}')"
+      <select id="fuel-month-to" onchange="renderFuelTab(document.getElementById('fuel-month-from').value, this.value)"
+        style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit">
+        ${monthOptions(toMonth)}
+      </select>
+      <button onclick="renderFuelTab('${minMonth}','${maxMonth}')"
         style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
     </div>
     <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} سجل</span>
@@ -19156,8 +19142,8 @@ function renderFuelTab(_fromDate, _toDate) {
       <div class="card-title" style="margin:0;padding:0;border:0">سجلات الوقود <span class="sub" id="fuel-tbl-cnt"></span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select class="fsel" id="fuel-sort" onchange="window.__fuelSort && window.__fuelSort()" style="font-size:11px">
-          <option value="date_desc" selected>التاريخ ↓ الأحدث</option>
-          <option value="date_asc">التاريخ ↑ الأقدم</option>
+          <option value="month_desc" selected>الشهر ↓ الأحدث</option>
+          <option value="month_asc">الشهر ↑ الأقدم</option>
           <option value="cost_desc">التكلفة ↓</option>
           <option value="cost_asc">التكلفة ↑</option>
           <option value="liters_desc">اللترات ↓</option>
@@ -19175,7 +19161,7 @@ function renderFuelTab(_fromDate, _toDate) {
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px" id="fuel-table">
         <thead><tr style="background:var(--bg2)">
-          <th style="padding:8px 10px;text-align:right">التاريخ</th>
+          <th style="padding:8px 10px;text-align:right">الشهر</th>
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
           <th style="padding:8px 10px;text-align:right">السائق</th>
           <th style="padding:8px 10px;text-align:center">اللترات</th>
@@ -19183,7 +19169,7 @@ function renderFuelTab(_fromDate, _toDate) {
         </tr></thead>
         <tbody id="fuel-tbody">
           ${[...rows].reverse().slice(0,30).map(r=>`<tr style="border-bottom:1px solid var(--brd)">
-            <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(getDate(r))||"—"}</td>
+            <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${(()=>{const mo=getMonthNum(r); return mo?esc(MM_AR[mo-1]):"—";})()}</td>
             <td style="padding:6px 10px;font-weight:600;color:${CSS_TOKENS.info()}">${esc(getPlate(r))||"—"}</td>
             <td style="padding:6px 10px">${esc(getDriver(r))}</td>
             <td style="padding:6px 10px;text-align:center;font-weight:600">${n_(getLiters(r)).toFixed(1)}</td>
@@ -19260,7 +19246,7 @@ function renderFuelTab(_fromDate, _toDate) {
     const cPrice = document.getElementById("ch-fuel-price");
     if (cPrice && typeof Chart !== "undefined") {
       killChart("ch-fuel-price");
-      const monthPrice = monthKeys.map(k => byMonth[k].liters ? +(byMonth[k].cost / byMonth[k].liters).toFixed(2) : null);
+      const monthPrice = monthKeys.map(mo => byMonth[mo].liters ? +(byMonth[mo].cost / byMonth[mo].liters).toFixed(2) : null);
       CHARTS["ch-fuel-price"] = new Chart(cPrice, {
         type:"line",
         data:{ labels:monthLabels, datasets:[{ label:"ريال/لتر", data: monthPrice, borderColor:CSS_TOKENS.special(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.special(),0.1), borderWidth:2.5, pointRadius:4, pointBackgroundColor:CSS_TOKENS.special(), fill:true, tension:0.3, spanGaps:true }] },
@@ -19271,7 +19257,7 @@ function renderFuelTab(_fromDate, _toDate) {
 
   // ── فلتر الترتيب لجدول الوقود ──
   window.__fuelSort = function() {
-    var sort = document.getElementById('fuel-sort') ? document.getElementById('fuel-sort').value : 'date_desc';
+    var sort = document.getElementById('fuel-sort') ? document.getElementById('fuel-sort').value : 'month_desc';
     var limit = parseInt(document.getElementById('fuel-limit') ? document.getElementById('fuel-limit').value : '30') || 30;
     var tbody = document.getElementById('fuel-tbody');
     var cntEl = document.getElementById('fuel-tbl-cnt');
@@ -19282,14 +19268,15 @@ function renderFuelTab(_fromDate, _toDate) {
       var p = v['رقم اللوحة'], u = (v['اسم المستخدم الفعلي'] || '').trim();
       if (p && u) plateToDriver[String(p).trim()] = u;
     });
+    var MM_AR2 = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
     function gp(r){ return r['رقم اللوحة'] ?? r['رقم_اللوحة'] ?? r['لوحة_السيارة'] ?? ''; }
     function gc(r){ return r['التكلفة (SAR)'] ?? r['التكلفة(SAR)'] ?? r['التكلفة'] ?? 0; }
     function gl(r){ return r['اللترات'] ?? 0; }
-    function gd(r){ return r['التاريخ'] ?? r['الشهر'] ?? ''; }
+    function gmo(r){ var s = String(r['التاريخ'] ?? r['الشهر'] ?? '').trim(); var n = +s; return (n>=1 && n<=12) ? n : 0; }
     function gdr(r){ return plateToDriver[String(gp(r) || '').trim()] || 'غير محدد'; }
     rows.sort(function(a,b){
-      if (sort==='date_desc') return String(normDate(gd(b))||'').localeCompare(String(normDate(gd(a))||''));
-      if (sort==='date_asc')  return String(normDate(gd(a))||'').localeCompare(String(normDate(gd(b))||''));
+      if (sort==='month_desc') return gmo(b) - gmo(a);
+      if (sort==='month_asc')  return gmo(a) - gmo(b);
       if (sort==='cost_desc') return Number(gc(b)||0) - Number(gc(a)||0);
       if (sort==='cost_asc')  return Number(gc(a)||0) - Number(gc(b)||0);
       if (sort==='liters_desc') return Number(gl(b)||0) - Number(gl(a)||0);
@@ -19302,8 +19289,9 @@ function renderFuelTab(_fromDate, _toDate) {
     function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
     tbody.innerHTML = limited.map(function(r){
+      var mo = gmo(r);
       return '<tr style="border-bottom:1px solid var(--brd)">'+
-        '<td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">'+esc(gd(r)||'—')+'</td>'+
+        '<td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">'+(mo?esc(MM_AR2[mo-1]):'—')+'</td>'+
         '<td style="padding:6px 10px;font-weight:600;color:'+CSS_TOKENS.info()+'">'+esc(gp(r)||'—')+'</td>'+
         '<td style="padding:6px 10px">'+esc(gdr(r))+'</td>'+
         '<td style="padding:6px 10px;text-align:center;font-weight:600">'+n_(gl(r)).toFixed(1)+'</td>'+

@@ -5743,49 +5743,60 @@ tbody tr:last-child td:last-child {
    يبقى ضمن نفس عائلة "Ink & Brass" الموحّدة للداشبورد.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 18-A: رأس overlay بلون مستقل (كحلي-رمادي) ─────────────────── */
+/* ── 18-A: رأس overlay بلون مستقل (كحلي-رمادي) مع خط نحاسي سفلي ─── */
 .raci-head {
   background: linear-gradient(135deg, #26333f 0%, #3d5266 55%, #1e2933 100%) !important;
+  border-bottom: 2px solid rgba(215,162,95,.55);
 }
 
 .raci-container { width: min(1180px, 96vw); }
 
-/* ── 18-B: دليل الرموز (Legend) ──────────────────────────────────── */
+/* ── 18-B: دليل الرموز (Legend) — شريط بطاقات هادئ بحد علوي بلون العلامة ── */
 .raci-legend {
-  display: flex; flex-wrap: wrap; gap: 10px 18px;
+  display: flex; flex-wrap: wrap; gap: 8px 12px;
   padding: 14px 18px;
-  background: #eef1f3;
-  border: 1px solid rgba(61,82,102,.14);
-  border-radius: 12px;
-  margin-bottom: 18px;
+  background: #fbfcfd;
+  border: 1px solid rgba(61,82,102,.12);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 0 rgba(13,47,64,.03);
 }
 .raci-legend-item {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 600; color: #2c3947;
+  padding: 5px 10px 5px 6px;
+  background: #fff;
+  border: 1px solid rgba(61,82,102,.1);
+  border-radius: 20px;
+  transition: box-shadow .15s ease, transform .15s ease;
 }
+.raci-legend-item:hover { box-shadow: 0 3px 10px rgba(13,47,64,.08); transform: translateY(-1px); }
 .raci-legend-txt { white-space: nowrap; }
 
-/* ── 18-C: شارات R/A/C/I/X ────────────────────────────────────────── */
+/* ── 18-C: شارات R/A/C/I/X — شكل حبّة (pill) بظل خفيف وحدود أوضح ──── */
 .raci-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 30px; height: 24px; padding: 0 6px;
-  border-radius: 7px;
+  min-width: 32px; height: 25px; padding: 0 8px;
+  border-radius: 20px;
   font-size: 11.5px; font-weight: 800; letter-spacing: .2px;
   border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(13,47,64,.06);
 }
-.raci-badge-R  { background: rgba(13,132,156,.16); color: #0b6b7e; border-color: rgba(13,132,156,.34); }
-.raci-badge-A  { background: rgba(13,47,64,.14);   color: #0d2f40; border-color: rgba(13,47,64,.32); }
-.raci-badge-AR { background: linear-gradient(135deg, rgba(13,47,64,.16), rgba(13,132,156,.2)); color: #0d2f40; border-color: rgba(13,90,110,.4); font-size: 10.5px; }
-.raci-badge-C  { background: rgba(176,138,78,.18); color: #8a6a37; border-color: rgba(176,138,78,.36); }
-.raci-badge-I  { background: rgba(91,107,120,.14); color: #4c5c68; border-color: rgba(91,107,120,.3); }
-.raci-badge-X  { background: rgba(148,163,174,.12); color: #94a3ae; border-color: rgba(148,163,174,.28); border-style: dashed; }
+.raci-badge-R  { background: rgba(13,132,156,.15); color: #0b6b7e; border-color: rgba(13,132,156,.38); }
+.raci-badge-A  { background: rgba(13,47,64,.13);   color: #0d2f40; border-color: rgba(13,47,64,.36); }
+.raci-badge-AR { background: linear-gradient(135deg, rgba(13,47,64,.18), rgba(13,132,156,.22)); color: #0d2f40; border-color: rgba(13,90,110,.44); font-size: 10.5px; }
+.raci-badge-C  { background: rgba(176,138,78,.17); color: #8a6a37; border-color: rgba(176,138,78,.4); }
+.raci-badge-I  { background: rgba(91,107,120,.13); color: #4c5c68; border-color: rgba(91,107,120,.32); }
+.raci-badge-X  { background: rgba(148,163,174,.1); color: #9aa7b1; border-color: rgba(148,163,174,.3); border-style: dashed; box-shadow: none; }
 
 /* ── 18-D: جدول المصفوفة — رأس وعمود أول ثابتان أثناء التمرير ──── */
 .raci-table-wrap {
   overflow: auto;
   max-height: 60vh;
-  border: 1px solid var(--bd-light, #e2e8f0);
-  border-radius: 12px;
+  border: 1px solid rgba(61,82,102,.16);
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(13,47,64,.06);
+  background: #fff;
 }
 .raci-table {
   width: 100%;
@@ -5795,27 +5806,31 @@ tbody tr:last-child td:last-child {
 }
 .raci-table thead th {
   position: sticky; top: 0; z-index: 2;
-  background: #f6f8f9;
-  border-bottom: 2px solid rgba(61,82,102,.18);
-  padding: 10px 8px;
+  background: linear-gradient(180deg, #eef2f5 0%, #e4eaee 100%);
+  border-bottom: 2px solid rgba(176,138,78,.55);
+  padding: 11px 8px;
   text-align: center;
   vertical-align: bottom;
 }
 .raci-th-task {
   position: sticky; right: 0; z-index: 3;
   text-align: right !important;
-  background: #f6f8f9;
+  background: linear-gradient(180deg, #eef2f5 0%, #e4eaee 100%);
   min-width: 220px;
-  border-left: 1px solid rgba(61,82,102,.14);
+  border-left: 1px solid rgba(61,82,102,.16);
+  color: #0d2f40;
+  font-weight: 800;
+  letter-spacing: .2px;
 }
-.raci-role-short { font-size: 12px; font-weight: 800; color: #26333f; white-space: nowrap; }
-.raci-role-person { font-size: 10px; font-weight: 500; color: #7c8a96; margin-top: 2px; white-space: nowrap; }
+.raci-role-short { font-size: 12px; font-weight: 800; color: #1a2a36; white-space: nowrap; }
+.raci-role-person { font-size: 10px; font-weight: 600; color: #6d84a1; margin-top: 3px; white-space: nowrap; }
 
 .raci-table tbody td {
   padding: 9px 8px;
   border-bottom: 1px solid var(--bd-light, #eef1f3);
   text-align: center;
   vertical-align: middle;
+  transition: background .12s ease;
 }
 .raci-task-name {
   position: sticky; right: 0; z-index: 1;
@@ -5828,23 +5843,35 @@ tbody tr:last-child td:last-child {
 }
 .raci-table tbody tr:nth-child(even) td,
 .raci-table tbody tr:nth-child(even) .raci-task-name {
-  background: #fbfcfd;
+  background: #f7f9fa;
+}
+.raci-table tbody tr:not(.raci-group-row):hover td,
+.raci-table tbody tr:not(.raci-group-row):hover .raci-task-name {
+  background: rgba(13,132,156,.07);
 }
 .raci-group-row td {
   position: sticky; right: auto;
-  background: linear-gradient(90deg, rgba(61,82,102,.12), rgba(61,82,102,.04));
-  color: #26333f;
+  background: linear-gradient(90deg, rgba(13,47,64,.9), rgba(61,82,102,.75));
+  color: #fff;
   font-weight: 800; font-size: 12.5px;
+  letter-spacing: .2px;
   text-align: right !important;
-  padding: 9px 12px;
-  border-top: 1px solid rgba(61,82,102,.16);
-  border-bottom: 1px solid rgba(61,82,102,.16);
+  padding: 9px 14px;
+  border-top: 1px solid rgba(13,47,64,.9);
+  border-bottom: 1px solid rgba(13,47,64,.9);
+}
+.raci-group-row td::before {
+  content: "◆";
+  color: #d7a25f;
+  font-size: 9px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 /* ── 18-E: Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .raci-legend { padding: 12px 14px; gap: 8px 14px; }
-  .raci-legend-item { font-size: 11px; }
+  .raci-legend { padding: 12px 14px; gap: 6px 10px; }
+  .raci-legend-item { font-size: 11px; padding: 4px 8px 4px 5px; }
   .raci-table { font-size: 11px; }
   .raci-th-task, .raci-task-name { min-width: 160px; max-width: 200px; }
   .raci-table-wrap { max-height: 70vh; }

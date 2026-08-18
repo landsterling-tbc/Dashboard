@@ -220,9 +220,17 @@ window.LANG = window.LANG || "ar";
 
 
 /* وضع العرض المؤقت: إخفاء/إظهار عناصر محددة بدون حذف أي كود */
-// عند الفتح دايماً كروت الطلاب/عمر المبنى مخفية (ON) لأن بياناتها غير دقيقة
+// عند الفتح دايماً تبويبات "الطلاب وعمر المبنى" و"استهلاك الوقود" مخفية (ON)
 // — المستخدم هو اللي يقرر يظهرها يدوياً (من زر العين جوا أو برّه)
 window.__PRESENTATION_MODE__ = true;
+
+// أسماء التبويبات (name في PORTAL_CATEGORIES) المخفية في وضع العرض —
+// أضف أي اسم تبويب هنا عشان يختفي تلقائياً من: كارت الصفحة الرئيسية (برا)،
+// القائمة الجانبية داخل القسم (جوا)، ونافذة الاختصارات — بدون حذف أي كود.
+var PRESENTATION_HIDDEN_TABS = ["students", "fuel"];
+function __isPresentationHiddenTab(name) {
+  return !!window.__PRESENTATION_MODE__ && PRESENTATION_HIDDEN_TABS.indexOf(name) !== -1;
+}
 
 function setPresentationMode(nextMode) {
   window.__PRESENTATION_MODE__ = !!nextMode;
@@ -243,6 +251,8 @@ function applyPresentationModeUI() {
     "kpi-age-avg",
     "kpi-age-old",
     "kpi-age-new",
+    "tabbtn-fuel",
+    "tab-fuel",
   ];
   idsToHide.forEach((id) => {
     const el = document.getElementById(id);
@@ -269,15 +279,15 @@ function applyPresentationModeUI() {
     btnOuter.classList.toggle("on", on);
     btnOuter.setAttribute("aria-pressed", on ? "true" : "false");
     btnOuter.title = on
-      ? "بيانات الطلاب وعمر المبنى مخفية (غير دقيقة) — اضغط للإظهار"
-      : "بيانات الطلاب وعمر المبنى ظاهرة — اضغط للإخفاء";
+      ? "تبويبات الطلاب وعمر المبنى واستهلاك الوقود مخفية — اضغط للإظهار"
+      : "تبويبات الطلاب وعمر المبنى واستهلاك الوقود ظاهرة — اضغط للإخفاء";
     btnOuter.textContent = on ? "👁" : "◌";
     btnOuter.style.opacity = on ? ".35" : ".12";
   }
 
   if (on) {
     const activeTab = document.querySelector(".tab.active");
-    if (activeTab && activeTab.id === "tabbtn-students") {
+    if (activeTab && (activeTab.id === "tabbtn-students" || activeTab.id === "tabbtn-fuel")) {
       const fallback = document.querySelector('.tab[onclick*="showTab(\'overview\'"]');
       if (fallback && typeof showTab === "function") showTab("overview", fallback);
     }
@@ -1142,7 +1152,7 @@ function renderTierStrip() {
    ║                                                                ║
    ╚════════════════════════════════════════════════════════════════╝ */
 function showTab(name, el) {
-  if (window.__PRESENTATION_MODE__ && name === "students") {
+  if (__isPresentationHiddenTab(name)) {
     const fallback = document.getElementById("tabbtn-overview");
     return showTab("overview", fallback);
   }
@@ -24261,9 +24271,8 @@ function __fillPortalCardTabsList() {
     if (!card) return;
     var descEl = card.querySelector(".portal-card-desc");
     if (!descEl) return;
-    var hideStudents = !!window.__PRESENTATION_MODE__;
     var tabs = PORTAL_CATEGORIES[key].tabs.filter(function (t) {
-      return !(hideStudents && t.name === "students");
+      return !__isPresentationHiddenTab(t.name);
     });
     var html = '<div class="portal-card-tabs-grid">';
     tabs.forEach(function (t) {
@@ -24306,7 +24315,7 @@ function __setFavoriteTabs(list) {
 function __renderPortalFavoritesCard() {
   var card = document.getElementById("portalFavoritesCard");
   if (!card) return;
-  var favs = __getFavoriteTabs();
+  var favs = __getFavoriteTabs().filter(function (f) { return !__isPresentationHiddenTab(f.name); });
 
   if (!favs.length) {
     card.innerHTML =
@@ -24341,9 +24350,11 @@ function openFavoritesModal() {
   var html = '';
   Object.keys(PORTAL_CATEGORIES).forEach(function (catKey) {
     var cat = PORTAL_CATEGORIES[catKey];
+    var visibleTabs = cat.tabs.filter(function (t) { return !__isPresentationHiddenTab(t.name); });
+    if (!visibleTabs.length) return;
     html += '<div class="portal-favorites-group">';
     html += '  <div class="portal-favorites-group-title">' + cat.icon + ' ' + cat.title + '</div>';
-    cat.tabs.forEach(function (t) {
+    visibleTabs.forEach(function (t) {
       var key = catKey + "::" + t.name;
       var checked = favKeys.indexOf(key) !== -1 ? "checked" : "";
       html += '<label class="portal-favorites-check-item">';
@@ -24487,6 +24498,7 @@ function renderCategorySidebar(catKey) {
   /* قسم "⭐ اختصاراتك" — يظهر فقط لو عنده اختصارات محفوظة، ويتيح
      القفز لأي اختصار من أي قسم مباشرة دون الرجوع لـ Portal Home */
   var favs = typeof __getFavoriteTabs === "function" ? __getFavoriteTabs() : [];
+  favs = favs.filter(function (f) { return !__isPresentationHiddenTab(f.name); });
   if (favs.length) {
     html += '<div class="cat-sidebar-favs">';
     html += '  <div class="cat-sidebar-favs-title">⭐ اختصاراتك</div>';
@@ -24500,7 +24512,7 @@ function renderCategorySidebar(catKey) {
   }
 
   html += '<div class="cat-sidebar-list">';
-  cat.tabs.forEach(function (t) {
+  cat.tabs.filter(function (t) { return !__isPresentationHiddenTab(t.name); }).forEach(function (t) {
     html += '<button type="button" class="cat-sidebar-item" data-subtab="' + t.name + '" onclick="goToSubTab(\'' + t.name + '\')">' + t.label + '</button>';
   });
   html += '</div>';

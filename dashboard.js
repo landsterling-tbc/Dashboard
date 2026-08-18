@@ -12033,7 +12033,7 @@ function tajOpenDetail(topic, qismName) {
 
   const kpisHtml = `
     <div class="hasr-igrid">
-      ${tiles.map((t) => `<div class="hasr-ic" style="--hc:${t.c}"><div class="hasr-ic-lbl">${esc(t.l)}</div><div class="hasr-ic-val" style="font-size:16px">${t.v}</div></div>`).join("")}
+      ${tiles.map((t) => `<div class="hasr-ic" style="--hc:${t.c}"><div class="hasr-ic-lbl">${esc(t.l)}</div><div class="hasr-ic-val" style="font-size:18px">${t.v}</div></div>`).join("")}
     </div>`;
 
   let bodyExtra;
@@ -12066,7 +12066,7 @@ function tajOpenDetail(topic, qismName) {
               <span class="hasr-sbadge" style="background:${pc}18;color:${pc}">${pct}%</span>
             </div>`;
           })
-          .join("") || '<div style="color:var(--tx-muted);font-size:13.5px;text-align:center;padding:16px">لا يوجد موردون ضمن هذا العرض</div>'
+          .join("") || '<div style="color:var(--tx-muted);font-size:14px;text-align:center;padding:18px">لا يوجد موردون ضمن هذا العرض</div>'
       }
     `;
   } else {
@@ -12084,7 +12084,7 @@ function tajOpenDetail(topic, qismName) {
     bodyExtra = `
       <div class="hasr-sec" style="display:flex;justify-content:space-between;align-items:center">
         <span>الأصناف (${numFmt(sorted.length)})</span>
-        ${sorted.length > CAP ? `<span style="font-size:10.5px;color:var(--tx-muted)">أعلى ${CAP} — ضيّق بالفلاتر لعرض الباقي</span>` : ""}
+        ${sorted.length > CAP ? `<span style="font-size:12px;color:var(--tx-muted)">أعلى ${CAP} — ضيّق بالفلاتر لعرض الباقي</span>` : ""}
       </div>
       ${
         shown
@@ -12094,12 +12094,12 @@ function tajOpenDetail(topic, qismName) {
               <div style="flex:1;min-width:0">
                 <div class="hasr-sname">${esc(r.صنف || "—")}</div>
                 <div class="hasr-smeta">${esc(r.قسم || "—")} · ${esc(r.مورد || "—")}</div>
-                <div style="font-size:11.5px;color:var(--tx-muted);margin-top:3px">احتياج: ${sarFmt(r.احتياج.قيمة)} · مخصص: ${sarFmt(r.مخصص.قيمة)}</div>
+                <div style="font-size:13px;color:var(--tx-muted);margin-top:4px">احتياج: ${sarFmt(r.احتياج.قيمة)} · مخصص: ${sarFmt(r.مخصص.قيمة)}</div>
               </div>
               <span class="hasr-sbadge" style="background:${cb.bg};color:${cb.color}">${esc(cb.label)}</span>
             </div>`;
           })
-          .join("") || '<div style="color:var(--tx-muted);font-size:13.5px;text-align:center;padding:16px">لا توجد أصناف ضمن هذا العرض</div>'
+          .join("") || '<div style="color:var(--tx-muted);font-size:14px;text-align:center;padding:18px">لا توجد أصناف ضمن هذا العرض</div>'
       }
     `;
   }
@@ -20858,30 +20858,30 @@ function _hasrRenderFilterBanner() {
     }
     #hasr-ov.hasr-open { display:block; opacity:1; }
     .hasr-head {
-      padding:18px 22px 14px;
-      background:linear-gradient(135deg,#071C28 0%,#0A3043 100%);
+      padding:20px 24px 16px;
+      background:linear-gradient(135deg,#071C28 0%,#0A3043 60%,#0d3d55 100%);
       color:#fff; flex-shrink:0;
-      border-bottom:1px solid rgba(255,255,255,.08);
+      border-bottom:1px solid rgba(255,255,255,.1);
       position:relative;
     }
     .hasr-head-close {
-      position:absolute; top:14px; left:16px;
-      width:30px; height:30px; border-radius:50%;
-      background:rgba(255,255,255,.1); border:none; color:#fff;
-      font-size:15px; cursor:pointer;
+      position:absolute; top:16px; left:18px;
+      width:34px; height:34px; border-radius:50%;
+      background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.1); color:#fff;
+      font-size:16px; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
-      transition:background .18s; font-family:Tajawal,sans-serif;
+      transition:background .18s,border-color .18s; font-family:Tajawal,sans-serif;
     }
-    .hasr-head-close:hover { background:rgba(255,255,255,.25); }
-    .hasr-head-title { font-size:16px; font-weight:800; max-width:calc(100% - 44px); }
-    .hasr-head-sub   { font-size:12.5px; color:rgba(255,255,255,.5); margin-top:3px; }
+    .hasr-head-close:hover { background:rgba(255,255,255,.28); border-color:rgba(255,255,255,.2); }
+    .hasr-head-title { font-size:18px; font-weight:800; max-width:calc(100% - 50px); line-height:1.3; }
+    .hasr-head-sub   { font-size:13.5px; color:rgba(255,255,255,.55); margin-top:4px; }
     .hasr-tabs {
       display:flex; background:#071C28; overflow-x:auto; flex-shrink:0;
       border-bottom:1px solid rgba(255,255,255,.08); scrollbar-width:none;
     }
     .hasr-tabs::-webkit-scrollbar { display:none; }
     .hasr-tab {
-      padding:9px 14px; font-size:11.5px; font-weight:700; letter-spacing:.02em;
+      padding:10px 16px; font-size:13px; font-weight:700; letter-spacing:.02em;
       color:rgba(255,255,255,.45); cursor:pointer; white-space:nowrap;
       border-bottom:2px solid transparent; transition:all .18s;
       background:transparent; border-top:none; border-left:none; border-right:none;
@@ -20889,33 +20889,33 @@ function _hasrRenderFilterBanner() {
     }
     .hasr-tab:hover  { color:rgba(255,255,255,.8); }
     .hasr-tab.active { color:#fff; border-bottom-color:#0891B2; }
-    .hasr-body { flex:1; overflow-y:auto; padding:16px 18px; scrollbar-width:thin; }
+    .hasr-body { flex:1; overflow-y:auto; padding:18px 20px; scrollbar-width:thin; }
     .hasr-body::-webkit-scrollbar { width:7px; }
     .hasr-body::-webkit-scrollbar-track { background:transparent; }
     .hasr-body::-webkit-scrollbar-thumb { background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.35)}; border-radius:10px; }
     .hasr-body::-webkit-scrollbar-thumb:hover { background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.55)}; }
-    .hasr-igrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .hasr-igrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
     .hasr-ic {
       background:var(--bg-2); border:1px solid var(--bd-light);
-      border-radius:12px; padding:12px 14px; position:relative; overflow:hidden;
-      box-shadow:0 1px 3px rgba(6,20,28,.05);
+      border-radius:14px; padding:14px 16px; position:relative; overflow:hidden;
+      box-shadow:0 2px 6px rgba(6,20,28,.06);
       transition:box-shadow .18s,transform .18s;
     }
-    .hasr-ic:hover { box-shadow:0 5px 16px rgba(6,20,28,.09); transform:translateY(-2px); }
+    .hasr-ic:hover { box-shadow:0 6px 18px rgba(6,20,28,.1); transform:translateY(-2px); }
     .hasr-ic::before {
       content:''; position:absolute; top:0; right:0;
-      width:3px; height:100%; background:var(--hc,#94a3b8);
+      width:3.5px; height:100%; background:var(--hc,#94a3b8);
     }
     .hasr-ic.full { grid-column:1/-1; }
-    .hasr-ic-lbl  { font-size:11.5px; color:var(--tx-muted); font-weight:700; margin-bottom:4px; letter-spacing:.01em; }
-    .hasr-ic-val  { font-size:19px; font-weight:900; color:var(--hc,var(--tx-main)); line-height:1.25; }
-    .hasr-ic-sub  { font-size:11.5px; color:var(--tx-muted); margin-top:3px; }
+    .hasr-ic-lbl  { font-size:13px; color:var(--tx-muted); font-weight:700; margin-bottom:5px; letter-spacing:.01em; }
+    .hasr-ic-val  { font-size:21px; font-weight:900; color:var(--hc,var(--tx-main)); line-height:1.25; }
+    .hasr-ic-sub  { font-size:12.5px; color:var(--tx-muted); margin-top:4px; }
     .hasr-prog    { height:6px; border-radius:4px; background:var(--bd-light); overflow:hidden; margin-top:7px; }
     .hasr-pfill   { height:100%; border-radius:4px; transition:width .7s cubic-bezier(.22,.6,.34,1); }
     .hasr-sec {
-      display:flex; align-items:center; gap:7px;
-      font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
-      color:var(--tx-muted); margin:20px 0 10px; padding-bottom:8px;
+      display:flex; align-items:center; gap:8px;
+      font-size:13.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+      color:var(--tx-muted); margin:22px 0 12px; padding-bottom:9px;
       border-bottom:1.5px solid var(--bd-light);
     }
     .hasr-sec::before {
@@ -20926,35 +20926,35 @@ function _hasrRenderFilterBanner() {
     .hasr-sec:first-child { margin-top:0; }
     .hasr-srow {
       display:flex; align-items:center; justify-content:space-between;
-      padding:11px 13px; border-radius:11px; cursor:pointer;
+      padding:13px 15px; border-radius:12px; cursor:pointer;
       transition:background .16s,border-color .16s,box-shadow .16s;
-      margin-bottom:7px;
+      margin-bottom:8px;
       background:var(--bg-2);
       border:1px solid var(--bd-light);
-      box-shadow:0 1px 2px rgba(6,20,28,.03);
+      box-shadow:0 1px 3px rgba(6,20,28,.04);
     }
     .hasr-srow:hover {
       background:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.1)};
       border-color:${CSS_TOKENS.α(CSS_TOKENS.info(), 0.45)};
-      box-shadow:0 3px 10px rgba(6,20,28,.07);
+      box-shadow:0 4px 12px rgba(6,20,28,.08);
     }
     .hasr-srow:last-child { margin-bottom:0; }
-    .hasr-sname { font-size:14px; font-weight:800; color:var(--tx-main); line-height:1.35; }
-    .hasr-smeta { font-size:12px; color:var(--tx-muted); margin-top:3px; line-height:1.5; }
+    .hasr-sname { font-size:15px; font-weight:800; color:var(--tx-main); line-height:1.4; }
+    .hasr-smeta { font-size:13px; color:var(--tx-muted); margin-top:4px; line-height:1.5; }
     .hasr-sbadge {
-      font-size:11.5px; font-weight:800; padding:3px 10px;
+      font-size:13px; font-weight:800; padding:4px 12px;
       border-radius:999px; background:#EFF6FF; color:#1D4ED8;
       border:1px solid rgba(29,78,216,.15);
       flex-shrink:0; margin-right:6px; white-space:nowrap;
     }
     .hasr-cbar {
-      display:flex; border-radius:9px; overflow:hidden; height:28px;
-      border:1px solid var(--bd-light); margin-bottom:10px;
+      display:flex; border-radius:10px; overflow:hidden; height:32px;
+      border:1px solid var(--bd-light); margin-bottom:12px;
       box-shadow:inset 0 1px 2px rgba(6,20,28,.06);
     }
     .hasr-cseg {
       display:flex; align-items:center; justify-content:center;
-      font-size:11.5px; color:#fff; font-weight:700; min-width:0;
+      font-size:12.5px; color:#fff; font-weight:700; min-width:0;
       transition:filter .15s;
     }
     .hasr-cseg:hover { filter:brightness(1.08); }
@@ -20971,16 +20971,16 @@ function _hasrRenderFilterBanner() {
       box-shadow:0 0 0 2px var(--hac,#1D4ED8),0 4px 16px rgba(0,0,0,.1) !important;
     }
     .hasr-finp {
-      width:100%; box-sizing:border-box; padding:8px 12px; margin-bottom:8px;
-      background:var(--bg-2); border:1px solid var(--bd-light); border-radius:8px;
-      font-size:13.5px; font-family:Tajawal,sans-serif; color:var(--tx-main); outline:none;
+      width:100%; box-sizing:border-box; padding:10px 14px; margin-bottom:10px;
+      background:var(--bg-2); border:1px solid var(--bd-light); border-radius:10px;
+      font-size:14px; font-family:Tajawal,sans-serif; color:var(--tx-main); outline:none;
     }
-    .hasr-finp:focus { border-color:#0891B2; }
+    .hasr-finp:focus { border-color:#0891B2; box-shadow:0 0 0 3px ${CSS_TOKENS.α(CSS_TOKENS.info(),.12)}; }
     .hasr-back-btn {
-      display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
-      padding:6px 14px;border-radius:8px;background:var(--bg-2);color:var(--teal,#0891B2);
+      display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;
+      padding:8px 16px;border-radius:10px;background:var(--bg-2);color:var(--teal,#0891B2);
       border:1.5px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.3)};cursor:pointer;font-family:Tajawal;
-      margin-bottom:14px;transition:background .15s;
+      margin-bottom:16px;transition:background .15s;
     }
     .hasr-back-btn:hover { background:${CSS_TOKENS.α(CSS_TOKENS.info(),.12)}; }
   `;
@@ -21457,7 +21457,7 @@ function _hDrawSL() {
   const sl=document.getElementById('hasr-ps-list'); if(!sl) return;
   const slice=list.slice(HASR.sPage*PAGE,(HASR.sPage+1)*PAGE);
   sl.innerHTML = !list.length
-    ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:13.5px">لا توجد نتائج</div>'
+    ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:14.5px">لا توجد نتائج</div>'
     : slice.map(sc=>`
       <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(sc.code)}')">
         <div>
@@ -21520,8 +21520,8 @@ function _hPanelAssets(body) {
     ${topSys.map(sys=>`
       <div style="padding:7px 0;border-bottom:1px solid var(--bd-light)">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-          <span style="font-size:12.5px;font-weight:600;color:var(--tx-main)">${_hE(sys.name)}</span>
-          <span style="font-size:12.5px;font-weight:700;color:#1D4ED8">${sys.total}</span>
+          <span style="font-size:14px;font-weight:600;color:var(--tx-main)">${_hE(sys.name)}</span>
+          <span style="font-size:14px;font-weight:700;color:#1D4ED8">${sys.total}</span>
         </div>
         <div style="display:flex;border-radius:4px;overflow:hidden;height:6px;background:var(--bd-light)">
           ${sys.excellent>0?`<div style="flex:${sys.excellent};background:#10B981"></div>`:''}
@@ -21554,14 +21554,14 @@ function _hPanelReassessed(body) {
     </div>
     <div class="hasr-sec">المدارس المعادة (${list.length})</div>
     ${!list.length
-      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:13.5px">لا توجد مدارس معادة</div>'
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:14.5px">لا توجد مدارس معادة</div>'
       : list.map(sc=>`
         <div class="hasr-srow" onclick="hasrOpenDetail('${_hE(sc.code)}')">
           <div>
             <div class="hasr-sname">${_hE(sc.name)}</div>
             <div class="hasr-smeta">${_hE(sc.city)} · ${sc.buildings||0} مبنى · ${sc.rooms||0} غرفة</div>
           </div>
-          <span style="font-size:10.5px;padding:2px 8px;border-radius:999px;background:#EDE9FE;color:#6D28D9;font-weight:700">✓ معادة</span>
+          <span style="font-size:12.5px;padding:2px 8px;border-radius:999px;background:#EDE9FE;color:#6D28D9;font-weight:700">✓ معادة</span>
         </div>`).join('')}
   `;
 }
@@ -21584,9 +21584,9 @@ function _hPanelAvg(body) {
       <div class="hasr-ic" style="--hc:#EF4444"><div class="hasr-ic-lbl">متوسط متهالك</div><div class="hasr-ic-val">${Math.round(s.deteriorated/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
     </div>
     <div class="hasr-sec">أعلى 5 أصولاً</div>
-    ${top5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:14.5px;font-weight:900;color:#1D4ED8;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+    ${top5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#1D4ED8;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
     <div class="hasr-sec">أقل 5 أصولاً</div>
-    ${bot5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:14.5px;font-weight:900;color:#EF4444;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+    ${bot5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#EF4444;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
   `;
 }
 
@@ -21604,7 +21604,7 @@ function _hPanelBuildings(body) {
       <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.buildings||0),0)}</div><div class="hasr-ic-sub">مبنى</div></div>
     </div>
     <div class="hasr-sec">أعلى 10 مدارس مبانياً</div>
-    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:14.5px;font-weight:900;color:#D97706;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEF3C7;color:#92400E">${x.buildings||0} مبنى</div></div>`).join('')}
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#D97706;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEF3C7;color:#92400E">${x.buildings||0} مبنى</div></div>`).join('')}
   `;
 }
 
@@ -21622,7 +21622,7 @@ function _hPanelRooms(body) {
       <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.rooms||0),0)}</div><div class="hasr-ic-sub">غرفة</div></div>
     </div>
     <div class="hasr-sec">أعلى 10 مدارس غرفاً</div>
-    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:14.5px;font-weight:900;color:#DC2626;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.rooms||0} غرفة</div></div>`).join('')}
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#DC2626;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.rooms||0} غرفة</div></div>`).join('')}
   `;
 }
 
@@ -21641,9 +21641,9 @@ function _hPanelMainSystems(body) {
 
   const ctxBanner = sc
     ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
-        <span style="font-size:12.5px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
-        <span style="font-size:11.5px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
-        <button onclick="HASR._schoolCtx=null;hasrTab('systems')" style="margin-right:auto;font-size:10.5px;padding:2px 8px;border-radius:999px;background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ عرض جميع المدارس</button>
+        <span style="font-size:14px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:13px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
+        <button onclick="HASR._schoolCtx=null;hasrTab('systems')" style="margin-right:auto;font-size:12.5px;padding:2px 8px;border-radius:999px;background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ عرض جميع المدارس</button>
       </div>`
     : '';
 
@@ -21657,7 +21657,7 @@ function _hPanelMainSystems(body) {
     </div>
     <div class="hasr-sec">الأنظمة الرئيسية — اضغط لعرض الفرعية وتطبيق الفلتر</div>
     ${!sys.length
-      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:13.5px">لا توجد أنظمة</div>'
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:14.5px">لا توجد أنظمة</div>'
       : sys.map(s=>{
           const tot=s.total||1;
           const isActive = ctx.filter.mainSys===s.name && !ctx.filter.subSys;
@@ -21694,7 +21694,7 @@ function _hPanelSubSystems(body) {
     </div>
     <div class="hasr-sec">الأنظمة الفرعية — اضغط لتطبيق الفلتر</div>
     ${!subs.length
-      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:13.5px">لا توجد أنظمة فرعية</div>'
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:14.5px">لا توجد أنظمة فرعية</div>'
       : subs.map(sub=>{
           const isActive = ctx.filter.subSys===sub.name && ctx.filter.mainSys===sub.mainSys;
           return `
@@ -21751,10 +21751,10 @@ function hasrSelectMainSystem(mainSys) {
   const schoolBanner = sc
     ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;
                    background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
-        <span style="font-size:12.5px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
-        <span style="font-size:11.5px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
+        <span style="font-size:14px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:13px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
         <button onclick="HASR._schoolCtx=null;hasrTab('systems')"
-          style="margin-right:auto;font-size:10.5px;padding:2px 8px;border-radius:999px;
+          style="margin-right:auto;font-size:12.5px;padding:2px 8px;border-radius:999px;
                  background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ كل المدارس</button>
       </div>`
     : '';
@@ -21782,7 +21782,7 @@ function hasrSelectMainSystem(mainSys) {
       ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/barTot)*100).toFixed(0)}%</div>`).join('')}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      ${bars.map(x=>`<span style="font-size:11.5px;color:var(--tx-sec)">
+      ${bars.map(x=>`<span style="font-size:13px;color:var(--tx-sec)">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>
         ${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong>
       </span>`).join('')}
@@ -21790,7 +21790,7 @@ function hasrSelectMainSystem(mainSys) {
 
     <div class="hasr-sec">الأنظمة الفرعية — اضغط لعرض التفاصيل</div>
     ${!subs.length
-      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:13.5px">لا توجد أنظمة فرعية</div>'
+      ? '<div style="text-align:center;padding:20px;color:var(--tx-muted);font-size:14.5px">لا توجد أنظمة فرعية</div>'
       : subs.map(sub=>{
           const pct = ((sub.total/totAll)*100).toFixed(1);
           return `
@@ -21857,7 +21857,7 @@ function hasrShowSubDetail(mainSys, subSys) {
       ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/barTot)*100).toFixed(0)}%</div>`).join('')}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      ${bars.map(x=>`<span style="font-size:11.5px;color:var(--tx-sec)">
+      ${bars.map(x=>`<span style="font-size:13px;color:var(--tx-sec)">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>
         ${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong>
       </span>`).join('')}
@@ -21865,13 +21865,13 @@ function hasrShowSubDetail(mainSys, subSys) {
 
     <div class="hasr-sec">النظام الرئيسي</div>
     <div style="padding:10px 12px;background:rgba(30,58,138,.06);border-radius:8px;border:1px solid rgba(30,58,138,.15)">
-      <span style="font-size:13.5px;font-weight:700;color:#1E3A8A">⚙️ ${_hE(mainSys)}</span>
+      <span style="font-size:14.5px;font-weight:700;color:#1E3A8A">⚙️ ${_hE(mainSys)}</span>
     </div>
     ${sc ? `
     <div class="hasr-sec" style="margin-top:12px">المدرسة</div>
     <div style="padding:10px 12px;background:${CSS_TOKENS.α(CSS_TOKENS.info(),.06)};border-radius:8px;border:1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.18)}">
-      <div style="font-size:13.5px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
-      <div style="font-size:11.5px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
+      <div style="font-size:14.5px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
+      <div style="font-size:13px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
     </div>` : ''}
   `;
 }
@@ -21909,27 +21909,27 @@ function hasrOpenDetail(code) {
       <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأصول</div><div class="hasr-ic-val">${(sc.totalAssets||0).toLocaleString('ar')}</div></div>
       <div class="hasr-ic" style="--hc:#1D4ED8"><div class="hasr-ic-lbl">المباني</div><div class="hasr-ic-val">${sc.buildings||0}</div></div>
       <div class="hasr-ic" style="--hc:#7C3AED"><div class="hasr-ic-lbl">الغرف</div><div class="hasr-ic-val">${sc.rooms||0}</div></div>
-      <div class="hasr-ic" style="--hc:${sc.reassessed==='نعم'?'#7C3AED':'#94A3B8'}"><div class="hasr-ic-lbl">معادة</div><div class="hasr-ic-val" style="font-size:15px">${sc.reassessed==='نعم'?'✓ نعم':'لا'}</div></div>
+      <div class="hasr-ic" style="--hc:${sc.reassessed==='نعم'?'#7C3AED':'#94A3B8'}"><div class="hasr-ic-lbl">معادة</div><div class="hasr-ic-val" style="font-size:15.5px">${sc.reassessed==='نعم'?'✓ نعم':'لا'}</div></div>
     </div>
     <div class="hasr-sec">توزيع الحالة</div>
     <div class="hasr-cbar">
       ${bars.filter(x=>x.v>0).map(x=>`<div class="hasr-cseg" style="flex:${x.v};background:${x.c}">${((x.v/tot)*100).toFixed(0)}%</div>`).join('')}
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-      ${bars.map(x=>`<span style="font-size:11.5px;color:var(--tx-sec)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong></span>`).join('')}
+      ${bars.map(x=>`<span style="font-size:13px;color:var(--tx-sec)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${x.c};margin-left:3px"></span>${x.l}: <strong>${(x.v||0).toLocaleString('ar')}</strong></span>`).join('')}
     </div>
     <div class="hasr-sec" style="display:flex;align-items:center;justify-content:space-between">
       <span>الأنظمة الرئيسية</span>
-      ${active.length?`<button onclick="hasrOpenSchoolSystems('${_hE(sc.code)}')" style="font-size:10.5px;padding:3px 9px;border-radius:6px;background:#1E3A8A;color:#fff;border:none;cursor:pointer;font-family:Tajawal">⚙️ عرض الكل</button>`:''}
+      ${active.length?`<button onclick="hasrOpenSchoolSystems('${_hE(sc.code)}')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;background:#1E3A8A;color:#fff;border:none;cursor:pointer;font-family:Tajawal">⚙️ عرض الكل</button>`:''}
     </div>
     ${!active.length
-      ?'<div style="color:var(--tx-muted);font-size:13.5px;text-align:center;padding:16px">لا توجد أصول</div>'
+      ?'<div style="color:var(--tx-muted);font-size:14.5px;text-align:center;padding:16px">لا توجد أصول</div>'
       :active.map(s=>`
         <div class="hasr-srow" onclick="hasrOpenSchoolSystems('${_hE(sc.code)}','${_hE(s.name)}')" style="padding:9px 0;border-bottom:1px solid var(--bd-light)">
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-              <span style="font-size:13.5px;font-weight:700;color:var(--tx-main)">${_hE(s.name)}</span>
-              <span style="font-size:12.5px;font-weight:700;background:#EFF6FF;color:#1D4ED8;padding:2px 8px;border-radius:6px">${s.total}</span>
+              <span style="font-size:14.5px;font-weight:700;color:var(--tx-main)">${_hE(s.name)}</span>
+              <span style="font-size:14px;font-weight:700;background:#EFF6FF;color:#1D4ED8;padding:2px 8px;border-radius:6px">${s.total}</span>
             </div>
             <div style="display:flex;border-radius:5px;overflow:hidden;height:9px;background:var(--bd-light)">
               ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
@@ -21938,7 +21938,7 @@ function hasrOpenDetail(code) {
               ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
             </div>
           </div>
-          <div style="font-size:11.5px;color:var(--tx-muted);padding-right:6px">← تفاصيل</div>
+          <div style="font-size:13px;color:var(--tx-muted);padding-right:6px">← تفاصيل</div>
         </div>`).join('')}
   `;
   document.getElementById('hasr-dp').classList.add('hasr-open');

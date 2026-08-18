@@ -4057,6 +4057,23 @@ const KPI_MONTH_NAME_BY_NUM = [
 ];
 const KPI_FORECAST_MONTHS = 4; // عدد شهور التوقع القادمة في اللاين تشارت
 
+/* 🧹 يشيل من نهاية القائمة أي شهور "فاضية" بالكامل — موجودة كأعمدة/صفوف
+   في الشيت (مثلاً قالب سنوي فيه شهور مُجهّزة مسبقًا لحد شهر 12) لكن من
+   غير أي قيمة فعلية مُدخلة لأي منطقة. من غيرها، لو المستخدم عبّى البيانات
+   لحد شهر 7 بس، التوقع كان هيفضل مستني لحد ما يتخطى شهور 8-12 الفاضية
+   الموجودة في الشيت، بدل ما يبدأ فورًا بعد آخر شهر فيه بيانات حقيقية (7). */
+function trimTrailingEmptyMonths_(monthCols, data) {
+  let n = monthCols.length;
+  while (n > 0 && !data.some((r) => r.values[n - 1] !== null && r.values[n - 1] !== undefined)) {
+    n--;
+  }
+  if (n === monthCols.length) return { monthCols, data };
+  return {
+    monthCols: monthCols.slice(0, n),
+    data: data.map((r) => ({ ...r, values: r.values.slice(0, n) })),
+  };
+}
+
 // أعمدة محتملة لكل حقل — بيدور عليها بالاسم بغض النظر عن شكل الشيت
 const KPI_REGION_KEYS    = ["المنطقة", "Region", "region"];
 const KPI_MONTH_NUM_KEYS = ["الشهر", "Month", "month"];
@@ -4137,7 +4154,8 @@ function buildKpiSeries_(rows) {
     });
 
     const data = [...byRegion.values()].filter((r) => r.values.some((v) => v !== null));
-    return { months: monthCols.map((c) => c.label), monthMeta: monthCols, data };
+    const trimmed = trimTrailingEmptyMonths_(monthCols, data);
+    return { months: trimmed.monthCols.map((c) => c.label), monthMeta: trimmed.monthCols, data: trimmed.data };
   }
 
   // ── الشكل العريض (Wide) — للتوافق مع نسخ شيتات قديمة ──
@@ -4168,10 +4186,11 @@ function buildKpiSeries_(rows) {
     })
     .filter(Boolean);
 
+  const trimmedW = trimTrailingEmptyMonths_(monthCols, data);
   return {
-    months: monthCols.map((c) => `${c.name} ${c.year}`),
-    monthMeta: monthCols.map((c) => ({ num: c.num, year: c.year, label: `${c.name} ${c.year}` })),
-    data,
+    months: trimmedW.monthCols.map((c) => `${c.name} ${c.year}`),
+    monthMeta: trimmedW.monthCols.map((c) => ({ num: c.num, year: c.year, label: `${c.name} ${c.year}` })),
+    data: trimmedW.data,
   };
 }
 
@@ -24219,7 +24238,7 @@ function openRaciPage() {
   html += '<table class="raci-table">';
   html += '<thead><tr><th class="raci-th-task">المهمة</th>';
   RACI_ROLES.forEach(function (r) {
-    html += '<th title="' + r.title + ' — ' + r.person + '"><div class="raci-role-short">' + r.short + '</div><div class="raci-role-person">' + r.person + '</div></th>';
+    html += '<th title="' + r.title + ' — ' + r.person + '"><div class="raci-role-short">' + r.title + '</div><div class="raci-role-person">' + r.person + '</div></th>';
   });
   html += '</tr></thead><tbody>';
 

@@ -15325,6 +15325,46 @@ function renderTajheezAllTable() {
 لو المستخدم سأل عن أي نظام من هذه الأنظمة، أجبه من المعلومات أعلاه مباشرةً.
 
 ══════════════════════════════════════════════════════
+مصفوفة RACI — الأدوار والمسؤوليات في فريق البرنامج
+══════════════════════════════════════════════════════
+اللوحة فيها كارت "مصفوفة RACI" (بجانب المفضلة في الصفحة الرئيسية) يعرض جدول كامل بمن المسؤول عن كل مهمة. استخدم البيانات التالية للإجابة على أي سؤال من نوع "مين المسؤول عن..." أو "مين يعتمد..." أو "دور فلان إيه؟".
+
+الأدوار السبعة في الفريق:
+1. مدير برنامج المرافق للقطاع الغربي — م. عبدالله لافي
+2. مسؤول العمليات — م. تمام باظبي
+3. مسؤول الأنظمة والتخطيط التشغيلي — م. ريان عدار
+4. مسؤول التخطيط والتحكم — م. فهد الزهراني
+5. مسؤول التجهيزات والتوريدات والأصول — م. سلطان الجبالي
+6. منسقة الوثائق — أ. روابي القرني
+7. مسؤول الإصلاحات والصيانة الطارئة — م. أنس باقلاقل
+
+معنى الرموز: R = المسؤول عن التنفيذ (Responsible) | A = المعتمد النهائي (Accountable) | A/R = مسؤول ومعتمد معاً | C = يُستشار (Consulted) | I = يُبلَّغ فقط (Informed) | X = غير معني بهذه المهمة.
+
+توزيع المهام حسب المجموعة (كل مهمة مع صاحب الـ R التنفيذي، والمدير عبدالله لافي هو A/المعتمد في كل المهام تقريباً ما عدا مجموعة الإصلاحات حيث يكون هو I ومسؤول الإصلاحات هو A):
+
+• الإدارة العامة للبرنامج: "إدارة برنامج المرافق للقطاع الغربي ومتابعة أعمال الأقسام" → عبدالله لافي (A/R)، والباقي C.
+
+• الإشراف والعمليات (R = مسؤول العمليات تمام باظبي، A = عبدالله لافي، الباقي C):
+  متابعة أعمال فريق جهاز الإشراف، متابعة عقد مقدم خدمات IFM، متابعة عقود مقاولي FM، متابعة تقارير الجودة بالمواقع، متابعة عقود الخدمات المساندة (نزح الصرف وتوريد المياه)، متابعة مؤشرات أداء مقدم الخدمة وجهاز الإشراف.
+
+• الأنظمة والتخطيط التشغيلي (R = مسؤول الأنظمة والتخطيط ريان عدار، A = عبدالله لافي، الباقي C):
+  متابعة أنظمة إدارة المرافق والمنصات الرقمية، متابعة البلاغات وأوامر العمل على الأنظمة، مراجعة الأنظمة وتحسينها وتطويرها، متابعة تكامل البيانات بين الأنظمة، إعداد ومتابعة الخطط التشغيلية.
+
+• التخطيط والتحكم (R = مسؤول التخطيط والتحكم فهد الزهراني، A = عبدالله لافي، الباقي C):
+  إعداد الخطة العامة والبرامج الزمنية، متابعة نسب الإنجاز والانحرافات، إعداد تقارير الأداء الدورية والتوقعات، متابعة التكاليف والمخصصات المالية، مراجعة المستخلصات والارتباطات المالية.
+
+• التجهيزات والتوريدات والأصول (R = مسؤول التجهيزات والأصول سلطان الجبالي، A = عبدالله لافي، الباقي C):
+  متابعة عقود توريد أجهزة التكييف وبرادات المياه، متابعة عقود تجهيز الأثاث، متابعة احتياجات ومخصصات التوريدات والتجهيزات، متابعة أعمال حصر وترميز الأصول، متابعة بيانات الأصول وجودتها واكتمالها.
+
+• الوثائق والمراسلات (R = منسقة الوثائق روابي القرني، A = عبدالله لافي، الباقي C):
+  متابعة المراسلات والمعاملات والمهام، تسجيل وتوزيع ومتابعة المراسلات الواردة والصادرة، تنظيم الملفات والوثائق ومحاضر الاجتماعات، متابعة إقفال الإجراءات والردود المطلوبة.
+
+• الإصلاحات والصيانة الطارئة (R = مسؤول الإصلاحات والطوارئ أنس باقلاقل، A = عبدالله لافي، الباقي I):
+  متابعة أعمال الإصلاحات، متابعة أعمال الصيانة الطارئة.
+
+لو المستخدم سأل "مين المسؤول عن X" ابحث عن اسم المهمة الأقرب في القائمة أعلاه ورُدّ باسم صاحب الـ R (المسؤول التنفيذي) مع ذكر أن عبدالله لافي هو المعتمد (A) في الأغلب. لو سأل عن دور شخص معين اذكر كل المهام اللي هو R فيها.
+
+══════════════════════════════════════════════════════
 تعليمات خاصة لكل نوع سؤال
 ══════════════════════════════════════════════════════
 ▸ أسئلة عن حصر الأصول:
@@ -23664,13 +23704,9 @@ var PORTAL_CATEGORIES = {
     ]
   },
   operations: {
-    title: "التشغيل والبلاغات",
-    icon: "📢",
+    title: "التشغيل",
+    icon: "⚙️",
     tabs: [
-      { name: "balagh",          label: "البلاغات" },
-      { name: "security-safety", label: "الأمن والسلامة" },
-      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
-      { name: "corrections-escalations", label: "تصحيحات وتصعيدات الأمن والسلامة" },
       { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
       { name: "training",        label: "برامج التدريب" },
@@ -23678,6 +23714,16 @@ var PORTAL_CATEGORIES = {
       { name: "safety-kpi",      label: "مؤشرات أداء فريق السلامة" },
       { name: "gatekeepers",     label: "البوابين" },
       { name: "recruitment",     label: "التوظيف" }
+    ]
+  },
+  safety: {
+    title: "الأمن والسلامة والبلاغات",
+    icon: "📢",
+    tabs: [
+      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
+      { name: "security-safety", label: "الأمن والسلامة" },
+      { name: "balagh",          label: "البلاغات" },
+      { name: "corrections-escalations", label: "تصحيحات وتصعيدات الأمن والسلامة" }
     ]
   },
   geo: {
@@ -24030,6 +24076,181 @@ function __scrollToDigiSys(id) {
   setTimeout(function () { el.classList.remove("digi-sys-card-flash"); }, 900);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   مصفوفة RACI — الأدوار والمسؤوليات (WRFM RACI)
+   ──────────────────────────────────────────────────────────────────────
+   مصدر البيانات: ملف RACI.xlsx المرفوع من المستخدم — منقولة هنا حرفياً.
+   R = Responsible (المسؤول عن التنفيذ) · A = Accountable (المعتمد النهائي)
+   A/R = مسؤول ومعتمد معاً · C = Consulted (يُستشار) · I = Informed (يُبلَّغ)
+   X = غير معني بهذه المهمة
+   ══════════════════════════════════════════════════════════════════════ */
+var RACI_ROLES = [
+  { id: "director", title: "مدير برنامج المرافق للقطاع الغربي", person: "م. عبدالله لافي", short: "مدير البرنامج" },
+  { id: "ops",       title: "مسؤول العمليات",                     person: "م. تمام باظبي",   short: "مسؤول العمليات" },
+  { id: "systems",   title: "مسؤول الأنظمة والتخطيط التشغيلي",     person: "م. ريان عدار",     short: "الأنظمة والتخطيط" },
+  { id: "planning",  title: "مسؤول التخطيط والتحكم",               person: "م. فهد الزهراني",  short: "التخطيط والتحكم" },
+  { id: "assets",    title: "مسؤول التجهيزات والتوريدات والأصول",  person: "م. سلطان الجبالي", short: "التجهيزات والأصول" },
+  { id: "docs",      title: "منسقة الوثائق",                       person: "أ. روابي القرني",  short: "منسقة الوثائق" },
+  { id: "repairs",   title: "مسؤول الإصلاحات والصيانة الطارئة",    person: "م. أنس باقلاقل",   short: "الإصلاحات والطوارئ" }
+];
+
+var RACI_GROUPS = [
+  {
+    title: "الإدارة العامة للبرنامج",
+    tasks: [
+      { name: "إدارة برنامج المرافق للقطاع الغربي ومتابعة أعمال الأقسام", v: ["A/R", "C", "C", "C", "C", "C", "X"] }
+    ]
+  },
+  {
+    title: "الإشراف والعمليات",
+    tasks: [
+      { name: "متابعة أعمال فريق جهاز الإشراف", v: ["A", "R", "C", "C", "C", "I", "X"] },
+      { name: "متابعة عقد مقدم خدمات IFM", v: ["A", "R", "C", "C", "C", "I", "X"] },
+      { name: "متابعة عقود مقاولي FM", v: ["A", "R", "C", "C", "C", "I", "X"] },
+      { name: "متابعة تقارير الجودة بالمواقع", v: ["A", "R", "C", "C", "C", "I", "X"] },
+      { name: "متابعة عقود الخدمات المساندة، بما فيها نزح الصرف وتوريد المياه", v: ["A", "R", "C", "C", "C", "I", "X"] },
+      { name: "متابعة مؤشرات أداء مقدم الخدمة وجهاز الإشراف", v: ["A", "R", "C", "C", "C", "I", "X"] }
+    ]
+  },
+  {
+    title: "الأنظمة والتخطيط التشغيلي",
+    tasks: [
+      { name: "متابعة أنظمة إدارة المرافق والمنصات الرقمية", v: ["A", "C", "R", "C", "C", "I", "X"] },
+      { name: "متابعة البلاغات وأوامر العمل على الأنظمة", v: ["A", "C", "R", "C", "C", "I", "X"] },
+      { name: "مراجعة الأنظمة وتحسينها وتطويرها", v: ["A", "C", "R", "C", "C", "I", "X"] },
+      { name: "متابعة تكامل البيانات بين الأنظمة", v: ["A", "C", "R", "C", "C", "I", "X"] },
+      { name: "إعداد ومتابعة الخطط التشغيلية", v: ["A", "C", "R", "C", "C", "I", "X"] }
+    ]
+  },
+  {
+    title: "التخطيط والتحكم",
+    tasks: [
+      { name: "إعداد الخطة العامة والبرامج الزمنية", v: ["A", "C", "C", "R", "C", "I", "X"] },
+      { name: "متابعة نسب الإنجاز والانحرافات", v: ["A", "C", "C", "R", "C", "I", "X"] },
+      { name: "إعداد تقارير الأداء الدورية والتوقعات", v: ["A", "C", "C", "R", "C", "I", "X"] },
+      { name: "متابعة التكاليف والمخصصات المالية", v: ["A", "C", "C", "R", "C", "I", "X"] },
+      { name: "مراجعة المستخلصات والارتباطات المالية", v: ["A", "C", "C", "R", "C", "I", "X"] }
+    ]
+  },
+  {
+    title: "التجهيزات والتوريدات والأصول",
+    tasks: [
+      { name: "متابعة عقود توريد أجهزة التكييف وبرادات المياه", v: ["A", "C", "C", "C", "R", "I", "X"] },
+      { name: "متابعة عقود تجهيز الأثاث", v: ["A", "C", "C", "C", "R", "I", "X"] },
+      { name: "متابعة احتياجات ومخصصات التوريدات والتجهيزات", v: ["A", "C", "C", "C", "R", "I", "X"] },
+      { name: "متابعة أعمال حصر وترميز الأصول", v: ["A", "C", "C", "C", "R", "I", "X"] },
+      { name: "متابعة بيانات الأصول وجودتها واكتمالها", v: ["A", "C", "C", "C", "R", "I", "X"] }
+    ]
+  },
+  {
+    title: "الوثائق والمراسلات",
+    tasks: [
+      { name: "متابعة المراسلات والمعاملات والمهام", v: ["A", "C", "C", "C", "C", "R", "X"] },
+      { name: "تسجيل وتوزيع ومتابعة المراسلات الواردة والصادرة", v: ["A", "C", "C", "C", "C", "R", "X"] },
+      { name: "تنظيم الملفات والوثائق ومحاضر الاجتماعات", v: ["A", "C", "C", "C", "C", "R", "X"] },
+      { name: "متابعة إقفال الإجراءات والردود المطلوبة", v: ["A", "C", "C", "C", "C", "R", "X"] }
+    ]
+  },
+  {
+    title: "الإصلاحات والصيانة الطارئة",
+    tasks: [
+      { name: "متابعة أعمال الإصلاحات", v: ["R", "I", "I", "I", "I", "I", "A"] },
+      { name: "متابعة أعمال الصيانة الطارئة", v: ["R", "I", "I", "I", "I", "I", "A"] }
+    ]
+  }
+];
+
+var RACI_LEGEND = [
+  { k: "R",   label: "Responsible — المسؤول عن التنفيذ" },
+  { k: "A",   label: "Accountable — المعتمد النهائي" },
+  { k: "A/R", label: "مسؤول ومعتمد معاً" },
+  { k: "C",   label: "Consulted — يُستشار" },
+  { k: "I",   label: "Informed — يُبلَّغ فقط" },
+  { k: "X",   label: "غير معني بهذه المهمة" }
+];
+
+function __raciBadgeClass(val) {
+  return "raci-badge-" + String(val).replace("/", "");
+}
+
+function openRaciPage() {
+  var existing = document.getElementById("raciOverlay");
+  if (existing) existing.remove();
+
+  var overlay = document.createElement("div");
+  overlay.id = "raciOverlay";
+  overlay.className = "digital-systems-overlay raci-overlay";
+
+  var totalTasks = RACI_GROUPS.reduce(function (s, g) { return s + g.tasks.length; }, 0);
+
+  var html = '<div class="digital-systems-container raci-container">';
+
+  /* الرأس */
+  html += '<div class="digital-systems-head raci-head">';
+  html += '  <div class="digital-systems-head-icon">🧩</div>';
+  html += '  <div class="digital-systems-head-title-wrap">';
+  html += '    <div class="digital-systems-head-title">مصفوفة RACI</div>';
+  html += '    <div class="digital-systems-head-sub">الأدوار والمسؤوليات — WRFM RACI · ' + RACI_ROLES.length + ' أدوار · ' + totalTasks + ' مهمة</div>';
+  html += '  </div>';
+  html += '  <button type="button" class="digital-systems-head-close" onclick="closeRaciPage()" title="إغلاق">✕</button>';
+  html += '</div>';
+
+  html += '<div class="digital-systems-body raci-body">';
+
+  /* دليل الرموز */
+  html += '<div class="raci-legend">';
+  RACI_LEGEND.forEach(function (it) {
+    html += '<div class="raci-legend-item"><span class="raci-badge ' + __raciBadgeClass(it.k) + '">' + it.k + '</span><span class="raci-legend-txt">' + it.label + '</span></div>';
+  });
+  html += '</div>';
+
+  /* الجدول */
+  html += '<div class="raci-table-wrap">';
+  html += '<table class="raci-table">';
+  html += '<thead><tr><th class="raci-th-task">المهمة</th>';
+  RACI_ROLES.forEach(function (r) {
+    html += '<th title="' + r.title + ' — ' + r.person + '"><div class="raci-role-short">' + r.short + '</div><div class="raci-role-person">' + r.person + '</div></th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  RACI_GROUPS.forEach(function (g) {
+    html += '<tr class="raci-group-row"><td colspan="' + (RACI_ROLES.length + 1) + '">' + g.title + '</td></tr>';
+    g.tasks.forEach(function (t) {
+      html += '<tr><td class="raci-task-name">' + t.name + '</td>';
+      t.v.forEach(function (val) {
+        html += '<td class="raci-cell"><span class="raci-badge ' + __raciBadgeClass(val) + '">' + val + '</span></td>';
+      });
+      html += '</tr>';
+    });
+  });
+
+  html += '</tbody></table>';
+  html += '</div>'; /* end raci-table-wrap */
+
+  html += '</div>'; /* end body */
+  html += '</div>'; /* end container */
+
+  overlay.innerHTML = html;
+
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeRaciPage();
+  });
+  overlay.__escHandler = function (e) {
+    if (e.key === "Escape") closeRaciPage();
+  };
+  document.addEventListener("keydown", overlay.__escHandler);
+
+  document.body.appendChild(overlay);
+}
+
+function closeRaciPage() {
+  var overlay = document.getElementById("raciOverlay");
+  if (overlay) {
+    if (overlay.__escHandler) document.removeEventListener("keydown", overlay.__escHandler);
+    overlay.remove();
+  }
+}
+
 /* عرض كل التبويبات الموجودة داخل كل قسم تحت اسم الكارت في Portal Home
    (بناءً على طلب صريح) — بدل الوصف المختصر، نعرض القائمة الكاملة
    مبنية مباشرة من نفس PORTAL_CATEGORIES فوق، فتبقى متزامنة دائماً مع
@@ -24192,6 +24413,11 @@ function navigateToCategory(catKey) {
   /* الأنظمة الرقمية — تفتح overlay خاص بدل الـ Sidebar العادي */
   if (catKey === "digital") {
     openDigitalSystemsPage();
+    return;
+  }
+  /* مصفوفة RACI — تفتح overlay خاص بدل الـ Sidebar العادي */
+  if (catKey === "raci") {
+    openRaciPage();
     return;
   }
   var cat = PORTAL_CATEGORIES[catKey];

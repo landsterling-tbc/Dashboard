@@ -972,6 +972,7 @@ function applyFilters() {
     }
     if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
+    if (activeId === "tab-security-safety-summary") safeRun(renderSecuritySafetySummaryTab, "security-safety-summary");
     if (activeId === "tab-corrections-escalations") safeRun(renderCorrectionsEscalationsTab, "corrections-escalations");
     if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
     if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
@@ -1178,6 +1179,7 @@ function showTab(name, el) {
     "mag-kpi" === name && renderMagKpiTab(),
     "consultant-kpi" === name && renderConsultantKpiTab(),
     "security-safety" === name && renderSecuritySafetyTab(),
+    "security-safety-summary" === name && renderSecuritySafetySummaryTab(),
     "corrections-escalations" === name && renderCorrectionsEscalationsTab(),
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
@@ -4705,6 +4707,84 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
+   ║  🛡️📊 JS تبويب: ملخص الأمن والسلامة
+   ║  (tab-security-safety-summary) — بيانات ثابتة مُدخلة يدوياً من
+   ║  تقرير خارجي (Looker Studio / Google Data Studio)، مفيش ملف
+   ║  مصدر مرتبط بها تلقائياً — عدّل الأرقام في SECURITY_SAFETY_SUMMARY_DATA
+   ║  تحت مباشرة كل ما يتحدّث التقرير الخارجي
+   ╚════════════════════════════════════════════════════════════╝ */
+var SECURITY_SAFETY_SUMMARY_DATA = {
+  // 🔧 عدّل الأرقام هنا فقط عند تحديث التقرير الخارجي
+  slaCompliant: 53.3,     // نسبة الملتزم باتفاقية مستوى الخدمة %
+  slaNonCompliant: 46.7,  // نسبة غير الملتزم باتفاقية مستوى الخدمة %
+  reopened: 60,           // التذاكر المعاد فتحها
+  cancelled: 89,          // التذاكر الملغاة
+  resolved: 4,            // التذاكر المحلولة
+  closed: 3366,           // التذاكر المغلقة
+  totalTickets: 3842,     // إجمالي التذاكر (تفاصيل حالة التذاكر المفتوحة)
+  suggestedTickets: 383,  // التذاكر المقترحة
+};
+
+function renderSecuritySafetySummaryTab() {
+  const el = document.getElementById("security-safety-summary-content");
+  if (!el) return;
+  const d = SECURITY_SAFETY_SUMMARY_DATA;
+
+  el.innerHTML = `
+    <div class="card mb14">
+      <div class="card-title">🛡️ الالتزام باتفاقية مستوى الخدمة (SLA)</div>
+      <div style="display:flex;gap:24px;justify-content:space-around;padding:18px 0 12px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">ملتزم باتفاقية مستوى الخدمة</div>
+          <div style="font-size:40px;font-weight:800;color:#EA580C">${d.slaCompliant}<span style="font-size:22px">%</span></div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">غير ملتزم باتفاقية مستوى الخدمة</div>
+          <div style="font-size:40px;font-weight:800;color:#EA580C">${d.slaNonCompliant}<span style="font-size:22px">%</span></div>
+        </div>
+      </div>
+      <div style="height:10px;border-radius:6px;overflow:hidden;display:flex;border:1px solid var(--bd-light)">
+        <div style="width:${d.slaCompliant}%;background:#059669" title="ملتزم ${d.slaCompliant}%"></div>
+        <div style="width:${d.slaNonCompliant}%;background:#DC2626" title="غير ملتزم ${d.slaNonCompliant}%"></div>
+      </div>
+    </div>
+
+    <div class="kpi-grid mb14">
+      <div class="kpi kc-red">
+        <div class="kpi-val">${d.reopened.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">التذاكر المعاد فتحها</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${d.cancelled.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">التذاكر الملغاة</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${d.resolved.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">التذاكر المحلولة</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${d.closed.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">التذاكر المغلقة</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">تفاصيل حالة التذاكر المفتوحة</div>
+      <div class="kpi-grid" style="margin-top:12px">
+        <div class="kpi kc-green">
+          <div class="kpi-val">${d.totalTickets.toLocaleString("en-US")}</div>
+          <div class="kpi-lbl">إجمالي التذاكر</div>
+        </div>
+        <div class="kpi kc-green">
+          <div class="kpi-val">${d.suggestedTickets.toLocaleString("en-US")}</div>
+          <div class="kpi-lbl">التذاكر المقترحة</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
    ║  🧾 JS تبويب: تصحيحات وتصعيدات الأمن والسلامة
    ║  (tab-corrections-escalations)
    ║  المصدر: شيت "تصحيحات_وتصعيدات_الأمن_والسلامة"
@@ -5520,17 +5600,28 @@ function acNormContractor(v) {
     .replace(/^\s*مؤسسة\s+/, "")
     .trim();
 }
-function acRemDays(r) {
-  return num(r["المدة المتبقية بالأيام"]);
+/* 🔄 بنية الشيت الجديدة (عقود_عدا_المجال) لا تحتوي على تواريخ/مدة متبقية —
+   بدّلنا منطق "جارية/منتهية" القديم بمنطق "نسبة السداد" المبني على
+   الأعمدة الفعلية الموجودة الآن: القيمة الأساسية، القيمة المحدثة،
+   المدفوع، نسبة السداد %، المتبقي */
+function acPaymentPct(r) {
+  let p = num(r["نسبة السداد %"]);
+  if (p == null) {
+    const paid = num(r["المدفوع"]);
+    const updated = num(r["القيمة المحدثة"]);
+    if (paid != null && updated) p = paid / updated;
+  }
+  if (p == null) return null;
+  return p <= 1 ? p * 100 : p;
 }
-function acStatusBadge(rem) {
-  return null == rem
+function acPaymentBadge(pct) {
+  return null == pct
     ? '<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #64748b33">—</span>'
-    : rem <= 0
-      ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">منتهي</span>'
-      : rem <= 90
-        ? '<span style="background:#FFFBEB;color:#D97706;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #D9770633">قارب على الانتهاء</span>'
-        : '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">جاري</span>';
+    : pct <= 0
+      ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">لم يبدأ السداد</span>'
+      : pct >= 100
+        ? '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">مكتمل السداد</span>'
+        : '<span style="background:#FFFBEB;color:#D97706;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #D9770633">جاري السداد</span>';
 }
 window._acState = { contractor: "", search: "" };
 function renderAllContracts() {
@@ -5598,52 +5689,52 @@ function renderAllContractsBody() {
   }
 
   const total = data.length,
-    active = data.filter((r) => {
-      const rem = acRemDays(r);
-      return null != rem && rem > 0;
+    fullyPaid = data.filter((r) => {
+      const p = acPaymentPct(r);
+      return null != p && p >= 100;
     }).length,
-    expired = data.filter((r) => {
-      const rem = acRemDays(r);
-      return null != rem && rem <= 0;
+    notStarted = data.filter((r) => {
+      const p = acPaymentPct(r);
+      return null != p && p <= 0;
     }).length,
-    expiring = data.filter((r) => {
-      const rem = acRemDays(r);
-      return null != rem && rem > 0 && rem <= 90;
+    inProgress = data.filter((r) => {
+      const p = acPaymentPct(r);
+      return null != p && p > 0 && p < 100;
     }).length,
-    totalBase = data.reduce((s, r) => s + (num(r["قيمة العقد الأساسي"]) || 0), 0),
-    totalValue = data.reduce((s, r) => s + (num(r["قيمة العقد المحدثة"]) || 0), 0),
-    totalSpent = data.reduce((s, r) => s + (num(r["تراكمي المستخلصات المصروفة"]) || 0), 0);
+    totalBase = data.reduce((s, r) => s + (num(r["القيمة الأساسية"]) || 0), 0),
+    totalValue = data.reduce((s, r) => s + (num(r["القيمة المحدثة"]) || 0), 0),
+    totalSpent = data.reduce((s, r) => s + (num(r["المدفوع"]) || 0), 0),
+    totalRemaining = data.reduce((s, r) => s + (num(r["المتبقي"]) || 0), 0);
 
   const byRegion = {},
     byScope = {},
     byContractor = {};
   data.forEach((r) => {
     const reg = r["المنطقة"] || "غير محدد";
-    (byRegion[reg] || (byRegion[reg] = { total: 0, active: 0, expired: 0 }),
+    (byRegion[reg] || (byRegion[reg] = { total: 0, fullyPaid: 0 }),
       byRegion[reg].total++,
       (() => {
-        const rem = acRemDays(r);
-        null != rem && rem > 0 ? byRegion[reg].active++ : byRegion[reg].expired++;
+        const p = acPaymentPct(r);
+        null != p && p >= 100 && byRegion[reg].fullyPaid++;
       })());
-    const sc = r["النطاق"] || "غير محدد";
+    const sc = r["التصنيف"] || "غير محدد";
     byScope[sc] = (byScope[sc] || 0) + 1;
     const ctr = acNormContractor(r["المقاول"]) || "غير محدد";
     byContractor[ctr] = (byContractor[ctr] || 0) + 1;
   });
 
-  // تفصيل مالي كامل لكل مقاول: عدد العقود + القيم + المستخلصات + المستحق
+  // تفصيل مالي كامل لكل مقاول: عدد العقود + القيم + المدفوع + المتبقي
   const contractorFin = {};
   data.forEach((r) => {
     const ctr = acNormContractor(r["المقاول"]) || "غير محدد";
     if (!contractorFin[ctr])
-      contractorFin[ctr] = { count: 0, base: 0, updated: 0, spent: 0, due: 0, lastInvoice: 0 };
+      contractorFin[ctr] = { count: 0, base: 0, updated: 0, spent: 0, due: 0 };
     const f = contractorFin[ctr];
     f.count++;
-    f.base += num(r["قيمة العقد الأساسي"]) || 0;
-    f.updated += num(r["قيمة العقد المحدثة"]) || 0;
-    f.spent += num(r["تراكمي المستخلصات المصروفة"]) || 0;
-    f.due += num(r["القيمة المستحقة للمستخلصات حتى تاريخه"]) || 0;
-    f.lastInvoice += num(r["القيمة"]) || 0;
+    f.base += num(r["القيمة الأساسية"]) || 0;
+    f.updated += num(r["القيمة المحدثة"]) || 0;
+    f.spent += num(r["المدفوع"]) || 0;
+    f.due += num(r["المتبقي"]) || 0;
   });
   const contractorFinRows = Object.entries(contractorFin)
     .map(([name, f]) => ({ name, ...f }))
@@ -5669,18 +5760,18 @@ function renderAllContractsBody() {
       </div>
       <div class="kpi kc-teal">
         <div class="kpi-val" style="font-size:18px">${fmt(totalSpent, 0)}</div>
-        <div class="kpi-lbl">إجمالي المستخلصات المصروفة</div>
-        <div class="kpi-sub">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة</div>
+        <div class="kpi-lbl">إجمالي المدفوع</div>
+        <div class="kpi-sub">ر.س · ${totalValue ? Math.round((totalSpent / totalValue) * 100) : 0}% من إجمالي القيمة · متبقي ${fmt(totalRemaining, 0)}</div>
       </div>
-      <div class="kpi ${expired ? "kc-red" : "kc-green"}">
+      <div class="kpi ${notStarted ? "kc-red" : "kc-green"}">
         <div class="kpi-val" style="font-size:20px;color:var(--tx-main)">
-          <span style="color:#059669">${active}</span>
+          <span style="color:#059669">${fullyPaid}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
-          <span style="color:#DC2626">${expired}</span>
+          <span style="color:#D97706">${inProgress}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
-          <span style="color:#D97706">${expiring}</span>
+          <span style="color:#DC2626">${notStarted}</span>
         </div>
-        <div class="kpi-lbl">جارية / منتهية / قاربت</div>
+        <div class="kpi-lbl">مكتمل / جاري / لم يبدأ (السداد)</div>
         <div class="kpi-sub">من إجمالي ${total} عقد</div>
       </div>
     </div>
@@ -5691,7 +5782,7 @@ function renderAllContractsBody() {
         <div class="chart-box" style="height:260px"><canvas id="ch-ac-region"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">توزيع العقود حسب النطاق</div>
+        <div class="card-title">توزيع العقود حسب التصنيف</div>
         <div class="chart-box" style="height:260px"><canvas id="ch-ac-scope"></canvas></div>
       </div>
     </div>
@@ -5704,7 +5795,7 @@ function renderAllContractsBody() {
     </div>
 
     <div class="card mb14">
-      <div class="card-title">💰 قيمة العقود (المحدثة) والمستخلصات المصروفة لكل مقاول
+      <div class="card-title">💰 قيمة العقود (المحدثة)، المدفوع، والمتبقي لكل مقاول
         <span class="sub">أعلى ${Math.min(contractorFinRows.length, 15)} مقاول</span>
       </div>
       <div class="chart-box" style="height:${Math.max(260, Math.min(contractorFinRows.length, 15) * 32)}px"><canvas id="ch-ac-contractor-value"></canvas></div>
@@ -5720,12 +5811,11 @@ function renderAllContractsBody() {
             <tr style="text-align:right">
               <th style="padding:8px 10px">المقاول</th>
               <th style="padding:8px 10px">عدد العقود</th>
-              <th style="padding:8px 10px">قيمة العقد الأساسي</th>
-              <th style="padding:8px 10px">قيمة العقد المحدثة</th>
-              <th style="padding:8px 10px">إجمالي المستخلصات المصروفة</th>
-              <th style="padding:8px 10px">القيمة المستحقة</th>
-              <th style="padding:8px 10px">آخر مستخلص</th>
-              <th style="padding:8px 10px">% الصرف من المحدثة</th>
+              <th style="padding:8px 10px">القيمة الأساسية</th>
+              <th style="padding:8px 10px">القيمة المحدثة</th>
+              <th style="padding:8px 10px">إجمالي المدفوع</th>
+              <th style="padding:8px 10px">إجمالي المتبقي</th>
+              <th style="padding:8px 10px">% السداد من المحدثة</th>
             </tr>
           </thead>
           <tbody>
@@ -5738,7 +5828,6 @@ function renderAllContractsBody() {
                   <td style="padding:9px 10px;font-weight:700;color:#7C3AED">${fmt(c.updated, 0)} ر.س</td>
                   <td style="padding:9px 10px;color:#0E7490">${fmt(c.spent, 0)} ر.س</td>
                   <td style="padding:9px 10px;font-weight:700;color:${c.due > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(c.due, 0)} ر.س</td>
-                  <td style="padding:9px 10px">${fmt(c.lastInvoice, 0)} ر.س</td>
                   <td style="padding:9px 10px">${c.updated ? Math.round((c.spent / c.updated) * 100) : 0}%</td>
                 </tr>`,
               )
@@ -5752,7 +5841,6 @@ function renderAllContractsBody() {
               <td style="padding:9px 10px;color:#7C3AED">${fmt(contractorFinRows.reduce((s, c) => s + c.updated, 0), 0)} ر.س</td>
               <td style="padding:9px 10px;color:#0E7490">${fmt(contractorFinRows.reduce((s, c) => s + c.spent, 0), 0)} ر.س</td>
               <td style="padding:9px 10px;color:#DC2626">${fmt(contractorFinRows.reduce((s, c) => s + c.due, 0), 0)} ر.س</td>
-              <td style="padding:9px 10px">${fmt(contractorFinRows.reduce((s, c) => s + c.lastInvoice, 0), 0)} ر.س</td>
               <td></td>
             </tr>
           </tfoot>
@@ -5771,58 +5859,38 @@ function renderAllContractsBody() {
             <tr style="text-align:right">
               <th>المقاول</th>
               <th>رقم العقد</th>
-              <th>المشروع</th>
               <th>المنطقة</th>
-              <th>النطاق</th>
-              <th>الفترة</th>
-              <th>المتبقي (يوم)</th>
-              <th>% الإنجاز</th>
-              <th>آخر مستخلص</th>
-              <th>القيمة المستحقة</th>
-              <th>حالة مشاهد الإنجاز</th>
-              <th>المسؤل / التواصل</th>
-              <th>الإجراءات والملاحظات</th>
+              <th>المجال / الوصف</th>
+              <th>التصنيف</th>
+              <th>القيمة الأساسية</th>
+              <th>القيمة المحدثة</th>
+              <th>المدفوع</th>
+              <th>نسبة السداد %</th>
+              <th>المتبقي</th>
               <th>الحالة</th>
             </tr>
           </thead>
           <tbody>
             ${data
               .map((r, i) => {
-                const rem = acRemDays(r),
-                  remBadge =
-                    null == rem
-                      ? "—"
-                      : rem <= 0
-                        ? `<span style="color:#DC2626;font-weight:800">${rem} (منتهي)</span>`
-                        : `<span style="color:${rem <= 90 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()};font-weight:800">${rem}</span>`,
-                  lastVal = num(r["القيمة"]),
-                  lastMonth = r["الشهر"],
-                  lastYear = r["السنة"],
-                  lastInvoice =
-                    null == lastVal
-                      ? "—"
-                      : `${fmt(lastVal, 0)} ر.س<div style="font-size:9px;color:var(--tx-muted);margin-top:2px">${esc([lastMonth, lastYear].filter(Boolean).join(" "))}</div>`,
-                  dueVal = num(r["القيمة المستحقة للمستخلصات حتى تاريخه"]),
-                  responsible = [r["اسم المسؤل من المقاول"], r["رقم التواصل"]].filter(Boolean).join(" · ");
+                const pct = acPaymentPct(r),
+                  pctDisplay = null == pct ? "—" : Math.round(pct) + "%",
+                  baseVal = num(r["القيمة الأساسية"]),
+                  updatedVal = num(r["القيمة المحدثة"]),
+                  paidVal = num(r["المدفوع"]),
+                  remVal = num(r["المتبقي"]);
                 return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:160px">${esc(r["المقاول"] || "")}</td>
                   <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
-                  <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:240px">${esc(r["المشروع"] || "")}</td>
                   <td style="padding:10px 8px;font-weight:600">${esc(r["المنطقة"] || "")}</td>
-                  <td style="padding:10px 8px;font-size:10px">${esc(r["النطاق"] || "—")}</td>
-                  <td style="padding:10px 8px;white-space:nowrap;font-family:monospace;font-size:10px">${esc(r["تاريخ بداية العقد"] || "—")} ← ${esc(r["تاريخ نهاية العقد المحدثة"] || "—")}</td>
-                  <td style="padding:10px 8px">${remBadge}</td>
-                  <td style="padding:10px 8px;font-weight:700">${esc(r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"] || "—")}</td>
-                  <td style="padding:10px 8px;white-space:nowrap">${lastInvoice}</td>
-                  <td style="padding:10px 8px;white-space:nowrap;font-weight:600;color:#7C3AED">${null == dueVal ? "—" : fmt(dueVal, 0) + " ر.س"}</td>
-                  <td style="padding:10px 8px;font-size:10px">${r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] === "مكتملة " || r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] === "مكتملة"
-                    ? '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">مكتملة</span>'
-                    : r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]
-                    ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">غير مكتملة</span>'
-                    : "—"}</td>
-                  <td style="padding:10px 8px;font-size:10px;color:var(--tx-sec)">${esc(responsible || "—")}</td>
-                  <td style="padding:10px 12px;font-size:10px;color:var(--tx-sec);line-height:1.5;max-width:260px">${esc(r["الإجراءات المتخذة والملاحظات"] || "—")}</td>
-                  <td style="padding:10px 8px">${acStatusBadge(rem)}</td>
+                  <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:260px">${esc(r["المجال / الوصف"] || "—")}</td>
+                  <td style="padding:10px 8px;font-size:10px">${esc(r["التصنيف"] || "—")}</td>
+                  <td style="padding:10px 8px;white-space:nowrap">${null == baseVal ? "—" : fmt(baseVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;font-weight:700;color:#7C3AED">${null == updatedVal ? "—" : fmt(updatedVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;color:#0E7490">${null == paidVal ? "—" : fmt(paidVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;font-weight:700">${pctDisplay}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;font-weight:600;color:${remVal > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${null == remVal ? "—" : fmt(remVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px">${acPaymentBadge(pct)}</td>
                 </tr>`;
               })
               .join("")}
@@ -5833,8 +5901,8 @@ function renderAllContractsBody() {
   `),
     requestAnimationFrame(() => {
       const regionLabels = regions,
-        regionActive = regionLabels.map((k) => byRegion[k].active),
-        regionExpired = regionLabels.map((k) => byRegion[k].expired);
+        regionFullyPaid = regionLabels.map((k) => byRegion[k].fullyPaid),
+        regionNotComplete = regionLabels.map((k) => byRegion[k].total - byRegion[k].fullyPaid);
       (killChart("ch-ac-region"),
         (CHARTS["ch-ac-region"] = new Chart(document.getElementById("ch-ac-region"), {
           type: "bar",
@@ -5842,16 +5910,16 @@ function renderAllContractsBody() {
             labels: regionLabels,
             datasets: [
               {
-                label: "جارية",
-                data: regionActive,
+                label: "مكتمل السداد",
+                data: regionFullyPaid,
                 backgroundColor: CSS_TOKENS.positive() + "88",
                 borderColor: CSS_TOKENS.positive(),
                 borderWidth: 1.5,
                 borderRadius: 4,
               },
               {
-                label: "منتهية",
-                data: regionExpired,
+                label: "لم يكتمل السداد",
+                data: regionNotComplete,
                 backgroundColor: CSS_TOKENS.danger() + "88",
                 borderColor: CSS_TOKENS.danger(),
                 borderWidth: 1.5,
@@ -5937,7 +6005,7 @@ function renderAllContractsBody() {
                 borderRadius: 4,
               },
               {
-                label: "المستخلصات المصروفة",
+                label: "المدفوع",
                 data: topValRows.map((c) => c.spent),
                 backgroundColor: CSS_TOKENS.info() + "99",
                 borderColor: CSS_TOKENS.info(),
@@ -5945,7 +6013,7 @@ function renderAllContractsBody() {
                 borderRadius: 4,
               },
               {
-                label: "القيمة المستحقة",
+                label: "المتبقي",
                 data: topValRows.map((c) => c.due),
                 backgroundColor: CSS_TOKENS.danger() + "99",
                 borderColor: CSS_TOKENS.danger(),
@@ -13435,78 +13503,79 @@ function renderTajheezAllTable() {
       if (Array.isArray(window.RAW_FM_CONTRACTS) && window.RAW_FM_CONTRACTS.length) {
         const fm = window.RAW_FM_CONTRACTS;
         const fmNum = (v) => { const n = parseFloat(String(v||"").replace(/,/g,"").replace(/ - /g,"").trim()); return isFinite(n)?n:null; };
-        const fmRemDays = (r) => fmNum(r["المدة المتبقية بالأيام"]);
+        // 🔄 بنية الشيت الحالية (عقود_عدا_المجال) لا تحتوي على تواريخ/مدة متبقية —
+        // نسبة السداد % هي مصدر الحقيقة لحالة كل عقد الآن
+        const fmPct = (r) => {
+          let p = fmNum(r["نسبة السداد %"]);
+          if (p == null) {
+            const paid = fmNum(r["المدفوع"]);
+            const updated = fmNum(r["القيمة المحدثة"]);
+            if (paid != null && updated) p = paid / updated;
+          }
+          if (p == null) return null;
+          return p <= 1 ? p * 100 : p;
+        };
 
-        // إحصائيات الحالة
-        const active   = fm.filter(r => { const d=fmRemDays(r); return d!=null && d>0; }).length;
-        const expired  = fm.filter(r => { const d=fmRemDays(r); return d!=null && d<=0; }).length;
-        const expiring = fm.filter(r => { const d=fmRemDays(r); return d!=null && d>0 && d<=90; }).length;
-        const noDate   = fm.filter(r => fmRemDays(r)==null).length;
-
-        // مشاهد الإنجاز
-        const scenesComplete   = fm.filter(r => String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("مكتملة") && !String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("غير")).length;
-        const scenesIncomplete = fm.filter(r => String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"]||"").includes("غير مكتملة")).length;
+        // إحصائيات حالة السداد
+        const fullyPaid   = fm.filter(r => { const p=fmPct(r); return p!=null && p>=100; }).length;
+        const notStarted  = fm.filter(r => { const p=fmPct(r); return p!=null && p<=0; }).length;
+        const inProgress  = fm.filter(r => { const p=fmPct(r); return p!=null && p>0 && p<100; }).length;
+        const noPctData   = fm.filter(r => fmPct(r)==null).length;
 
         // القيم المالية
-        const totalBase    = fm.reduce((s,r)=>s+(fmNum(r["قيمة العقد الأساسي"])||0),0);
-        const totalUpdated = fm.reduce((s,r)=>s+(fmNum(r["قيمة العقد المحدثة"])||0),0);
-        const totalSpent   = fm.reduce((s,r)=>s+(fmNum(r["تراكمي المستخلصات المصروفة"])||0),0);
-        const totalDue     = fm.reduce((s,r)=>s+(fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"])||0),0);
-        const totalLastInv = fm.reduce((s,r)=>s+(fmNum(r["القيمة"])||0),0);
+        const totalBase      = fm.reduce((s,r)=>s+(fmNum(r["القيمة الأساسية"])||0),0);
+        const totalUpdated   = fm.reduce((s,r)=>s+(fmNum(r["القيمة المحدثة"])||0),0);
+        const totalSpent     = fm.reduce((s,r)=>s+(fmNum(r["المدفوع"])||0),0);
+        const totalRemaining = fm.reduce((s,r)=>s+(fmNum(r["المتبقي"])||0),0);
 
         // توزيعات
         const byRegion     = fcbCountBy(fm, "المنطقة", 50);
-        const byScope      = fcbCountBy(fm, "النطاق", 50);
+        const byScope      = fcbCountBy(fm, "التصنيف", 50);
         const byContractor = fcbCountBy(fm, "المقاول", 50);
 
-        // أعلى عقود من حيث القيمة المستحقة غير المصروفة
+        // أعلى عقود من حيث المتبقي (غير المسدد)
         const topDue = [...fm]
-          .filter(r => fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"]) > 0)
-          .sort((a,b) => (fmNum(b["القيمة المستحقة للمستخلصات حتى تاريخه"])||0) - (fmNum(a["القيمة المستحقة للمستخلصات حتى تاريخه"])||0))
+          .filter(r => fmNum(r["المتبقي"]) > 0)
+          .sort((a,b) => (fmNum(b["المتبقي"])||0) - (fmNum(a["المتبقي"])||0))
           .slice(0,10)
           .map(r => ({
             المقاول: r["المقاول"],
-            المشروع: String(r["المشروع"]||"").slice(0,60),
+            الوصف: String(r["المجال / الوصف"]||"").slice(0,60),
             رقم_العقد: r["رقم العقد"],
             المنطقة: r["المنطقة"],
-            القيمة_المستحقة: fmNum(r["القيمة المستحقة للمستخلصات حتى تاريخه"]),
-            نسبة_الإنجاز: r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"],
-            حالة_مشاهد: r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"],
-            الإجراءات: String(r["الإجراءات المتخذة والملاحظات"]||"").slice(0,120),
+            التصنيف: r["التصنيف"],
+            المتبقي: fmNum(r["المتبقي"]),
+            نسبة_السداد: fmPct(r),
           }));
 
-        // عقود منتهية مع ملاحظات
-        const expiredContracts = [...fm]
-          .filter(r => { const d=fmRemDays(r); return d!=null && d<=0; })
-          .sort((a,b) => (fmRemDays(a)||0) - (fmRemDays(b)||0))
+        // عقود لم يبدأ سدادها بعد
+        const notStartedContracts = [...fm]
+          .filter(r => { const p=fmPct(r); return p!=null && p<=0; })
+          .sort((a,b) => (fmNum(b["القيمة المحدثة"])||0) - (fmNum(a["القيمة المحدثة"])||0))
           .slice(0,10)
           .map(r => ({
             المقاول: r["المقاول"],
             رقم_العقد: r["رقم العقد"],
             المنطقة: r["المنطقة"],
-            المدة_المتبقية: fmRemDays(r),
-            نسبة_الإنجاز: r["نسبة الإنجاز  POC%"] || r["نسبة الإنجاز POC%"],
-            الإجراءات: String(r["الإجراءات المتخذة والملاحظات"]||"").slice(0,120),
+            القيمة_المحدثة: fmNum(r["القيمة المحدثة"]),
           }));
 
         summary.عقود_FM = {
           مصدر: "تبويب عقود غير المجال — شيت عقود_عدا_المجال",
           إجمالي_العقود: fm.length,
-          حالة_العقود: { جارية: active, منتهية: expired, قاربت_الانتهاء_90_يوم: expiring, بدون_تاريخ: noDate },
-          مشاهد_الإنجاز: { مكتملة: scenesComplete, غير_مكتملة: scenesIncomplete },
+          حالة_السداد: { مكتمل: fullyPaid, جاري: inProgress, لم_يبدأ: notStarted, بدون_بيانات_نسبة: noPctData },
           ملخص_مالي_ريال: {
-            إجمالي_قيمة_العقود_الأساسية: +totalBase.toFixed(0),
-            إجمالي_قيمة_العقود_المحدثة: +totalUpdated.toFixed(0),
-            إجمالي_المستخلصات_المصروفة: +totalSpent.toFixed(0),
-            نسبة_الصرف_من_المحدثة: totalUpdated ? +(totalSpent/totalUpdated*100).toFixed(1) : 0,
-            إجمالي_القيمة_المستحقة_غير_المصروفة: +totalDue.toFixed(0),
-            إجمالي_آخر_مستخلص_شهري: +totalLastInv.toFixed(0),
+            إجمالي_القيمة_الأساسية: +totalBase.toFixed(0),
+            إجمالي_القيمة_المحدثة: +totalUpdated.toFixed(0),
+            إجمالي_المدفوع: +totalSpent.toFixed(0),
+            نسبة_السداد_الإجمالية: totalUpdated ? +(totalSpent/totalUpdated*100).toFixed(1) : 0,
+            إجمالي_المتبقي: +totalRemaining.toFixed(0),
           },
           توزيع_حسب_المنطقة: byRegion,
-          توزيع_حسب_النطاق: byScope,
+          توزيع_حسب_التصنيف: byScope,
           توزيع_حسب_المقاول: byContractor,
-          أعلى_10_عقود_من_حيث_القيمة_المستحقة_غير_المصروفة: topDue,
-          أبرز_العقود_المنتهية: expiredContracts,
+          أعلى_10_عقود_من_حيث_المتبقي_غير_المسدد: topDue,
+          عقود_لم_يبدأ_سدادها: notStartedContracts,
         };
       }
     } catch (e) {
@@ -15204,7 +15273,7 @@ function renderTajheezAllTable() {
 • البيئة المدرسية         → البيئة_المدرسية: متوسط، أسوأ/أفضل مدارس
 • الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي: أقدم مباني، أكبر مدارس، توزيع أعمار
 • المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب)
-• عقود عدا المجال        → عقود_FM: إجمالي، مالي، منتهية، مستحقة، توزيع حسب مقاول/منطقة
+• عقود عدا المجال        → عقود_FM: إجمالي، حالة السداد (مكتمل/جاري/لم يبدأ)، مالي (أساسية/محدثة/مدفوع/متبقي)، توزيع حسب مقاول/منطقة/تصنيف
 • الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات حسب النظام
 • الأنظمة التفصيلية      → الأنظمة_الرئيسية_والتفصيلية (نفس المصدر، تفصيل أعمق)
 • التجهيزات              → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام، مدن
@@ -15221,6 +15290,39 @@ function renderTajheezAllTable() {
 • خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
 • مؤشرات الأداء للمقاول  → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف)
 • حصر الأصول             → حصر_الأصول: إجمالي الأصول، توزيع الحالة (ممتاز/جيد/سيئ/متهالك)، المباني، الغرف، المعادة، أعلى 10 مدارس، أعلى 10 أنظمة، الأنظمة_الرئيسية_والفرعية_الكاملة (كل نظام رئيسي وكل نظام فرعي بداخله بالتفصيل الكامل)، أعلى المدن أصولاً
+
+══════════════════════════════════════════════════════
+الأنظمة الرقمية — مبادرة التحول الرقمي
+══════════════════════════════════════════════════════
+المشروع يستخدم 7 أنظمة رقمية رئيسية:
+
+1. MAXIMO (ماكسيمو — IBM Maximo Application Suite):
+   منصة موحدة لإدارة الأصول — دورة حياة الأصول، إدارة القوى العاملة، الامتثال والتفتيش، سجلات موحدة.
+   المنافع: تقليل التكاليف، تحسين السلامة والامتثال، قرارات مدعومة بالبيانات، زيادة الكفاءة التشغيلية.
+
+2. TAKAMUL (تكامل — متابعة وتحضّر القوة العاملة/البوابين):
+   متابعة حضور القوى العاملة في المدارس ضمن نطاق جغرافي محدد.
+   المنافع: ضمان فتح المدارس بالوقت، تتبع الحراسات، تقليل الغياب/التأخير، تقارير فورية.
+
+3. TFMP (TATWEER Facility Management Platform — منصة إدارة المرافق):
+   نظام إدارة المباني والمرافق الذكية المتكاملة — حوكمة، ذكاء تشغيلي، تنسيق مع مقدمي الخدمة، إدارة الأداء.
+   يتكامل مع MAXIMO وTAKAMUL وERP وBMS عبر REST API.
+
+4. UniFire (يوني فاير — إدارة المشاريع والمهام):
+   منصة لإدارة المشاريع ومتابعة التنفيذ، التكليفات، الموافقات الإلكترونية، حفظ المستندات.
+
+5. Fares (فارس — منصة وزارة التعليم):
+   إدارة الطلبات والاحتياجات التشغيلية — رفع طلبات العهد والأصول، تقديم احتياجات التجهيزات، متابعة حالة الطلبات.
+
+6. نظام متابعة المركبات (Vehicle Tracking System):
+   منصة إلكترونية لمتابعة مواقع وتواجد المركبات الخاصة بفرق الإشراف ميدانياً.
+   المنافع: تحسين إدارة الحركة الميدانية، تتبع لحظي للمركبات، تنسيق أفضل بين الفرق الميدانية والإدارة، توثيق مسارات التنقل، استجابة أسرع في الطوارئ.
+
+7. نظام إدارة الموارد (TBC HR System):
+   نظام الموارد البشرية والهيكل التنظيمي للمشروع — يوثّق الهيكلة التنظيمية للشركات العاملة (الاستشاري والمقاول وTBC)، ويدير التوظيف وتقييم الأداء لجميع الأطراف.
+   المنافع: وضوح خطوط المسؤولية والتبعية بين الشركات، متابعة التوظيف والشواغر، تقييم أداء موحّد للاستشاري والمقاول وTBC.
+
+لو المستخدم سأل عن أي نظام من هذه الأنظمة، أجبه من المعلومات أعلاه مباشرةً.
 
 ══════════════════════════════════════════════════════
 تعليمات خاصة لكل نوع سؤال
@@ -18620,6 +18722,16 @@ window.addEventListener('load', function () {
       kpis: ['إجمالي البلاغات','إجمالي الإصابات','الحالات الحرجة','تحقيقات مكتملة']
     },
     {
+      id: 'security-safety-summary', label: 'ملخص الأمن والسلامة',
+      keywords: [
+        'ملخص الأمن والسلامة','SLA','اتفاقية مستوى الخدمة','تذاكر','تذاكر معاد فتحها',
+        'تذاكر ملغاة','تذاكر محلولة','تذاكر مغلقة','تذاكر مقترحة','ملتزم','غير ملتزم',
+        'tickets','reopened','cancelled','resolved','closed tickets','service level agreement'
+      ],
+      charts: [],
+      kpis: ['نسبة الالتزام بـSLA','التذاكر المعاد فتحها','التذاكر الملغاة','التذاكر المحلولة','التذاكر المغلقة','إجمالي التذاكر','التذاكر المقترحة']
+    },
+    {
       id: 'corrections-escalations', label: 'تصحيحات وتصعيدات الأمن والسلامة',
       keywords: [
         'تصحيحات','تصعيدات','تصعيد','ملاحظات HSEQ','HSEQ','ملاحظات السلامة','مخالفات',
@@ -18975,20 +19087,24 @@ ${dataCtx}
       };
     }
 
-    /* عقود FM جارية وتم إنجاز مشاهدها */
+    /* عقود FM — مكتملة السداد ومدفوعاتها */
     var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
     if (fm.length) {
       var fmNum = function (v) { var n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : null; };
-      var active = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d > 0; }).length;
-      var complete = fm.filter(function (r) {
-        var s = String(r["حالة مشاهد الإنجاز (مكتملة / غير مكتملة)"] || "");
-        return s.includes("مكتملة") && !s.includes("غير");
-      }).length;
-      var totalSpent = fm.reduce(function (s, r) { return s + (fmNum(r["تراكمي المستخلصات المصروفة"]) || 0); }, 0);
+      var fmPct2 = function (r) {
+        var p = fmNum(r["نسبة السداد %"]);
+        if (p == null) {
+          var paid = fmNum(r["المدفوع"]), updated = fmNum(r["القيمة المحدثة"]);
+          if (paid != null && updated) p = paid / updated;
+        }
+        if (p == null) return null;
+        return p <= 1 ? p * 100 : p;
+      };
+      var fullyPaidCount = fm.filter(function (r) { var p = fmPct2(r); return p != null && p >= 100; }).length;
+      var totalSpent = fm.reduce(function (s, r) { return s + (fmNum(r["المدفوع"]) || 0); }, 0);
       achieved.عقود_FM = {
-        عقود_جارية: active,
-        مشاهد_إنجاز_مكتملة: complete,
-        إجمالي_مستخلصات_مصروفة_ريال: Math.round(totalSpent).toLocaleString("en-US"),
+        عقود_مكتملة_السداد: fullyPaidCount,
+        إجمالي_مدفوع_ريال: Math.round(totalSpent).toLocaleString("en-US"),
       };
     }
 
@@ -19076,18 +19192,32 @@ ${dataCtx}
       }
     }
 
-    /* عقود FM منتهية */
+    /* عقود FM لم يبدأ سدادها + عقود عليها متبقي كبير */
     var fm = Array.isArray(window.RAW_FM_CONTRACTS) ? window.RAW_FM_CONTRACTS : [];
     if (fm.length) {
       var fmNum = function (v) { var n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : null; };
-      var expired = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d <= 0; });
-      var expiring90 = fm.filter(function (r) { var d = fmNum(r["المدة المتبقية بالأيام"]); return d != null && d > 0 && d <= 90; });
-      if (expired.length || expiring90.length) {
+      var fmPct3 = function (r) {
+        var p = fmNum(r["نسبة السداد %"]);
+        if (p == null) {
+          var paid = fmNum(r["المدفوع"]), updated = fmNum(r["القيمة المحدثة"]);
+          if (paid != null && updated) p = paid / updated;
+        }
+        if (p == null) return null;
+        return p <= 1 ? p * 100 : p;
+      };
+      var notStarted = fm.filter(function (r) { var p = fmPct3(r); return p != null && p <= 0; });
+      var highRemaining = [...fm]
+        .filter(function (r) { return (fmNum(r["المتبقي"]) || 0) > 0; })
+        .sort(function (a, b) { return (fmNum(b["المتبقي"]) || 0) - (fmNum(a["المتبقي"]) || 0); })
+        .slice(0, 3);
+      if (notStarted.length || highRemaining.length) {
         risks.عقود_FM = {
-          منتهية: expired.length,
-          قاربت_الانتهاء_90_يوم: expiring90.length,
-          أبرز_منتهية: expired.slice(0, 3).map(function (r) {
+          لم_يبدأ_سدادها: notStarted.length,
+          أبرز_لم_يبدأ_سدادها: notStarted.slice(0, 3).map(function (r) {
             return { المقاول: r["المقاول"], رقم_العقد: r["رقم العقد"], المنطقة: r["المنطقة"] };
+          }),
+          أعلى_3_عقود_متبقي_غير_مسدد: highRemaining.map(function (r) {
+            return { المقاول: r["المقاول"], رقم_العقد: r["رقم العقد"], المتبقي: fmNum(r["المتبقي"]) };
           }),
         };
       }
@@ -23480,6 +23610,19 @@ document.addEventListener("DOMContentLoaded", function () {
 /* خريطة الأقسام → التبويبات الفرعية (name يطابق تماماً القيم المستخدمة
    في استدعاءات showTab() الأصلية داخل الكود القديم — لم تُخترع أسماء جديدة) */
 var PORTAL_CATEGORIES = {
+  digital: {
+    title: "الأنظمة الرقمية",
+    icon: "💻",
+    tabs: [
+      { name: "sys-maximo",  label: "MAXIMO" },
+      { name: "sys-takamul", label: "TAKAMUL — تكامل" },
+      { name: "sys-tfmp",    label: "TFMP" },
+      { name: "sys-unifire", label: "UniFire — يوني فاير" },
+      { name: "sys-fares",   label: "Fares — فارس" },
+      { name: "sys-vts",     label: "نظام متابعة المركبات" },
+      { name: "sys-hr",      label: "نظام إدارة الموارد" }
+    ]
+  },
   assessment: {
     title: "التقييمات والحالة الفنية",
     icon: "📊",
@@ -23526,6 +23669,7 @@ var PORTAL_CATEGORIES = {
     tabs: [
       { name: "balagh",          label: "البلاغات" },
       { name: "security-safety", label: "الأمن والسلامة" },
+      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
       { name: "corrections-escalations", label: "تصحيحات وتصعيدات الأمن والسلامة" },
       { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
@@ -23553,6 +23697,338 @@ var PORTAL_CATEGORIES = {
 };
 
 window.CURRENT_PORTAL_CATEGORY = null;
+
+/* ══════════════════════════════════════════════════════════════════════
+   ألوان الفئات — كل فئة نظام لها لون مستقل من نفس لوحة الداشبورد
+   الموحّدة "Ink & Brass" (تيل / كحلي / برونزي) — يُستخدم في شارة الفئة
+   وفي مؤشر شريط التنقل السريع، عشان كل فئة تتميّز بصرياً عن التانية.
+   ══════════════════════════════════════════════════════════════════════ */
+var DIGI_CATEGORY_COLORS = {
+  "إدارة الأصول والصيانة":     { tx: "#0b6b8f", bg: "rgba(13,132,156,.14)",  bd: "rgba(13,132,156,.34)"  },
+  "إدارة القوى العاملة":       { tx: "#163d52", bg: "rgba(22,61,82,.13)",    bd: "rgba(22,61,82,.32)"    },
+  "إدارة المرافق والحوكمة":    { tx: "#0d2f40", bg: "rgba(13,47,64,.12)",    bd: "rgba(13,47,64,.3)"     },
+  "إدارة المشاريع والمهام":    { tx: "#1c7f93", bg: "rgba(28,148,171,.14)",  bd: "rgba(28,148,171,.32)"  },
+  "بوابة الطلبات التشغيلية":   { tx: "#8a6a37", bg: "rgba(176,138,78,.16)",  bd: "rgba(176,138,78,.34)"  },
+  "تتبع الحركة الميدانية":     { tx: "#0b6b7e", bg: "rgba(11,107,126,.14)",  bd: "rgba(11,107,126,.32)"  },
+  "الموارد البشرية والهيكل التنظيمي": { tx: "#3d5266", bg: "rgba(61,82,102,.13)", bd: "rgba(61,82,102,.32)" }
+};
+function __digiCatColor(cat) {
+  return DIGI_CATEGORY_COLORS[cat] || { tx: "#0b6b7e", bg: "rgba(13,132,156,.12)", bd: "rgba(13,132,156,.3)" };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   بيانات الأنظمة الرقمية (Digital Transformation Systems)
+   ──────────────────────────────────────────────────────────────────────
+   كل نظام يحتوي: اسم عربي، اسم إنجليزي، فئة، وصف (نبذة)، مميزات/منافع،
+   ملاحظة إضافية (اختياري)، ورابط placeholder يستبدله المستخدم بنفسه.
+   ══════════════════════════════════════════════════════════════════════ */
+var DIGITAL_SYSTEMS_DATA = [
+  {
+    id: "maximo",
+    nameAr: "ماكسيمو",
+    nameEn: "IBM Maximo Application Suite",
+    category: "إدارة الأصول والصيانة",
+    logo: "MX",
+    /* لا يوجد رابط شعار خارجي موثوق تم تزويده — بدل المخاطرة برابط قد لا
+       يعمل، صُمم شعار مصغّر بهوية IBM الأصلية (أزرق IBM + Maximo) مباشرة
+       بالكود بدون أي اعتماد على شبكة خارجية — إن توفر لديك ملف الشعار
+       الرسمي أرسله وسنستبدله بصورة حقيقية فوراً */
+    logoStyle: "ibm",
+    desc: "منصة موحدة لإدارة الأصول تشمل دورة حياة الأصول، إدارة القوى العاملة، الامتثال والتفتيش، سجلات موحدة، تكامل سلس مع الأنظمة الأخرى، وتحسين تجربة المدارس.",
+    features: [
+      "تقليل التكاليف التشغيلية وتحسين كفاءة إدارة الأصول",
+      "تحسين السلامة والامتثال للمعايير والتفتيش",
+      "اتخاذ قرارات مدعومة بالبيانات والتحليلات",
+      "زيادة الكفاءة التشغيلية لعمليات الصيانة",
+      "إدارة دورة حياة الأصول من البداية للنهاية",
+      "إدارة وتتبع القوى العاملة الميدانية",
+      "سجلات موحدة لكل الأصول والمرافق"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → maximo → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://auth.mag.apps.mas.mag-maximo.com/login/#/form"
+  },
+  {
+    id: "takamul",
+    nameAr: "تكامل",
+    nameEn: "TAKAMUL",
+    category: "إدارة القوى العاملة",
+    logo: "TK",
+    logoImg: "https://mag-om.com/APP/assets/images/logo.png",
+    desc: "نظام لمتابعة وتحضّر القوة العاملة في المدارس (البوابين) ضمن نطاق جغرافي محدد، يضمن فتح المدارس في الوقت المحدد ويوفر تقارير فورية عن الحضور والغياب.",
+    features: [
+      "ضمان فتح المدارس في الوقت المحدد يومياً",
+      "تتبع حضور وانصراف الحراسات بدقة",
+      "تقليل الغياب والتأخير عبر المراقبة الآلية",
+      "تحسين مستوى الأمن في المدارس",
+      "توفير تقارير فورية عن حالة القوى العاملة",
+      "متابعة جغرافية ضمن نطاق محدد"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → takamul → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://mag-om.com/APP/Login"
+  },
+  {
+    id: "tfmp",
+    nameAr: "منصة إدارة المرافق",
+    nameEn: "TATWEER Facility Management Platform (TFMP)",
+    category: "إدارة المرافق والحوكمة",
+    logo: "TF",
+    /* شعار النظام الرسمي — يُعرض بدل الحروف الافتراضية (TF) لو الصورة نجحت في التحميل */
+    logoImg: "https://tfmp.meem-edgenta.tech/logo.png",
+    desc: "نظام إدارة المباني والمرافق الذكية المتكاملة — يوفر حوكمة وامتثال، ذكاء تشغيلي مبني على البيانات، تنسيق مع مقدمي الخدمة، وإدارة الأداء ومؤشرات الامتثال.",
+    features: [
+      "حوكمة وامتثال شامل للمرافق",
+      "ذكاء تشغيلي مبني على البيانات والتحليلات",
+      "تنسيق متكامل مع مقدمي الخدمة",
+      "إدارة الأداء ومؤشرات الامتثال (KPIs)",
+      "إدارة العمليات والتدخلات التصحيحية",
+      "ضمان الجودة واستمرارية الخدمة",
+      "إدارة أصحاب المصلحة والعلاقات",
+      "قابلية التشغيل البيني — تتكامل مع MAXIMO وTAKAMUL وERP وBMS عبر REST API"
+    ],
+    note: "مراحل التطور: المرحلة الثانية (تفعيل الأتمتة والحوكمة) ← المرحلة الثالثة (تعميق التحليل والربط المؤسسي)",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → tfmp → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://tfmp.meem-edgenta.tech/login"
+  },
+  {
+    id: "unifire",
+    nameAr: "يوني فاير",
+    nameEn: "UniFire",
+    category: "إدارة المشاريع والمهام",
+    logo: "UF",
+    /* منصة داخلية بدون حضور علني على الإنترنت — لا يوجد شعار رسمي عام
+       يمكن التحقق منه، لذلك صُمم شعار مصغّر مستوحى من اسم النظام
+       (UF + لمسة لهب) بدون أي اعتماد على شبكة خارجية — إن توفر لديك
+       ملف الشعار الرسمي أرسله وسنستبدله بصورة حقيقية فوراً */
+    logoStyle: "flame",
+    desc: "منصة إلكترونية متكاملة لإدارة المشاريع والمهام — تتيح إدارة المشاريع ومتابعة التنفيذ، إصدار واستقبال التكليفات، إدارة واعتماد الموافقات الإلكترونية.",
+    features: [
+      "إدارة المشاريع ومتابعة مراحل التنفيذ",
+      "إصدار واستقبال التكليفات بين الفرق",
+      "إدارة واعتماد الموافقات الإلكترونية",
+      "حفظ وإدارة المستندات والوثائق مركزياً"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → unifire → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://idcs-f199fcfdba284ca8b257b72a3ce2c6b5.identity.oraclecloud.com/ui/v1/signin"
+  },
+  {
+    id: "fares",
+    nameAr: "فارس",
+    nameEn: "Fares",
+    category: "بوابة الطلبات التشغيلية",
+    logo: "FR",
+    desc: "منصة تابعة لوزارة التعليم لإدارة الطلبات والاحتياجات التشغيلية — رفع طلبات العهد والأصول، تقديم احتياجات التجهيزات المدرسية، وطلب الأثاث والمستلزمات.",
+    features: [
+      "رفع طلبات العهد والأصول إلكترونياً",
+      "تقديم احتياجات التجهيزات المدرسية",
+      "طلب الأثاث والمستلزمات المدرسية",
+      "متابعة حالة الطلبات واعتمادها من الجهات المختصة"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → fares → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://sshr.moe.gov.sa/OA_HTML/AppsLocalLogin.jsp"
+  },
+  {
+    id: "vts",
+    nameAr: "نظام متابعة المركبات",
+    nameEn: "Afaqy — Vehicle Tracking System",
+    category: "تتبع الحركة الميدانية",
+    logo: "VT",
+    /* شعار النظام الرسمي — يُعرض بدل الحروف الافتراضية (VT) لو الصورة نجحت في التحميل */
+    logoImg: "https://api.afaqy.pro/images/system/logo.png",
+    desc: "منصة إلكترونية تُستخدم لمتابعة مواقع وتواجد المركبات الخاصة بفرق الإشراف ميدانياً، بما يساهم في تحسين إدارة الحركة الميدانية وتنسيق تنقل الفرق بين المدارس والمواقع.",
+    features: [
+      "متابعة مواقع المركبات لحظياً أثناء التنقل الميداني",
+      "تحسين إدارة الحركة الميدانية لفرق الإشراف",
+      "رفع كفاءة التنسيق بين الفرق الميدانية والإدارة",
+      "توثيق مسارات التنقل والتحقق من التغطية الميدانية للمدارس",
+      "دعم اتخاذ قرارات أسرع في حالات الطوارئ والاستجابة السريعة"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → vts → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://afaqy.pro/"
+  },
+  {
+    id: "hr",
+    nameAr: "نظام إدارة الموارد",
+    nameEn: "TBC HR System",
+    category: "الموارد البشرية والهيكل التنظيمي",
+    logo: "HR",
+    desc: "نظام الموارد البشرية والهيكل التنظيمي للمشروع — يوثّق الهيكلة التنظيمية للشركات العاملة (الاستشاري والمقاول وTBC)، ويدير عمليات التوظيف وتقييم الأداء لجميع الأطراف، بما يضمن وضوح خطوط المسؤولية والتبعية داخل المشروع.",
+    features: [
+      "توثيق الهيكل التنظيمي الكامل للمشروع (الاستشاري، المقاول، TBC)",
+      "إدارة عمليات التوظيف وتتبع الشواغر",
+      "تقييم أداء الموظفين لدى الاستشاري والمقاول وTBC",
+      "وضوح خطوط المسؤولية والتبعية بين الشركات العاملة بالمشروع"
+    ],
+    note: "",
+    /* ════════════════════════════════════════════════════════
+       🔗 رابط النظام — تم تعيينه بالفعل
+       📍 الموقع في الكود: dashboard.js → DIGITAL_SYSTEMS_DATA → hr → link
+       ════════════════════════════════════════════════════════ */
+    link: "https://tbc-hr.netlify.app/"
+  }
+];
+
+/* ══════════════════════════════════════════════════════════════════════
+   عرض صفحة تفاصيل الأنظمة الرقمية (overlay كامل الشاشة)
+   ══════════════════════════════════════════════════════════════════════ */
+function openDigitalSystemsPage() {
+  /* إزالة أي overlay سابق */
+  var existing = document.getElementById("digitalSystemsOverlay");
+  if (existing) existing.remove();
+
+  var overlay = document.createElement("div");
+  overlay.id = "digitalSystemsOverlay";
+  overlay.className = "digital-systems-overlay";
+
+  var html = '<div class="digital-systems-container">';
+
+  /* ── الرأس ── */
+  html += '<div class="digital-systems-head">';
+  html += '  <div class="digital-systems-head-icon">💻</div>';
+  html += '  <div class="digital-systems-head-title-wrap">';
+  html += '    <div class="digital-systems-head-title">الأنظمة الرقمية</div>';
+  html += '    <div class="digital-systems-head-sub">مبادرة التحول الرقمي — ' + DIGITAL_SYSTEMS_DATA.length + ' أنظمة متكاملة لإدارة المرافق والأصول والعمليات</div>';
+  html += '  </div>';
+  html += '  <button type="button" class="digital-systems-head-close" onclick="closeDigitalSystemsPage()" title="إغلاق">✕</button>';
+  html += '</div>';
+
+  /* ── شريط التنقل السريع — رقاقة لكل نظام بلون فئته، تقفز مباشرة لكارته ── */
+  html += '<div class="digital-systems-quicknav">';
+  DIGITAL_SYSTEMS_DATA.forEach(function (sys) {
+    var c = __digiCatColor(sys.category);
+    html += '  <button type="button" class="digi-qn-chip" style="--qn-tx:' + c.tx + ';--qn-bg:' + c.bg + ';--qn-bd:' + c.bd + '" onclick="__scrollToDigiSys(\'' + sys.id + '\')">';
+    html += '    <span class="digi-qn-dot"></span>' + sys.nameAr;
+    html += '  </button>';
+  });
+  html += '</div>';
+
+  /* ── جسم الصفحة: كارت لكل نظام ── */
+  html += '<div class="digital-systems-body">';
+
+  DIGITAL_SYSTEMS_DATA.forEach(function (sys, idx) {
+    var c = __digiCatColor(sys.category);
+    html += '<div class="digi-sys-card" id="digi-sys-' + sys.id + '" style="--cat-tx:' + c.tx + ';--cat-bg:' + c.bg + ';--cat-bd:' + c.bd + '">';
+
+    /* رأس الكارت */
+    html += '  <div class="digi-sys-card-head">';
+    html += '    <div class="digi-sys-card-num">' + String(idx + 1).padStart(2, "0") + '</div>';
+    if (sys.logoImg) {
+      /* شعار حقيقي (صورة) — لو فشل التحميل يرجع تلقائياً للحروف الافتراضية */
+      html += '    <div class="digi-sys-card-logo digi-sys-card-logo--img">' +
+              '<img src="' + sys.logoImg + '" alt="' + sys.nameAr + '" ' +
+              'onerror="this.parentElement.classList.remove(\'digi-sys-card-logo--img\');this.outerHTML=\'' + sys.logo + '\';">' +
+              '</div>';
+    } else if (sys.logoStyle === "ibm") {
+      /* شعار مصمّم بهوية IBM (أزرق IBM + Maximo) — بدون صورة خارجية */
+      html += '    <div class="digi-sys-card-logo digi-sys-logo-ibm">' +
+              '<span class="digi-logo-ibm-main">IBM</span>' +
+              '<span class="digi-logo-ibm-sub">Maximo</span>' +
+              '</div>';
+    } else if (sys.logoStyle === "flame") {
+      /* شعار مصمّم مستوحى من اسم "يوني فاير" — بدون صورة خارجية */
+      html += '    <div class="digi-sys-card-logo digi-sys-logo-flame">' +
+              '<span class="digi-logo-flame-icon">🔥</span>' +
+              '<span class="digi-logo-flame-txt">' + sys.logo + '</span>' +
+              '</div>';
+    } else {
+      html += '    <div class="digi-sys-card-logo">' + sys.logo + '</div>';
+    }
+    html += '    <div class="digi-sys-card-titles">';
+    html += '      <div class="digi-sys-card-name-row">';
+    html += '        <span class="digi-sys-card-name">' + sys.nameAr + '</span>';
+    if (sys.category) {
+      html += '        <span class="digi-sys-cat-badge">' + sys.category + '</span>';
+    }
+    html += '      </div>';
+    html += '      <div class="digi-sys-card-name-en">' + sys.nameEn + '</div>';
+    html += '    </div>';
+    html += '  </div>';
+
+    /* الوصف (نبذة) */
+    html += '  <div class="digi-sys-card-desc">' + sys.desc + '</div>';
+
+    /* المنافع والمميزات */
+    html += '  <div class="digi-sys-features-title">✦ المنافع والمميزات</div>';
+    html += '  <div class="digi-sys-features-list">';
+    sys.features.forEach(function (f) {
+      html += '    <div class="digi-sys-feature">' + f + '</div>';
+    });
+    html += '  </div>';
+
+    /* ملاحظة إضافية (مثل مراحل التطور) */
+    if (sys.note) {
+      html += '  <div class="digi-sys-note">🛈 ' + sys.note + '</div>';
+    }
+
+    /* رابط النظام */
+    html += '  <div class="digi-sys-link-row">';
+    if (sys.link && sys.link !== "#SYSTEM_LINK_HERE") {
+      html += '    <a class="digi-sys-link-btn" href="' + sys.link + '" target="_blank" rel="noopener">🔗 فتح النظام</a>';
+    } else {
+      html += '    <a class="digi-sys-link-btn" href="#SYSTEM_LINK_HERE">🔗 الرابط قيد الإضافة</a>';
+    }
+    html += '  </div>';
+
+    html += '</div>'; /* end digi-sys-card */
+  });
+
+  html += '</div>'; /* end body */
+  html += '</div>'; /* end container */
+
+  overlay.innerHTML = html;
+
+  /* إغلاق بالضغط على الخلفية */
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeDigitalSystemsPage();
+  });
+
+  /* إغلاق بالـ Escape */
+  overlay.__escHandler = function (e) {
+    if (e.key === "Escape") closeDigitalSystemsPage();
+  };
+  document.addEventListener("keydown", overlay.__escHandler);
+
+  document.body.appendChild(overlay);
+}
+
+function closeDigitalSystemsPage() {
+  var overlay = document.getElementById("digitalSystemsOverlay");
+  if (overlay) {
+    if (overlay.__escHandler) document.removeEventListener("keydown", overlay.__escHandler);
+    overlay.remove();
+  }
+}
+
+/* قفز سلس لكارت نظام معيّن عبر شريط التنقل السريع + إبراز مؤقت */
+function __scrollToDigiSys(id) {
+  var el = document.getElementById("digi-sys-" + id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("digi-sys-card-flash");
+  setTimeout(function () { el.classList.remove("digi-sys-card-flash"); }, 900);
+}
 
 /* عرض كل التبويبات الموجودة داخل كل قسم تحت اسم الكارت في Portal Home
    (بناءً على طلب صريح) — بدل الوصف المختصر، نعرض القائمة الكاملة
@@ -23713,6 +24189,11 @@ if (document.readyState === "loading") {
 /* الانتقال من Portal Home إلى قسم معيّن + عرض Sidebar الخاص به
    + فتح أول تبويب فرعي تلقائياً (دون حذف أي تبويب قديم) */
 function navigateToCategory(catKey) {
+  /* الأنظمة الرقمية — تفتح overlay خاص بدل الـ Sidebar العادي */
+  if (catKey === "digital") {
+    openDigitalSystemsPage();
+    return;
+  }
   var cat = PORTAL_CATEGORIES[catKey];
   if (!cat) return;
   window.CURRENT_PORTAL_CATEGORY = catKey;

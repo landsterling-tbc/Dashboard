@@ -5445,3 +5445,283 @@ tbody tr:last-child td:last-child {
 }
 
 /* نهاية Phase 16 */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PHASE 17 — كارت "الأنظمة الرقمية" + صفحة التفاصيل
+   ملوّنة بنفس لوحة ألوان الداشبورد الموحّدة "Ink & Brass" (تيل + كحلي +
+   برونزي) — بدون أي لون خارج هوية الداشبورد، وبنفس عائلة الخط
+   "IBM Plex Sans Arabic" / Tajawal المستخدمة في كل مكان (موروثة تلقائياً
+   لأن الـ overlay يُلحق بـ body مباشرة).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 17-A: ألوان كارت الأنظمة الرقمية — تيل غامق مميز داخل نفس العائلة ── */
+[data-category="digital"] { background: linear-gradient(160deg, #ffffff 0%, rgba(15,87,113,.06) 100%); border-color: rgba(15,87,113,.24); }
+[data-category="digital"] .portal-card-icon { background: rgba(15,87,113,.12); color: #0f5771; border: 1px solid rgba(15,87,113,.26); }
+[data-category="digital"]:hover::before    { background: linear-gradient(90deg,#0d2f40,#0f5771,#3fa8c4); opacity: 1; }
+[data-category="digital"]:hover            { border-color: rgba(15,87,113,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(15,87,113,.18), inset 0 1px 0 #fff; }
+
+/* ── 17-B: صفحة تفاصيل الأنظمة الرقمية (overlay) ──────────────────── */
+.digital-systems-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(8,30,43,.55);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: dso-fadein .25s ease;
+  direction: rtl;
+  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
+}
+@keyframes dso-fadein { from { opacity: 0; } to { opacity: 1; } }
+
+.digital-systems-container {
+  width: min(1100px, 94vw);
+  max-height: 92vh;
+  background: linear-gradient(170deg, #f7f9fb 0%, #edf2f5 100%);
+  border-radius: 22px;
+  box-shadow: 0 8px 40px rgba(8,30,43,.25), 0 2px 8px rgba(8,30,43,.12);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: dso-slideup .3s ease;
+}
+@keyframes dso-slideup { from { transform: translateY(28px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* رأس الصفحة — نفس تدرج رأس البانلات (hasr-head/taj-head): كحلي → تيل → كحلي داكن */
+.digital-systems-head {
+  display: flex; align-items: center; gap: 16px;
+  padding: 22px 28px 20px;
+  background: linear-gradient(135deg, #0d2f40 0%, #0d849c 55%, #0d3d55 100%);
+  color: #fff;
+}
+.digital-systems-head-icon {
+  font-size: 32px;
+  width: 54px; height: 54px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 16px;
+}
+.digital-systems-head-title-wrap { flex: 1; min-width: 0; }
+.digital-systems-head-title { font-size: 20px; font-weight: 700; line-height: 1.3; }
+.digital-systems-head-sub { font-size: 13px; font-weight: 500; color: rgba(255,255,255,.82); margin-top: 4px; }
+.digital-systems-head-close {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s ease;
+  flex-shrink: 0;
+}
+.digital-systems-head-close:hover { background: rgba(255,255,255,.32); }
+
+.digital-systems-body {
+  padding: 20px 28px 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── 17-B٢: شريط التنقل السريع بين الأنظمة ───────────────────────── */
+.digital-systems-quicknav {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 14px 28px 4px;
+  background: #eef3f5;
+  border-bottom: 1px solid rgba(13,47,64,.08);
+}
+.digi-qn-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--qn-bg, rgba(13,132,156,.12));
+  border: 1px solid var(--qn-bd, rgba(13,132,156,.3));
+  color: var(--qn-tx, #0b6b7e);
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+  font-family: inherit;
+}
+.digi-qn-chip:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(13,47,64,.12); }
+.digi-qn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--qn-tx, #0b6b7e);
+  flex-shrink: 0;
+}
+
+/* ── 17-C: كارت نظام واحد ───────────────────────────────────────── */
+.digi-sys-card {
+  position: relative;
+  background: #fff;
+  border: 1.5px solid rgba(13,132,156,.16);
+  border-radius: 16px;
+  padding: 24px 26px 22px;
+  margin-top: 18px;
+  margin-bottom: 0;
+  box-shadow: 0 2px 8px rgba(13,132,156,.06);
+  transition: border-color .2s ease, box-shadow .2s ease, background .5s ease;
+  overflow: hidden;
+}
+.digi-sys-card::before {
+  content: "";
+  position: absolute; inset-inline-start: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--cat-tx, #0d849c);
+}
+.digi-sys-card:hover {
+  border-color: var(--cat-bd, rgba(13,132,156,.3));
+  box-shadow: 0 4px 18px rgba(13,132,156,.13);
+}
+.digi-sys-card-flash {
+  background: var(--cat-bg, rgba(13,132,156,.08)) !important;
+}
+.digi-sys-card-head {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 14px;
+}
+.digi-sys-card-num {
+  font-size: 12px; font-weight: 800; color: #9aabb5;
+  letter-spacing: .5px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.digi-sys-card-logo {
+  width: 50px; height: 50px;
+  border-radius: 14px;
+  background: var(--cat-bg, rgba(13,132,156,.12));
+  border: 1px solid var(--cat-bd, rgba(13,132,156,.28));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: var(--cat-tx, #0d2f40);
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+/* شعار حقيقي (صورة) — عرض أوسع بنسبة تتناسب مع شعارات مستطيلة، بخلفية بيضاء نظيفة */
+.digi-sys-card-logo--img {
+  width: 78px;
+  background: #fff;
+  padding: 6px 10px;
+}
+.digi-sys-card-logo--img img {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+}
+
+/* شعار IBM Maximo المصمّم بالكود (بدون صورة خارجية) — أزرق IBM الرسمي */
+.digi-sys-logo-ibm {
+  background: linear-gradient(160deg, #0530ad, #1f70c1);
+  border-color: rgba(5,48,173,.4);
+  flex-direction: column; gap: 1px;
+}
+.digi-logo-ibm-main {
+  font-size: 15px; font-weight: 900; color: #fff;
+  letter-spacing: 1.5px; line-height: 1;
+}
+.digi-logo-ibm-sub {
+  font-size: 8px; font-weight: 600; color: rgba(255,255,255,.85);
+  letter-spacing: .3px; line-height: 1;
+}
+
+/* شعار UniFire المصمّم بالكود (بدون صورة خارجية) — لمسة لهب + الحروف */
+.digi-sys-logo-flame {
+  background: linear-gradient(160deg, #0f5771, #1c94ab);
+  border-color: rgba(15,87,113,.4);
+  flex-direction: column; gap: 0;
+}
+.digi-logo-flame-icon { font-size: 16px; line-height: 1; }
+.digi-logo-flame-txt {
+  font-size: 10px; font-weight: 800; color: #fff;
+  letter-spacing: .5px; line-height: 1; margin-top: 2px;
+}
+
+.digi-sys-card-titles { min-width: 0; }
+.digi-sys-card-name-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.digi-sys-card-name {
+  font-size: 18px; font-weight: 700; color: #0c2330;
+}
+.digi-sys-cat-badge {
+  font-size: 11.5px; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px;
+  background: var(--cat-bg, rgba(13,132,156,.14));
+  color: var(--cat-tx, #0b6b7e);
+  border: 1px solid var(--cat-bd, rgba(13,132,156,.3));
+  white-space: nowrap;
+}
+.digi-sys-card-name-en {
+  font-size: 13px; font-weight: 500; color: #0d849c;
+  margin-top: 3px; direction: ltr; text-align: right;
+}
+.digi-sys-card-desc {
+  font-size: 14.5px; line-height: 1.75; color: #2c5468;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(13,132,156,.04);
+  border-radius: 10px;
+  border-right: 3px solid rgba(13,132,156,.28);
+}
+
+.digi-sys-features-title {
+  font-size: 14px; font-weight: 700; color: #0b6b7e;
+  margin-bottom: 10px;
+}
+.digi-sys-features-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px; margin-bottom: 16px;
+}
+.digi-sys-feature {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13.5px; line-height: 1.55; color: #2c5468;
+  padding: 8px 12px;
+  background: rgba(13,132,156,.035);
+  border-radius: 8px;
+}
+.digi-sys-feature::before {
+  content: "✦"; color: #0d849c; font-size: 11px;
+  margin-top: 3px; flex-shrink: 0;
+}
+
+/* ملاحظة إضافية (زي مراحل التطور) — بلون البرونزي التحذيري الموحّد */
+.digi-sys-note {
+  font-size: 12.5px; line-height: 1.6; color: #8a6a37;
+  background: rgba(176,138,78,.08);
+  border: 1px solid rgba(176,138,78,.22);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+}
+
+/* ── 17-D: رابط النظام (placeholder) ────────────────────────────── */
+.digi-sys-link-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 12px; padding-top: 14px;
+  border-top: 1px solid rgba(13,132,156,.12);
+}
+.digi-sys-link-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #0d2f40, #0d849c);
+  color: #fff; border-radius: 10px; border: none;
+  font-size: 13.5px; font-weight: 600;
+  cursor: pointer; text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.digi-sys-link-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(13,132,156,.28);
+}
+.digi-sys-link-btn[href="#SYSTEM_LINK_HERE"] {
+  background: linear-gradient(135deg, #9aa7ae, #c1cbd1);
+  cursor: default; pointer-events: none;
+  opacity: .7;
+}
+
+/* ── 17-E: Responsive ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .digital-systems-container { border-radius: 16px; }
+  .digital-systems-head { padding: 18px 20px 14px; }
+  .digital-systems-head-title { font-size: 17px; }
+  .digital-systems-head-sub { font-size: 12px; }
+  .digital-systems-quicknav { padding: 12px 16px 4px; }
+  .digi-qn-chip { font-size: 11.5px; padding: 5px 11px; }
+  .digital-systems-body { padding: 16px 18px 24px; }
+  .digi-sys-card { padding: 18px 16px 16px; }
+  .digi-sys-card-num { display: none; }
+  .digi-sys-features-list { grid-template-columns: 1fr; }
+}

@@ -183,6 +183,12 @@
         <!-- يُملأ ديناميكياً عبر __renderPortalFavoritesCard() -->
       </div>
 
+      <div class="portal-card" id="portal-card-digital" data-category="digital" data-wm="💻">
+        <div class="portal-card-icon">💻</div>
+        <div class="portal-card-title">الأنظمة الرقمية</div>
+        <div class="portal-card-desc">MAXIMO، TAKAMUL، TFMP، UniFire، Fares</div>
+      </div>
+
       <div class="portal-card" id="portal-card-assessment" data-category="assessment" data-wm="📊">
         <div class="portal-card-icon">📊</div>
         <div class="portal-card-title">التقييمات والحالة الفنية</div>
@@ -944,6 +950,18 @@
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🛡️📊  تبويب: ملخص الأمن والسلامة
+║  ID: tab-security-safety-summary
+║  بيانات ثابتة مُدخلة يدوياً (من تقرير خارجي) — عدّلها في
+║  SECURITY_SAFETY_SUMMARY_DATA داخل dashboard.js
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-security-safety-summary">
+    <div id="security-safety-summary-content"></div>
   </div>
 
 <!--

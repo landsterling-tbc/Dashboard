@@ -5841,8 +5841,11 @@ tbody tr:last-child td:last-child {
   min-width: 220px; max-width: 320px;
   border-left: 1px solid rgba(61,82,102,.1);
 }
-.raci-table tbody tr:nth-child(even) td,
-.raci-table tbody tr:nth-child(even) .raci-task-name {
+/* :not(.raci-group-row) — عشان صفوف عناوين المجموعات ما تاخدش لون التبطيط
+   الفاتح (zebra) حتى لو وقعت على ترتيب زوجي بين كل صفوف الجدول، ده كان
+   بيخلي نص أبيض على خلفية فاتحة في بعض المجموعات (مش ظاهر) */
+.raci-table tbody tr:nth-child(even):not(.raci-group-row) td,
+.raci-table tbody tr:nth-child(even):not(.raci-group-row) .raci-task-name {
   background: #f7f9fa;
 }
 .raci-table tbody tr:not(.raci-group-row):hover td,
@@ -5851,8 +5854,8 @@ tbody tr:last-child td:last-child {
 }
 .raci-group-row td {
   position: sticky; right: auto;
-  background: linear-gradient(90deg, rgba(13,47,64,.9), rgba(61,82,102,.75));
-  color: #fff;
+  background: linear-gradient(90deg, rgba(13,47,64,.9), rgba(61,82,102,.75)) !important;
+  color: #fff !important;
   font-weight: 800; font-size: 12.5px;
   letter-spacing: .2px;
   text-align: right !important;

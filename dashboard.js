@@ -384,6 +384,7 @@ const CFG = {
     students: ["عدد_الطلاب"],
     buildingAge: ["عمر_المبني"],
     ayenScore: ["تقييم_عاين"],
+    asolStatus: ["تقييم (منصة أصول)", "تقييم_منصة_أصول"],
   },
   // ⚠️ TIER يستخدم CSS_TOKENS — كل الألوان من مصدر واحد
   TIER = {
@@ -976,6 +977,7 @@ function applyFilters() {
     if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
     if (activeId === "tab-students") safeRun(renderStudentsTab, "students");
     if (activeId === "tab-ayen") safeRun(renderAyenTab, "ayen");
+    if (activeId === "tab-asol") safeRun(renderAsolTab, "asol");
     if (activeId === "tab-table") {
       TBL.cur = 0;
       safeRun(renderTable, "table");
@@ -1184,6 +1186,7 @@ function showTab(name, el) {
     "spare" === name && renderSpareTab(),
     "students" === name && renderStudentsTab(),
     "ayen" === name && renderAyenTab(),
+    "asol" === name && renderAsolTab(),
     "table" === name && ((TBL.cur = 0), renderTable()),
     "ac-plan" === name && renderAcPlanTab(),
     "mag-kpi" === name && renderMagKpiTab(),
@@ -3085,6 +3088,12 @@ let __bgRevalidatedOnce = false;
             students: num(b["عدد_الطلاب"]),
             buildingAge: num(b["عمر_المبني"]),
             ayenScore: num(b["تقييم_عاين"]),
+            asolStatus: (() => {
+              const v = String(
+                b["تقييم (منصة أصول)"] ?? b["تقييم_منصة_أصول"] ?? ""
+              ).trim();
+              return v && "—" !== v && "null" !== v ? v : null;
+            })(),
             alerts: num(b["عدد_البلاغات"]) ?? 0,
             acUnits: num(b["وحدات_التكييف"]),
             subscriptionStatus: String(b["حالة_الاشتراك"] ?? "").trim(),
@@ -3095,6 +3104,33 @@ let __bgRevalidatedOnce = false;
           };
         })
         .filter((r) => r.name && "—" !== r.name && "null" !== r.name && "" !== r.name)));
+
+    // 🩺 تشخيص عمود "تقييم (منصة أصول)" — لو العمود مش موجود في الشيت أصلاً
+    // أو موجود لكن كل قيمه فاضية، نطبع تحذير واضح في الكونسول بدل ما
+    // المشكلة تفضل مخبّية والداشبورد يعرض أصفار بصمت.
+    (() => {
+      const rawSample = buildings[0] || {};
+      const hasRawCol =
+        Object.prototype.hasOwnProperty.call(rawSample, "تقييم (منصة أصول)") ||
+        Object.prototype.hasOwnProperty.call(rawSample, "تقييم_منصة_أصول");
+      const withStatus = RAW.filter((r) => null != r.asolStatus).length;
+      if (!hasRawCol) {
+        console.warn(
+          '⚠️ [أصول] العمود "تقييم (منصة أصول)" غير موجود في شيت "المباني" على جوجل شيتس. ' +
+            "تأكد أن اسم العمود مطابق تماماً (بمسافة قبل القوس وبعده). الأعمدة المتاحة: " +
+            Object.keys(rawSample).join(" | "),
+        );
+      } else if (0 === withStatus) {
+        console.warn(
+          '⚠️ [أصول] العمود "تقييم (منصة أصول)" موجود لكن كل قيمه فاضية — تأكد من تعبئة البيانات في الشيت.',
+        );
+      } else {
+        console.log(
+          `✅ [أصول] تم ربط ${withStatus.toLocaleString()} مبنى بعمود "تقييم (منصة أصول)" من إجمالي ${RAW.length.toLocaleString()} مبنى.`,
+        );
+      }
+    })();
+
     const spareMap = {};
     for (const sp of spareParts) {
       // 🔑 نفس الدالة الموحّدة (window.normSchoolId) — كانت المطابقة هنا
@@ -5615,6 +5651,287 @@ function renderAyenTable() {
       ),
       addBtn(String(maxPg + 1), maxPg, !1)),
       addBtn("التالي ►", pg.cur + 1, pg.cur >= maxPg));
+  }
+}
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  📊  JS تبويب: تقييم منصة أصول (تقييم البنود الحرجة)
+   ║  (tab-asol) — الدوال الخاصة بهذا التبويب تبدأ هنا
+   ║  المصدر: عمود "تقييم (منصة أصول)" في شيت المباني — قيمتان فقط:
+   ║  "حرجة" / "ليست حرجة" (وأي مبنى بدون قيمة يُعتبر "غير مصنّف")
+   ╚════════════════════════════════════════════════════════════╝ */
+function renderAsolTab() {
+  const el = document.getElementById("asol-content");
+  if (!el) return;
+  const D = FILTERED;
+  if (!D.length)
+    return void (el.innerHTML =
+      '<div class="card empty-state">\n      <div class="empty-state-icon">📊</div>\n      <div class="empty-state-title">لم يتم التحميل</div>\n    </div>');
+
+  const isCritical = (r) => "حرجة" === String(r.asolStatus || "").trim();
+  const isNotCritical = (r) => "ليست حرجة" === String(r.asolStatus || "").trim();
+  const critical = D.filter(isCritical);
+  const notCritical = D.filter(isNotCritical);
+  const unclassified = D.filter((r) => !isCritical(r) && !isNotCritical(r));
+  const totalClassified = critical.length + notCritical.length;
+  const criticalPct = totalClassified ? ((critical.length / totalClassified) * 100) : 0;
+
+  // توزيع حسب المدينة (أعلى 15 مدينة بعدد المباني الحرجة)
+  const byCity = {};
+  critical.forEach((r) => {
+    const c = r.city || "غير محدد";
+    byCity[c] = (byCity[c] || 0) + 1;
+  });
+  const cityArr = Object.entries(byCity)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15);
+
+  // توزيع حسب المرحلة
+  const byStage = {};
+  critical.forEach((r) => {
+    const s = r.stage || "غير محدد";
+    byStage[s] = (byStage[s] || 0) + 1;
+  });
+  const stageArr = Object.entries(byStage).sort((a, b) => b[1] - a[1]);
+
+  el.innerHTML = `
+
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi kc-red">
+        <div class="kpi-val">${critical.length.toLocaleString()}</div>
+        <div class="kpi-lbl">مبنى حرج</div>
+        <div class="kpi-sub">${totalClassified ? criticalPct.toFixed(1) : 0}% من المباني المصنّفة</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${notCritical.length.toLocaleString()}</div>
+        <div class="kpi-lbl">مبنى غير حرج</div>
+        <div class="kpi-sub">${totalClassified ? (100 - criticalPct).toFixed(1) : 0}% من المباني المصنّفة</div>
+      </div>
+      <div class="kpi kc-blue">
+        <div class="kpi-val">${D.length.toLocaleString()}</div>
+        <div class="kpi-lbl">إجمالي المباني</div>
+        <div class="kpi-sub">حسب الفلاتر الحالية</div>
+      </div>
+    </div>
+
+    <div class="card mb14" style="padding-bottom:20px">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626">📊</span>
+        توزيع حالة تقييم منصة أصول
+        <span class="sub">${totalClassified.toLocaleString()} مبنى مصنّف</span>
+      </div>
+      <div class="chart-box" style="height:280px;max-width:420px;margin:0 auto"><canvas id="ch-asol-status"></canvas></div>
+    </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">أعلى 15 مدينة — عدد المباني الحرجة</div>
+        <div class="chart-box" style="height:420px"><canvas id="ch-asol-city"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">المباني الحرجة حسب المرحلة</div>
+        <div class="chart-box" style="height:420px"><canvas id="ch-asol-stage"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div class="card-title" style="margin:0">
+          <span class="card-title-icon" style="background:#FFF5F5;color:#DC2626">⚠️</span>
+          قائمة المباني الحرجة
+          <span class="sub" id="asol-tbl-cnt">${critical.length.toLocaleString()} مبنى</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="text" id="asol-tbl-search" class="fsel" placeholder="بحث بالاسم أو الرقم الوزاري…"
+                 oninput="renderAsolTable()" style="font-size:11px;min-width:200px">
+          <select class="fsel" id="asol-tbl-sort" onchange="renderAsolTable()" style="font-size:11px">
+            <option value="fca_asc">FCA ↑ الأقل أولاً</option>
+            <option value="fca_desc">FCA ↓ الأعلى أولاً</option>
+            <option value="ayen_asc">عاين ↑ الأقل أولاً</option>
+            <option value="ayen_desc">عاين ↓ الأعلى أولاً</option>
+            <option value="name">الاسم أ-ي</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th style="text-align:right;padding-right:14px;min-width:220px">اسم المدرسة</th>
+            <th style="min-width:90px">الرقم الوزاري</th>
+            <th style="min-width:100px">المدينة</th>
+            <th style="min-width:100px">الحي</th>
+            <th style="min-width:110px">المرحلة</th>
+            <th style="min-width:110px;text-align:center">الحالة (منصة أصول)</th>
+            <th style="min-width:80px">FCA</th>
+            <th style="min-width:80px">عاين</th>
+          </tr></thead>
+          <tbody id="asol-tbl-body"></tbody>
+        </table>
+      </div>
+      <div class="pag-bar" id="asol-tbl-pag">
+        <span class="pag-info" id="asol-pag-info"></span>
+        <div class="pag-btns" id="asol-pag-btns"></div>
+      </div>
+    </div>
+
+  `;
+
+  requestAnimationFrame(() => {
+    killChart("ch-asol-status");
+    makeDoughnut("ch-asol-status", {
+      "حرجة": critical.length,
+      "ليست حرجة": notCritical.length,
+    }, {
+      "حرجة": CSS_TOKENS.danger(),
+      "ليست حرجة": CSS_TOKENS.positive(),
+    });
+
+    killChart("ch-asol-city");
+    CHARTS["ch-asol-city"] = new Chart(document.getElementById("ch-asol-city"), {
+      type: "bar",
+      data: {
+        labels: cityArr.map((x) => x[0]),
+        datasets: [
+          {
+            label: "عدد المباني الحرجة",
+            data: cityArr.map((x) => x[1]),
+            backgroundColor: CSS_TOKENS.danger() + "BB",
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+
+    killChart("ch-asol-stage");
+    CHARTS["ch-asol-stage"] = new Chart(document.getElementById("ch-asol-stage"), {
+      type: "bar",
+      data: {
+        labels: stageArr.map((x) => x[0]),
+        datasets: [
+          {
+            label: "عدد المباني الحرجة",
+            data: stageArr.map((x) => x[1]),
+            backgroundColor: PALETTE.slice(0, stageArr.length),
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  });
+
+  window._ASOL_ROWS = critical;
+  window._ASOL_PAGE = { cur: 0, SIZE: 50 };
+  renderAsolTable();
+}
+function renderAsolTable() {
+  const rows = window._ASOL_ROWS || [],
+    pg = window._ASOL_PAGE || { cur: 0, SIZE: 50 },
+    sort = document.getElementById("asol-tbl-sort")?.value || "fca_asc",
+    searchVal = (document.getElementById("asol-tbl-search")?.value || "").trim().toLowerCase(),
+    sorters = {
+      fca_asc: (a, b) => (a.fca ?? 999) - (b.fca ?? 999),
+      fca_desc: (a, b) => (b.fca ?? -1) - (a.fca ?? -1),
+      ayen_asc: (a, b) => (a.ayenScore ?? 999) - (b.ayenScore ?? 999),
+      ayen_desc: (a, b) => (b.ayenScore ?? -1) - (a.ayenScore ?? -1),
+      name: (a, b) => a.name.localeCompare(b.name, "ar"),
+    },
+    sorted = [
+      ...(searchVal
+        ? rows.filter(
+            (r) =>
+              r.name.toLowerCase().includes(searchVal) || String(r.minId || "").includes(searchVal),
+          )
+        : rows),
+    ].sort(sorters[sort] || sorters.fca_asc),
+    total = sorted.length,
+    maxPage = Math.max(0, Math.ceil(total / pg.SIZE) - 1);
+  pg.cur = Math.min(pg.cur, maxPage);
+  const start = pg.cur * pg.SIZE,
+    page = sorted.slice(start, start + pg.SIZE),
+    tbody = document.getElementById("asol-tbl-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  page.forEach((r) => {
+    const fc = null != r.fca ? tierColor(r.fca) : "#ccc",
+      ac = null != r.ayenScore ? tierColor(r.ayenScore) : "#ccc",
+      tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="text-align:right;padding-right:14px">
+        <div style="font-weight:700;font-size:12px;white-space:normal;line-height:1.4">${esc(r.name)}</div>
+      </td>
+      <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td>
+      <td style="font-size:11px">${esc(r.city) || "—"}</td>
+      <td style="font-size:11px">${esc(r.district) || "—"}</td>
+      <td style="font-size:11px">${esc(r.stage) || "—"}</td>
+      <td style="text-align:center">
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;background:${CSS_TOKENS.bgDanger()};color:${CSS_TOKENS.danger()};border:1px solid ${CSS_TOKENS.danger()}44;white-space:nowrap">
+          🔴 حرجة
+        </span>
+      </td>
+      <td><span style="font-weight:800;color:${fc}">${null != r.fca ? pct(r.fca) : "—"}</span></td>
+      <td><span style="font-weight:800;color:${ac}">${null != r.ayenScore ? pct(r.ayenScore) : "—"}</span></td>
+    `;
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+  const cntEl = document.getElementById("asol-tbl-cnt");
+  if (cntEl) cntEl.textContent = `${total.toLocaleString()} مبنى${searchVal ? " (نتائج البحث)" : ""}`;
+  const infoEl = document.getElementById("asol-pag-info"),
+    btnsEl = document.getElementById("asol-pag-btns");
+  if (infoEl)
+    infoEl.textContent = total
+      ? `الصفوف ${(start + 1).toLocaleString()}–${Math.min(start + pg.SIZE, total).toLocaleString()} من ${total.toLocaleString()}`
+      : "لا توجد نتائج";
+  if (btnsEl) {
+    btnsEl.innerHTML = "";
+    const addBtn = (label, page, disabled, active = !1) => {
+      const b = document.createElement("button");
+      b.className = "pag-btn" + (active ? " active" : "");
+      b.textContent = label;
+      b.disabled = disabled;
+      if (!disabled)
+        b.onclick = () => {
+          pg.cur = page;
+          renderAsolTable();
+        };
+      btnsEl.appendChild(b);
+    };
+    addBtn("◄ السابق", pg.cur - 1, 0 === pg.cur);
+    const range = 3;
+    let lo = Math.max(0, pg.cur - range),
+      hi = Math.min(maxPage, pg.cur + range);
+    if (lo > 0) {
+      addBtn("1", 0, !1);
+      if (lo > 1)
+        btnsEl.appendChild(
+          Object.assign(document.createElement("span"), {
+            textContent: "…",
+            style: "padding:0 4px;color:var(--tx-muted)",
+          }),
+        );
+    }
+    for (let i = lo; i <= hi; i++) addBtn(String(i + 1), i, !1, i === pg.cur);
+    if (hi < maxPage) {
+      btnsEl.appendChild(
+        Object.assign(document.createElement("span"), {
+          textContent: "…",
+          style: "padding:0 4px;color:var(--tx-muted)",
+        }),
+      );
+      addBtn(String(maxPage + 1), maxPage, !1);
+    }
+    addBtn("التالي ►", pg.cur + 1, pg.cur >= maxPage);
   }
 }
 /* ╔════════════════════════════════════════════════════════════╗
@@ -14631,6 +14948,7 @@ function renderTajheezAllTable() {
     fca:         { ar: "قيمة FCA", header: "قيمة_FCA", syn: ["fca", "إف سي إيه", "الحالة الفنية", "قيمة fca", "تقييم المبنى"] },
     envScore:    { ar: "درجة البيئة المدرسية", header: "درجة_البيئة_المدرسية", syn: ["البيئة", "البيئة المدرسية", "درجة البيئة"] },
     ayenScore:   { ar: "تقييم عاين", header: "تقييم_عاين", syn: ["عاين", "تقييم عاين"] },
+    asolStatus:  { ar: "تقييم منصة أصول", header: "تقييم (منصة أصول)", syn: ["أصول", "منصة أصول", "تقييم منصة أصول", "بند حرج", "مباني حرجة", "حرجة"] },
     students:    { ar: "عدد الطلاب", header: "عدد_الطلاب", syn: ["الطلاب", "عدد الطلاب", "الطالبات"] },
     buildingAge: { ar: "عمر المبنى", header: "عمر_المبني", syn: ["عمر المبنى", "العمر", "قدم المبنى"] },
     classrooms:  { ar: "عدد الفصول", header: "عدد_الفصول", syn: ["الفصول", "عدد الفصول", "الفصول الدراسية"] },
@@ -18677,6 +18995,12 @@ window.addEventListener('load', function () {
       keywords: ['عاين','ayen','ayın','تقييم عاين','ayen score','درجة عاين','فحص عاين','نتيجة عاين','ayen evaluation','عاين تقييم'],
       charts: ['درجات عاين حسب المدرسة','توزيع درجات عاين'],
       kpis: ['متوسط درجة عاين','أعلى درجة عاين','أدنى درجة عاين']
+    },
+    {
+      id: 'asol', label: 'تقييم منصة أصول',
+      keywords: ['أصول','asol','منصة أصول','تقييم منصة أصول','بنود حرجة','مباني حرجة','critical items','critical buildings','حرجة','ليست حرجة','asol platform','asset platform'],
+      charts: ['توزيع حالة تقييم منصة أصول','المباني الحرجة حسب المدينة','المباني الحرجة حسب المرحلة','متوسط FCA وعاين للمباني الحرجة'],
+      kpis: ['عدد المباني الحرجة','نسبة المباني الحرجة','عدد المباني غير الحرجة','عدد غير المصنّف']
     },
     {
       id: 'sys-main', label: 'الأنظمة الرئيسية',
@@ -23388,6 +23712,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(23, 'click', function (event) { showTab('students',this) });
   bind(24, 'click', function (event) { showTab('stages',this) });
   bind(25, 'click', function (event) { showTab('ayen',this) });
+  bind(200, 'click', function (event) { showTab('asol',this) });
   bind(26, 'click', function (event) { showTab('sys-main',this) });
   bind(27, 'click', function (event) { showTab('sys-detail',this) });
   bind(28, 'click', function (event) { showTab('elevators',this) });
@@ -23593,6 +23918,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ["spare",           function(){ renderSpareTab(); }],
     ["students",        function(){ renderStudentsTab(); }],
     ["ayen",            function(){ renderAyenTab(); }],
+    ["asol",            function(){ renderAsolTab(); }],
     ["ac-plan",         function(){ renderAcPlanTab(); }],
     ["mag-kpi",         function(){ renderMagKpiTab(); }],
     ["consultant-kpi",  function(){ renderConsultantKpiTab(); }],
@@ -23702,6 +24028,7 @@ var PORTAL_CATEGORIES = {
       { name: "fca-ref",      label: "FCA المرجعي" },
       { name: "env",          label: "البيئة المدرسية" },
       { name: "ayen",         label: "تقييم عاين" },
+      { name: "asol",         label: "تقييم منصة أصول" },
       { name: "sys-main",     label: "الأنظمة الرئيسية FCA" },
       { name: "sys-detail",   label: "الأنظمة التفصيلية FCA" },
       { name: "stages",       label: "المرحلة الدراسية" }

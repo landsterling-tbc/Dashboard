@@ -814,6 +814,11 @@
       startThinking();
       pullLiveData();
       acRestoreHistoryOnce();
+      /* المستخدم يريد أن تنزل الواجهة عند فتح الشات مباشرة إلى منطقة المحادثة
+         (الرسائل/صندوق الكتابة) بدل البقاء فوق عند أقسام الملخص. نمرّر فوراً،
+         ثم مرة أخرى بعد تسوية الـlayout (صور/خطوط/رسوم قد تُغيّر الارتفاع). */
+      acScrollToBottom(true);
+      setTimeout(function() { acScrollToBottom(true); }, 150);
       setTimeout(function() { stopThinking('جاهز للاستخدام'); }, 3400);
       clearInterval(liveRefreshTimer);
       liveRefreshTimer = setInterval(pullLiveData, 8000);
@@ -986,9 +991,11 @@
        Without this, reading earlier history while a reply streams in
        gets interrupted every ~26ms by a forced jump. */
     function acScrollToBottom(force) {
-      if (!threadEl) return;
-      var nearBottom = (threadEl.scrollHeight - threadEl.scrollTop - threadEl.clientHeight) < 80;
-      if (force || nearBottom) threadEl.scrollTop = threadEl.scrollHeight;
+      /* الحاوية القابلة للتمرير فعلياً هي .ac-body (تحتوي أقسام الملخص + خيط
+         المحادثة معاً)، وليست #ac-chat-thread نفسه — فهو بلا overflow خاص به. */
+      if (!body) return;
+      var nearBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 80;
+      if (force || nearBottom) body.scrollTop = body.scrollHeight;
     }
 
     function acAppendMsg(html, who, rawText) {

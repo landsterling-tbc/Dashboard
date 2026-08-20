@@ -2,6 +2,10 @@
    القسم 1: الإعدادات والحالة وخدمة البيانات والفلاتر والـ KPIs
    ════════════════════════════════════════════════════════════ */
 /* dashboard.js — updated 2026-06-24 07:40 */
+/* 🩹 PATCH MARKER — لو ظهر هذا في console يبقى الملف الجديد فعلاً هو
+   اللي شغّال (استخدمها للتأكد إن المتصفح مش بيقرا نسخة قديمة من كاش) */
+window.__BALAGH_AI_PATCH_VERSION = "school-detail-fuzzy-match-2026-08-20";
+console.log("[Dashboard] patch version:", window.__BALAGH_AI_PATCH_VERSION);
 
 /* ════════════════════════════════════════════════════════════════
    🎨 CSS_TOKENS — مصدر الألوان الموحّد في JS
@@ -7501,6 +7505,9 @@ function _sysDownloadFile(filename, content, mime) {
     category: "",
     priority: "",
     location: "",
+    contractor: "",
+    stage: "",
+    gender: "",
     dateFrom: "",
     dateTo: "",
     month: "",
@@ -7708,6 +7715,21 @@ function _sysDownloadFile(filename, content, mime) {
   // نفس النتيجة الجاهزة بدل ما نعيد بناء/تحليل كل صف من جديد. أي تحميل بيانات
   // جديد بيعمل reassign كامل للمصفوفة (مش تعديل داخلي)، فالمقارنة دي أمينة.
   let __balaghNormCache = null;
+  // ── تحويل نص "SLA DAYS" الخام (مثال: "33 Days 2 Hours 20 Minutes") لرقم
+  // فعلي بالساعات/الأيام قابل للحساب (متوسط/فرز/مقارنة). يرجع null لو
+  // الخانة فاضية أو مفيهاش صيغة أيام/ساعات/دقايق معروفة (زي "-" أو نص
+  // حالة زي "خارج نطاق التغطية"). ──
+  function parseSlaDurationToHours_(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return null;
+    const m = s.match(/(\d+)\s*Days?\s*(\d+)\s*Hours?\s*(\d+)\s*Minutes?/i);
+    if (!m) return null;
+    const days = parseInt(m[1], 10) || 0;
+    const hours = parseInt(m[2], 10) || 0;
+    const minutes = parseInt(m[3], 10) || 0;
+    return days * 24 + hours + minutes / 60;
+  }
+
   function normalizeRows() {
     const rawBalagh = getRaw();
     if (
@@ -7736,6 +7758,13 @@ function _sysDownloadFile(filename, content, mime) {
           : (coreSchoolNo(schoolNumber) ? ("ID::" + coreSchoolNo(schoolNumber)) : ("NM::" + norm(r["اسم المبنى"])));
         // حالة SLA — نحسب "متأخر" من حالة SLA مباشرة
         const isOverdue = slaStatus === "تم اختراقه";
+        // ── الأعمدة الجديدة (SLA DAYS الفعلي بالأيام/الساعات/الدقائق،
+        // المرحلة، الجنس، المقاول) — أُضيفت لاحقاً للشيت، فبنقرأها بأمان
+        // (null/فاضي لو مش موجودة في صف قديم). SLA DAYS نص خام زي
+        // "33 Days 2 Hours 20 Minutes" فبنحوّله كمان لرقم فعلي بالساعات
+        // والأيام عشان يتحسب عليه متوسط/فرز حقيقي بدل النص وحده. ──
+        const slaDurationRaw = norm(r["SLA DAYS"]);
+        const slaDurationHours = parseSlaDurationToHours_(slaDurationRaw);
         return {
           idx: idx + 1,
           recordNo:          norm(r["مُعرّف الحالة"]),
@@ -7745,6 +7774,12 @@ function _sysDownloadFile(filename, content, mime) {
           slaDays:           slaStatus,          // بنستخدم حالة SLA بدل الأيام
           slaNum:            isOverdue ? -1 : 0, // -1 = متأخر
           slaStatus,
+          slaDurationRaw,                                     // النص الخام كما هو من الشيت، مثال: "33 Days 2 Hours 20 Minutes"
+          slaDurationHours,                                   // رقم فعلي بالساعات (null لو غير متاح/غير قابل للتحليل)
+          slaDurationDays:   slaDurationHours == null ? null : +(slaDurationHours / 24).toFixed(2),
+          stage:             norm(r["المرحلة"]) || "",        // المرحلة الدراسية للبلاغ
+          gender:            norm(r["الجنس"]) || "",          // بنين/بنات
+          contractor:        norm(r["المقاول"]) || "",        // اسم شركة المقاول المسؤول
           status,
           schoolNumber,
           schoolKey,
@@ -7788,6 +7823,9 @@ function _sysDownloadFile(filename, content, mime) {
     const dateFrom = ST.dateFrom || document.getElementById("balagh-date-from")?.value || "";
     const dateTo = ST.dateTo || document.getElementById("balagh-date-to")?.value || "";
     const month = ST.month || document.getElementById("balagh-month")?.value || "";
+    const contractor = ST.contractor || document.getElementById("balagh-contractor")?.value || "";
+    const stage = ST.stage || document.getElementById("balagh-stage")?.value || "";
+    const gender = ST.gender || document.getElementById("balagh-gender")?.value || "";
     const schoolKeyFilter = ST.schoolKeyFilter || "";
 
     return all.filter((r) => {
@@ -7798,6 +7836,9 @@ function _sysDownloadFile(filename, content, mime) {
       if (category && r.category !== category) return false;
       if (priority && r.priority !== priority) return false;
       if (location && r.location !== location) return false;
+      if (contractor && r.contractor !== contractor) return false;
+      if (stage && r.stage !== stage) return false;
+      if (gender && r.gender !== gender) return false;
       if (month) {
         if (!r.creationDateObj || (r.creationDateObj.getMonth() + 1) !== +month) return false;
       }
@@ -8209,6 +8250,41 @@ function _sysDownloadFile(filename, content, mime) {
     const schoolBreakdownList = Object.values(schoolBreakdownMap).sort((a, b) => b.total - a.total);
     const schoolBreakdownShowN = STATE.breakdownShowN || 15;
 
+    // ── تحليل الأعمدة الجديدة: SLA الفعلي (بالأيام)، المرحلة، الجنس، المقاول ──
+    const slaRowsWithDuration = rows.filter((r) => r.slaDurationDays != null);
+    const avgSlaDays = slaRowsWithDuration.length
+      ? slaRowsWithDuration.reduce((s, r) => s + r.slaDurationDays, 0) / slaRowsWithDuration.length
+      : null;
+    const stageCounts = topCounts(rows, "stage", 8);
+    const genderCounts = topCounts(rows, "gender", 6);
+    // ترتيب المقاولين حسب متوسط سرعة الحل (SLA الفعلي) — الأسرع أولاً
+    const contractorAggMap = new Map();
+    rows.forEach((r) => {
+      const c = r.contractor;
+      if (!c) return;
+      if (!contractorAggMap.has(c)) contractorAggMap.set(c, { name: c, total: 0, overdue: 0, slaSum: 0, slaCount: 0 });
+      const o = contractorAggMap.get(c);
+      o.total++;
+      if (r.isOverdue) o.overdue++;
+      if (r.slaDurationDays != null) {
+        o.slaSum += r.slaDurationDays;
+        o.slaCount++;
+      }
+    });
+    const contractorList = [...contractorAggMap.values()]
+      .map((o) => ({
+        ...o,
+        avgSla: o.slaCount ? o.slaSum / o.slaCount : null,
+        compliancePct: o.total ? ((o.total - o.overdue) / o.total) * 100 : null,
+      }))
+      .sort((a, b) => {
+        // المقاولون اللي عندهم متوسط SLA فعلي أولاً (الأسرع فالأبطأ)، والباقي (بدون بيانات SLA كافية) في الآخر
+        if (a.avgSla == null && b.avgSla == null) return b.total - a.total;
+        if (a.avgSla == null) return 1;
+        if (b.avgSla == null) return -1;
+        return a.avgSla - b.avgSla;
+      });
+
     const list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
     const totalForBars = Math.max(1, filteredTotal);
 
@@ -8323,6 +8399,45 @@ function _sysDownloadFile(filename, content, mime) {
               .map(
                 (v) =>
                   `<option value="${escText(v)}"${STATE.location === v ? " selected" : ""}>${escText(v)}</option>`,
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المقاول</div>
+          <select class="fsel" id="balagh-contractor" onchange="window.__BALAGH_STATE__.contractor=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            <option value="">الكل</option>
+            ${[...new Set(all.map((r) => r.contractor).filter(Boolean))]
+              .sort()
+              .map(
+                (v) =>
+                  `<option value="${escText(v)}"${STATE.contractor === v ? " selected" : ""}>${escText(v)}</option>`,
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المرحلة</div>
+          <select class="fsel" id="balagh-stage" onchange="window.__BALAGH_STATE__.stage=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            <option value="">الكل</option>
+            ${[...new Set(all.map((r) => r.stage).filter(Boolean))]
+              .sort()
+              .map(
+                (v) =>
+                  `<option value="${escText(v)}"${STATE.stage === v ? " selected" : ""}>${escText(v)}</option>`,
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الجنس</div>
+          <select class="fsel" id="balagh-gender" onchange="window.__BALAGH_STATE__.gender=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            <option value="">الكل</option>
+            ${[...new Set(all.map((r) => r.gender).filter(Boolean))]
+              .sort()
+              .map(
+                (v) =>
+                  `<option value="${escText(v)}"${STATE.gender === v ? " selected" : ""}>${escText(v)}</option>`,
               )
               .join("")}
           </select>
@@ -8532,7 +8647,83 @@ function _sysDownloadFile(filename, content, mime) {
         </div>
       </div>
 
-      ${balaghSecHead(6, "🧾", "السجل التفصيلي", "كل البلاغات مع إمكانية البحث والترتيب والتصدير")}
+      ${balaghSecHead(6, "⏱️", "SLA والمقاولون", "سرعة الحل وأداء المقاولين")}
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">⏱️</span>
+          <span>ملخص سريع</span>
+        </div>
+        <div class="g3" style="margin-bottom:0">
+          <div class="kpi kc-blue">
+            <div class="kpi-val" style="color:#0891B2">${avgSlaDays != null ? avgSlaDays.toFixed(1) : "—"}</div>
+            <div class="kpi-lbl">متوسط زمن الحل (أيام)</div>
+          </div>
+          <div class="kpi kc-green">
+            <div class="kpi-val" style="color:#059669;font-size:${contractorList[0] && contractorList[0].avgSla != null ? "20px" : "28px"}">${contractorList[0] && contractorList[0].avgSla != null ? escText(contractorList[0].name) : "—"}</div>
+            <div class="kpi-lbl">أسرع مقاول</div>
+          </div>
+          <div class="kpi kc-navy">
+            <div class="kpi-val" style="color:#083D4F">${fmt(contractorList.length)}</div>
+            <div class="kpi-lbl">عدد المقاولين</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="g2 mb14" style="align-items:start">
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-icon" style="background:#F0FDF4;color:#15803D">🏫</span>
+            <span>حسب المرحلة</span>
+          </div>
+          ${renderBarList(stageCounts, totalForBars, CSS_TOKENS.positive())}
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span class="card-title-icon" style="background:#FDF4FF;color:#86198F">🚻</span>
+            <span>حسب الجنس</span>
+          </div>
+          ${renderBarList(genderCounts, totalForBars, CSS_TOKENS.special())}
+        </div>
+      </div>
+
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#FFF7ED;color:#C2410C">👷</span>
+          <span>ترتيب المقاولين — الأسرع أولاً</span>
+        </div>
+        ${
+          contractorList.length
+            ? `<div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse">
+                  <thead>
+                    <tr style="text-align:right;font-size:11px;color:var(--tx-sec)">
+                      <th style="padding:8px">المقاول</th>
+                      <th style="padding:8px">عدد البلاغات</th>
+                      <th style="padding:8px">متوسط SLA (أيام)</th>
+                      <th style="padding:8px">نسبة الالتزام (غير متأخر)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${contractorList
+                      .slice(0, 20)
+                      .map(
+                        (c) => `
+                      <tr style="border-top:1px solid var(--bd-light);font-size:12px">
+                        <td style="padding:8px;font-weight:700">${escText(c.name)}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums">${fmt(c.total)}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums;color:${CSS_TOKENS.info2()}">${c.avgSla != null ? c.avgSla.toFixed(1) : "—"}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums">${c.compliancePct != null ? c.compliancePct.toFixed(1) + "%" : "—"}</td>
+                      </tr>`,
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>`
+            : '<div class="empty-msg" style="padding:18px">لا توجد بيانات مقاولين ضمن الفلاتر الحالية</div>'
+        }
+      </div>
+
+      ${balaghSecHead(7, "🧾", "السجل التفصيلي", "كل البلاغات مع إمكانية البحث والترتيب والتصدير")}
       <div class="card">
         <div class="card-title">
           <span class="card-title-icon" style="background:#EEF2FF;color:#4338CA">🧾</span>
@@ -9336,6 +9527,17 @@ function _sysDownloadFile(filename, content, mime) {
   window.balaghExportCSV = function () {
     exportCSV(filteredRows(normalizeRows()));
   };
+
+  /* ── تعريض قراءة فقط لمحرك AIBalaghat (المساعد الذكي — يُعرَّف لاحقاً
+     في هذا الملف) — بدون أي تعديل على منطق هذا التبويب. الهدف: مصدر
+     حقيقة واحد (Single Source of Truth) لتصنيف "مفتوح/مغلق/متأخر/عالي
+     الخطورة" ولمفتاح المدرسة الموحّد (schoolKey)، بدل ما يبني المساعد
+     نسخته الخاصة من هذا المنطق واحتمال يختلف عن الأرقام الظاهرة فعلياً
+     في هذا التبويب. نفس normalizeRows بكاشها الحالي — بدون أي نسخ. ── */
+  window.__balaghNormalizeRows = normalizeRows;
+  window.__balaghIsClosed = balaghIsClosed;
+  window.__balaghIsHighRiskPriority = isHighRiskPriority;
+  window.__balaghPriorityLabel = balaghPriorityLabel;
 })();
 
 
@@ -14815,10 +15017,17 @@ function renderTajheezAllTable() {
   /* كاش أسماء الأنظمة الرئيسية والفرعية من بيانات حصر الأصول — يُبنى مرة واحدة
      ويُستخدم للتعرف التلقائي على أسماء الأنظمة الفرعية داخل سؤال المستخدم
      حتى لو مقالش "حصر أصول" صراحة */
+  // ⚠️ الكاش ده (وتلاته اللي بعده لقطع الغيار والتجهيزات) كان بيتبني مرة
+  // واحدة بس طول عمر الصفحة ومبيتحدّثش تاني، حتى لو البيانات المصدر اتغيّرت
+  // (تحديث تلقائي/يدوي بعد ما الصفحة اتفتحت). بنستخدم نفس إشارة الإبطال
+  // المستخدمة في باقي الكاشات الثقيلة بالملف (window.__DATA_REV__) عشان
+  // يُعاد البناء تلقائياً كل ما البيانات تتغيّر فعلياً، مش يفضل مجمّد.
   let _fcbHasrSysNamesCache = null;
+  let _fcbHasrSysNamesCacheRev = -1;
   function fcbHasrSysNames() {
-    if (_fcbHasrSysNamesCache) return _fcbHasrSysNamesCache;
     if (!(window.HASR && window.HASR.loaded && window.HASR.data)) return [];
+    const rev = window.__DATA_REV__ || 0;
+    if (_fcbHasrSysNamesCache && _fcbHasrSysNamesCacheRev === rev) return _fcbHasrSysNamesCache;
     const names = [];
     (window.HASR.data.systems || []).forEach(s => {
       if (s.name) names.push({ name: s.name, main: s.name });
@@ -14829,6 +15038,7 @@ function renderTajheezAllTable() {
     // أطول الأسماء أولاً لتفادي تطابقات جزئية مضللة
     names.sort((a, b) => b.name.length - a.name.length);
     _fcbHasrSysNamesCache = names;
+    _fcbHasrSysNamesCacheRev = rev;
     return names;
   }
   // يرجع أول اسم نظام رئيسي/فرعي موجود داخل نص المستخدم، أو null
@@ -14843,9 +15053,11 @@ function renderTajheezAllTable() {
   /* نفس فكرة الكاش أعلاه لكن لأسماء أصناف قطع الغيار — يسمح للمستخدم يسأل
      عن صنف بعينه بالاسم من غير ما يقول "قطع غيار" صراحة */
   let _fcbSparePartNamesCache = null;
+  let _fcbSparePartNamesCacheRev = -1;
   function fcbSparePartNames() {
-    if (_fcbSparePartNamesCache) return _fcbSparePartNamesCache;
     if (!Array.isArray(window.RAW_SPARE_PARTS) || !window.RAW_SPARE_PARTS.length) return [];
+    const rev = window.__DATA_REV__ || 0;
+    if (_fcbSparePartNamesCache && _fcbSparePartNamesCacheRev === rev) return _fcbSparePartNamesCache;
     const seen = new Set();
     window.RAW_SPARE_PARTS.forEach(r => {
       const name = String(r["وصف_الصنف"] ?? "").trim();
@@ -14853,6 +15065,7 @@ function renderTajheezAllTable() {
     });
     const names = [...seen].sort((a, b) => b.length - a.length);
     _fcbSparePartNamesCache = names;
+    _fcbSparePartNamesCacheRev = rev;
     return names;
   }
   function fcbMatchSparePartName(text) {
@@ -14865,9 +15078,11 @@ function renderTajheezAllTable() {
 
   /* نفس الفكرة لأسماء أقسام وأصناف تبويب التجهيزات */
   let _fcbTajheezNamesCache = null;
+  let _fcbTajheezNamesCacheRev = -1;
   function fcbTajheezNames() {
-    if (_fcbTajheezNamesCache) return _fcbTajheezNamesCache;
     if (!Array.isArray(window.RAW_TAJHEEZ_INV) || !window.RAW_TAJHEEZ_INV.length || typeof parseTajheezRow !== "function") return [];
+    const rev = window.__DATA_REV__ || 0;
+    if (_fcbTajheezNamesCache && _fcbTajheezNamesCacheRev === rev) return _fcbTajheezNamesCache;
     const taj = window.RAW_TAJHEEZ_INV.map(parseTajheezRow).filter((r) => r.صنف || r.قسم);
     const seen = new Map(); // name -> {name, isDept}
     taj.forEach(r => {
@@ -14876,6 +15091,7 @@ function renderTajheezAllTable() {
     });
     const names = [...seen.values()].sort((a, b) => b.name.length - a.name.length);
     _fcbTajheezNamesCache = names;
+    _fcbTajheezNamesCacheRev = rev;
     return names;
   }
   function fcbMatchTajheezName(text) {
@@ -14886,6 +15102,558 @@ function renderTajheezAllTable() {
     return null;
   }
 
+  /* نفس فكرة المطابقة أعلاه لكن لأسماء المدارس — يسمح للمستخدم يسأل عن
+     بلاغات مدرسة بعينها بالاسم مباشرة (مع أو من غير كلمة "مدرسة" قبلها)،
+     وترجع لنا الـ minId عشان نربطها بسجلات RAW_BALAGH بدقة 100% بدل الاعتماد
+     على تطابق نص تقريبي.
+     ⚠️ الاسم الرسمي غالباً بترتيب مختلف عن اللي بيكتبه المستخدم (مثلاً
+     "متوسطة الأمير خالد بن فهد" في البيانات مقابل "الأمير خالد بن فهد
+     المتوسطة" في السؤال)، فمطابقة substring المباشرة كانت بتفشل. الحل:
+     مطابقة على مستوى الكلمات (word overlap) بغض النظر عن الترتيب، مع تطبيع
+     الهمزات/التاء المربوطة/"ال" التعريف. */
+  function fcbNormalizeArabic(s) {
+    return String(s || "")
+      .replace(/[\u064B-\u065F\u0670]/g, "")   // تشكيل
+      .replace(/[إأآا]/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+      .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)) // أرقام عربية → لاتينية
+      .replace(/[،؛؟٪ـ]/g, " ")                 // علامات ترقيم عربية
+      .replace(/[^\u0621-\u064A0-9\s]/g, " ")   // إبقاء الحروف والأرقام فقط (استبعاد أي رموز/ترقيم)
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function fcbStripAl_(w) {
+    return w.length > 3 && w.startsWith("ال") ? w.slice(2) : w;
+  }
+  function fcbSchoolWords_(name) {
+    return fcbNormalizeArabic(name).split(" ").filter(w => w.length >= 2).map(fcbStripAl_);
+  }
+  // ── كاش بيتبني مرة واحدة لكل نسخة من window.RAW، وبيُعاد بناؤه تلقائياً
+  // لو window.RAW اتغيّر (بعد أي تحديث تلقائي/يدوي للبيانات بيستبدل RAW
+  // بمصفوفة جديدة) — نفس مبدأ كاش aiBalaghGetIndex_ (مقارنة بالمرجع
+  // srcRaw === window.RAW مش قيمة قديمة مجمّدة للأبد). قبل هذا التعديل
+  // كان الكاش لا يُعاد بناؤه إطلاقاً طول عمر الصفحة، فمدرسة تُضاف للشيت
+  // بعد فتح اللوحة كانت تفضل غير معروفة للمطابقة حتى لو تحدّثت البيانات. ──
+  let _fcbSchoolNamesCache = null;
+  let _fcbSchoolNamesCacheSrc = null;
+  function fcbSchoolNames() {
+    if (!Array.isArray(window.RAW) || !window.RAW.length) return [];
+    if (_fcbSchoolNamesCache && _fcbSchoolNamesCacheSrc === window.RAW) return _fcbSchoolNamesCache;
+    const seen = new Map(); // name -> {name, minId, words}
+    window.RAW.forEach(r => {
+      const name = String(r.name ?? "").trim();
+      const minId = r.minId || r.schoolSeq;
+      if (name && name.length >= 4 && minId && !seen.has(name)) {
+        seen.set(name, { name, minId, words: fcbSchoolWords_(name) });
+      }
+    });
+    const names = [...seen.values()].sort((a, b) => b.name.length - a.name.length);
+    _fcbSchoolNamesCache = names;
+    _fcbSchoolNamesCacheSrc = window.RAW;
+    return names;
+  }
+  /* 🔬 نسخة مفصّلة من المطابقة: بترجع طريقة المطابقة + حالة "ambiguity"
+     صريحة لو فيه أكتر من مدرسة منافسة بنفس القوة — عشان محرك AIBalaghat
+     (تحت) يقدر يقرر يسأل المستخدم يوضح بدل ما يخمن (ممنوع fuzzy matching
+     عدواني). fcbMatchSchoolName القديمة اتسابت زي ما هي (wrapper بسيط)
+     عشان أي كود موجود بينده عليها يفضل شغال بالظبط زي الأول. */
+  function fcbMatchSchoolNameDetailed(text) {
+    const t = String(text || "");
+    // 1) مطابقة مباشرة (substring) — أسرع ولو الاسم مكتوب زي ما هو بالظبط،
+    // ومضمونة 100% (مفيش ambiguity ممكنة هنا لأنها مطابقة حرفية كاملة)
+    for (const entry of fcbSchoolNames()) {
+      if (t.includes(entry.name)) {
+        return { match: entry, method: "exact-substring", ambiguous: false, candidates: [entry] };
+      }
+    }
+    // 2) مطابقة بالكلمات (word overlap) — تتحمّل اختلاف الترتيب، "ال"
+    // التعريف، وكمان بتسمح بكلمة واحدة غير متطابقة (زي رقم مكتوب بالحروف
+    // في السؤال "الثانية والخمسون" مقابل رقم بالأرقام "52" في اسم المدرسة
+    // الرسمي) — بدل نسبة تطابق ثابتة 80% اللي كانت بترفض أسماء قصيرة (٣-٤
+    // كلمات) لمجرد اختلاف كلمة رقمية واحدة.
+    const normT = fcbNormalizeArabic(t);
+    const textWords = new Set(normT.split(" ").filter(w => w.length >= 2).map(fcbStripAl_));
+    const passing = [];
+    for (const entry of fcbSchoolNames()) {
+      const words = entry.words;
+      if (words.length < 2) continue; // اسم قصير جداً — تجنّب مطابقات زائفة
+      let hits = 0;
+      for (const w of words) if (textWords.has(w)) hits++;
+      const ratio = hits / words.length;
+      const minRequiredHits = Math.max(2, words.length - 1); // نسمح بكلمة واحدة ناقصة كحد أقصى
+      if (hits >= minRequiredHits) passing.push({ entry, hits, ratio });
+    }
+    if (!passing.length) return { match: null, method: "none", ambiguous: false, candidates: [] };
+    passing.sort((a, b) => (b.hits - a.hits) || (b.ratio - a.ratio));
+    const top = passing[0];
+    // منافس حقيقي = مدرسة مختلفة (minId مختلف) بنفس قوة التطابق (hits) —
+    // في الحالة دي منقدرش نحسم أنهي مدرسة المقصودة، فلازم نرجّع ambiguous
+    // بدل ما نخمّن ونختار أول واحدة طلعت.
+    const rivals = passing.filter(p => String(p.entry.minId) !== String(top.entry.minId) && p.hits >= top.hits);
+    if (rivals.length) {
+      const candidates = [top, ...rivals].slice(0, 4).map(p => p.entry);
+      return { match: null, method: "word-overlap", ambiguous: true, candidates };
+    }
+    return { match: top.entry, method: "word-overlap", ambiguous: false, candidates: [top.entry] };
+  }
+  function fcbMatchSchoolName(text) {
+    return fcbMatchSchoolNameDetailed(text).match;
+  }
+  /* بيرجع كل المدارس المذكورة صراحةً بمطابقة مباشرة (exact-substring بس —
+     أكثر أماناً للمقارنة بين مدرستين، بدون مخاطرة fuzzy). تُستخدم في
+     BALAGH_SCHOOL_COMPARE. */
+  function fcbMatchAllSchoolNamesExact_(text) {
+    const t = String(text || "");
+    const found = [];
+    const seenIds = new Set();
+    for (const entry of fcbSchoolNames()) {
+      if (t.includes(entry.name) && !seenIds.has(String(entry.minId))) {
+        found.push(entry);
+        seenIds.add(String(entry.minId));
+        if (found.length >= 4) break;
+      }
+    }
+    return found;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     🧠 AIBalaghatEngine — طبقة استعلام بيانات مستقلة لتبويب البلاغات
+     ────────────────────────────────────────────────────────────────────
+     مبدأ معماري: فصل DATA RETRIEVAL عن AI ANSWER GENERATION.
+     User Question → Intent Detection → Entity Detection → Data Query
+     Engine → Exact Result → LLM (صياغة بشرية فقط، بدون حساب أو تخمين).
+
+     يعتمد على window.__balaghNormalizeRows (نفس الدالة الفعلية اللي
+     بيستخدمها تبويب البلاغات، بنفس الكاش) — Single Source of Truth،
+     مش نسخة تانية ممكن تختلف في العدّ عن الأرقام الظاهرة للمستخدم.
+
+     API عام:
+       window.AIBalaghat.findSchool(query)
+       window.AIBalaghat.getReportsForSchool(school)
+       window.AIBalaghat.getSchoolStats(school)
+       window.AIBalaghat.getSchoolSummary(school)
+       window.AIBalaghat.searchReports(query)
+       window.AIBalaghat.compareSchools([school1, school2])
+       window.AIBalaghat.detectIntent(text)
+       window.AIBalaghat.isDataReady()
+       window.AIBalaghat.resolve(userText, historyMessages) — نقطة الدخول
+       المستخدمة من fcbAskOpenAI نفسها.
+     ════════════════════════════════════════════════════════════════════ */
+
+  // وضع تشخيص داخلي — فعّله من الكونسول بـ: window.AI_DEBUG = true
+  window.AI_DEBUG = window.AI_DEBUG || false;
+  function aiDebugLog_(tag, data) {
+    if (!window.AI_DEBUG) return;
+    try { console.log(tag, data); } catch (_) {}
+  }
+
+  // حالة المحادثة عبر الأسئلة المتتابعة — آخر مدرسة/تبويب/intent مؤكدين.
+  // "كم منها مفتوح؟" بعد "كم بلاغ عند مدرسة X؟" بيفهم إن المقصود X من هنا.
+  window.AI_CONTEXT = window.AI_CONTEXT || { school: null, tab: null, intent: null, timestamp: null };
+
+  function aiBalaghIsDataReady_() {
+    return window.__BALAGH_LOAD_STATE__ === "loaded" && Array.isArray(window.RAW_BALAGH);
+  }
+
+  // ── Index مبني مرة واحدة، وبيُعاد بناؤه تلقائياً بس لو normalizeRows()
+  // رجّعت مصفوفة جديدة فعلاً (يعني RAW_BALAGH اتغيّر) — نفس فكرة كاش
+  // normalizeRows نفسها، هنا بنجمّع بالإضافة لكده حسب schoolKey/الاسم
+  // المطبّع/الرقم الوزاري عشان lookup فوري بدل فلترة آلاف السجلات كل سؤال. ──
+  let __aiBalaghIndexCache = null;
+  function aiBalaghGetIndex_() {
+    const getNorm = window.__balaghNormalizeRows;
+    if (typeof getNorm !== "function") {
+      return { bySchoolKey: new Map(), bySchoolName: new Map(), byMinId: new Map(), rows: [] };
+    }
+    const rows = getNorm();
+    if (__aiBalaghIndexCache && __aiBalaghIndexCache.srcRows === rows) {
+      return __aiBalaghIndexCache;
+    }
+    const bySchoolKey = new Map(), bySchoolName = new Map(), byMinId = new Map();
+    const pushTo = (map, key, row) => {
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    };
+    rows.forEach((r) => {
+      pushTo(bySchoolKey, r.schoolKey, r);
+      pushTo(bySchoolName, fcbNormalizeArabic(r.linkedSchoolName || r.schoolName || ""), r);
+      const idNorm = window.normSchoolId
+        ? window.normSchoolId(r.linkedMinId || r.schoolNumber)
+        : String(r.linkedMinId || r.schoolNumber || "").trim();
+      pushTo(byMinId, idNorm, r);
+    });
+    __aiBalaghIndexCache = { srcRows: rows, bySchoolKey, bySchoolName, byMinId, rows };
+    return __aiBalaghIndexCache;
+  }
+
+  /* ── 1) اكتشاف المدرسة (Entity Detection) ──────────────────────────
+     يرجّع: { status: "found"|"ambiguous"|"not_found", school, candidates, method } */
+  function aiBalaghFindSchool_(query) {
+    const detailed = fcbMatchSchoolNameDetailed(query);
+    if (detailed.ambiguous) {
+      aiDebugLog_("[AI SCHOOL MATCH]", { query, status: "ambiguous", candidates: detailed.candidates.map((c) => c.name) });
+      return { status: "ambiguous", school: null, candidates: detailed.candidates, method: detailed.method };
+    }
+    if (detailed.match) {
+      aiDebugLog_("[AI SCHOOL MATCH]", { query, matched: detailed.match.name, method: detailed.method, minId: detailed.match.minId });
+      return { status: "found", school: detailed.match, candidates: [detailed.match], method: detailed.method };
+    }
+    aiDebugLog_("[AI SCHOOL MATCH]", { query, status: "not_found" });
+    return { status: "not_found", school: null, candidates: [], method: "none" };
+  }
+
+  /* ── 2) بلاغات مدرسة بعينها — عبر schoolKey الموحّد أولاً (نفس منطق
+     تبويب البلاغات بالحرف)، وفولباك بالاسم المطبّع/الرقم الوزاري لو
+     المدرسة لأي سبب مش مرتبطة عبر schoolKey. ── */
+  function aiBalaghGetReportsForSchool_(school) {
+    if (!school) return [];
+    const idx = aiBalaghGetIndex_();
+    const key = "ID::" + school.minId;
+    const byKey = idx.bySchoolKey.get(key);
+    if (byKey && byKey.length) return byKey;
+    const nameNorm = fcbNormalizeArabic(school.name);
+    const idNorm = window.normSchoolId ? window.normSchoolId(school.minId) : String(school.minId || "").trim();
+    const byName = idx.bySchoolName.get(nameNorm) || [];
+    const byId = idx.byMinId.get(idNorm) || [];
+    if (!byName.length && !byId.length) return [];
+    const seen = new Set(), merged = [];
+    [...byName, ...byId].forEach((r) => { if (!seen.has(r)) { seen.add(r); merged.push(r); } });
+    return merged;
+  }
+
+  function aiBalaghCountBy_(rows, field) {
+    const out = {};
+    rows.forEach((r) => {
+      const v = String(r[field] ?? "").trim() || "غير محدد";
+      out[v] = (out[v] || 0) + 1;
+    });
+    return Object.fromEntries(Object.entries(out).sort((a, b) => b[1] - a[1]));
+  }
+
+  /* ── 3) إحصائيات محسوبة كاملة لمدرسة — كل الأرقام هنا محسوبة فعلياً في
+     JavaScript من RAW_BALAGH (عبر normalizeRows الأصلية)، مفيش أي رقم
+     بيتحسب أو يتخمّن من الـ LLM. بتحمل provenance واضح لأي تشخيص لاحق. ── */
+  function aiBalaghGetSchoolStats_(school) {
+    const rows = aiBalaghGetReportsForSchool_(school);
+    const isHighRiskFn = window.__balaghIsHighRiskPriority || (() => false);
+    const open = rows.filter((r) => r.isOpen).length;
+    const closed = rows.filter((r) => r.isClosed).length;
+    const urgent = rows.filter((r) => isHighRiskFn(r.priority)).length;
+    const overdue = rows.filter((r) => r.isOverdue).length;
+    const categories = aiBalaghCountBy_(rows, "category");
+    const subCategories = aiBalaghCountBy_(rows, "subCategory");
+    const priorities = aiBalaghCountBy_(rows, "priority");
+    const statuses = aiBalaghCountBy_(rows, "status");
+    const slaStatuses = aiBalaghCountBy_(rows, "slaStatus");
+    const sortedByDate = [...rows].sort((a, b) => {
+      const ta = a.creationDateObj ? a.creationDateObj.getTime() : -Infinity;
+      const tb = b.creationDateObj ? b.creationDateObj.getTime() : -Infinity;
+      return tb - ta;
+    });
+    const toDetail = (r) => ({
+      رقم: r.recordNo || null,
+      حالة: r.status || null,
+      فئة: r.category || null,
+      فئة_فرعية: r.subCategory || null,
+      أولوية: r.priority || null,
+      sla: r.slaStatus || null,
+      SLA_أيام: r.slaDurationDays ?? null,
+      المرحلة: r.stage || null,
+      الجنس: r.gender || null,
+      المقاول: r.contractor || null,
+      تاريخ_الإنشاء: r.creationDate || null,
+      وصف: (r.problemDescription || "").slice(0, 140),
+      وصف_الحل: (r.resolutionDesc || "").slice(0, 140),
+    });
+    const topCatKey = Object.keys(categories)[0] || null;
+    // ── الأعمدة الجديدة: SLA الفعلي (بالأيام)، المرحلة، الجنس، المقاول ──
+    const slaRowsWithDuration = rows.filter((r) => r.slaDurationDays != null);
+    const avgSlaDays = slaRowsWithDuration.length
+      ? +(slaRowsWithDuration.reduce((s, r) => s + r.slaDurationDays, 0) / slaRowsWithDuration.length).toFixed(2)
+      : null;
+    const stages = aiBalaghCountBy_(rows, "stage");
+    const genders = aiBalaghCountBy_(rows, "gender");
+    const contractors = aiBalaghCountBy_(rows, "contractor");
+    return {
+      status: rows.length ? "ok" : "ok_zero", // ok_zero = مدرسة معروفة بالتأكيد لكن بدون بلاغات فعلاً (مختلف عن not_ready)
+      schoolName: school.name,
+      matchedSchoolName: school.name,
+      matchedSchoolId: school.minId,
+      total: rows.length,
+      open, closed, urgent, overdue,
+      unclassified: rows.length - open - closed,
+      topCategory: topCatKey,
+      topCategoryCount: topCatKey ? categories[topCatKey] : 0,
+      topSubCategory: Object.keys(subCategories)[0] || null,
+      categories, subCategories, priorities, statuses, slaStatuses,
+      avgSlaDays,                        // متوسط SLA الفعلي بالأيام (null لو مفيش بيانات SLA DAYS كافية)
+      slaDaysSampleSize: slaRowsWithDuration.length, // كام بلاغ فعلاً دخل في حساب المتوسط
+      stages,                            // توزيع البلاغات حسب المرحلة الدراسية
+      genders,                           // توزيع البلاغات حسب الجنس
+      contractors,                       // توزيع البلاغات حسب المقاول المسؤول (بلاغ واحد ممكن يكون له أكتر من مقاول عبر الوقت)
+      topContractor: Object.keys(contractors)[0] || null,
+      latest10: sortedByDate.slice(0, 10).map(toDetail),
+      openDetails: rows.filter((r) => r.isOpen).slice(0, 60).map(toDetail),
+      urgentDetails: rows.filter((r) => isHighRiskFn(r.priority)).slice(0, 60).map(toDetail),
+      allDetails: rows.slice(0, 250).map(toDetail),
+      truncated: rows.length > 250,
+      source: "RAW_BALAGH",
+      schoolMatchedBy: rows.length && rows[0].schoolKey === ("ID::" + school.minId) ? "schoolKey" : "name/minId-fallback",
+      rowCount: rows.length,
+    };
+  }
+
+  function aiBalaghGetSchoolSummary_(school) {
+    return aiBalaghGetSchoolStats_(school); // alias مبسّط لنفس البيانات
+  }
+
+  /* ── 4) استعلام عام على كل البلاغات (مش مقيّد بمدرسة واحدة) — يدعم
+     نفس فلاتر تبويب البلاغات نفسه. ── */
+  function aiBalaghSearchReports_(q) {
+    q = q || {};
+    const idx = aiBalaghGetIndex_();
+    let rows = q.school ? aiBalaghGetReportsForSchool_(q.school) : idx.rows;
+    if (q.status) rows = rows.filter((r) => String(r.status || "").includes(q.status));
+    if (q.priority) rows = rows.filter((r) => String(r.priority || "").includes(q.priority));
+    if (q.category) rows = rows.filter((r) => String(r.category || "").includes(q.category));
+    if (q.subcategory) rows = rows.filter((r) => String(r.subCategory || "").includes(q.subcategory));
+    if (q.sla) rows = rows.filter((r) => String(r.slaStatus || "").includes(q.sla));
+    if (q.contractor) rows = rows.filter((r) => String(r.contractor || "").includes(q.contractor));
+    if (q.stage) rows = rows.filter((r) => String(r.stage || "").includes(q.stage));
+    if (q.gender) rows = rows.filter((r) => String(r.gender || "").includes(q.gender));
+    if (q.openOnly) rows = rows.filter((r) => r.isOpen);
+    if (q.closedOnly) rows = rows.filter((r) => r.isClosed);
+    if (q.urgentOnly) {
+      const isHighRiskFn = window.__balaghIsHighRiskPriority || (() => false);
+      rows = rows.filter((r) => isHighRiskFn(r.priority));
+    }
+    const sortKey = q.sort || "date_desc";
+    rows = [...rows].sort((a, b) => {
+      const ta = a.creationDateObj ? a.creationDateObj.getTime() : -Infinity;
+      const tb = b.creationDateObj ? b.creationDateObj.getTime() : -Infinity;
+      return sortKey === "date_asc" ? ta - tb : tb - ta;
+    });
+    const limit = Math.min(q.limit || 50, 250);
+    return {
+      status: "ok",
+      total: rows.length,
+      returned: Math.min(rows.length, limit),
+      rows: rows.slice(0, limit).map((r) => ({
+        رقم: r.recordNo, مدرسة: r.linkedSchoolName || r.schoolName, حالة: r.status,
+        فئة: r.category, فئة_فرعية: r.subCategory, أولوية: r.priority, sla: r.slaStatus,
+        SLA_أيام: r.slaDurationDays ?? null, المرحلة: r.stage || null, الجنس: r.gender || null, المقاول: r.contractor || null,
+        تاريخ: r.creationDate, وصف: (r.problemDescription || "").slice(0, 120),
+      })),
+      source: "RAW_BALAGH",
+    };
+  }
+
+  /* ── 5) مقارنة مدرستين أو أكتر — كل مدرسة بإحصائياتها الحقيقية. ── */
+  function aiBalaghCompareSchools_(schools) {
+    const stats = schools.map((s) => aiBalaghGetSchoolStats_(s));
+    return {
+      status: "ok",
+      schools: stats,
+      moreTotal: stats.length >= 2 ? (stats[0].total >= stats[1].total ? stats[0].schoolName : stats[1].schoolName) : null,
+      moreOpen: stats.length >= 2 ? (stats[0].open >= stats[1].open ? stats[0].schoolName : stats[1].schoolName) : null,
+      source: "RAW_BALAGH",
+    };
+  }
+
+  /* ── 5.5) ترتيب المقاولين عبر كل المدارس حسب سرعة حل البلاغات (SLA
+     الفعلي) — لأسئلة زي "من أسرع مقاول؟"، "رتب المقاولين"، "أداء
+     المقاولين". لا يحسب أي رقم غير موجود فعلياً في RAW_BALAGH. ── */
+  function aiBalaghContractorRanking_() {
+    const idx = aiBalaghGetIndex_();
+    const map = new Map();
+    idx.rows.forEach((r) => {
+      const c = r.contractor;
+      if (!c) return;
+      if (!map.has(c)) map.set(c, { name: c, total: 0, open: 0, closed: 0, overdue: 0, slaSum: 0, slaCount: 0 });
+      const o = map.get(c);
+      o.total++;
+      if (r.isOpen) o.open++;
+      if (r.isClosed) o.closed++;
+      if (r.isOverdue) o.overdue++;
+      if (r.slaDurationDays != null) {
+        o.slaSum += r.slaDurationDays;
+        o.slaCount++;
+      }
+    });
+    const list = [...map.values()]
+      .map((o) => ({
+        المقاول: o.name,
+        إجمالي_البلاغات: o.total,
+        مفتوحة: o.open,
+        مغلقة: o.closed,
+        متأخرة_SLA: o.overdue,
+        نسبة_الالتزام: o.total ? +(((o.total - o.overdue) / o.total) * 100).toFixed(1) : null,
+        متوسط_SLA_أيام: o.slaCount ? +(o.slaSum / o.slaCount).toFixed(2) : null,
+        حجم_عينة_SLA: o.slaCount,
+      }))
+      .sort((a, b) => {
+        // الأسرع (أقل متوسط SLA) أولاً؛ من غير بيانات SLA كافية في الآخر
+        if (a.متوسط_SLA_أيام == null && b.متوسط_SLA_أيام == null) return b.إجمالي_البلاغات - a.إجمالي_البلاغات;
+        if (a.متوسط_SLA_أيام == null) return 1;
+        if (b.متوسط_SLA_أيام == null) return -1;
+        return a.متوسط_SLA_أيام - b.متوسط_SLA_أيام;
+      });
+    return {
+      status: list.length ? "ok" : "ok_zero",
+      contractorsCount: list.length,
+      ranking: list,
+      fastestContractor: list.length && list[0].متوسط_SLA_أيام != null ? list[0].المقاول : null,
+      source: "RAW_BALAGH",
+      note: "الترتيب حسب متوسط SLA الفعلي (أيام) من عمود SLA DAYS — الأسرع في الحل أولاً. المقاولون بدون بيانات SLA كافية يظهرون في نهاية القائمة.",
+    };
+  }
+
+  /* ── 5.6) لقطة بيانات عامة لمدرسة بعينها — مش من RAW_BALAGH زي باقي
+     المحرك ده، مصدرها window.RAW (ملف المباني) مباشرة: FCA/بيئة/تقييم
+     عاين/تقييم منصة أصول/بيانات أساسية. الهدف: أي سؤال عن مدرسة محددة
+     (مش بس بلاغات) يلاقي بيانات حقيقية جاهزة بدل "لا توجد بيانات كافية".
+     ⚠️ مقصوداً بدون أي حقل "عدد بلاغات" هنا — عدد البلاغات مصدره الوحيد
+     الموثوق هو DATA_RESULT (بلاغات) فوق، تجنباً لتضارب مصدرين مختلفين. */
+  function aiSchoolSnapshot_(minId) {
+    if (!minId || !Array.isArray(window.RAW)) return "";
+    const schoolRow = window.RAW.find((x) => x.minId === minId);
+    if (!schoolRow) return "";
+    return (
+      `\n\nلقطة بيانات عامة لمدرسة "${schoolRow.name}" (مصدرها RAW — ملف المباني، نفس بيانات تبويبات FCA/البيئة المدرسية/تقييم عاين/تقييم منصة أصول):\n` +
+      JSON.stringify({
+        الاسم: schoolRow.name,
+        الرقم_الوزاري: schoolRow.minId,
+        نسبة_FCA: schoolRow.fca ?? null,
+        نسبة_البيئي: schoolRow.envScore ?? null,
+        تصنيف_بيئي: schoolRow.envRating ?? null,
+        تقييم_عاين: schoolRow.ayenScore ?? null,
+        تقييم_منصة_أصول: schoolRow.asolStatus ?? null,
+        المحافظة: schoolRow.sector ?? schoolRow.district ?? null,
+        المدينة: schoolRow.city ?? null,
+        المرحلة: schoolRow.stage ?? null,
+        الجنس: schoolRow.gender ?? null,
+        عدد_الطلاب: schoolRow.students ?? null,
+        عمر_المبنى: schoolRow.buildingAge ?? null,
+        عدد_الفصول: schoolRow.classrooms ?? null,
+        تاريخ_آخر_تقييم_FCA: schoolRow.fcaDate ?? null,
+        source: "RAW (ملف المباني)",
+        ملاحظة: "لا يحتوي عدد بلاغات — لعدد البلاغات استخدم DATA_RESULT (بلاغات) فقط لو موجود في نفس الرسالة.",
+      })
+    );
+  }
+
+  /* ── 6) محرك Intent — بيتحدد قبل استدعاء الـ LLM، كتلميح للصياغة (كل
+     الأرقام أصلاً جاهزة في DATA_RESULT بصرف النظر عن الـ intent). ── */
+  const AI_BALAGH_INTENT_PATTERNS = [
+    { intent: "BALAGH_CONTRACTOR_RANKING", re: /أسرع مقاول|أبطأ مقاول|ترتيب المقاول|تصنيف المقاول|أداء المقاول|أفضل مقاول|أسوأ مقاول|مقارن[ةه].*مقاول/i },
+    { intent: "BALAGH_SCHOOL_COMPARE",     re: /قارن|مقارن[ةه]|أيهما|ايهما|مقابل|compare/i },
+    { intent: "BALAGH_SCHOOL_SUBCATEGORY", re: /فئ[ةه]\s*فرعي[ةه]|subcategory|نوع فرعي/i },
+    { intent: "BALAGH_SCHOOL_CATEGORY",    re: /أكثر نوع|أنواع|توزيع|أكثر فئ[ةه](?!\s*فرعي[ةه])|فئ[ةه] رئيسي[ةه]|أكثر مشكل[ةه]|أكثر تكرار|category\b/i },
+    { intent: "BALAGH_SCHOOL_SLA",         re: /\bsla\b|متأخر|تجاوز|اخترق|تأخر/i },
+    { intent: "BALAGH_SCHOOL_URGENT",      re: /عاجل|طارئ|حرج|خطور[ةه]|urgent|critical/i },
+    { intent: "BALAGH_SCHOOL_PRIORITY",    re: /أولوي[ةه]|أولويات|priority/i },
+    { intent: "BALAGH_SCHOOL_OPEN",        re: /مفتوح|قيد التنفيذ|لسه شغال|لسه مفتوح|\bopen\b/i },
+    { intent: "BALAGH_SCHOOL_CLOSED",      re: /مغلق|منتهي|تم حله|تم الحل|\bclosed\b/i },
+    { intent: "BALAGH_SCHOOL_STATUS",      re: /حال[ةه] البلاغ|ما حال[ةه]|status/i },
+    { intent: "BALAGH_SCHOOL_LATEST",      re: /آخر|أحدث|latest|last\s*\d/i },
+    { intent: "BALAGH_SCHOOL_DETAILS",     re: /تفاصيل|فاصيل|وصف البلاغ|الحلول|details|أعطني البلاغات/i },
+    { intent: "BALAGH_SCHOOL_TOTAL",       re: /كم بلاغ|عدد البلاغات|إجمالي البلاغات|كام بلاغ|\btotal\b/i },
+  ];
+  function aiBalaghDetectIntent_(text) {
+    const t = String(text || "");
+    for (const p of AI_BALAGH_INTENT_PATTERNS) if (p.re.test(t)) return p.intent;
+    return "BALAGH_SCHOOL_TOTAL"; // افتراضي لو فيه إشارة بلاغات بدون تحديد نوع سؤال
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     🎯 نقطة الدخول الرئيسية — تُستدعى من fcbAskOpenAI قبل بناء الـ prompt.
+     Entity Detection → Data Query → DATA_RESULT جاهز. بتحدّث window.AI_CONTEXT
+     فقط (لتتبّع آخر مدرسة مؤكدة عبر الأسئلة المتتابعة). ════════════════ */
+  function aiBalaghResolve_(userText, historyMessages) {
+    if (!aiBalaghIsDataReady_()) {
+      aiDebugLog_("[AI DATA QUERY]", { intent: "N/A", status: "BALAGH_DATA_NOT_READY" });
+      return { status: "not_ready", reason: window.__BALAGH_LOAD_STATE__ || "idle" };
+    }
+
+    const intent = aiBalaghDetectIntent_(userText);
+    aiDebugLog_("[AI INTENT]", { text: userText, intent });
+
+    // ترتيب المقاولين حسب سرعة الحل — سؤال عام عبر كل المدارس، مفيش
+    // احتياج لاكتشاف مدرسة، ومينفعش نعتبره "مدرسة مش موجودة".
+    if (intent === "BALAGH_CONTRACTOR_RANKING") {
+      const result = aiBalaghContractorRanking_();
+      aiDebugLog_("[AI DATA QUERY]", { intent, contractorsCount: result.contractorsCount });
+      aiDebugLog_("[AI DATA RESULT]", result);
+      return { status: "ok", intent, result, type: "contractor_ranking" };
+    }
+
+    // مقارنة صريحة بين مدرستين مذكورتين بالاسم صراحةً في نفس الرسالة
+    if (intent === "BALAGH_SCHOOL_COMPARE") {
+      const exact = fcbMatchAllSchoolNamesExact_(userText);
+      if (exact.length >= 2) {
+        window.AI_CONTEXT = { school: exact[0], tab: "balagh", intent, timestamp: Date.now() };
+        aiDebugLog_("[AI DATA QUERY]", { intent, schools: exact.slice(0, 2).map((s) => s.name) });
+        const result = aiBalaghCompareSchools_(exact.slice(0, 2));
+        aiDebugLog_("[AI DATA RESULT]", result);
+        return { status: "ok", intent, result, type: "compare" };
+      }
+      // طلب مقارنة لكن مدرسة واحدة بس اتوضحت — نكمل كسؤال مدرسة عادي بالأسفل
+    }
+
+    // اكتشاف المدرسة من الرسالة الحالية أولاً
+    let found = aiBalaghFindSchool_(userText);
+
+    // لو ملقيناش مدرسة صريحة في الرسالة دي، استخدم آخر مدرسة مؤكدة من
+    // السياق (window.AI_CONTEXT.school) — ده اللي بيخلي "كم منها مفتوح؟"
+    // بعد "كم بلاغ عند مدرسة X؟" يفهم إن المقصود X. لو محصلش أي مدرسة
+    // من قبل في السياق، نرجع لآخر رسائل المحادثة كخط دفاع أخير.
+    let inferredFrom = null;
+    if (found.status === "not_found") {
+      if (window.AI_CONTEXT && window.AI_CONTEXT.school) {
+        found = { status: "found", school: window.AI_CONTEXT.school, candidates: [window.AI_CONTEXT.school], method: "session-context" };
+        inferredFrom = "session-context";
+      } else if (Array.isArray(historyMessages)) {
+        for (const msg of historyMessages.slice(-8).reverse()) {
+          const m = fcbMatchSchoolNameDetailed(msg.content || "");
+          if (m.match) { found = { status: "found", school: m.match, candidates: [m.match], method: m.method }; inferredFrom = "chat-history"; break; }
+        }
+      }
+    }
+
+    if (found.status === "ambiguous") {
+      aiDebugLog_("[AI DATA RESULT]", { status: "ambiguous", candidates: found.candidates.map((c) => c.name) });
+      return { status: "ambiguous", intent, candidates: found.candidates };
+    }
+    if (found.status === "not_found" || !found.school) {
+      return { status: "not_found", intent };
+    }
+
+    // 🎯 مدرسة مؤكدة — حدّث السياق للأسئلة المتتابعة الجاية
+    window.AI_CONTEXT = { school: found.school, tab: "balagh", intent, timestamp: Date.now() };
+
+    aiDebugLog_("[AI DATA QUERY]", { intent, school: found.school.name, inferredFrom });
+    const result = aiBalaghGetSchoolStats_(found.school);
+    result.intent = intent;
+    result.inferredFrom = inferredFrom; // null لو اتذكرت صراحةً في نفس الرسالة
+    aiDebugLog_("[AI DATA RESULT]", result);
+    return { status: "ok", intent, result, type: "school" };
+  }
+
+  window.AIBalaghat = {
+    findSchool: aiBalaghFindSchool_,
+    getReportsForSchool: aiBalaghGetReportsForSchool_,
+    getSchoolStats: aiBalaghGetSchoolStats_,
+    getSchoolSummary: aiBalaghGetSchoolSummary_,
+    searchReports: aiBalaghSearchReports_,
+    compareSchools: aiBalaghCompareSchools_,
+    contractorRanking: aiBalaghContractorRanking_,
+    detectIntent: aiBalaghDetectIntent_,
+    isDataReady: aiBalaghIsDataReady_,
+    resolve: aiBalaghResolve_,
+  };
+
   function fcbDetectTopics(text) {
     const t = text;
     const hasrSysMatch = fcbMatchHasrSysName(t);
@@ -14894,7 +15662,7 @@ function renderTajheezAllTable() {
     return {
       بوابين:    /بواب|بوابين|حارس|gatekeeper/i.test(t),
       عقود:      /عقد|عقود|مستحق|مقاول|contract|مدة|انتهاء|تجديد|fm|صروف/i.test(t),
-      بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق/i.test(t),
+      بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق|أسرع مقاول|أبطأ مقاول|ترتيب المقاول|تصنيف المقاول|أداء المقاول/i.test(t),
       fca:       /fca|حالة فنية|تقييم|حرج|متوسط.*مبنى|أسوأ مدرسة/i.test(t),
       أنظمة:     /نظام|تكييف|كهرباء|سباكة|hvac|درجة.*نظام/i.test(t),
       تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t) || !!tajheezMatch,
@@ -15230,26 +15998,91 @@ function renderTajheezAllTable() {
       }
     }
 
-    if (topics.بلاغات && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length) {
-      // نبعت أعلى 30 بلاغ مفتوح بالتفاصيل
-      const n = (v) => String(v ?? "").trim();
-      const CLOSED = new Set(["تم حله","ملغى","ملغي","مغلق","closed","cancelled","resolved"]);
-      const OPEN_ST = new Set(["جديد","قيد التنفيذ","موافقة الاستشاري قيد التنفيذ","تم التعيين"]);
-      const open30 = window.RAW_BALAGH
-        .filter(r => OPEN_ST.has((r["الحالة"] || "").trim()))
-        .slice(0, 30)
-        .map(r => ({
-          رقم:       (r["مُعرّف الحالة"] || "").trim(),
-          حالة:      (r["الحالة"] || "").trim(),
-          فئة:       (r["الفئة الرئيسية"] || "").trim(),
-          فئة_فرعية: (r["الفئة الفرعية"] || "").trim(),
-          أولوية:    (r["الأولوية"] || "").trim(),
-          مدرسة:     (r["اسم المبنى"] || "").trim(),
-          مدينة:     (r["TBC مدينة"] || "").trim(),
-          sla:       (r["حالة SLA"] || "").trim(),
-          مشكلة:     (r["الوصف"] || "").trim().slice(0, 80),
+    // ── تحديث سياق المدرسة حتى لو السؤال مش عن بلاغات (زي "مدرسة الملك
+    // فهد" لوحدها من غير أي سؤال) — عشان الأسئلة الجاية اللي فيها إشارة
+    // ("كم بلاغ عندها؟") تفهم نفسها على نفس المدرسة تلقائياً. كمان: لو
+    // آخر intent مسجل في AI_CONTEXT كان سؤال بلاغات معلّق (مثلاً البوت
+    // نفسه سأل "تقصد أي مدرسة بالتحديد؟" والمستخدم رد باسم المدرسة بس
+    // من غير أي كلمة "بلاغ") — لازم نعتبر هذه الرسالة استكمالاً لنفس
+    // سؤال البلاغات ونجيب DATA_RESULT فعلي، مش نسيبها من غير بيانات
+    // (كان ده الباج اللي بيخلي الرد "البيانات غير متاحة" رغم إن المدرسة
+    // اتحددت للتو). نحافظ على الـintent المعلّق بدل ما نصفّره. ──
+    let bareSchoolMatch = null;
+    if (!topics.بلاغات) {
+      bareSchoolMatch = fcbMatchSchoolNameDetailed(userText);
+      if (bareSchoolMatch.match) {
+        window.AI_CONTEXT = {
+          school: bareSchoolMatch.match,
+          tab: (window.AI_CONTEXT && window.AI_CONTEXT.tab) || null,
+          intent: (window.AI_CONTEXT && window.AI_CONTEXT.intent) || null,
+          timestamp: Date.now(),
+        };
+        aiDebugLog_("[AI SCHOOL MATCH]", { query: userText, matched: bareSchoolMatch.match.name, method: bareSchoolMatch.method, note: "school-only mention (no بلاغات topic)" });
+      }
+    }
+    // استكمال لسؤال بلاغات معلّق؟ (مدرسة اتذكرت الآن + آخر intent مسجل
+    // كان بلاغات) — يغطي بالضبط حالة "تقصد أي مدرسة؟" → رد المستخدم باسمها فقط.
+    const isPendingBalaghFollowUp =
+      !topics.بلاغات &&
+      !!(bareSchoolMatch && bareSchoolMatch.match) &&
+      !!(window.AI_CONTEXT && typeof window.AI_CONTEXT.intent === "string" && window.AI_CONTEXT.intent.indexOf("BALAGH_") === 0);
+
+    // تتبع هل حقنّا "لقطة بيانات عامة" لمدرسة بالفعل في هذه الرسالة، عشان
+    // منحقنش نفس اللقطة مرتين لو نفس المدرسة ظهرت من أكتر من مسار.
+    let __snapshotSchoolIdInjected = null;
+
+    // ── طبقة استعلام بيانات البلاغات المستقلة (AIBalaghatEngine) —
+    // المساعد لا يبحث عن الأرقام ولا يعدّها بنفسه؛ هذه الطبقة تحسبها في
+    // JavaScript صرف من RAW_BALAGH وترجّع DATA_RESULT جاهز، والـ LLM
+    // مسؤول فقط عن الصياغة (راجع قواعد "DATA_RESULT" في system prompt). ──
+    if (topics.بلاغات || isPendingBalaghFollowUp) {
+      const balaghResolution = aiBalaghResolve_(userText, typeof FCB_HISTORY !== "undefined" ? FCB_HISTORY : []);
+
+      if (balaghResolution.status === "not_ready") {
+        extraContext += `\n\nDATA_RESULT (بلاغات):\n${JSON.stringify({
+          status: "not_ready",
+          note: "بيانات البلاغات لسه بتحمّل أو محصلش تحميلها بعد. لا تقل إن عدد البلاغات صفر ولا إن المدرسة ليس لديها بلاغات — أبلغ المستخدم إن البيانات لسه مش جاهزة واقترح المحاولة تاني بعد لحظات.",
+        })}`;
+      } else if (balaghResolution.status === "ambiguous") {
+        extraContext += `\n\nDATA_RESULT (بلاغات):\n${JSON.stringify({
+          status: "ambiguous",
+          candidates: balaghResolution.candidates.map((c) => ({ الاسم: c.name, الرقم_الوزاري: c.minId })),
+          note: "فيه أكتر من مدرسة بنفس درجة التشابه في الاسم — لا تخمّن ولا تختار واحدة عشوائياً؛ اسأل المستخدم يحدد أنهي مدرسة بالضبط واذكر له الأسماء المحتملة.",
+        })}`;
+      } else if (balaghResolution.status === "ok" && balaghResolution.type === "compare") {
+        extraContext += `\n\nDATA_RESULT (مقارنة بلاغات مدرستين):\n${JSON.stringify(balaghResolution.result)}`;
+      } else if (balaghResolution.type === "contractor_ranking") {
+        extraContext += `\n\nDATA_RESULT (ترتيب المقاولين حسب سرعة الحل):\n${JSON.stringify(balaghResolution.result)}`;
+      } else if (balaghResolution.status === "ok" && balaghResolution.type === "school") {
+        const r = balaghResolution.result;
+        extraContext += `\n\nDATA_RESULT (بلاغات مدرسة "${r.schoolName}")${r.inferredFrom ? " — تم استنتاج المدرسة من " + (r.inferredFrom === "session-context" ? "سياق المحادثة الحالية" : "آخر رسائل المحادثة") + "؛ لو ده مش المقصود وضّح للمستخدم" : ""}:\n${JSON.stringify(r)}`;
+        // لقطة بيانات عامة (FCA/بيئة/عاين/أصول) لنفس المدرسة — إثراء إضافي فقط
+        extraContext += aiSchoolSnapshot_(r.matchedSchoolId);
+        __snapshotSchoolIdInjected = r.matchedSchoolId;
+      } else if (balaghResolution.status === "not_found") {
+        // مفيش مدرسة محددة في السؤال ولا في السياق — نظرة عامة على كل المدارس
+        const idx = aiBalaghGetIndex_();
+        const open30 = idx.rows.filter((r) => r.isOpen).slice(0, 30).map((r) => ({
+          رقم: r.recordNo, حالة: r.status, فئة: r.category, فئة_فرعية: r.subCategory,
+          أولوية: r.priority, مدرسة: r.linkedSchoolName || r.schoolName, مدينة: r.city,
+          sla: r.slaStatus, مشكلة: (r.problemDescription || "").slice(0, 80),
         }));
-      extraContext += `\n\nأعلى 30 بلاغ مفتوح حالياً:\n${JSON.stringify(open30)}`;
+        extraContext += `\n\nDATA_RESULT (لا توجد مدرسة محددة في السؤال):\n${JSON.stringify({
+          status: "not_found_school",
+          note: "لم يُذكر اسم مدرسة محدد ولا يوجد سياق سابق — هذه بيانات عامة عبر كل المدارس (أعلى 30 بلاغ مفتوح)، وليست خاصة بمدرسة بعينها. وضّح ذلك للمستخدم لو رد بأرقام منها.",
+          أعلى_30_بلاغ_مفتوح: open30,
+        })}`;
+      }
+    }
+
+    // ── لقطة بيانات عامة لمدرسة بعينها لأي سؤال غير بلاغاتي (FCA/بيئة/
+    // عاين/أصول/بيانات أساسية) — لو ذُكرت مدرسة في الرسالة (bareSchoolMatch)
+    // ولسه محقناش لقطة ليها من مسار البلاغات فوق، نحقنها هنا عشان أي سؤال
+    // عن "نفس المدرسة" مهما كان موضوعه يلاقي بيانات حقيقية، مش "لا توجد
+    // بيانات". ده بيوسّع نفس مبدأ البلاغات (بيانات حقيقية دايماً) لكل الأسئلة
+    // اللي فيها اسم مدرسة، مش بس أسئلة البلاغات. ──
+    if (bareSchoolMatch && bareSchoolMatch.match && bareSchoolMatch.match.minId !== __snapshotSchoolIdInjected) {
+      extraContext += aiSchoolSnapshot_(bareSchoolMatch.match.minId);
     }
 
     if (topics.أنظمة && Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) {
@@ -15419,6 +16252,110 @@ function renderTajheezAllTable() {
 ميتفقوش على نفس المباني بالظبط.
 
 ══════════════════════════════════════════════════════
+⚠️ قاعدة إلزامية: لو السؤال غامض أو ناقص — اسأل، ولا تخمّن
+══════════════════════════════════════════════════════
+لما تكون غير متأكد من قصد المستخدم بدرجة كافية للإجابة بدقة، **اسأل
+سؤال توضيح قصير ومحدد بدل ما تفترض أو تجاوب برقم/تحليل مبني على تخمين**.
+من أشهر الحالات اللي لازم تتأكد فيها:
+
+- سؤال بيشير لمدرسة بضمير أو إشارة ("هذه المدرسة"، "بلاغاتها"، "دي"،
+  "نفس المدرسة") من غير ما تكون واضحة من سياق البيانات المحقونة أسفله
+  (لو مفيش قسم "DATA_RESULT" أو "بيانات تقييم FCA لمدرسة ..." محقون فعلياً
+  في الرسالة دي، أو كان DATA_RESULT.status = "ambiguous"، فده معناه إن
+  النظام مش متأكد أنهي مدرسة تقصدها) — في الحالة دي اسأل: "تقصد أي مدرسة
+  بالتحديد؟" ولا تفترض آخر مدرسة اتكلمتوا عنها لو مش متأكد، ولا تختار
+  مدرسة عشوائية من البيانات.
+  ⚠️ مهم: لو DATA_RESULT.status = "ok" فعلاً موجود في هذه الرسالة (حتى
+  لو مصدره inferredFrom = "session-context" أو "chat-history")، فهذا
+  يعني النظام **بالفعل تأكد** من المدرسة المقصودة عبر السياق — ممنوع
+  إعادة سؤال المستخدم "تقصد أي مدرسة؟" في هذه الحالة، فقط أجب مباشرة
+  بالأرقام (ويمكنك ذكر اسم المدرسة مرة واحدة للتوضيح فقط، بدون توقف
+  لانتظار تأكيد). اسأل توضيحاً فقط لو DATA_RESULT غايب تماماً أو
+  status = "ambiguous"/"not_found".
+- سؤال فيه أكتر من مدرسة اتذكرت في المحادثة الأخيرة ومش واضح أنهي واحدة
+  المقصودة — اذكر أسماء المدارس المحتملة واسأل يحدد.
+- سؤال يحتاج فترة زمنية (شهر/سنة/ربع) ومش محدد — اسأل عن الفترة أو
+  وضّح إنك هترد على "كل البيانات المتاحة" ما لم يحدد غير كده.
+- سؤال عن "أكثر نوع بلاغ" أو تحليل تفصيلي لمدرسة معينة والبيانات
+  التفصيلية لبلاغات المدرسة دي مش موجودة فعلياً في السياق المحقون
+  أسفله (يعني القسم الخاص بيها مش ظاهر) — لا تخترع نسبة أو ترتيب، صرّح
+  إن التفاصيل غير متاحة حالياً واقترح على المستخدم يسمي المدرسة بوضوح
+  في سؤاله عشان تقدر تجيبها.
+
+القاعدة العامة: التأكد قبل الإجابة أهم من إجابة سريعة غير دقيقة.
+سؤال توضيحي واحد وقصير أفضل من تخمين قد يكون غلط.
+
+══════════════════════════════════════════════════════
+⚙️ DATA_RESULT — مصدر الحقيقة الوحيد لأرقام بلاغات المدارس
+══════════════════════════════════════════════════════
+لو لقيت في البيانات أسفله قسم اسمه "DATA_RESULT" (بأي عنوان فرعي: بلاغات
+مدرسة/مقارنة بلاغات مدرستين/لا توجد مدرسة محددة)، فهذا ناتج مباشر من
+محرك استعلام بيانات JavaScript اسمه AIBalaghat يقرأ من RAW_BALAGH الفعلي
+عبر نفس منطق تبويب البلاغات بالحرف — مش تلخيص ولا تخمين منك. القواعد:
+
+1. status = "ok": استخدم الأرقام الموجودة داخل DATA_RESULT حرفياً
+   (total/open/closed/urgent/overdue/categories/subCategories/priorities/
+   statuses/latest10/openDetails/urgentDetails). لا تُعِد حسابها بنفسك من
+   أي بيانات خام تانية، ولا تفلتر allDetails يدوياً لو فيه حقل جاهز
+   بالظبط لسؤال المستخدم (زي openDetails لسؤال "البلاغات المفتوحة").
+   ⚠️ كل هذه الحقول (open/closed/urgent/categories/subCategories/
+   priorities/statuses/openDetails/urgentDetails/latest10) هي **دائماً**
+   بيانات فعلية جاهزة كل ما status = "ok" — حتى لو كانت القيمة صفر (0)
+   أو كانت categories/subCategories فيها قيمة واحدة بس زي "غير محدد".
+   صفر أو "غير محدد" هو **رقم حقيقي يجب ذكره كما هو** ("لا يوجد بلاغات
+   مفتوحة حالياً" أو "الفئة غير مصنّفة في 268 بلاغاً")، وليس معناه "البيانات
+   غير متاحة". ممنوع تماماً الرد بأن أي حقل من القائمة أعلاه "غير متاح"
+   أو "يحتاج إعادة كتابة اسم المدرسة" طالما DATA_RESULT.status = "ok" —
+   البيانات فعلاً محقونة أمامك في نفس الرسالة، استخدمها مباشرة بدون تردد.
+   ⚙️ أعمدة إضافية أُضيفت حديثاً لبيانات البلاغات، موجودة في DATA_RESULT
+   (بلاغات مدرسة) بنفس القاعدة أعلاه — لا تقل "غير متاحة" لو موجودة:
+   - avgSlaDays: متوسط SLA الفعلي بالأيام (محسوب من عمود SLA DAYS الحقيقي
+     في الشيت، مختلف عن slaStatus النصي). null لو مفيش بيانات SLA DAYS
+     كافية لهذه المدرسة تحديداً — في هذه الحالة فقط قل "لا تتوفر بيانات
+     SLA بالأيام لهذه المدرسة"، ولا تخترع رقماً. راجع slaDaysSampleSize
+     لمعرفة كام بلاغ دخل في الحساب.
+   - stages/genders/contractors: توزيعات (object لكل قيمة وعددها) حسب
+     المرحلة الدراسية/الجنس/المقاول المسؤول عن بلاغات هذه المدرسة.
+     topContractor = المقاول الأكثر تكراراً لهذه المدرسة.
+   - كل عنصر داخل latest10/openDetails/urgentDetails/allDetails فيه كمان
+     الآن: SLA_أيام، المرحلة، الجنس، المقاول — لكل بلاغ على حدة.
+2. status = "ambiguous": فيه أكتر من مدرسة بنفس درجة التشابه — لا تختار
+   واحدة عشوائياً ولا تفترض. اذكر أسماء candidates واسأل المستخدم يحدد.
+3. status = "not_found_school": لم يُذكر اسم مدرسة محدد ولا يوجد سياق
+   سابق — أي أرقام مرفقة (أعلى_30_بلاغ_مفتوح) عامة عبر كل المدارس؛ وضّح
+   ذلك صراحة ولا تنسبها لمدرسة بعينها.
+4. status = "not_ready": بيانات البلاغات لسه بتحمّل أو محصلش تحميلها.
+   قل بوضوح إنها لسه مش جاهزة واقترح المحاولة تاني بعد لحظات — ممنوع
+   تماماً اعتبار غياب البيانات = صفر بلاغات، وممنوع تقول "لا توجد بلاغات"
+   في هذه الحالة.
+5. أي رقم تذكره عن بلاغات مدرسة لازم مصدره DATA_RESULT (source:
+   "RAW_BALAGH") — رقم بدون مصدر من هذه القائمة = ممنوع ذكره.
+6. DATA_RESULT (ترتيب المقاولين حسب سرعة الحل): يظهر لأسئلة زي "من أسرع
+   مقاول؟"/"رتب المقاولين". الحقل ranking مصفوفة مرتبة (الأسرع أولاً حسب
+   متوسط_SLA_أيام)؛ fastestContractor = اسم الأسرع (null لو مفيش بيانات
+   SLA كافية لأي مقاول). المقاولون بدون عينة SLA كافية يظهرون في نهاية
+   القائمة بـ متوسط_SLA_أيام = null — لا تفترض لهم رقماً ولا ترتبهم كأسرع.
+
+══════════════════════════════════════════════════════
+⚠️ حماية من التخمين (Hallucination) — قواعد صارمة
+══════════════════════════════════════════════════════
+- قيمة غير موجودة في البيانات المحقونة؟ قل "لا توجد بيانات كافية لهذه
+  المعلومة" — ممنوع اختراع رقم.
+- ممنوع استنتاج رقم من وصف عام أو "شكل" البيانات لو الرقم الدقيق متاح
+  فعلياً في DATA_RESULT أو في RAW/RAW_BALAGH المحقونين.
+- لا تقل "حسب البيانات" أو "وفقاً للنظام" إلا لو فعلاً استخدمت بيانات
+  محقونة في هذه الرسالة تحديداً — لا تدّعِ مصدراً لم تستخدمه فعلياً.
+
+══════════════════════════════════════════════════════
+🗣️ أسلوب الرد على سؤال مباشر عن مدرسة
+══════════════════════════════════════════════════════
+لا تبدأ بمقدمة طويلة ("بالطبع، يسعدني مساعدتك..."). رُدّ مباشرة بالرقم/
+الحقيقة المطلوبة أولاً، وأضف تفصيلاً إضافياً واحداً مختصراً لو مفيد.
+مثال — سؤال: "مدرسة الملك فهد كم بلاغ عندها؟"
+رد جيد: "مدرسة الملك فهد لديها 27 بلاغًا، منها 8 مفتوحة و19 مغلقة."
+رد سيء: "بالطبع، يسعدني مساعدتك في الاطلاع على بيانات المدرسة. بناءً على..."
+
+══════════════════════════════════════════════════════
 ملاحظة: أسماء تبويبات تم تحديثها مؤخراً
 ══════════════════════════════════════════════════════
 - "الأنظمة الرئيسية" و"الأنظمة التفصيلية" (القديم) → بقى اسمهم الرسمي
@@ -15571,6 +16508,13 @@ function renderTajheezAllTable() {
 ══════════════════════════════════════════════════════
 مهمتك: الإجابة على أسئلة المستخدم باللغة العربية (إلا لو سأل بالإنجليزية) بدقة، معتمداً على بيانات اللوحة الفعلية المرفقة بالأسفل.
 
+⚠️ الأسلوب اللغوي: اكتب ردودك دائماً بالعربية الفصحى (لغة إخبارية/تقريرية رسمية)،
+وليس بالعامية المصرية أو أي لهجة محلية. لا تستخدم صيغاً عامية مثل "عايز"،
+"إزاي"، "علشان"، "مفيش"، "دي/ده" كضمير إشارة، أو تراكيب عامية أخرى — استخدم
+بدلاً منها "أريد"، "كيف"، "لأنّ/من أجل"، "لا يوجد"، "هذا/هذه". حافظ على
+الفصحى حتى لو كتب المستخدم سؤاله بالعامية؛ يمكنك فهم لهجته لكن رُدّ عليه
+دائماً بلغة فصيحة، واضحة، وسليمة نحوياً، بأسلوب تقرير تنفيذي رسمي.
+
 - اعتمد فقط على البيانات المرفقة في أي رقم أو إحصائية — لا تخترع أرقاماً.
 - البيانات تغطي كل التبويبات — ابحث فيها كلها قبل ما تقول "غير متوفر".
 - لو قسم معيّن ظهر بمفتاح "تنبيه"، وضّح أن البيانات لم تُحمَّل واطلب الضغط على ↻.
@@ -15617,6 +16561,12 @@ function renderTajheezAllTable() {
 منع المعلومات غير الصحيحة
 ══════════════════════════════════════════════════════
 إذا لم تكفِ البيانات للإجابة، قُل ذلك صراحةً ("البيانات الحالية لا تكفي للإجابة على هذا") ووجّه لتبويب أو فلتر مناسب — ولا تُنشئ أرقاماً أو أسماءً غير موجودة في البيانات المرفقة إطلاقاً.
+⚠️ قبل ما تقرر إن البيانات "غير كافية" لسؤال عن مدرسة بعينها، تأكد أولاً
+إنك دوّرت في كل الأقسام المحقونة في هذه الرسالة (DATA_RESULT، "لقطة بيانات
+عامة لمدرسة ..."، نتائج_المحرك_التحليلي، الملخص العام) — غالباً الرقم
+المطلوب فعلاً موجود في أحدها حتى لو السؤال متعلق بموضوع مختلف عن اللي
+جابه القسم (مثلاً "لقطة بيانات عامة لمدرسة" بتحمل FCA/بيئة/عاين/أصول
+مع أي سؤال عن مدرسة محددة، بصرف النظر عن كلمة "بلاغ").
 
 ══════════════════════════════════════════════════════
 محرك الحساب الحر — لأي عملية حسابية يطلبها المستخدم
@@ -15635,7 +16585,22 @@ function renderTajheezAllTable() {
 ══════════════════════════════════════════════════════
 اقتراح أسئلة متابعة — إلزامي في نهاية كل رد
 ══════════════════════════════════════════════════════
-اختم كل رد بسطر "💡 أسئلة مقترحة:" يتبعه 2-3 أسئلة قصيرة مرتبطة بالسؤال الحالي وبالتبويب المفتوح (استرشد بـ"أسئلة_مقترحة" أدناه أو اقترح أفضل منها).
+اختم كل رد بسطر "💡 أسئلة مقترحة:" يتبعه 2-3 أسئلة قصيرة مرتبطة بالسؤال الحالي.
+⚠️ قاعدة صارمة (الأهم هنا): اقترح فقط أسئلة متأكد 100% إنك تقدر تجاوب
+عليها بالكامل وبأرقام حقيقية لو المستخدم سألها فعلاً في رسالته الجاية —
+يعني إجابتها موجودة أصلاً في البيانات المحقونة في هذه الرسالة بالذات
+(DATA_RESULT/لقطة بيانات عامة لمدرسة/نتائج_المحرك_التحليلي/الملخص أدناه).
+لا تقترح سؤالاً "توقعياً" عن بيانات مش متأكد من توفرها. أمثلة صحيحة:
+- لو DATA_RESULT (بلاغات مدرسة) فيه urgent>0، اقترح "ما البلاغات الحرجة
+  فيها؟" لأن urgentDetails فعلاً موجود في نفس DATA_RESULT.
+- لو DATA_RESULT فيه categories بأكتر من قيمة، اقترح "ما توزيعها حسب
+  النوع؟" لأن categories فعلاً موجود.
+- لو "لقطة بيانات عامة لمدرسة" محقونة، اقترح سؤالاً عن أحد حقولها
+  (FCA/البيئة/تقييم عاين/تقييم منصة أصول) بدل سؤال عن مدرسة أو موضوع
+  تاني مش محقون.
+قاعدة عامة: أي سؤال متابعة تقترحه ثم يتضح للمستخدم إنه "غير متاح" لما
+يسأله فعلاً = خطأ يجب تفاديه دائماً؛ في حالة الشك، اقترح سؤالاً أعم
+(زي "أعطني كل التفاصيل") بدل سؤال محدد قد لا تكون بياناته جاهزة.
 
 ══════════════════════════════════════════════════════
 دليل التبويبات — أين تجد كل بيانات
@@ -15653,7 +16618,7 @@ function renderTajheezAllTable() {
 • التجهيزات              → تجهيزات_المخزون: مخصص vs احتياج، عجز، أقسام، مدن
 • البوابين               → البوابين: إحصائيات + توزيع (القايمة الكاملة تُحقن تلقائياً لو السؤال عن بواب)
 • قطع الغيار             → قطع_الغيار: إجمالي، أعلى أصناف قيمة
-• البلاغات               → البلاغات: إجمالي، حالة، SLA، فئات، أولويات، أعلى مدارس
+• البلاغات               → البلاغات: إجمالي، حالة، SLA (حالة نصية + مدة فعلية بالأيام)، فئات، أولويات، المرحلة، الجنس، المقاول المسؤول، أعلى مدارس، ترتيب المقاولين حسب سرعة الحل
 • خنادق الصرف            → خنادق_الصرف: بيانات ثابتة مُدخلة يدوياً (مكة/جدة/الطائف/المدينة…)، لا تأتي من ملف خارجي
 • تقييم عاين             → تقييم_عاين_تفصيلي: متوسط، تصنيفات، أسوأ مدارس، حسب المدينة
 • المصاعد                → المصاعد: إجمالي، متعطلة، عاملة، توزيع حسب المدينة
@@ -15930,6 +16895,12 @@ ${(() => {
       ...FCB_HISTORY,
       { role: "user", content: userText },
     ];
+
+    if (window.AI_DEBUG) {
+      try {
+        console.log("[AI FINAL PROMPT]", systemPrompt.length > 6000 ? systemPrompt.slice(0, 6000) + "\n…[مقتطع — الطول الكامل: " + systemPrompt.length + " حرف]" : systemPrompt);
+      } catch (_) {}
+    }
 
     let reply = await AIService.chat(messages);
 
@@ -26530,8 +27501,14 @@ setTimeout(function tellUserStillTrying() {
              من AI_ContextEngine (نقاط القوة/الضعف/الأولويات) */
           var existing = window.__FCB_LIVE_CONTEXT_INJECT__ || {};
           window.__FCB_LIVE_CONTEXT_INJECT__ = {
-            /* السياق المنقّح من Builder — يحلّ محل السياق القديم */
-            context:   built.context,
+            /* السياق المنقّح من Builder — يحلّ محل السياق القديم
+               مع الحفاظ على أي طبقات ذكاء أضافتها الطبقات الخارجية */
+            context:   Object.assign({}, built.context, {
+              ai_intelligence:
+                (existing.context && existing.context.ai_intelligence) ||
+                built.context.ai_intelligence ||
+                null
+            }),
             /* Global Snapshot */
             global_snapshot: built.global_snapshot,
             /* Reasoning guide للموديل */

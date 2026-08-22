@@ -7722,11 +7722,19 @@ function _sysDownloadFile(filename, content, mime) {
   function parseSlaDurationToHours_(raw) {
     const s = String(raw ?? "").trim();
     if (!s) return null;
-    const m = s.match(/(\d+)\s*Days?\s*(\d+)\s*Hours?\s*(\d+)\s*Minutes?/i);
+    // ⚠️ لازم نلتقط علامة السالب لو موجودة قبل الرقم. لو اتجاهلناها (زي ما
+    // كان بيحصل قبل كده)، قيمة زي "-46111 Days 10 Hours 21 Minutes" كانت
+    // بتتفسّر كـ +46111 يوم موجب وتدخل في المتوسط بغلط فادح — ده اللي كان
+    // سبب رئيسي في تضخّم "متوسط زمن الحل" (اكتُشف من ملاحظة المستخدم).
+    // مدة سالبة أصلاً معناها بيانات فاسدة في الشيت (خطأ في الفورمولا/تاريخ
+    // مقلوب) — مش رقم SLA حقيقي بأي معنى، فبنستبعدها تماماً (null) بدل ما
+    // نحسبها موجبة أو حتى سالبة.
+    const m = s.match(/(-)?\s*(\d+)\s*Days?\s*(\d+)\s*Hours?\s*(\d+)\s*Minutes?/i);
     if (!m) return null;
-    const days = parseInt(m[1], 10) || 0;
-    const hours = parseInt(m[2], 10) || 0;
-    const minutes = parseInt(m[3], 10) || 0;
+    if (m[1] === "-") return null; // مدة سالبة = بيانات فاسدة، نستبعدها من أي حساب
+    const days = parseInt(m[2], 10) || 0;
+    const hours = parseInt(m[3], 10) || 0;
+    const minutes = parseInt(m[4], 10) || 0;
     return days * 24 + hours + minutes / 60;
   }
 
@@ -7765,12 +7773,26 @@ function _sysDownloadFile(filename, content, mime) {
         // والأيام عشان يتحسب عليه متوسط/فرز حقيقي بدل النص وحده. ──
         const slaDurationRaw = norm(r["SLA DAYS"]);
         const slaDurationHours = parseSlaDurationToHours_(slaDurationRaw);
+        // ── فحص تقاطعي مستقل لعمود "SLA DAYS": نحسب كمان الفرق التقويمي
+        // الفعلي بين "تاريخ الإنشاء" و"تاريخ الحل" (لو البلاغ مغلق وكلا
+        // التاريخين قابلين للقراءة). ده بيدّينا رقم مستقل عن عمود SLA DAYS
+        // نفسه، يفيد في اكتشاف لو عمود SLA DAYS نص/فورمولا "شغالة" ومحدّتش
+        // فعلياً عند إغلاق البلاغ (يعني بيفضل يكبر حتى بعد الإغلاق) —
+        // لو الفرق ده مختلف جداً عن SLA DAYS، ده مؤشر واضح على مشكلة بيانات
+        // في عمود SLA DAYS نفسه مش مجرد بلاغات قديمة عالقة. ──
+        const finishDateObj = parseBalaghDate(finished);
+        const resolutionDaysActual =
+          !openLike && creationDateObj && finishDateObj && finishDateObj.getTime() >= creationDateObj.getTime()
+            ? +(((finishDateObj.getTime() - creationDateObj.getTime()) / 86400000).toFixed(2))
+            : null;
         return {
           idx: idx + 1,
           recordNo:          norm(r["مُعرّف الحالة"]),
           creationDate:      created,
           creationDateObj,
           finishDate:        finished,
+          finishDateObj,
+          resolutionDaysActual,               // فرق تقويمي فعلي (تاريخ الحل - تاريخ الإنشاء) — مستقل عن عمود SLA DAYS، للتحقق التقاطعي فقط
           slaDays:           slaStatus,          // بنستخدم حالة SLA بدل الأيام
           slaNum:            isOverdue ? -1 : 0, // -1 = متأخر
           slaStatus,
@@ -7878,6 +7900,16 @@ function _sysDownloadFile(filename, content, mime) {
     return ((n / total) * 100).toFixed(1) + "%";
   }
 
+  // ── الوسيط (median) لمصفوفة أرقام — أقل تأثراً بالقيم الشاذة (outliers)
+  // من المتوسط الحسابي العادي، مفيد جداً لأعمدة زي SLA DAYS اللي ممكن
+  // يبقى فيها بلاغات قليلة بقيم ضخمة جداً بتشد المتوسط لفوق. ──
+  function medianOf(nums) {
+    const arr = (nums || []).filter((n) => typeof n === "number" && isFinite(n)).sort((a, b) => a - b);
+    if (!arr.length) return null;
+    const mid = Math.floor(arr.length / 2);
+    return arr.length % 2 ? arr[mid] : +((arr[mid - 1] + arr[mid]) / 2).toFixed(2);
+  }
+
   function topCounts(rows, key, limit) {
     const map = new Map();
     rows.forEach((r) => {
@@ -7948,6 +7980,7 @@ function _sysDownloadFile(filename, content, mime) {
       "تاريخ الإنشاء",
       "تاريخ الحل",
       "حالة SLA",
+      "SLA (أيام)",
       "الحالة",
       "رقم المدرسة",
       "اسم المبنى",
@@ -7955,6 +7988,9 @@ function _sysDownloadFile(filename, content, mime) {
       "TBC مدينة",
       "الفئة الرئيسية",
       "الفئة الفرعية",
+      "المرحلة",
+      "الجنس",
+      "المقاول",
       "الوصف",
       "الأولوية",
       "وصف الحل",
@@ -7966,6 +8002,7 @@ function _sysDownloadFile(filename, content, mime) {
         r.creationDate,
         r.finishDate,
         r.slaStatus,
+        r.slaDurationDays ?? "",
         r.status,
         r.schoolNumber,
         r.schoolName,
@@ -7973,6 +8010,9 @@ function _sysDownloadFile(filename, content, mime) {
         r.city,
         r.category,
         r.subCategory,
+        r.stage,
+        r.gender,
+        r.contractor,
         r.problemDescription,
         r.priority,
         r.resolutionDesc,
@@ -8251,13 +8291,29 @@ function _sysDownloadFile(filename, content, mime) {
     const schoolBreakdownShowN = STATE.breakdownShowN || 15;
 
     // ── تحليل الأعمدة الجديدة: SLA الفعلي (بالأيام)، المرحلة، الجنس، المقاول ──
-    const slaRowsWithDuration = rows.filter((r) => r.slaDurationDays != null);
+    // ⚠️ مهم: المتوسط لازم يتحسب من البلاغات "المغلقة" فقط (زمن حل فعلي
+    // ومنتهي)، مش كل البلاغات. لو ضممنا بلاغات لسه مفتوحة، قيمة SLA DAYS
+    // بتاعتها بتكون عداد شغال لحد النهاردة ولسه بيكبر — فبلاغ واحد قديم
+    // عالق من زمان كان بيرفع المتوسط لأرقام غير واقعية (مئات/آلاف الأيام)،
+    // بالظبط زي ما ظهر في اختبار المستخدم. نفس مبدأ "متوسط زمن الحل شهرياً"
+    // الموجود بالفعل (مقيّد بالمغلقة فقط) — بنوحّد المنطق هنا معاه.
+    const slaRowsWithDuration = rows.filter((r) => r.isClosed && r.slaDurationDays != null);
     const avgSlaDays = slaRowsWithDuration.length
       ? slaRowsWithDuration.reduce((s, r) => s + r.slaDurationDays, 0) / slaRowsWithDuration.length
       : null;
+    // ── الوسيط (median) بديل أقل حساسية للقيم الشاذة من المتوسط الحسابي —
+    // لو فيه فرق كبير بين المتوسط والوسيط، ده معناه إن فيه بلاغات قليلة
+    // بقيم SLA ضخمة جداً شادّة المتوسط لفوق (مش إن كل البلاغات بطيئة). ──
+    const medianSlaDays = medianOf(slaRowsWithDuration.map((r) => r.slaDurationDays));
+    // ── أعلى 5 بلاغات من حيث SLA (أيام) — عشان نعرف بالظبط أي بلاغات
+    // شادّة المتوسط لفوق، ونقارن SLA DAYS (من الشيت) بالفرق التقويمي
+    // الفعلي (تاريخ الحل - تاريخ الإنشاء) لاكتشاف أي تعارض في البيانات. ──
+    const slaOutliers = [...slaRowsWithDuration]
+      .sort((a, b) => b.slaDurationDays - a.slaDurationDays)
+      .slice(0, 5);
     const stageCounts = topCounts(rows, "stage", 8);
     const genderCounts = topCounts(rows, "gender", 6);
-    // ترتيب المقاولين حسب متوسط سرعة الحل (SLA الفعلي) — الأسرع أولاً
+    // ترتيب المقاولين حسب متوسط سرعة الحل (SLA الفعلي، للبلاغات المغلقة فقط) — الأسرع أولاً
     const contractorAggMap = new Map();
     rows.forEach((r) => {
       const c = r.contractor;
@@ -8266,7 +8322,7 @@ function _sysDownloadFile(filename, content, mime) {
       const o = contractorAggMap.get(c);
       o.total++;
       if (r.isOverdue) o.overdue++;
-      if (r.slaDurationDays != null) {
+      if (r.isClosed && r.slaDurationDays != null) {
         o.slaSum += r.slaDurationDays;
         o.slaCount++;
       }
@@ -8628,23 +8684,13 @@ function _sysDownloadFile(filename, content, mime) {
         <div class="chart-box" style="height:300px"><canvas id="balagh-cat-priority-stacked"></canvas></div>
       </div>
 
-      <div class="g2 mb14" style="align-items:start">
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-icon" style="background:#EFF6FF;color:#1E3A8A">🎯</span>
-            <span>مصفوفة مخاطر المدارس</span>
-            <span class="sub">إجمالي مقابل عالية الخطورة</span>
-          </div>
-          <div class="chart-box" style="height:300px"><canvas id="balagh-school-risk-scatter"></canvas></div>
+      <div class="card mb14">
+        <div class="card-title">
+          <span class="card-title-icon" style="background:#F0FDF4;color:#15803D">⏱️</span>
+          <span>متوسط زمن الحل شهرياً</span>
+          <span class="sub">للبلاغات المغلقة فقط (أيام)</span>
         </div>
-        <div class="card">
-          <div class="card-title">
-            <span class="card-title-icon" style="background:#F0FDF4;color:#15803D">⏱️</span>
-            <span>متوسط زمن الحل شهرياً</span>
-            <span class="sub">للبلاغات المغلقة فقط (أيام)</span>
-          </div>
-          <div class="chart-box" style="height:300px"><canvas id="balagh-resolution-trend-chart"></canvas></div>
-        </div>
+        <div class="chart-box" style="height:300px"><canvas id="balagh-resolution-trend-chart"></canvas></div>
       </div>
 
       ${balaghSecHead(6, "⏱️", "SLA والمقاولون", "سرعة الحل وأداء المقاولين")}
@@ -8653,13 +8699,17 @@ function _sysDownloadFile(filename, content, mime) {
           <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490">⏱️</span>
           <span>ملخص سريع</span>
         </div>
-        <div class="g3" style="margin-bottom:0">
+        <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
           <div class="kpi kc-blue">
             <div class="kpi-val" style="color:#0891B2">${avgSlaDays != null ? avgSlaDays.toFixed(1) : "—"}</div>
             <div class="kpi-lbl">متوسط زمن الحل (أيام)</div>
           </div>
+          <div class="kpi kc-blue">
+            <div class="kpi-val" style="color:#0891B2">${medianSlaDays != null ? medianSlaDays.toFixed(1) : "—"}</div>
+            <div class="kpi-lbl">وسيط زمن الحل (أيام)</div>
+          </div>
           <div class="kpi kc-green">
-            <div class="kpi-val" style="color:#059669;font-size:${contractorList[0] && contractorList[0].avgSla != null ? "20px" : "28px"}">${contractorList[0] && contractorList[0].avgSla != null ? escText(contractorList[0].name) : "—"}</div>
+            <div class="kpi-val" style="color:#059669;font-size:${contractorList[0] && contractorList[0].avgSla != null ? "18px" : "28px"}">${contractorList[0] && contractorList[0].avgSla != null ? escText(contractorList[0].name) : "—"}</div>
             <div class="kpi-lbl">أسرع مقاول</div>
           </div>
           <div class="kpi kc-navy">
@@ -8667,6 +8717,40 @@ function _sysDownloadFile(filename, content, mime) {
             <div class="kpi-lbl">عدد المقاولين</div>
           </div>
         </div>
+        ${
+          slaOutliers.length
+            ? `<div style="margin-top:14px;overflow-x:auto">
+                <div style="font-size:12px;font-weight:700;color:var(--tx-sec);margin-bottom:8px">أعلى ${slaOutliers.length} بلاغات من حيث زمن الحل (أيام) — للمراجعة</div>
+                <table style="width:100%;border-collapse:collapse;font-size:12px">
+                  <thead>
+                    <tr style="text-align:right;color:var(--tx-sec)">
+                      <th style="padding:6px">المدرسة</th>
+                      <th style="padding:6px">المقاول</th>
+                      <th style="padding:6px">SLA (أيام)</th>
+                      <th style="padding:6px">الفرق الفعلي (إنشاء→حل)</th>
+                      <th style="padding:6px">تاريخ الإنشاء</th>
+                      <th style="padding:6px">تاريخ الحل</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${slaOutliers
+                      .map(
+                        (r) => `
+                      <tr style="border-top:1px solid var(--bd-soft)">
+                        <td style="padding:6px">${escText(r.isLinked ? r.linkedSchoolName : r.schoolName || "—")}</td>
+                        <td style="padding:6px">${escText(r.contractor || "—")}</td>
+                        <td style="padding:6px;font-weight:700;color:#DC2626">${r.slaDurationDays}</td>
+                        <td style="padding:6px${r.resolutionDaysActual != null && Math.abs(r.resolutionDaysActual - r.slaDurationDays) > 5 ? ';font-weight:700;color:#DC2626' : ''}">${r.resolutionDaysActual != null ? r.resolutionDaysActual + " يوم" : "—"}</td>
+                        <td style="padding:6px">${escText(r.creationDate || "—")}</td>
+                        <td style="padding:6px">${escText(r.finishDate || "—")}</td>
+                      </tr>`
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>`
+            : ""
+        }
       </div>
 
       <div class="g2 mb14" style="align-items:start">
@@ -8712,7 +8796,21 @@ function _sysDownloadFile(filename, content, mime) {
                         <td style="padding:8px;font-weight:700">${escText(c.name)}</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums">${fmt(c.total)}</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums;color:${CSS_TOKENS.info2()}">${c.avgSla != null ? c.avgSla.toFixed(1) : "—"}</td>
-                        <td style="padding:8px;font-variant-numeric:tabular-nums">${c.compliancePct != null ? c.compliancePct.toFixed(1) + "%" : "—"}</td>
+                        <td style="padding:8px">${
+                          c.compliancePct == null
+                            ? "—"
+                            : (() => {
+                                // شريط بصري لنسبة الالتزام — نفس ستايل الأشرطة المستخدمة
+                                // في باقي التبويب (mini-track/mini-fill) عشان المقارنة بين
+                                // المقاولين تبقى بالعين مش بقراءة أرقام سطر سطر.
+                                const p = c.compliancePct;
+                                const col = p >= 90 ? CSS_TOKENS.positive() : p >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+                                return `<div style="display:flex;align-items:center;gap:8px">
+                                  <div class="mini-track" style="flex:1;min-width:58px"><div class="mini-fill" style="width:${Math.max(2, Math.min(100, p))}%;background:${col}"></div></div>
+                                  <span style="font-variant-numeric:tabular-nums;font-weight:800;color:${col};min-width:46px;text-align:left">${p.toFixed(1)}%</span>
+                                </div>`;
+                              })()
+                        }</td>
                       </tr>`,
                       )
                       .join("")}
@@ -8764,6 +8862,10 @@ function _sysDownloadFile(filename, content, mime) {
                 <th>الموقع</th>
                 <th>الفئة</th>
                 <th>الأولوية</th>
+                <th>SLA (أيام)</th>
+                <th>المرحلة</th>
+                <th>الجنس</th>
+                <th>المقاول</th>
                 <th>وصف المشكلة</th>
                 <th>وصف إضافي</th>
                 <th>المسجل</th>
@@ -8784,6 +8886,10 @@ function _sysDownloadFile(filename, content, mime) {
                   <td>${escText(r.location)}</td>
                   <td>${escText(r.category)}</td>
                   <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
+                  <td style="font-variant-numeric:tabular-nums">${r.slaDurationDays != null ? fmt(r.slaDurationDays, 1) : "—"}</td>
+                  <td>${escText(r.stage || "—")}</td>
+                  <td>${escText(r.gender || "—")}</td>
+                  <td>${escText(r.contractor || "—")}</td>
                   <td style="text-align:right;max-width:320px">${escText(r.problemDescription)}</td>
                   <td style="text-align:right;max-width:360px">${escText(r.issueDescription || "—")}</td>
                   <td>${escText(r.creator || "—")}</td>
@@ -8792,7 +8898,7 @@ function _sysDownloadFile(filename, content, mime) {
                       )
                       .join("")
                   : `
-                <tr><td colspan="11"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
+                <tr><td colspan="15"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
               `
               }
             </tbody>
@@ -8875,7 +8981,6 @@ function _sysDownloadFile(filename, content, mime) {
         "balagh-priority-donut",
         "balagh-sla-donut",
         "balagh-cat-priority-stacked",
-        "balagh-school-risk-scatter",
         "balagh-resolution-trend-chart",
       ];
       if (!allRowsForTime.length) {
@@ -9366,74 +9471,6 @@ function _sysDownloadFile(filename, content, mime) {
       }
       } catch (e) { console.warn("[balagh-cat-priority-stacked]", e); }
 
-      // ═══ 10. مصفوفة مخاطر المدارس (Scatter) ═══
-      try {
-      if (document.getElementById("balagh-school-risk-scatter")) {
-        destroyChart_("balagh-school-risk-scatter");
-        const schMap = {};
-        allRowsForTime.forEach((r) => {
-          const key = r.schoolKey || "NM::" + (r.schoolName || "غير معروف");
-          if (!schMap[key]) {
-            schMap[key] = { name: r.isLinked ? r.linkedSchoolName : (r.schoolName || r.schoolNumber || key), total: 0, highRisk: 0 };
-          }
-          schMap[key].total++;
-          if (isHighRiskPriority(r.priority)) schMap[key].highRisk++;
-        });
-        const schoolPoints = Object.values(schMap)
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 40)
-          .map((s) => ({ x: s.total, y: s.highRisk, name: s.name }));
-        CHARTS["balagh-school-risk-scatter"] = new Chart(
-          document.getElementById("balagh-school-risk-scatter"),
-          {
-            type: "scatter",
-            data: {
-              datasets: [
-                {
-                  label: "مدرسة",
-                  data: schoolPoints,
-                  backgroundColor: CSS_TOKENS.α(CSS_TOKENS.special(), 0.65),
-                  borderColor: CSS_TOKENS.special(),
-                  borderWidth: 1.5,
-                  pointRadius: 6,
-                  pointHoverRadius: 9,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: (ctx) => {
-                      const p = ctx.raw;
-                      return ` ${p.name}: إجمالي ${fmt(p.x)} · عالية الخطورة ${fmt(p.y)}`;
-                    },
-                  },
-                },
-              },
-              scales: {
-                x: {
-                  beginAtZero: true,
-                  title: { display: true, text: "إجمالي البلاغات", color: CSS_TOKENS.txMuted(), font: { size: 10, weight: "700" } },
-                  ticks: { font: { size: 10 } },
-                  grid: { color: "rgba(168,195,214,.15)" },
-                },
-                y: {
-                  beginAtZero: true,
-                  title: { display: true, text: "بلاغات عالية الخطورة", color: CSS_TOKENS.txMuted(), font: { size: 10, weight: "700" } },
-                  ticks: { font: { size: 10 } },
-                  grid: { color: "rgba(168,195,214,.15)" },
-                },
-              },
-            },
-          },
-        );
-      }
-      } catch (e) { console.warn("[balagh-school-risk-scatter]", e); }
-
       // ═══ 11. متوسط زمن الحل شهرياً (خط) ═══
       try {
       if (document.getElementById("balagh-resolution-trend-chart")) {
@@ -9538,6 +9575,7 @@ function _sysDownloadFile(filename, content, mime) {
   window.__balaghIsClosed = balaghIsClosed;
   window.__balaghIsHighRiskPriority = isHighRiskPriority;
   window.__balaghPriorityLabel = balaghPriorityLabel;
+  window.__balaghMedian = medianOf;
 })();
 
 
@@ -15369,10 +15407,28 @@ function renderTajheezAllTable() {
     });
     const topCatKey = Object.keys(categories)[0] || null;
     // ── الأعمدة الجديدة: SLA الفعلي (بالأيام)، المرحلة، الجنس، المقاول ──
-    const slaRowsWithDuration = rows.filter((r) => r.slaDurationDays != null);
+    // ⚠️ متوسط SLA يُحسب من البلاغات المغلقة فقط (زمن حل فعلي منتهي) —
+    // بلاغ لسه مفتوح قيمة SLA DAYS بتاعته عداد شغال ولسه بيكبر، وضمّه
+    // للمتوسط بيدّي رقماً غير واقعي (مئات/آلاف الأيام) لو فيه بلاغ عالق قديم.
+    const slaRowsWithDuration = rows.filter((r) => r.isClosed && r.slaDurationDays != null);
     const avgSlaDays = slaRowsWithDuration.length
       ? +(slaRowsWithDuration.reduce((s, r) => s + r.slaDurationDays, 0) / slaRowsWithDuration.length).toFixed(2)
       : null;
+    // الوسيط (median) — أقل تأثراً من المتوسط لو فيه بلاغات قليلة بقيم SLA ضخمة شادّة له لفوق
+    const medianOfFn = window.__balaghMedian || ((a) => (a && a.length ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : null));
+    const medianSlaDays = medianOfFn(slaRowsWithDuration.map((r) => r.slaDurationDays));
+    // أعلى 5 بلاغات SLA لهذه المدرسة — للمراجعة/التشخيص لو المتوسط بدا مرتفع بشكل غير واقعي
+    const topSlaOutliers = [...slaRowsWithDuration]
+      .sort((a, b) => b.slaDurationDays - a.slaDurationDays)
+      .slice(0, 5)
+      .map((r) => ({
+        رقم: r.recordNo || null,
+        SLA_أيام: r.slaDurationDays,
+        الفرق_الفعلي_أيام: r.resolutionDaysActual ?? null, // فرق تقويمي مستقل (تاريخ الحل - تاريخ الإنشاء) للتحقق
+        المقاول: r.contractor || null,
+        تاريخ_الإنشاء: r.creationDate || null,
+        تاريخ_الحل: r.finishDate || null,
+      }));
     const stages = aiBalaghCountBy_(rows, "stage");
     const genders = aiBalaghCountBy_(rows, "gender");
     const contractors = aiBalaghCountBy_(rows, "contractor");
@@ -15389,7 +15445,9 @@ function renderTajheezAllTable() {
       topSubCategory: Object.keys(subCategories)[0] || null,
       categories, subCategories, priorities, statuses, slaStatuses,
       avgSlaDays,                        // متوسط SLA الفعلي بالأيام (null لو مفيش بيانات SLA DAYS كافية)
+      medianSlaDays,                     // وسيط SLA بالأيام — أدق من المتوسط لو فيه بلاغات شاذة قليلة بقيم ضخمة
       slaDaysSampleSize: slaRowsWithDuration.length, // كام بلاغ فعلاً دخل في حساب المتوسط
+      topSlaOutliers,                    // أعلى 5 بلاغات SLA لهذه المدرسة (للتشخيص لو المتوسط مرتفع بشكل غير متوقع)
       stages,                            // توزيع البلاغات حسب المرحلة الدراسية
       genders,                           // توزيع البلاغات حسب الجنس
       contractors,                       // توزيع البلاغات حسب المقاول المسؤول (بلاغ واحد ممكن يكون له أكتر من مقاول عبر الوقت)
@@ -15471,17 +15529,21 @@ function renderTajheezAllTable() {
     idx.rows.forEach((r) => {
       const c = r.contractor;
       if (!c) return;
-      if (!map.has(c)) map.set(c, { name: c, total: 0, open: 0, closed: 0, overdue: 0, slaSum: 0, slaCount: 0 });
+      if (!map.has(c)) map.set(c, { name: c, total: 0, open: 0, closed: 0, overdue: 0, slaSum: 0, slaCount: 0, slaValues: [] });
       const o = map.get(c);
       o.total++;
       if (r.isOpen) o.open++;
       if (r.isClosed) o.closed++;
       if (r.isOverdue) o.overdue++;
-      if (r.slaDurationDays != null) {
+      // متوسط SLA من البلاغات المغلقة فقط — بلاغ لسه مفتوح قيمة SLA DAYS
+      // بتاعته لسه بتكبر (عداد شغال)، وضمّه بيدّي متوسطاً غير واقعي.
+      if (r.isClosed && r.slaDurationDays != null) {
         o.slaSum += r.slaDurationDays;
         o.slaCount++;
+        o.slaValues.push(r.slaDurationDays);
       }
     });
+    const medianOfFn = window.__balaghMedian || ((a) => (a && a.length ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : null));
     const list = [...map.values()]
       .map((o) => ({
         المقاول: o.name,
@@ -15491,6 +15553,7 @@ function renderTajheezAllTable() {
         متأخرة_SLA: o.overdue,
         نسبة_الالتزام: o.total ? +(((o.total - o.overdue) / o.total) * 100).toFixed(1) : null,
         متوسط_SLA_أيام: o.slaCount ? +(o.slaSum / o.slaCount).toFixed(2) : null,
+        وسيط_SLA_أيام: o.slaCount ? medianOfFn(o.slaValues) : null, // أدق من المتوسط لو فيه بلاغات شاذة قليلة
         حجم_عينة_SLA: o.slaCount,
       }))
       .sort((a, b) => {
@@ -15500,13 +15563,28 @@ function renderTajheezAllTable() {
         if (b.متوسط_SLA_أيام == null) return -1;
         return a.متوسط_SLA_أيام - b.متوسط_SLA_أيام;
       });
+    // أعلى 5 بلاغات SLA على مستوى كل المقاولين — للتشخيص لو رقم مقاول معيّن طلع مرتفع بشكل غير متوقع
+    const allSlaRows = idx.rows.filter((r) => r.contractor && r.isClosed && r.slaDurationDays != null);
+    const topSlaOutliers = [...allSlaRows]
+      .sort((a, b) => b.slaDurationDays - a.slaDurationDays)
+      .slice(0, 5)
+      .map((r) => ({
+        رقم: r.recordNo || null,
+        المدرسة: r.isLinked ? r.linkedSchoolName : r.schoolName || null,
+        المقاول: r.contractor || null,
+        SLA_أيام: r.slaDurationDays,
+        الفرق_الفعلي_أيام: r.resolutionDaysActual ?? null,
+        تاريخ_الإنشاء: r.creationDate || null,
+        تاريخ_الحل: r.finishDate || null,
+      }));
     return {
       status: list.length ? "ok" : "ok_zero",
       contractorsCount: list.length,
       ranking: list,
       fastestContractor: list.length && list[0].متوسط_SLA_أيام != null ? list[0].المقاول : null,
+      topSlaOutliers, // أعلى 5 بلاغات SLA على مستوى كل المقاولين (للتشخيص لو رقم أي مقاول بدا مرتفع بشكل غير واقعي)
       source: "RAW_BALAGH",
-      note: "الترتيب حسب متوسط SLA الفعلي (أيام) من عمود SLA DAYS — الأسرع في الحل أولاً. المقاولون بدون بيانات SLA كافية يظهرون في نهاية القائمة.",
+      note: "الترتيب حسب متوسط زمن الحل الفعلي (أيام) من عمود SLA DAYS، محسوب من البلاغات المغلقة فقط لكل مقاول (البلاغات لسه مفتوحة عداد وقتها لسه شغال فمش داخلة في المتوسط) — الأسرع في الحل أولاً. المقاولون بدون بلاغات مغلقة ليها بيانات SLA كافية يظهرون في نهاية القائمة. وسيط_SLA_أيام أدق من المتوسط لو فيه بلاغات قليلة بقيم شاذة.",
     };
   }
 
@@ -16309,11 +16387,21 @@ function renderTajheezAllTable() {
    البيانات فعلاً محقونة أمامك في نفس الرسالة، استخدمها مباشرة بدون تردد.
    ⚙️ أعمدة إضافية أُضيفت حديثاً لبيانات البلاغات، موجودة في DATA_RESULT
    (بلاغات مدرسة) بنفس القاعدة أعلاه — لا تقل "غير متاحة" لو موجودة:
-   - avgSlaDays: متوسط SLA الفعلي بالأيام (محسوب من عمود SLA DAYS الحقيقي
-     في الشيت، مختلف عن slaStatus النصي). null لو مفيش بيانات SLA DAYS
-     كافية لهذه المدرسة تحديداً — في هذه الحالة فقط قل "لا تتوفر بيانات
-     SLA بالأيام لهذه المدرسة"، ولا تخترع رقماً. راجع slaDaysSampleSize
-     لمعرفة كام بلاغ دخل في الحساب.
+   - avgSlaDays: متوسط زمن الحل الفعلي بالأيام، محسوب من عمود SLA DAYS
+     الحقيقي في الشيت (مختلف عن slaStatus النصي) **للبلاغات المغلقة فقط**
+     — البلاغات لسه مفتوحة قيمة SLA DAYS بتاعتها عداد شغال لسه بيكبر، فمش
+     بتدخل في هذا المتوسط عشان ميتضخمش برقم غير واقعي. null لو مفيش بلاغات
+     مغلقة ليها بيانات SLA كافية لهذه المدرسة — في هذه الحالة فقط قل "لا
+     تتوفر بيانات SLA بالأيام لهذه المدرسة"، ولا تخترع رقماً. راجع
+     slaDaysSampleSize لمعرفة كام بلاغ مغلق فعلاً دخل في الحساب.
+   - medianSlaDays: الوسيط (وليس المتوسط) لنفس بيانات SLA — أقل تأثراً
+     بالبلاغات الشاذة (القليلة اللي عندها قيمة SLA ضخمة جداً). لو avgSlaDays
+     أعلى بكثير من medianSlaDays، ده معناه إن عدد قليل من البلاغات هو اللي
+     شادّ المتوسط لفوق مش إن كل البلاغات بطيئة — وضّح الفرق ده لو المستخدم
+     سأل عن رقم يبدو مرتفع بشكل غير متوقع، واستخدم topSlaOutliers (أعلى 5
+     بلاغات SLA لهذه المدرسة، كل عنصر فيه SLA_أيام والفرق_الفعلي_أيام وهو
+     فرق تقويمي مستقل بين تاريخ الإنشاء وتاريخ الحل) لتوضيح أي البلاغات
+     بالتحديد وراء الرقم المرتفع.
    - stages/genders/contractors: توزيعات (object لكل قيمة وعددها) حسب
      المرحلة الدراسية/الجنس/المقاول المسؤول عن بلاغات هذه المدرسة.
      topContractor = المقاول الأكثر تكراراً لهذه المدرسة.
@@ -16335,6 +16423,10 @@ function renderTajheezAllTable() {
    متوسط_SLA_أيام)؛ fastestContractor = اسم الأسرع (null لو مفيش بيانات
    SLA كافية لأي مقاول). المقاولون بدون عينة SLA كافية يظهرون في نهاية
    القائمة بـ متوسط_SLA_أيام = null — لا تفترض لهم رقماً ولا ترتبهم كأسرع.
+   كل مقاول فيه كمان وسيط_SLA_أيام (أقل تأثراً بالبلاغات الشاذة من
+   المتوسط) — لو المتوسط بدا مرتفع بشكل غير متوقع لمقاول معيّن، قارنه
+   بالوسيط ووضّح الفرق. topSlaOutliers = أعلى 5 بلاغات SLA عبر كل
+   المقاولين (للتشخيص) — استخدمها لو المستخدم سأل عن سبب رقم مرتفع.
 
 ══════════════════════════════════════════════════════
 ⚠️ حماية من التخمين (Hallucination) — قواعد صارمة
@@ -25013,7 +25105,7 @@ var PORTAL_CATEGORIES = {
       { name: "sys-unifire", label: "UniFire — يوني فاير" },
       { name: "sys-fares",   label: "Fares — فارس" },
       { name: "sys-vts",     label: "نظام متابعة المركبات" },
-      { name: "sys-hr",      label: "نظام إدارة الموارد" }
+      { name: "sys-hr",      label: "نظام إدارة الموارد البشرية" }
     ]
   },
   assessment: {
@@ -25270,7 +25362,7 @@ var DIGITAL_SYSTEMS_DATA = [
   },
   {
     id: "hr",
-    nameAr: "نظام إدارة الموارد",
+    nameAr: "نظام إدارة الموارد البشرية",
     nameEn: "TBC HR System",
     category: "الموارد البشرية والهيكل التنظيمي",
     logo: "HR",
@@ -25630,6 +25722,133 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", __fillPortalCardTabsList);
 } else {
   __fillPortalCardTabsList();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   بحث سريع عن تبويب — في هيرو الواجهة الرئيسية
+   ──────────────────────────────────────────────────────────────────────
+   عندنا عشرات التبويبات موزّعة على 9 أقسام؛ المستخدم اللي عارف اسم
+   التبويب كان لازم يفتح القسم الصح الأول ويدوّر. هنا بيكتب الاسم
+   وينتقل له مباشرة. القائمة مبنية من نفس PORTAL_CATEGORIES فتفضل
+   متزامنة تلقائياً مع أي تبويب يتضاف مستقبلاً.
+   ══════════════════════════════════════════════════════════════════════ */
+function __portalSearchIndex() {
+  var out = [];
+  if (typeof PORTAL_CATEGORIES === "undefined") return out;
+  Object.keys(PORTAL_CATEGORIES).forEach(function (catKey) {
+    var cat = PORTAL_CATEGORIES[catKey];
+    (cat.tabs || []).forEach(function (t) {
+      if (typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(t.name)) return;
+      out.push({ cat: catKey, catTitle: cat.title, name: t.name, label: t.label });
+    });
+  });
+  return out;
+}
+
+function __portalSearchNormalize(s) {
+  // تطبيع عربي خفيف: الهمزات/الألف المقصورة/التاء المربوطة + إزالة التشكيل
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[ً-ْـ]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function __initPortalSearch() {
+  var hero = document.querySelector(".portal-hero");
+  if (!hero || document.getElementById("portalSearchInput")) return;
+
+  var wrap = document.createElement("div");
+  wrap.className = "portal-search-wrap";
+  wrap.innerHTML =
+    '<input type="text" id="portalSearchInput" class="portal-search-input" autocomplete="off" ' +
+    'placeholder="ابحث عن تبويب… (مثال: البلاغات، المصاعد، التكلفة)" aria-label="بحث سريع عن تبويب">' +
+    '<span class="portal-search-icon">🔍</span>' +
+    '<div class="portal-search-results" id="portalSearchResults" style="display:none"></div>';
+  // ⚠️ بنحطها بعد الـ hero مش جواه: الـ hero عنده overflow:hidden وكان
+  // هيقص قائمة النتائج المنسدلة تحت خالص.
+  if (hero.parentNode) hero.parentNode.insertBefore(wrap, hero.nextSibling);
+  else return;
+
+  var input = wrap.querySelector("#portalSearchInput");
+  var box = wrap.querySelector("#portalSearchResults");
+  var matches = [];
+  var activeIdx = -1;
+
+  function close() { box.style.display = "none"; matches = []; activeIdx = -1; }
+
+  function open(list) {
+    matches = list;
+    activeIdx = list.length ? 0 : -1;
+    if (!list.length) {
+      box.innerHTML = '<div class="portal-search-empty">مفيش تبويب بالاسم ده</div>';
+      box.style.display = "";
+      return;
+    }
+    box.innerHTML = list
+      .map(function (m, i) {
+        return (
+          '<div class="portal-search-item' + (i === 0 ? " active" : "") + '" data-i="' + i + '">' +
+          "<span>" + m.label + "</span>" +
+          '<span class="portal-search-item-cat">' + m.catTitle + "</span>" +
+          "</div>"
+        );
+      })
+      .join("");
+    box.style.display = "";
+  }
+
+  function go(i) {
+    var m = matches[i];
+    if (!m) return;
+    close();
+    input.value = "";
+    if (typeof openFavoriteTab === "function") openFavoriteTab(m.cat, m.name);
+  }
+
+  function highlight() {
+    [].slice.call(box.querySelectorAll(".portal-search-item")).forEach(function (el, i) {
+      el.classList.toggle("active", i === activeIdx);
+    });
+  }
+
+  input.addEventListener("input", function () {
+    var q = __portalSearchNormalize(input.value);
+    if (!q) return close();
+    var list = __portalSearchIndex().filter(function (m) {
+      return (
+        __portalSearchNormalize(m.label).indexOf(q) !== -1 ||
+        __portalSearchNormalize(m.catTitle).indexOf(q) !== -1
+      );
+    });
+    open(list.slice(0, 8));
+  });
+
+  input.addEventListener("keydown", function (e) {
+    if (box.style.display === "none") return;
+    if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = Math.min(matches.length - 1, activeIdx + 1); highlight(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = Math.max(0, activeIdx - 1); highlight(); }
+    else if (e.key === "Enter") { e.preventDefault(); go(activeIdx); }
+    else if (e.key === "Escape") { close(); }
+  });
+
+  box.addEventListener("click", function (e) {
+    var item = e.target.closest ? e.target.closest(".portal-search-item") : null;
+    if (item) go(+item.getAttribute("data-i"));
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!wrap.contains(e.target)) close();
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", __initPortalSearch);
+} else {
+  __initPortalSearch();
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -26059,10 +26278,9 @@ document.addEventListener("core-data-ready", function () {
      الفتح كما كانت دائماً) */
   ["assessment", "assets", "contracts", "operations", "geo", "explore"].forEach(function (key) {
     var s = document.getElementById("portalStatus-" + key);
-    var c = document.getElementById("portalCount-" + key);
     if (s) { s.textContent = "جاهز"; s.className = "portal-card-status ready"; }
-    if (c && schoolsEl) c.textContent = schoolsEl.textContent + " سجل";
   });
+
 
   setTimeout(function () {
     __appLoadingHide();
@@ -27627,11 +27845,18 @@ setTimeout(function tellUserStillTrying() {
         var strip = document.createElement("div");
         strip.id = "portalQuickStats";
         strip.className = "portal-quick-stats";
+        /* كروت الإحصائيات دي بتستخدم نفس كلاسات الـ KPI المستخدمة جوّه
+           التبويبات (.kpi + kc-*) بدل ستايل خاص بالواجهة الرئيسية —
+           فبتورث تلقائياً نفس الشكل بالظبط (الشريط اللوني العلوي، حجم
+           الرقم، الظل، الـ hover) وأي تعديل مستقبلي على ستايل الـ KPI
+           بيتطبّق هنا كمان من غير أي شغل إضافي.
+           الألوان متطابقة مع نفس المؤشرات في شبكة KPI الرئيسية:
+           المدارس = أزرق، الأصول = تيل، البلاغات = كهرماني، FCA = أخضر. */
         strip.innerHTML =
-          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-schools">—</div><div class="portal-stat-lbl">🏫 عدد المدارس</div></div>' +
-          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-assets">—</div><div class="portal-stat-lbl">📦 إجمالي الأصول</div></div>' +
-          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-reports">—</div><div class="portal-stat-lbl">📢 إجمالي البلاغات</div></div>' +
-          '<div class="portal-stat"><div class="portal-stat-val" id="pqs-fca">—</div><div class="portal-stat-lbl">🏗️ متوسط تقييم FCA</div></div>';
+          '<div class="kpi kc-blue"><div class="kpi-val" id="pqs-schools">—</div><div class="kpi-lbl">عدد المدارس</div></div>' +
+          '<div class="kpi kc-teal"><div class="kpi-val" id="pqs-assets">—</div><div class="kpi-lbl">إجمالي الأصول</div></div>' +
+          '<div class="kpi kc-amber"><div class="kpi-val" id="pqs-reports">—</div><div class="kpi-lbl">إجمالي البلاغات</div></div>' +
+          '<div class="kpi kc-green"><div class="kpi-val" id="pqs-fca">—</div><div class="kpi-lbl">متوسط تقييم FCA</div></div>';
         grid.parentElement.insertBefore(strip, grid);
 
         var refresh = function () {

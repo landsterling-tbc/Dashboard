@@ -2597,6 +2597,105 @@ canvas {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   بحث سريع عن تبويب — في هيرو الواجهة الرئيسية
+   ══════════════════════════════════════════════════════════════ */
+/* ⚠️ الحاوية دي بتتحط كشقيق للـ .portal-hero مش جواه — لأن الـ hero
+   عنده overflow:hidden فكان هيقص قائمة نتائج البحث المنسدلة. */
+.portal-search-wrap {
+  position: relative;
+  margin: 12px 0 16px;
+  max-width: 480px;
+}
+
+.portal-search-input {
+  width: 100%;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d2f40;
+  background: rgba(255,255,255,.97);
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-pill);
+  padding: 11px 42px 11px 16px;
+  outline: none;
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 4px 14px rgba(8,45,60,.07);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.portal-search-input::placeholder { color: #93a9b6; font-weight: 500; }
+
+.portal-search-input:focus {
+  border-color: rgba(22,164,191,.5);
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 6px 18px rgba(8,45,60,.1),
+    0 0 0 4px rgba(22,164,191,.12);
+}
+
+.portal-search-icon {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #93a9b6;
+  pointer-events: none;
+}
+
+.portal-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  background: #fff;
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-lg);
+  box-shadow: 0 18px 44px rgba(8,45,60,.22);
+  overflow: hidden;
+  z-index: 400;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.portal-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0d2f40;
+  border-bottom: 1px solid rgba(13,47,64,.05);
+  transition: background .12s ease;
+}
+
+.portal-search-item:last-child { border-bottom: none; }
+.portal-search-item:hover,
+.portal-search-item.active { background: rgba(22,164,191,.09); }
+
+.portal-search-item-cat {
+  margin-right: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #7c93a1;
+  background: rgba(13,47,64,.06);
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+}
+
+.portal-search-empty {
+  padding: 14px;
+  text-align: center;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px;
+  color: #7c93a1;
+}
+
+/* ══════════════════════════════════════════════════════════════
    19) OPTIMIZATION PASS (المرحلة 10 — Optimization)
    تحسينات CSS غير-هدّامة فقط: تسريع الرسم وتقليل إعادة الحساب
    دون تغيير أي شكل أو سلوك ظاهر للمستخدم.
@@ -5879,4 +5978,137 @@ tbody tr:last-child td:last-child {
   .raci-table { font-size: 11px; }
   .raci-th-task, .raci-task-name { min-width: 160px; max-width: 200px; }
   .raci-table-wrap { max-height: 70vh; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   17)  توحيد كروت الواجهة الرئيسية مع بطاقات .card الداخلية
+   ──────────────────────────────────────────────────────────────────────
+   الكروت اللي فوق (Portal Home) كانت لها لغة بصرية مستقلة شوية عن
+   بطاقات .card الموحّدة اللي جوّه التبويبات: حواف أصغر، خلفية متدرّجة
+   مختلفة، وأهم حاجة — كل الأيقونات بنفس اللون التيل الواحد، بينما
+   بطاقات الداخل كل واحدة ليها لون أيقونة خاص بيها.
+   القسم ده بيوحّد الاتنين: نفس الحواف (--r-2xl)، نفس الخلفية والحد،
+   نفس الشريط العلوي الملوّن — مع إعطاء كل قسم لون accent خاص بيه
+   (نفس مبدأ .card-title-icon الداخلية) عشان الأقسام تتميّز عن بعض.
+   بيتحط في آخر الملف عن قصد عشان يفوز على مراحل التنسيق السابقة
+   (10-F / 13-C / 16-C) من غير ما نلمس أو نحذف أي منها.
+   ══════════════════════════════════════════════════════════════════════ */
+.portal-card {
+  background: rgba(255,255,255,.97);
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-2xl);
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.04),
+    0 4px 14px rgba(8,45,60,.07),
+    inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.portal-card::before {
+  height: 3px;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  background: linear-gradient(90deg, var(--cat-accent, var(--teal-3)), var(--teal-2) 55%, var(--brass-2));
+  opacity: .85;
+}
+
+.portal-card:hover {
+  box-shadow:
+    0 2px 4px rgba(8,45,60,.05),
+    0 16px 38px rgba(8,45,60,.15),
+    inset 0 1px 0 rgba(255,255,255,.85);
+  border-color: var(--cat-bd, rgba(22,164,191,.34));
+}
+
+.portal-card:hover::before { opacity: 1; }
+
+/* الأيقونة — نفس مبدأ .card-title-icon الداخلية: مربّع دائري ناعم
+   بخلفية من لون القسم نفسه بدل اللون التيل الموحّد لكل الكروت */
+.portal-card-icon {
+  border-radius: var(--r-lg);
+  background: var(--cat-soft, rgba(22,164,191,.13));
+  border: 1px solid var(--cat-bd, rgba(22,164,191,.26));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 2px 8px rgba(8,45,60,.07);
+}
+
+/* لون accent لكل قسم — مسحوب من نفس لوحة الداشبورد "Ink & Brass".
+   القيم مكتوبة صراحةً (مش color-mix) عشان تشتغل على أي متصفح من غير
+   ما تسقط بصمت على المتصفحات الأقدم. */
+#portal-card-assessment { --cat-accent:#0b6b7e; --cat-soft:rgba(11,107,126,.13);  --cat-bd:rgba(11,107,126,.28);  }
+#portal-card-assets     { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13);  --cat-bd:rgba(13,132,156,.28);  }
+#portal-card-contracts  { --cat-accent:#b08a4e; --cat-soft:rgba(176,138,78,.15);  --cat-bd:rgba(176,138,78,.3);   }
+#portal-card-operations { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);   }
+#portal-card-safety     { --cat-accent:#9f1239; --cat-soft:rgba(159,18,57,.11);   --cat-bd:rgba(159,18,57,.26);   }
+#portal-card-geo        { --cat-accent:#1c7f93; --cat-soft:rgba(28,148,171,.13);  --cat-bd:rgba(28,148,171,.28);  }
+#portal-card-explore    { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);    --cat-bd:rgba(22,61,82,.28);    }
+#portal-card-digital    { --cat-accent:#16a4bf; --cat-soft:rgba(22,164,191,.14);  --cat-bd:rgba(22,164,191,.3);   }
+#portal-card-raci       { --cat-accent:#8a6a37; --cat-soft:rgba(138,106,55,.14);  --cat-bd:rgba(138,106,55,.3);   }
+
+.portal-favorites-card { border-radius: var(--r-2xl); }
+
+/* ── شريط الإحصائيات فوق الكروت بقى بيستخدم كلاسات .kpi نفسها،
+   فبناخد نفس شكل كروت التبويبات بالظبط. بنظبط بس الشبكة عشان
+   تفضل 4 أعمدة زي ما هي (شبكة .kpi-grid العامة auto-fit). ── */
+.portal-quick-stats .kpi { min-height: 118px; }
+.portal-quick-stats .kpi .kpi-val { font-size: 29px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   18)  الواجهة الرئيسية — الخطوة 1: التخطيط والمساحات
+   ──────────────────────────────────────────────────────────────────────
+   المشكلة المقيسة فعلياً على الصفحة:
+   • .portal-cards-grid كان عليه grid-auto-rows:1fr — يعني كل صف بياخد
+     ارتفاع أطول كارت فيه. فكارت زي "استكشاف البيانات" (تبويب واحد) كان
+     بياخد 308px ويفضل أكتر من 250px منها فراغ أبيض.
+   • كارت المفضلة كان بيمتد على صفين بس من أصل 3، فكان سايب عمود فاضي
+     بارتفاع ~307px تحته.
+   • صف البحث عرضه 1380px والبحث مستخدم 480px بس — الباقي فراغ ميت.
+   الحل هنا كله CSS (مفيش أي تعديل على index.html): الصفوف تاخد ارتفاع
+   محتواها، المفضلة تاخد ارتفاعها الطبيعي بس، والكروت تترتّب بصرياً
+   حسب كثافة محتواها عبر order عشان كل صف يبقى متوازن.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* الصفوف تاخد ارتفاع محتواها بدل ارتفاع موحّد مفروض على الكل.
+   وبنعرّف 3 صفوف صريحة (9 كروت ÷ 3 أعمدة) عشان كارت المفضلة يقدر
+   يحجز عموده على طول الشبكة — الرقم -1 في grid-row مالوش معنى موثوق
+   من غير صفوف صريحة، وده اللي كان بيخلي الكروت تتوزّع بشكل مبعثر
+   وتنزل على العمود الرابع. grid-auto-rows سايبة auto عشان لو اتضاف
+   قسم جديد مستقبلاً الصف الزيادة يشتغل عادي. */
+.portal-cards-grid {
+  grid-template-rows: repeat(3, auto);
+  grid-auto-rows: auto;
+}
+
+/* ⚠️ باگ حقيقي كان في CSS: .portal-favorites-empty-text عليه
+   flex: 1 1 300px جوّه حاوية flex-direction:column — يعني الـ300px
+   بتتطبّق على الارتفاع مش العرض (flex-basis بيمشي على المحور الرئيسي).
+   النتيجة: كارت المفضلة كان بيطلع 509px بدل ~250px، وبيفرض الارتفاع ده
+   على كل كروت الصف الأول معاه. ده كان السبب الأساسي للفراغ الأبيض
+   الكبير في أول صف. */
+.portal-favorites-empty-text { flex: 0 0 auto; }
+
+/* المفضلة: تفضل في عمودها لكن بارتفاع محتواها فقط — الفراغ اللي تحتها
+   بقى خلفية الصفحة العادية بدل كارت فاضي بمساحة كبيرة.
+   (شغّال دلوقتي لأننا عرّفنا grid-template-rows صريحة فوق) */
+.portal-favorites-card {
+  grid-column: 4;
+  grid-row: 1 / -1;
+  align-self: start;
+}
+
+/* ترتيب بصري متوازن: الصف الأول للأقسام الأكتر محتوى، والأخير للأقل —
+   فمفيش صف بيتمطّط عشان كارت واحد جنبه فاضي. (ترتيب العرض بس —
+   ترتيب الـHTML نفسه ما اتغيرش) */
+#portal-card-assessment { order: 1; }
+#portal-card-assets     { order: 2; }
+#portal-card-digital    { order: 3; }
+#portal-card-operations { order: 4; }
+#portal-card-safety     { order: 5; }
+#portal-card-contracts  { order: 6; }
+#portal-card-geo        { order: 7; }
+#portal-card-explore    { order: 8; }
+#portal-card-raci       { order: 9; }
+
+/* شريط البحث ياخد عرض الصف بالكامل بدل ما يسيب ~900px فراغ جنبه */
+.portal-search-wrap { max-width: none; }
+
+@media (max-width: 900px) {
+  .portal-favorites-card { grid-column: 1 / -1; grid-row: auto; }
 }

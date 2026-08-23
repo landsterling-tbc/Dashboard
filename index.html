@@ -183,56 +183,69 @@
         <!-- يُملأ ديناميكياً عبر __renderPortalFavoritesCard() -->
       </div>
 
+      <!-- أيقونات كروت البوابة الرئيسية: Lucide (lucide-static v1.33.0، رخصة ISC،
+           https://lucide.dev) — SVG بدل الإيموجي (المرحلة 1 من خطة الأيقونات).
+           stroke="currentColor" فبتاخد لونها تلقائياً من --cat-accent الخاص
+           بكل كارت (dashboard.css). ملاحظة: data-wm تبقى إيموجي كما هي — دي
+           علامة مائية خلفية شفافة جداً (opacity 0.05) عبر CSS content، مش
+           جزء من الأيقونة الظاهرة، وخارج نطاق هذه المرحلة. -->
+
       <div class="portal-card" id="portal-card-raci" data-category="raci" data-wm="🧩">
-        <div class="portal-card-icon">🧩</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></div>
         <div class="portal-card-title">مصفوفة RACI</div>
         <div class="portal-card-desc">الأدوار والمسؤوليات — من المسؤول عن كل مهمة في فريق البرنامج</div>
       </div>
 
       <div class="portal-card" id="portal-card-digital" data-category="digital" data-wm="💻">
-        <div class="portal-card-icon">💻</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></div>
         <div class="portal-card-title">الأنظمة الرقمية</div>
         <div class="portal-card-desc">MAXIMO، TAKAMUL، TFMP، UniFire، Fares</div>
       </div>
 
       <div class="portal-card" id="portal-card-assessment" data-category="assessment" data-wm="📊">
-        <div class="portal-card-icon">📊</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></div>
         <div class="portal-card-title">التقييمات والحالة الفنية</div>
         <div class="portal-card-desc">تحليل FCA، مقارنة المراحل، FCA المرجعي، البيئة المدرسية، تقييم عاين، الأنظمة الرئيسية والتفصيلية</div>
       </div>
 
       <div class="portal-card" id="portal-card-assets" data-category="assets" data-wm="🏗️">
-        <div class="portal-card-icon">🏗️</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg></div>
         <div class="portal-card-title">الأصول والمرافق</div>
-        <div class="portal-card-desc">التجهيزات، قطع الغيار، المصاعد، خنادق الصرف، خطة استبدال المكيفات</div>
+        <div class="portal-card-desc">حصر الأصول، قطع الغيار، المصاعد، خنادق الصرف، خطة استبدال المكيفات</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-equipment" data-category="equipment" data-wm="🧰">
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12v4"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M17 6a2 2 0 0 1 1.414.586l3 3A2 2 0 0 1 22 11v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 .586-1.414l3-3A2 2 0 0 1 7 6z"/><path d="M2 14h20"/><path d="M8 12v4"/></svg></div>
+        <div class="portal-card-title">التجهيزات والتوريدات</div>
+        <div class="portal-card-desc">المخصص والاحتياج، التوريدات، عقود التجهيزات</div>
       </div>
 
       <div class="portal-card" id="portal-card-contracts" data-category="contracts" data-wm="💰">
-        <div class="portal-card-icon">💰</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></div>
         <div class="portal-card-title">العقود والتكاليف</div>
         <div class="portal-card-desc">التكلفة، المدفوعات، العقود، العقود غير المجال</div>
       </div>
 
       <div class="portal-card" id="portal-card-operations" data-category="operations" data-wm="⚙️">
-        <div class="portal-card-icon">⚙️</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="portal-card-title">التشغيل</div>
         <div class="portal-card-desc">مؤشرات الأداء، التدريب، تقييم الموظفين، البوابين، التوظيف</div>
       </div>
 
       <div class="portal-card" id="portal-card-safety" data-category="safety" data-wm="📢">
-        <div class="portal-card-icon">📢</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></div>
         <div class="portal-card-title">الأمن والسلامة والبلاغات</div>
         <div class="portal-card-desc">ملخص الأمن والسلامة، البلاغات، تصحيحات وتصعيدات</div>
       </div>
 
       <div class="portal-card" id="portal-card-geo" data-category="geo" data-wm="🗺️">
-        <div class="portal-card-icon">🗺️</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></div>
         <div class="portal-card-title">التحليل الجغرافي</div>
         <div class="portal-card-desc">الخرائط، التوزيع الجغرافي</div>
       </div>
 
       <div class="portal-card" id="portal-card-explore" data-category="explore" data-wm="🔍">
-        <div class="portal-card-icon">🔍</div>
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></div>
         <div class="portal-card-title">استكشاف البيانات</div>
         <div class="portal-card-desc">الجداول، البحث، التقارير</div>
       </div>
@@ -434,7 +447,7 @@
 
   <div class="card mb14" style="padding-bottom:20px">
     <div class="card-title">
-      <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">▦</span>
+      <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
       <span data-ar="توزيع المدارس حسب درجة FCA" data-en="Schools Distribution by FCA Score">توزيع المدارس حسب درجة FCA</span>
       <span class="sub" id="tier-sub"></span>
     </div>
@@ -486,7 +499,9 @@
     <div class="tab" data-evt="31">خطة استبدال المكيفات</div>
     <div class="tab" data-evt="32">البلاغات</div>
     <div class="tab" data-evt="33">الأمن والسلامة</div>
-    <div class="tab" data-evt="34">التجهيزات</div>
+    <div class="tab" data-evt="34">المخصص والاحتياج</div>
+    <div class="tab" data-evt="51">التوريدات</div>
+    <div class="tab" data-evt="52">عقود التجهيزات</div>
     <div class="tab" data-evt="35">قطع الغيار</div>
     <div class="tab" data-evt="36">البوابين</div>
     <div class="tab" data-evt="37">التوظيف</div>
@@ -562,7 +577,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" data-evt="51">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="53">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -605,7 +620,7 @@
 ║  HTML الخاص بهذا التبويب ↓
 ║
 ║  📌 كيفية إضافة تبويب جديد بعد هذا:
-║     1. أضف: <div class="tab" data-evt="52">الاسم</div>
+║     1. أضف: <div class="tab" data-evt="66">الاسم</div>
 ║        في قسم <div class="tabs"> (حوالي السطر 649)
 ║     2. أنشئ قسم HTML جديد: <div class="panel" id="tab-NEW_ID">...</div>
 ║        في مكانٍ مناسب بعد هذا القسم
@@ -694,7 +709,7 @@
   <div class="panel" id="tab-stage-compare">
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">📊</span>
+        <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
         مقارنة مراحل FCA
       </div>
 
@@ -737,7 +752,7 @@
       <!-- Chart 1: متوسط كل مرحلة (bar grouped) -->
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">📊</span>
+          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
           متوسط FCA لكل مرحلة — مقارنة شاملة
           <span class="sub">كل مرحلة موجودة في الملف تظهر تلقائياً</span>
         </div>
@@ -747,7 +762,7 @@
       <!-- Chart 2: التطور الزمني لكل مرحلة -->
       <div class="card mb14" style="border:1.5px solid rgba(8,145,178,0.2)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info-2)">📈</span>
+          <span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
           تطور متوسط FCA عبر الشهور — كل المراحل
           <span class="sub">كل شهر موجود في الملف يظهر تلقائياً</span>
         </div>
@@ -760,7 +775,7 @@
       <!-- Chart 3: حسب المنطقة -->
       <div class="card mb14" style="border:1.5px solid rgba(5,150,105,0.18)">
         <div class="card-title">
-          <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46">🗺️</span>
+          <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>
           متوسط FCA حسب المنطقة الرئيسية — مقارنة المراحل
         </div>
         <div id="stageRegionEmpty" style="display:none;text-align:center;padding:32px;color:var(--tx-muted);font-size:13px">
@@ -772,7 +787,7 @@
       <!-- Chart 4: تغطية البيانات per stage (doughnut row) -->
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#F5F3FF;color:var(--c-special)">🥧</span>
+          <span class="card-title-icon" style="background:#F5F3FF;color:var(--c-special)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>
           تغطية البيانات حسب المرحلة
           <span class="sub">عدد المدارس لكل مرحلة</span>
         </div>
@@ -783,7 +798,7 @@
       <div class="card">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
           <span>
-            <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">📋</span>
+            <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
             جدول المدارس — كل المراحل
           </span>
           <span style="display:flex;gap:8px;flex-wrap:wrap">
@@ -808,7 +823,7 @@
   <div class="panel" id="tab-fca-ref">
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46">📋</span>
+        <span class="card-title-icon" style="background:var(--bg-positive);color:#065F46"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
         FCA المرجعي — آخر تقييم لكل مدرسة
         <span class="sub">مبني على أحدث تقييم متاح (Jun &gt; May &gt; Apr)</span>
       </div>
@@ -1013,6 +1028,36 @@
     <div id="tajheez-content">
       <div class="card loading-placeholder">
         <div class="loading-placeholder-icon">🏗️</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🚚  تبويب: التوريدات (جوّه كارت "التجهيزات والتوريدات")
+║  ID: tab-tajheez-supplies — مصدر بيانات مستقل (Apps Script خاص)
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-tajheez-supplies">
+    <div id="tajheez-supplies-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🚚</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🧾  تبويب: عقود التجهيزات (جوّه كارت "التجهيزات والتوريدات")
+║  ID: tab-tajheez-contracts — مصدر بيانات مستقل (Apps Script خاص)
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-tajheez-contracts">
+    <div id="tajheez-contracts-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🧾</div>
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>
@@ -1639,7 +1684,7 @@
 
       <!-- كارت 1: المدارس المحصورة -->
       <div class="kpi kc-info">
-        <div class="kpi-icon">🏫</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></div>
         <div class="kpi-val" id="hasr-k-surveyed">—</div>
         <div class="kpi-lbl">المدارس المحصورة</div>
         <div class="kpi-sub">
@@ -1653,7 +1698,7 @@
 
       <!-- كارت 2: إجمالي الأصول -->
       <div class="kpi kc-green">
-        <div class="kpi-icon">📊</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></div>
         <div class="kpi-val" id="hasr-k-assets">—</div>
         <div class="kpi-lbl">إجمالي الأصول</div>
         <div class="kpi-sub">أصل موثّق</div>
@@ -1662,7 +1707,7 @@
 
       <!-- كارت 3: المدارس المعادة -->
       <div class="kpi kc-purple">
-        <div class="kpi-icon">🔄</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></div>
         <div class="kpi-val" id="hasr-k-reassessed">—</div>
         <div class="kpi-lbl">المدارس المعادة</div>
         <div class="kpi-sub">
@@ -1676,7 +1721,7 @@
 
       <!-- كارت 4: متوسط الأصول -->
       <div class="kpi kc-teal">
-        <div class="kpi-icon">📐</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg></div>
         <div class="kpi-val" id="hasr-k-avg-assets">—</div>
         <div class="kpi-lbl">متوسط الأصول</div>
         <div class="kpi-sub">أصل / مدرسة</div>
@@ -1684,7 +1729,7 @@
 
       <!-- كارت 5: المباني -->
       <div class="kpi kc-amber">
-        <div class="kpi-icon">🏗️</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="6" x="4" y="2" rx="1"/><path d="M4 8v13a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1 2 2 0 0 0 0-4 1 1 0 0 1-1-1V8"/><path d="M8 8v3"/><path d="M12 8v3"/></svg></div>
         <div class="kpi-val" id="hasr-k-total-buildings">—</div>
         <div class="kpi-lbl">إجمالي المباني</div>
         <div class="kpi-sub" id="hasr-k-avg-buildings">— مبنى / مدرسة</div>
@@ -1692,7 +1737,7 @@
 
       <!-- كارت 6: الغرف -->
       <div class="kpi kc-red">
-        <div class="kpi-icon">🚪</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20H2"/><path d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"/><path d="M11 4H8a2 2 0 0 0-2 2v14"/><path d="M14 12h.01"/><path d="M22 20h-3"/></svg></div>
         <div class="kpi-val" id="hasr-k-total-rooms">—</div>
         <div class="kpi-lbl">إجمالي الغرف</div>
         <div class="kpi-sub" id="hasr-k-avg-rooms">— غرفة / مدرسة</div>
@@ -1700,7 +1745,7 @@
 
       <!-- كارت 7: الأنظمة الرئيسية -->
       <div class="kpi kc-navy">
-        <div class="kpi-icon">⚙️</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="kpi-val" id="hasr-k-main-systems">—</div>
         <div class="kpi-lbl">الأنظمة الرئيسية</div>
         <div class="kpi-sub">نظام رئيسي</div>
@@ -1708,7 +1753,7 @@
 
       <!-- كارت 8: الأنظمة الفرعية -->
       <div class="kpi kc-teal">
-        <div class="kpi-icon">🔩</div>
+        <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4V2"/><path d="M5 10v4a7.004 7.004 0 0 0 5.277 6.787c.412.104.802.292 1.102.592L12 22l.621-.621c.3-.3.69-.488 1.102-.592A7.003 7.003 0 0 0 19 14v-4"/><path d="M12 4C8 4 4.5 6 4 8c-.243.97-.919 1.952-2 3 1.31-.082 1.972-.29 3-1 .54.92.982 1.356 2 2 1.452-.647 1.954-1.098 2.5-2 .595.995 1.151 1.427 2.5 2 1.31-.621 1.862-1.058 2.5-2 .629.977 1.162 1.423 2.5 2 1.209-.548 1.68-.967 2-2 1.032.916 1.683 1.157 3 1-1.297-1.036-1.758-2.03-2-3-.5-2-4-4-8-4Z"/></svg></div>
         <div class="kpi-val" id="hasr-k-sub-systems">—</div>
         <div class="kpi-lbl">الأنظمة الفرعية</div>
         <div class="kpi-sub">نظام فرعي</div>
@@ -1721,23 +1766,23 @@
     <!-- الرسوم البيانية -->
     <div class="g2 mb14">
       <div class="card">
-        <div class="card-title"><span class="card-title-icon" style="background:#F0FDF4;color:var(--c-positive)">📊</span>توزيع الأصول حسب الحالة</div>
+        <div class="card-title"><span class="card-title-icon" style="background:#F0FDF4;color:var(--c-positive)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>توزيع الأصول حسب الحالة</div>
         <div class="chart-box" style="height:260px"><canvas id="hasr-ch-condition"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title"><span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)">⚙️</span>الأصول حسب النظام الرئيسي<span class="sub">أعلى 10</span></div>
+        <div class="card-title"><span class="card-title-icon" style="background:var(--bg-info);color:var(--c-info)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></span>الأصول حسب النظام الرئيسي<span class="sub">أعلى 10</span></div>
         <div class="chart-box" style="height:340px"><canvas id="hasr-ch-systems"></canvas></div>
       </div>
     </div>
     <div class="card mb14">
-      <div class="card-title"><span class="card-title-icon" style="background:#FFF7ED;color:#C2410C">🌍</span>المدارس المحصورة حسب المدينة</div>
+      <div class="card-title"><span class="card-title-icon" style="background:#FFF7ED;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>المدارس المحصورة حسب المدينة</div>
       <div class="chart-box" style="height:240px"><canvas id="hasr-ch-cities"></canvas></div>
     </div>
 
     <!-- جدول المدارس -->
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1">🏫</span>
+        <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
         جدول المدارس المحصورة
         <span class="sub" id="hasr-tbl-count"></span>
       </div>

@@ -1117,6 +1117,18 @@ tbody tr:last-child td { border-bottom: none; }
   line-height: 1;
 }
 
+/* أيقونة SVG بديلة عن الإيموجي (المرحلة ٤ من خطة الأيقونات) — inline-block
+   عشان تفضل تتوسّط تلقائياً بنفس text-align:center الموروثة من .empty-state
+   (كانت شغالة كده مع الإيموجي كنص عادي، فمفيش داعي لتغيير آلية التوسيط).
+   بلا لون مضبوط صراحةً — بترث اللون الرمادي الموحّد (var(--tx-muted)) بدل
+   ألوان الإيموجي المتفرقة، وده أنسب لحالة "لا توجد بيانات" فعلاً. */
+.empty-state-icon svg {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  vertical-align: middle;
+}
+
 .empty-state-title {
   font-size: 16px;
   font-weight: 800;
@@ -2281,7 +2293,7 @@ canvas {
 
 .portal-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) 240px;
+  grid-template-columns: repeat(4, 1fr);
   grid-auto-rows: 1fr;
   gap: 16px;
 }
@@ -2315,6 +2327,21 @@ canvas {
 .portal-card-icon {
   font-size: 26px;
   line-height: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   20) الواجهة الرئيسية — أيقونات SVG بدل الإيموجي (المرحلة 1: كروت
+       البوابة الرئيسية الـ10 فقط). أيقونات Lucide (رخصة ISC)، مرسومة
+       بـ stroke="currentColor" — فبتاخد لونها تلقائياً من --cat-accent
+       (معرّف لاحقاً في الملف مع باقي نظام ألوان الكروت). الحجم الأساسي
+       هنا فوق قصداً — عشان أي @media بعده في الملف يقدر يكسبه بترتيب
+       الملف الطبيعي (لو كان الحجم الأساسي في آخر الملف كان هيكسب هو
+       دايماً حتى جوه breakpoints الشاشات الأصغر). */
+.portal-card-icon svg {
+  width: 30px;
+  height: 30px;
+  display: block;
+  stroke: currentColor;
 }
 
 .portal-card-title {
@@ -2397,6 +2424,20 @@ canvas {
   font-weight: 800;
   font-size: 13px;
   color: #0d2f40;
+  display: flex;
+  align-items: center;
+}
+
+/* أيقونة SVG صغيرة بديلة عن إيموجي القسم — تُستخدم في عنوان القائمة
+   الجانبية (cat-sidebar-title)، عنوان مجموعة نافذة الاختصارات
+   (portal-favorites-group-title)، ورأس صفحتي الأنظمة الرقمية/RACI
+   (digital-systems-head-icon). بترث لون النص المحيط بيها (currentColor)
+   فمفيش حاجة تتظبط هنا لكل قسم على حدة (المرحلة ٢ من خطة الأيقونات). */
+.cat-icon-svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-inline-end: 6px;
 }
 
 .cat-sidebar-list {
@@ -3079,6 +3120,8 @@ body.portal-active .prog-bar {
   font-size: 12.5px;
   color: #0d2f40;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
 }
 
 .portal-favorites-check-item {
@@ -3901,6 +3944,19 @@ tbody td {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.6),
     0 1px 3px rgba(8,45,60,.10); /* ↑ كان: inset فقط — عمق خارجي خفيف */
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   21) أيقونات عناوين الكروت SVG بدل الإيموجي (المرحلة ٣ من خطة
+       الأيقونات — 64 مكان عبر كل تبويبات الداشبورد). أيقونات Lucide
+       (رخصة ISC)، stroke="currentColor" — فبتاخد لون كل بادج تلقائياً
+       من الـ style="background:...;color:..." المضبوط inline لكل
+       استخدام على حدة (زي ما كان الإيموجي بالظبط) — بلا أي تعارض ألوان.
+   ══════════════════════════════════════════════════════════════════════ */
+.card-title-icon svg.cti-svg {
+  width: 17px;
+  height: 17px;
+  display: block;
 }
 
 /* ── 8-F: Card Title Sub Badge ───────────────────────────────────
@@ -5027,36 +5083,27 @@ tbody tr:last-child td:last-child {
 /* ── لوحة ألوان موحّدة "Ink & Brass" — بدل الألوان المتفرقة (أحمر/بنفسجي/أخضر)
    كل الكروت الآن من نفس عائلة الداشبورد: درجات تيل + كحلي + لمسة برونزية
    واحدة للعنصر المالي فقط — نفس فلسفة التصميم الموثّقة أعلى index.html ── */
-[data-category="assessment"] .portal-card-icon { background: rgba(13,132,156,.12);  color: #0d849c; border: 1px solid rgba(13,132,156,.25); }
-[data-category="assessment"]:hover::before      { background: linear-gradient(90deg,#0d849c,#3fb5cc); opacity: 1; }
+/* ملاحظة توحيد (قسم 20): خلفية/لون/حدّ أيقونة كل كارت، وتدرّج الخط
+   العلوي عند hover، بقوا معتمدين حصرياً على نظام --cat-accent/--cat-soft/
+   --cat-bd الموحّد (قسم 20 تحت، مع ألوان الـ reorg المعدَّلة) بدل القيم
+   الثابتة القديمة هنا — كانت الاثنتان متعارضتين (نفس الأولوية تقريباً
+   بس القديمة أعلى تحديداً فبتكسب) فبيبان لون قديم مختلف عن لون الحدّ
+   العلوي للكارت. سيبنا فقط قواعد hover الخاصة بالحدود/الظل (بلا تعارض،
+   بتتغلب عليها القاعدة الأحدث تلقائياً بترتيب الملف). */
 [data-category="assessment"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
 
-[data-category="assets"] .portal-card-icon { background: rgba(11,107,126,.12);  color: #0b6b7e; border: 1px solid rgba(11,107,126,.25); }
-[data-category="assets"]:hover::before      { background: linear-gradient(90deg,#0b6b7e,#3fa3b8); opacity: 1; }
 [data-category="assets"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
 
-[data-category="contracts"] .portal-card-icon { background: rgba(176,138,78,.16); color: #8a6a37; border: 1px solid rgba(176,138,78,.3); }
-[data-category="contracts"]:hover::before      { background: linear-gradient(90deg,#b08a4e,#d4af6a); opacity: 1; }
 [data-category="contracts"]:hover               { border-color: rgba(176,138,78,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(176,138,78,.18), inset 0 1px 0 #fff; }
 
-[data-category="operations"] .portal-card-icon { background: rgba(22,61,82,.12); color: #163d52; border: 1px solid rgba(22,61,82,.26); }
-[data-category="operations"]:hover::before      { background: linear-gradient(90deg,#163d52,#3d6f8c); opacity: 1; }
 [data-category="operations"]:hover               { border-color: rgba(22,61,82,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(22,61,82,.16), inset 0 1px 0 #fff; }
 
-[data-category="safety"] .portal-card-icon { background: rgba(125,31,44,.12); color: #7d1f2c; border: 1px solid rgba(125,31,44,.26); }
-[data-category="safety"]:hover::before      { background: linear-gradient(90deg,#7d1f2c,#b23a4a); opacity: 1; }
 [data-category="safety"]:hover               { border-color: rgba(125,31,44,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(125,31,44,.16), inset 0 1px 0 #fff; }
 
-[data-category="raci"] .portal-card-icon { background: rgba(61,82,102,.12); color: #3d5266; border: 1px solid rgba(61,82,102,.26); }
-[data-category="raci"]:hover::before      { background: linear-gradient(90deg,#3d5266,#6b8299); opacity: 1; }
 [data-category="raci"]:hover               { border-color: rgba(61,82,102,.3); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(61,82,102,.16), inset 0 1px 0 #fff; }
 
-[data-category="geo"] .portal-card-icon { background: rgba(13,47,64,.1); color: #0d2f40; border: 1px solid rgba(13,47,64,.22); }
-[data-category="geo"]:hover::before      { background: linear-gradient(90deg,#0d2f40,#2a5878); opacity: 1; }
 [data-category="geo"]:hover               { border-color: rgba(13,47,64,.26); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,47,64,.14), inset 0 1px 0 #fff; }
 
-[data-category="explore"] .portal-card-icon { background: rgba(28,148,171,.12); color: #1c94ab; border: 1px solid rgba(28,148,171,.25); }
-[data-category="explore"]:hover::before      { background: linear-gradient(90deg,#1c94ab,#5cc3d6); opacity: 1; }
 [data-category="explore"]:hover               { border-color: rgba(28,148,171,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(28,148,171,.16), inset 0 1px 0 #fff; }
 
 /* سهم صغير يظهر بجانب عنوان الكارت عند hover — إشارة بصرية لطيفة إنه قابل للفتح
@@ -5539,6 +5586,7 @@ tbody tr:last-child td:last-child {
   .portal-stat-val { font-size: 34px; }
   .portal-stat-lbl { font-size: 13px; }
   .portal-card-icon { width: 68px; height: 68px; font-size: 38px; }
+  .portal-card-icon svg { width: 34px; height: 34px; }
   .portal-card-title { font-size: 18.5px; }
   .portal-card-desc { font-size: 13px; }
   .portal-card-tab-item { font-size: 12.5px; }
@@ -5550,6 +5598,7 @@ tbody tr:last-child td:last-child {
   .portal-stat { padding: 16px 10px 14px; }
   .portal-card { padding: 20px 16px; gap: 8px; }
   .portal-card-icon { width: 52px; height: 52px; font-size: 28px; border-radius: 14px; }
+  .portal-card-icon svg { width: 24px; height: 24px; }
   .portal-card-title { font-size: 15.5px; }
 }
 
@@ -5564,10 +5613,13 @@ tbody tr:last-child td:last-child {
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 17-A: ألوان كارت الأنظمة الرقمية — تيل غامق مميز داخل نفس العائلة ── */
-[data-category="digital"] { background: linear-gradient(160deg, #ffffff 0%, rgba(15,87,113,.06) 100%); border-color: rgba(15,87,113,.24); }
-[data-category="digital"] .portal-card-icon { background: rgba(15,87,113,.12); color: #0f5771; border: 1px solid rgba(15,87,113,.26); }
-[data-category="digital"]:hover::before    { background: linear-gradient(90deg,#0d2f40,#0f5771,#3fa8c4); opacity: 1; }
-[data-category="digital"]:hover            { border-color: rgba(15,87,113,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(15,87,113,.18), inset 0 1px 0 #fff; }
+/* الخلفية والحدّ هنا اتحدّثوا للّون الجديد (نيلي #4f46e5) بدل التيل
+   القديم عشان يتماشوا مع --cat-accent الخاص بـ #portal-card-digital
+   (اتغيّر في قسم إعادة الترتيب لحل تعارض الألوان التيل/سماوي). خلفية/لون
+   أيقونتها بقت معتمدة على النظام الموحّد فقط (زي باقي الكروت) — القاعدة
+   القديمة هنا كانت بتكسب بالتحديد على النظام الجديد فبتبيّن لون مختلف. */
+[data-category="digital"] { background: linear-gradient(160deg, #ffffff 0%, rgba(79,70,229,.06) 100%); border-color: rgba(79,70,229,.24); }
+[data-category="digital"]:hover            { border-color: rgba(79,70,229,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(79,70,229,.18), inset 0 1px 0 #fff; }
 
 /* ── 17-B: صفحة تفاصيل الأنظمة الرقمية (overlay) ──────────────────── */
 .digital-systems-overlay {
@@ -5607,6 +5659,12 @@ tbody tr:last-child td:last-child {
   background: rgba(255,255,255,.12);
   border: 1px solid rgba(255,255,255,.22);
   border-radius: 16px;
+}
+.digital-systems-head-icon svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  margin: 0; /* .cat-icon-svg بيحط margin-inline-end للاستخدام جوه نص — هنا الأيقونة لوحدها فمش محتاجينه */
 }
 .digital-systems-head-title-wrap { flex: 1; min-width: 0; }
 .digital-systems-head-title { font-size: 20px; font-weight: 700; line-height: 1.3; }
@@ -6027,19 +6085,26 @@ tbody tr:last-child td:last-child {
   background: var(--cat-soft, rgba(22,164,191,.13));
   border: 1px solid var(--cat-bd, rgba(22,164,191,.26));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 2px 8px rgba(8,45,60,.07);
+  color: var(--cat-accent, var(--teal-3));
 }
+
+/* حجم أيقونات SVG الأساسي (30px) موجود فوق قرب أول تعريف لـ
+   .portal-card-icon (عشان الـ breakpoints في @media الأصغر اللي جايه
+   بعد كده في الملف تقدر تكسبه بترتيب الملف — لو كان الحجم الأساسي هنا
+   في الآخر كان هيكسب هو دايماً حتى جوه الشاشات الصغيرة). */
 
 /* لون accent لكل قسم — مسحوب من نفس لوحة الداشبورد "Ink & Brass".
    القيم مكتوبة صراحةً (مش color-mix) عشان تشتغل على أي متصفح من غير
    ما تسقط بصمت على المتصفحات الأقدم. */
-#portal-card-assessment { --cat-accent:#0b6b7e; --cat-soft:rgba(11,107,126,.13);  --cat-bd:rgba(11,107,126,.28);  }
-#portal-card-assets     { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13);  --cat-bd:rgba(13,132,156,.28);  }
+#portal-card-assessment { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13);  --cat-bd:rgba(13,132,156,.28);  }
+#portal-card-assets     { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);   }
+#portal-card-equipment  { --cat-accent:#a15c1f; --cat-soft:rgba(161,92,31,.13);   --cat-bd:rgba(161,92,31,.28);   }
 #portal-card-contracts  { --cat-accent:#b08a4e; --cat-soft:rgba(176,138,78,.15);  --cat-bd:rgba(176,138,78,.3);   }
-#portal-card-operations { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);   }
+#portal-card-operations { --cat-accent:#6c2bd9; --cat-soft:rgba(108,43,217,.12);  --cat-bd:rgba(108,43,217,.28);  }
 #portal-card-safety     { --cat-accent:#9f1239; --cat-soft:rgba(159,18,57,.11);   --cat-bd:rgba(159,18,57,.26);   }
-#portal-card-geo        { --cat-accent:#1c7f93; --cat-soft:rgba(28,148,171,.13);  --cat-bd:rgba(28,148,171,.28);  }
+#portal-card-geo        { --cat-accent:#066a52; --cat-soft:rgba(6,106,82,.13);    --cat-bd:rgba(6,106,82,.28);    }
 #portal-card-explore    { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);    --cat-bd:rgba(22,61,82,.28);    }
-#portal-card-digital    { --cat-accent:#16a4bf; --cat-soft:rgba(22,164,191,.14);  --cat-bd:rgba(22,164,191,.3);   }
+#portal-card-digital    { --cat-accent:#4f46e5; --cat-soft:rgba(79,70,229,.13);   --cat-bd:rgba(79,70,229,.3);    }
 #portal-card-raci       { --cat-accent:#8a6a37; --cat-soft:rgba(138,106,55,.14);  --cat-bd:rgba(138,106,55,.3);   }
 
 .portal-favorites-card { border-radius: var(--r-2xl); }
@@ -6084,31 +6149,56 @@ tbody tr:last-child td:last-child {
    الكبير في أول صف. */
 .portal-favorites-empty-text { flex: 0 0 auto; }
 
-/* المفضلة: تفضل في عمودها لكن بارتفاع محتواها فقط — الفراغ اللي تحتها
-   بقى خلفية الصفحة العادية بدل كارت فاضي بمساحة كبيرة.
-   (شغّال دلوقتي لأننا عرّفنا grid-template-rows صريحة فوق) */
+/* المفضلة بقت بنفس عرض الكارت اللي جمبها (عمود 4 = 1fr زي باقي
+   الأعمدة، مش 240px تابتة) وبنفس ارتفاع صف1 كامل — بترتفع تلقائيًا
+   (align-items الافتراضي = stretch) لأنها بقت في صف واحد بس (1) مش
+   ممتدة على الشبكة كلها. */
 .portal-favorites-card {
   grid-column: 4;
-  grid-row: 1 / -1;
-  align-self: start;
+  grid-row: 1;
 }
 
-/* ترتيب بصري متوازن: الصف الأول للأقسام الأكتر محتوى، والأخير للأقل —
-   فمفيش صف بيتمطّط عشان كارت واحد جنبه فاضي. (ترتيب العرض بس —
-   ترتيب الـHTML نفسه ما اتغيرش) */
+/* ══════════════════════════════════════════════════════════════════════
+   19)  الواجهة الرئيسية — إعادة ترتيب وتجميع الكروت (بعد إضافة كارت
+        "التجهيزات والتوريدات")
+   ──────────────────────────────────────────────────────────────────────
+   الترتيب الجديد بمعيارين مع بعض:
+   1) الأكثر استخدامًا يومياً أولاً (رأي مبني على طبيعة الاستخدام
+      التشغيلي لا بيانات استخدام فعلية): الحالة الفنية والسلامة والأصول
+      قبل الأدوات المرجعية/الاستكشافية.
+   2) تجميع منطقي: كل صف من الـ3 صفوف يمثل "طبقة" متقاربة في الغرض —
+      صف 1 = الحالة والمخاطر (تقييمات، سلامة، أصول)
+      صف 2 = العمليات والتمويل (تجهيزات وتوريدات، عقود، تشغيل)
+      صف 3 = أدوات مرجعية (خريطة، استكشاف بيانات، RACI)
+   "الأنظمة الرقمية" اتشالت من الشبكة التلاتة أعمدة وبقت مثبّتة تحت
+   كارت "المفضلة" في نفس العمود الضيق (الشمال)، فمكانها الفاضي جوه
+   شبكة الـ3×3 اتسدّ بنقل كارت RACI لمكانه بدل ما يفضل لوحده في صف رابع.
+   (ترتيب العرض بس — ترتيب الـHTML نفسه ما اتغيرش) */
 #portal-card-assessment { order: 1; }
-#portal-card-assets     { order: 2; }
-#portal-card-digital    { order: 3; }
-#portal-card-operations { order: 4; }
-#portal-card-safety     { order: 5; }
-#portal-card-contracts  { order: 6; }
+#portal-card-safety     { order: 2; }
+#portal-card-assets     { order: 3; }
+#portal-card-equipment  { order: 4; }
+#portal-card-contracts  { order: 5; }
+#portal-card-operations { order: 6; }
 #portal-card-geo        { order: 7; }
 #portal-card-explore    { order: 8; }
 #portal-card-raci       { order: 9; }
+
+/* "الأنظمة الرقمية" تحت المفضلة في نفس العمود (عمود 4)، وبقت بنفس
+   عرض وارتفاع الكارت اللي جمبها في صف 2 (تجهيزات/عقود/تشغيل) —
+   نفس منطق المفضلة بالظبط: عمود 1fr + بدون align-self:start. */
+#portal-card-digital {
+  grid-column: 4;
+  grid-row: 2;
+}
+/* عمود واحد بس للقائمة جوه الكارت (بدل عمودين) عشان أسماء الأنظمة
+   ما تتقصّش — الكارت أوسع دلوقتي بس القائمة أوضح بعمود واحد برضه. */
+#portal-card-digital .portal-card-tabs-grid { grid-template-columns: 1fr; }
 
 /* شريط البحث ياخد عرض الصف بالكامل بدل ما يسيب ~900px فراغ جنبه */
 .portal-search-wrap { max-width: none; }
 
 @media (max-width: 900px) {
   .portal-favorites-card { grid-column: 1 / -1; grid-row: auto; }
+  #portal-card-digital   { grid-column: 1 / -1; grid-row: auto; }
 }

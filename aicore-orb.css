@@ -839,6 +839,8 @@
 #aicore-panel .ac-msg-act:hover { background: rgba(13,47,64,.08); color: var(--ac-ink); transform: translateY(-1px); }
 #aicore-panel .ac-msg-act:active { transform: scale(.9); }
 #aicore-panel .ac-msg-act.ac-copied { color: var(--ac-good); }
+#aicore-panel .ac-msg-act.ac-pdf-busy { opacity: .55; cursor: wait; animation: ac-pdf-spin 1s linear infinite; }
+@keyframes ac-pdf-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 /* Error */
 #aicore-panel .ac-msg-error .ac-msg-bubble {

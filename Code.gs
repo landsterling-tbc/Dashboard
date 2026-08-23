@@ -19,7 +19,6 @@ const SHEET_NAMES = {
   consultantKpi     : 'مؤشرات_اداء_الاستشاري',
   payments          : 'المدفوعات',
   recruitment       : 'التوظيف',
-  balaghReports     : 'البلاغات',        // تُقرأ بشكل منفصل عبر ?sheet=balaghReports
   securitySafety    : 'بلاغات_أمن_وسلامة',
   correctionsEscalations: 'تصحيحات_وتصعيدات_الأمن_والسلامة',  // ★ جديد — تصحيحات وتصعيدات الأمن والسلامة
   fuelConsumption   : 'استهلاك_الوقود',
@@ -31,7 +30,7 @@ const SHEET_NAMES = {
 
 // ── إعدادات الكاش ───────────────────────────────────────────────
 const CACHE_SECONDS  = 600;
-const CACHE_KEY_FULL = 'tbc_sheet_v7';   // ★ رُفِّع الإصدار بسبب إضافة تصحيحات_وتصعيدات_الأمن_والسلامة
+const CACHE_KEY_FULL = 'tbc_sheet_v8';   // ★ رُفِّع الإصدار بسبب فصل البلاغات (balaghReports) لملف Apps Script مستقل
 const CACHE_CHUNK_MAX = 95 * 1024;
 
 // ══════════════════════════════════════════════════════════════════
@@ -78,10 +77,8 @@ function doGet(e) {
     const ss     = SpreadsheetApp.getActiveSpreadsheet();
     const result = {};
     const errors = {};
-    const SKIP_KEYS = new Set(['balaghReports']);
 
     for (const key of Object.keys(SHEET_NAMES)) {
-      if (SKIP_KEYS.has(key)) continue;
       try {
         result[key] = readSheet_(ss, key);
       } catch (err) {
@@ -197,7 +194,8 @@ function clearCache_(cache) {
       'tbc_sheet_v3', 'tbc_sheet_v3_chunks',
       'tbc_sheet_v4', 'tbc_sheet_v4_chunks',
       'tbc_sheet_v5', 'tbc_sheet_v5_chunks',
-      'tbc_sheet_v6', 'tbc_sheet_v6_chunks'
+      'tbc_sheet_v6', 'tbc_sheet_v6_chunks',
+      'tbc_sheet_v7', 'tbc_sheet_v7_chunks'
     );
     cache.removeAll(keys);
   } catch (err) {}
@@ -234,10 +232,8 @@ function warmCache_() {
   const ss     = SpreadsheetApp.getActiveSpreadsheet();
   const result = {};
   const errors = {};
-  const SKIP_KEYS = new Set(['balaghReports']);
 
   for (const key of Object.keys(SHEET_NAMES)) {
-    if (SKIP_KEYS.has(key)) continue;
     try { result[key] = readSheet_(ss, key); }
     catch (err) { errors[key] = err.message; result[key] = []; }
   }

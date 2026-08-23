@@ -29,6 +29,7 @@
     stop:        '<rect x="6" y="6" width="12" height="12" rx="2"/>',
     copy:        '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     redo:        '<path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/>',
+    download:    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
     trash:       '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
     expand:      '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
     collapse:    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
@@ -986,6 +987,130 @@
       threadEl.querySelectorAll('.ac-msg-regen').forEach(function(b) { b.remove(); });
     }
 
+    /* ── تحميل رد المساعد (تقرير/إجابة) كملف PDF ──
+       🛠️ محاولة أولى كانت بتستخدم html2canvas (تصوير المحتوى كصورة ثم وضعها
+       في jsPDF). اتضح إن ده بيكسر النص العربي (حروف بتدخل في بعضها) لأن
+       html2canvas بيعيد رسم النص بنفسه عبر Canvas 2D fillText، ومحرك الرسم
+       ده بتشكيل/ترتيب حروف عربي مختلف عن محرك العرض الحقيقي للمتصفح —
+       معروف إنه مش موثوق مع العربي (سكريبت متصل الحروف + RTL).
+       الحل الصحيح: نستخدم نافذة طباعة فعلية (window.print) — المتصفح
+       نفسه هو اللي بيرسم النص بمحرك العرض الحقيقي بتاعه (نفس اللي بيعرض
+       بيه الشات على الشاشة أصلاً وبيطلع صح)، فمفيش أي إعادة رسم للنص.
+       المستخدم بيختار "Save as PDF" من نافذة الطباعة (خيار افتراضي في
+       Chrome/Edge) — نتيجته PDF نص حقيقي قابل للنسخ والبحث، مش صورة. */
+    function acDownloadPdf(row, btn) {
+      if (btn && btn.disabled) return; // منع نقر مزدوج أثناء التجهيز
+      var liveContent = row.querySelector('.ac-msg-content');
+      if (!liveContent) return;
+
+      // ⚠️ لازم من غير noopener/noreferrer هنا — لو انحطّوا في سلسلة الخصائص
+      // دي، بعض إصدارات Chrome بترجع null من window.open حتى لو النافذة
+      // اتفتحت فعلياً على مستوى المتصفح، فبنفقد أي قدرة نكتب فيها المحتوى
+      // (تفضل نافذة فاضية معلّقة). المحتوى هنا كله من عندنا (مفيش أي رابط
+      // خارجي غير موثوق)، فمفيش داعي أصلاً لعزل opener/referrer.
+      var printWin = window.open('', '_blank', 'width=900,height=1000');
+      if (!printWin) {
+        var msg = 'المتصفح منع فتح نافذة الطباعة — من فضلك اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى';
+        if (typeof window.showToast === 'function') window.showToast(msg, 'error');
+        else alert(msg);
+        return;
+      }
+      if (btn) { btn.disabled = true; setTimeout(function() { btn.disabled = false; }, 1200); }
+
+      var contentClone = liveContent.cloneNode(true);
+
+      /* الرسوم البيانية (Chart.js) بترسم على <canvas>، والـ pixel buffer
+         بتاعها مش جزء من الـ HTML — فأي cloneNode بيطلع canvas فاضي، وأصلاً
+         مفيش Chart.js في نافذة الطباعة الجديدة. نحوّل كل canvas حي لصورة
+         (dataURL) ونستبدل نظيره في النسخة المستنسخة بيها. */
+      var liveCanvases  = liveContent.querySelectorAll('canvas');
+      var cloneCanvases = contentClone.querySelectorAll('canvas');
+      liveCanvases.forEach(function(c, i) {
+        var cc = cloneCanvases[i];
+        if (!cc) return;
+        var dataUrl;
+        try { dataUrl = c.toDataURL('image/png'); } catch (e) { dataUrl = null; }
+        var img = document.createElement('img');
+        img.setAttribute('style', 'max-width:100%;');
+        img.src = dataUrl || '';
+        if (cc.parentNode) cc.parentNode.replaceChild(img, cc);
+      });
+
+      var todayStr = new Date().toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' });
+      var fileDate = new Date().toISOString().slice(0, 10);
+
+      var printCss =
+        '@page { size: A4; margin: 18mm 16mm; }' +
+        'html,body{margin:0;padding:0;}' +
+        'body{background:#ffffff; color:#0d2f40; font-family:"Tajawal","IBM Plex Sans Arabic",Arial,sans-serif; font-size:13.5px; line-height:1.95;}' +
+        '.ac-print-header{display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0d849c; padding-bottom:10px; margin-bottom:20px;}' +
+        '.ac-print-title{font-weight:800; font-size:16px; color:#0d849c;}' +
+        '.ac-print-date{font-size:11px; color:#5b7280;}' +
+        '.ac-msg-content p{margin:0 0 8px;}' +
+        '.ac-msg-content > *:first-child{margin-top:0 !important;}' +
+        '.ac-msg-content > *:last-child{margin-bottom:0 !important;}' +
+        '.ac-md-h{margin:14px 0 6px; font-weight:800; font-size:14px; line-height:1.4; color:#0d2f40; page-break-after:avoid;}' +
+        '.ac-num{font-weight:700;}' +
+        '.ac-citation{font-size:9px; vertical-align:super;}' +
+        '.ac-md-link{color:#0d849c; text-decoration:underline;}' +
+        '.ac-md-img{max-width:100%;}' +
+        '.ac-table-wrap{overflow-x:auto; margin:8px 0;}' +
+        '.ac-md-table{width:100%; border-collapse:collapse; font-size:12px; page-break-inside:auto;}' +
+        '.ac-md-table th, .ac-md-table td{padding:6px 8px; border-bottom:1px solid rgba(13,47,64,.12); text-align:right;}' +
+        '.ac-md-table thead th{background:rgba(13,132,156,.08); font-weight:800; color:#0d2f40;}' +
+        '.ac-md-table tbody tr:nth-child(even) td{background:rgba(13,47,64,.02);}' +
+        '.ac-code-wrap{margin:8px 0; border-radius:8px; overflow:hidden; background:#151f27; direction:ltr; text-align:left;}' +
+        '.ac-code-wrap pre{margin:0; padding:10px; white-space:pre-wrap; word-break:break-word;}' +
+        '.ac-code-wrap code{color:#d4dee8; font-size:10.5px; font-family:"SFMono-Regular",Consolas,monospace;}' +
+        '.ac-alert-box{padding:8px 12px; border-radius:8px; font-size:12px; margin:8px 0; page-break-inside:avoid;}' +
+        '.ac-alert-warn{background:rgba(192,122,20,.08); color:#8a5a0a;}' +
+        '.ac-alert-good{background:rgba(6,106,82,.08); color:#066a52;}' +
+        '.ac-alert-danger{background:rgba(125,31,44,.08); color:#7d1f2c;}' +
+        '.ac-alert-info{background:rgba(13,132,156,.08); color:#0d849c;}' +
+        '.ac-empty-note{color:#8a97a3; font-style:italic;}' +
+        '.ac-fb-row{display:grid; grid-template-columns:minmax(60px,auto) 1fr auto; align-items:center; gap:8px; margin-bottom:6px;}' +
+        '.ac-fb-track{height:5px; border-radius:4px; background:rgba(13,47,64,.08); overflow:hidden;}' +
+        '.ac-fb-fill{height:100%; border-radius:4px; background:#0d849c;}' +
+        '@media print { .ac-print-noscreen{display:none;} }';
+
+      var html =
+        '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">' +
+        '<title>تقرير-' + fileDate + '</title>' +
+        '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+        '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+        '<style>' + printCss + '</style></head><body>' +
+        '<div class="ac-print-header"><div class="ac-print-title">تقرير — المساعد الذكي</div><div class="ac-print-date">' + todayStr + '</div></div>' +
+        '<div class="ac-msg-content">' + contentClone.innerHTML + '</div>' +
+        '</body></html>';
+
+      printWin.document.open();
+      printWin.document.write(html);
+      printWin.document.close();
+
+      /* ننتظر تحميل الخط العربي فعلياً قبل فتح نافذة الطباعة — لو طبعنا
+         قبل ما الخط يتحمّل، المتصفح ممكن يستخدم خط بديل مؤقت بمقاييس
+         مختلفة فيظهر تراكب/انزياح في الحروف. document.fonts.ready بيضمن
+         إن الخط جاهز فعلاً؛ ضفنا حد أقصى للانتظار (800ms) كشبكة أمان لو
+         الاتصال بطيء أو fonts API مش مدعوم في هذا المتصفح. */
+      var triggered = false;
+      var doPrint = function() {
+        if (triggered) return;
+        triggered = true;
+        try { printWin.focus(); printWin.print(); } catch (e) {}
+      };
+      try {
+        if (printWin.document.fonts && printWin.document.fonts.ready) {
+          printWin.document.fonts.ready.then(doPrint).catch(doPrint);
+        }
+      } catch (e) {}
+      setTimeout(doPrint, 800);
+
+      if (typeof window.showToast === 'function') {
+        window.showToast('اختر "Save as PDF" من نافذة الطباعة لتنزيل التقرير', 'ok');
+      }
+    }
+
     /* Smart autoscroll: only snap to bottom if the user was already near
        the bottom (or force=true, e.g. right after their own message).
        Without this, reading earlier history while a reply streams in
@@ -1010,6 +1135,7 @@
         actionsHtml = '<div class="ac-msg-actions">' +
           '<button type="button" class="ac-msg-act ac-msg-copy" aria-label="نسخ الرد">' + svg('copy') + '</button>' +
           '<button type="button" class="ac-msg-act ac-msg-regen" aria-label="إعادة توليد الرد">' + svg('redo') + '</button>' +
+          '<button type="button" class="ac-msg-act ac-msg-pdf" aria-label="تحميل PDF">' + svg('download') + '</button>' +
         '</div>';
       }
       var avatarHtml = who === 'user'
@@ -1029,11 +1155,13 @@
       if (who === 'bot') {
         var copyBtn  = row.querySelector('.ac-msg-copy');
         var regenBtn = row.querySelector('.ac-msg-regen');
+        var pdfBtn   = row.querySelector('.ac-msg-pdf');
         if (copyBtn)  copyBtn.addEventListener('click', function() { acCopyText(rawText != null ? rawText : row.querySelector('.ac-msg-content').textContent, copyBtn); });
         if (regenBtn) regenBtn.addEventListener('click', function() {
           var prompt = acLastUserPrompt();
           if (prompt) sendToAI(prompt, { regenerate: true });
         });
+        if (pdfBtn) pdfBtn.addEventListener('click', function() { acDownloadPdf(row, pdfBtn); });
       }
       return row;
     }
@@ -1119,6 +1247,13 @@
     var acGenerating   = false;
     var acStreamTimer  = null;
     var acStreamAbort  = false;
+    // 🛠️ إصلاح: acStreamFinish يحمل مرجع دالة finish() الحالية طول ما فيه
+    // ستريم شغال. قبل كده acStopGenerating كان بيعمل clearTimeout للمؤقّت
+    // من غير ما ينده على finish()، فكانت الرسالة بتفضل عالقة على النص
+    // الجزئي مع كاريت وامض للأبد، وأزرار النسخ/تحميل PDF بتفضل معطّلة
+    // للأبد (لأن finish() هو الوحيد اللي بيفعّلهم تاني). دلوقتي "إيقاف"
+    // بينهي الرسالة فوراً بنفس سلوك انتهاء الستريم الطبيعي.
+    var acStreamFinish = null;
     function acSetSendMode(mode) {
       /* mode: 'send' | 'stop' */
       if (!sendBtn) return;
@@ -1133,6 +1268,11 @@
       acHideTyping();
       stopThinking('تم الإيقاف');
       acSetSendMode('send');
+      if (typeof acStreamFinish === 'function') {
+        var f = acStreamFinish;
+        acStreamFinish = null;
+        f();
+      }
     }
 
     /* ── Simulated progressive reveal of the final reply ──
@@ -1149,6 +1289,13 @@
       var chunks = text.split(/(\s+)/); // keep whitespace tokens
       var idx = 0, shown = '';
 
+      // ⛔ نعطّل نسخ/إعادة توليد/تحميل PDF أثناء "الكتابة" الحية — لو المستخدم
+      // ضغط عليهم قبل ما الرد يخلص، هيصدّر/ينسخ رد منقوص من نص لسه بيتكتب.
+      // نفعّلهم بس بعد ما finish() يحط النص الكامل فعلياً.
+      var pdfBtnEl = row.querySelector('.ac-msg-pdf');
+      var copyBtnEl = row.querySelector('.ac-msg-copy');
+      [pdfBtnEl, copyBtnEl].forEach(function(b) { if (b) b.disabled = true; });
+
       function step() {
         if (acStreamAbort) { finish(); return; }
         var burst = 2; // words per tick
@@ -1163,12 +1310,15 @@
       }
       function finish() {
         clearTimeout(acStreamTimer);
+        acStreamFinish = null;
         contentEl.innerHTML = acRenderMarkdown(text);
         acMountPendingCharts();
+        [pdfBtnEl, copyBtnEl].forEach(function(b) { if (b) b.disabled = false; });
         acSetSendMode('send');
         setState('idle');
         stopThinking('جاهز');
       }
+      acStreamFinish = finish;
       step();
     }
 

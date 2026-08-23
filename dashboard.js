@@ -3218,6 +3218,14 @@ let __bgRevalidatedOnce = false;
     // ── تحميل البلاغات بشكل منفصل (ملف ضخم — لا يحجب باقي اللوحة) ──
     // نفس مبدأ التخزين بتاع البيانات الرئيسية: نعرض آخر نسخة محفوظة فورًا
     // (حتى بعد تحديث الصفحة بالكامل F5)، ثم نجيب نسخة حديثة بالخلفية.
+    //
+    // 🔗 البلاغات دلوقتي بتيجي من ملف Google Sheets + Apps Script منفصل تماماً
+    // عن CFG.GAS_URL الرئيسي (راجع balagh_reports.gs) — الملف ده بيقرأ الأعمدة
+    // الخام الإنجليزية من نظام COW ويترجمها للمفاتيح العربية نفسها اللي كل كود
+    // تبويب البلاغات في هذا الملف شغّال عليها من زمان، فمفيش أي تعديل تاني مطلوب
+    // في منطق القراءة هنا. غيّر الرابط تحت بعد نشر balagh_reports.gs.
+    const BALAGH_URL =
+      "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec";
     const BALAGH_CACHE_KEY = "tbc_balagh_cache_v1";
     // 🔑 استخدام الدالة الموحّدة الوحيدة لتطبيع رقم المدرسة (window.normSchoolId)
     // بدل أي نسخة محلية — راجع تعريفها فوق لشرح القاعدة والسبب بالتفصيل.
@@ -3271,7 +3279,10 @@ let __bgRevalidatedOnce = false;
         }
       }
       try {
-        const bResp = await fetch(CFG.GAS_URL + "?sheet=balaghReports");
+        if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
+          throw new Error("لسه محطوطش رابط ملف Apps Script بتاع البلاغات (BALAGH_URL) في dashboard.js");
+        }
+        const bResp = await fetch(BALAGH_URL, { cache: "no-store" });
         if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
         const bJson = await bResp.json();
         if (bJson.status === "ok" && Array.isArray(bJson.data)) {
@@ -15441,57 +15452,98 @@ function exportNashatExcel(rows) {
         ? (useProxy ? CFG.PROXY_URL.trim() : CFG.OPENAI_RESPONSES_URL)
         : url;
 
-      const payload = useFileSearch
-        ? {
-            model: this.getModel(),
-            input: messages, // Responses API تقبل نفس مصفوفة الرسائل كـ input
-            tools: [{ type: "file_search", vector_store_ids: [vsId] }],
-            max_output_tokens: 1500,
-          }
-        : {
-            model: this.getModel(),
-            messages: messages,
-            temperature: 0.4,
-            max_completion_tokens: 1500,
-          };
+      // 📏 حد أقصى لطول رد الموديل لكل طلب. كان 1500 توكن — قليل جداً لأي
+      // رد طويل (زي "تقرير فني كامل")، فكان الرد بيتقطع فجأة في نص الكلام
+      // بمجرد ما يوصل الحد ده (finish_reason: "length") من غير أي تنبيه
+      // للمستخدم. رفعناه لمساحة أكبر بكتير تكفي تقرير كامل متعدد الأقسام.
+      const AI_MAX_REPLY_TOKENS = 8000;
+      // 🔁 لو الموديل لسه اتقطع رغم الحد الكبير ده (تقرير ضخم جداً)، نبعت
+      // تلقائياً طلب "كمل" ونلزّق الرد ببعضه — بدل ما نسيب المستخدم يواجه
+      // رد ناقص أو يضطر يكتب "كمل" بنفسه. حد أقصى 3 استكمالات (٤ طلبات
+      // إجمالاً لنفس السؤال) عشان ميحصلش استهلاك غير منطقي للحصة الشهرية.
+      const AI_MAX_CONTINUATIONS = 3;
 
-      const resp = await fetch(targetUrl, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-        signal: window.__FCB_ABORT ? window.__FCB_ABORT.signal : undefined, // Task 3
-      });
-      if (!resp.ok) {
-        let errMsg = "HTTP " + resp.status;
+      const buildPayload = (msgs) =>
+        useFileSearch
+          ? {
+              model: this.getModel(),
+              input: msgs, // Responses API تقبل نفس مصفوفة الرسائل كـ input
+              tools: [{ type: "file_search", vector_store_ids: [vsId] }],
+              max_output_tokens: AI_MAX_REPLY_TOKENS,
+            }
+          : {
+              model: this.getModel(),
+              messages: msgs,
+              temperature: 0.4,
+              max_completion_tokens: AI_MAX_REPLY_TOKENS,
+            };
+
+      const singleRequest = async (msgs) => {
+        const resp = await fetch(targetUrl, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(buildPayload(msgs)),
+          signal: window.__FCB_ABORT ? window.__FCB_ABORT.signal : undefined, // Task 3
+        });
+        if (!resp.ok) {
+          let errMsg = "HTTP " + resp.status;
+          try {
+            const errJson = await resp.json();
+            errMsg = errJson?.error?.message || errMsg;
+          } catch (_) {}
+          const err = new Error(errMsg);
+          err.code = resp.status === 401 ? "INVALID_KEY" : "REQUEST_FAILED";
+          throw err;
+        }
+        const data = await resp.json();
+        // نقرأ الرد من الصيغتين: Responses API (output/output_text) أو chat/completions (choices)
+        let text = null;
+        if (typeof data?.output_text === "string" && data.output_text.trim()) {
+          text = data.output_text.trim();
+        } else if (Array.isArray(data?.output)) {
+          text = data.output
+            .filter((it) => it?.type === "message")
+            .flatMap((it) => it.content || [])
+            .filter((c) => c?.type === "output_text" && c.text)
+            .map((c) => c.text)
+            .join("\n")
+            .trim() || null;
+        }
+        if (!text) text = data?.choices?.[0]?.message?.content?.trim();
+        if (!text) {
+          const err = new Error("EMPTY_RESPONSE");
+          err.code = "EMPTY_RESPONSE";
+          throw err;
+        }
+        // كشف القطع بسبب حد الطول تحديداً (مش أي سبب توقف تاني زي stop العادي)
+        const truncated = useFileSearch
+          ? data?.status === "incomplete" && data?.incomplete_details?.reason === "max_output_tokens"
+          : data?.choices?.[0]?.finish_reason === "length";
+        return { text, truncated };
+      };
+
+      let working = messages.slice();
+      let full = "";
+      let rounds = 0;
+      while (true) {
+        let text, truncated;
         try {
-          const errJson = await resp.json();
-          errMsg = errJson?.error?.message || errMsg;
-        } catch (_) {}
-        const err = new Error(errMsg);
-        err.code = resp.status === 401 ? "INVALID_KEY" : "REQUEST_FAILED";
-        throw err;
+          ({ text, truncated } = await singleRequest(working));
+        } catch (err) {
+          // لو أول طلب فشل، نرمي الخطأ زي الأول تماماً. لو فشل طلب استكمال
+          // بعد ما جمعنا جزء من الرد بالفعل، نرجّع الجزء المتاح بدل ما نضيّعه.
+          if (!full) throw err;
+          break;
+        }
+        full += (full ? "\n" : "") + text;
+        rounds++;
+        if (!truncated || rounds > AI_MAX_CONTINUATIONS) break;
+        working = working.concat([
+          { role: "assistant", content: text },
+          { role: "user", content: "تابع من حيث توقفت بالضبط، دون إعادة أي جزء سبق ذكره ودون أي مقدمة جديدة." },
+        ]);
       }
-      const data = await resp.json();
-      // نقرأ الرد من الصيغتين: Responses API (output/output_text) أو chat/completions (choices)
-      let reply = null;
-      if (typeof data?.output_text === "string" && data.output_text.trim()) {
-        reply = data.output_text.trim();
-      } else if (Array.isArray(data?.output)) {
-        reply = data.output
-          .filter((it) => it?.type === "message")
-          .flatMap((it) => it.content || [])
-          .filter((c) => c?.type === "output_text" && c.text)
-          .map((c) => c.text)
-          .join("\n")
-          .trim() || null;
-      }
-      if (!reply) reply = data?.choices?.[0]?.message?.content?.trim();
-      if (!reply) {
-        const err = new Error("EMPTY_RESPONSE");
-        err.code = "EMPTY_RESPONSE";
-        throw err;
-      }
-      return reply;
+      return full;
     },
   };
   // 🔗 تعريض للاستخدام من وحدات خارجية (مثل AICore) — لا يغيّر أي سلوك داخلي

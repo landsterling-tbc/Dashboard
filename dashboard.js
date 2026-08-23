@@ -2081,7 +2081,7 @@ function renderStageCompareTab() {
   // محلية أضعف (تشيل ".0" بس) فكانت بتعامل نفس المدرسة كمدرستين لو
   // ظهر رقمها بشكلين مختلفين (S-30721 مقابل 30721 مثلاً)، وده سبب اختلاف
   // "إجمالي المدارس" هنا عن باقي تبويبات FCA.
-  const getMinId  = (r) => window.normSchoolId(r["رقم_المدرسة_الوزاري"]??r["رقم_وزاري"]??r["رقم وزاري"]??r.minId??"");
+  const getMinId  = (r) => window.normSchoolId(r["رقم_وزاري"]??r["رقم_المدرسة_الوزاري"]??r["رقم وزاري"]??r.minId??"");
   const getSchool = (r) => normText(r["اسم_المدرسة"]??r.schoolName??r.name??"");
   const getSector = (r) => normText(r["المحافظة"]??r.sector??"");
   const getCity   = (r) => normText(r["المدينة_الرئيسية"]??r["المدينة"]??r.city??"");
@@ -2978,9 +2978,13 @@ let __bgRevalidatedOnce = false;
     // بناء خريطة "آخر تقييم FCA" لكل مدرسة من ملف تقييمات_FCA_المراحل
     // المنطق: أحدث تاريخ يحتوي قيمة فعلية (Jun > May > Apr)
     //         لو Jun فارغ → نرجع May، لو May فارغ → نرجع Apr
-    // مفتاح الربط: رقم_المدرسة_الوزاري (S-42671) — يطابق 3673 مدرسة
+    // مفتاح الربط: رقم_وزاري (المفتاح الوحيد المعتمد الآن — راجع الشرح فوق
+    // window.normSchoolId) — رقم_المدرسة_الوزاري اتشال من شيت "المباني" لأنه
+    // كان بيرجّع قيم متلخبطة في 34 مبنى بيشتركوا بنفس الاسم بالضبط (نفس
+    // مشكلة الأب سكريبت القديمة اللي لازم محدش يكررها). سايبين قراءته هنا
+    // بس كـ fallback دفاعي لو مصدر تاني (غير شيت المباني) لسه بيبعته.
     // ══════════════════════════════════════════════════════════════════════
-    const latestFcaMap = {}; // key: رقم_المدرسة_الوزاري → { score, dateObj, dateRaw }
+    const latestFcaMap = {}; // key: رقم_وزاري (بعد normSchoolId) → { score, dateObj, dateRaw }
     (function buildLatestFcaMap() {
       const monMap = {
         jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
@@ -3004,8 +3008,10 @@ let __bgRevalidatedOnce = false;
       for (const row of fcaHistory) {
         // 🔑 نفس الدالة الموحّدة (window.normSchoolId) — كانت المطابقة هنا
         // بالنص الخام (.trim() بس) بدون شيل S-/M-/الأصفار البادئة.
+        // رقم_وزاري أولاً (المفتاح المعتمد بعد شيل عمود رقم_المدرسة_الوزاري
+        // من شيت المباني)، وباقي الأسماء fallback دفاعي بس.
         const rawId = window.normSchoolId(
-          row["رقم_المدرسة_الوزاري"] ?? row["رقم_وزاري"] ?? row["رقم وزاري"] ?? ""
+          row["رقم_وزاري"] ?? row["رقم_المدرسة_الوزاري"] ?? row["رقم وزاري"] ?? ""
         );
         if (!rawId) continue;
 
@@ -3045,7 +3051,13 @@ let __bgRevalidatedOnce = false;
     (setProgress(75),
       (RAW = buildings
         .map((b) => {
-          const schoolId = String(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"] ?? "")
+          // 🔑 رقم_وزاري هو المفتاح الوحيد المعتمد لرقم المدرسة في شيت
+          // "المباني" (اتشال عمود رقم_المدرسة_الوزاري نهائيًا في 2026-08-23
+          // بعد التأكد إنه كان بيرجّع أرقام متلخبطة/متبادلة في 34 مبنى
+          // بيشتركوا في نفس الاسم بالضبط — راجع تحليل ملف "المباني 1.xlsx").
+          // سايبين قراءة الاسم القديم هنا fallback دفاعي بس، عشان لو الشيت
+          // رجع فيه العمود القديم بالغلط يوم ما ميبوظش تحميل البيانات.
+          const schoolId = String(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"] ?? "")
               .trim()
               .replace(/^\uFEFF/, ""),
             minIdRaw = String(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"] ?? "")
@@ -3076,17 +3088,17 @@ let __bgRevalidatedOnce = false;
             fca: (() => {
               // آخر تقييم FCA من ملف تقييمات_FCA_المراحل
               // 🔑 نفس الدالة الموحّدة (window.normSchoolId)
-              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
+              const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
               const entry = latestFcaMap[id];
               return entry ? entry.score : null;
             })(),
             fcaDate: (() => {
-              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
+              const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
               const entry = latestFcaMap[id];
               return entry ? (entry.dateRaw ?? null) : null;
             })(),
             fcaDateObj: (() => {
-              const id = window.normSchoolId(b["رقم_المدرسة_الوزاري"] ?? b["رقم_وزاري"]);
+              const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
               const entry = latestFcaMap[id];
               return entry ? (entry.dateObj ?? null) : null;
             })(),
@@ -3169,7 +3181,8 @@ let __bgRevalidatedOnce = false;
 
     // ══════════════════════════════════════════════════════════════════
     // 🔄 استبدال حقل alerts بالعدد الفعلي من ملف COW (RAW_BALAGH)
-    // الربط: School Number (COW) ↔ رقم_المدرسة_الوزاري (RAW)
+    // الربط: School Number (COW) ↔ رقم_وزاري (RAW) — بعد normSchoolId
+    // (اتشال عمود رقم_المدرسة_الوزاري من شيت المباني، رقم_وزاري بقى المفتاح)
     // ══════════════════════════════════════════════════════════════════
     (function patchAlertsFromCOW() {
       try {

@@ -1181,6 +1181,7 @@ function showTab(name, el) {
     "tajheez" === name && renderTajheezInventoryTab(),
     "tajheez-supplies" === name && renderTajheezSuppliesTab(),
     "tajheez-contracts" === name && renderTajheezContractsTab(),
+    "nashat-badani" === name && renderNashatBadaniTab(),
     "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
     "recruitment" === name && "function" === typeof renderRecruitmentTab && renderRecruitmentTab(),
 
@@ -14807,6 +14808,569 @@ function exportTajContractsExcel(rows) {
 }
 /* ══════════════════════════════════ نهاية تبويب عقود التجهيزات ══════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════════
+   تبويب "مبادرة النشاط البدني" (جوّه كارت "التجهيزات والتوريدات")
+   ──────────────────────────────────────────────────────────────────────
+   المصدر: ملف "الموقف التنفيذي المجمع للنشاط البدني — منظف" — ناتج أداة
+   "منظّف مبادرة النشاط البدني.html" (بنفس فلسفة منظّف التجهيزات: جداول
+   طولية جاهزة، مبنية فقط على بيانات حقيقية موجودة في الملف الخام، بدون
+   أي تخمين). Apps Script منفصل (nashat_badani.gs) بيقرا 4 شيتات منظّفة:
+   التوزيع_التفصيلي (شركة×منطقة×صنف) / دليل_الأصناف (شركة×صنف، بدون
+   تفصيل منطقة) / ملخص_حسب_الشركة / ملخص_حسب_المنطقة.
+
+   هذا التبويب لا يعرض شيت "توضيح_منهجية_التنظيف" — الداشبورد ده بيتعرض
+   على الإدارة، فمفيش داعي لعرض تفاصيل تقنية عن آلية التنظيف. حتى لو
+   الشيت ده موجود في ملف جوجل شيتس، لا الاسكريبت ولا الكود هنا بيقراه.
+
+   ملاحظة مهمة عن البيانات: عمود "الكمية_المخصصة" في شيت التوزيع بيمثّل
+   توزيع "الكمية المخصصة للبند" على المناطق — مش "الكمية الإجمالية
+   المتعاقد عليها" (اللي أكبر عادة وبتشمل هامش/مخزون إضافي، ومفيهاش
+   توزيع منطقي موثوق في المصدر، فبتيجي من شيت "دليل_الأصناف" بدل كده
+   وبتتعرض فقط لما مفيش فلتر منطقة مفعّل).
+
+   كل الكروت والتشارتات والجداول هنا محسوبة من الصفوف المفلترة مباشرة
+   (بنفس فلاتر الشركة/المنطقة/البحث فوق) — مش من شيتات "ملخص_حسب_*"
+   الجاهزة (اللي بتفضل غير مفلترة)، عشان الفلاتر تتحكم في كل حاجة على
+   الصفحة، مش بس جدول التفاصيل.
+   ══════════════════════════════════════════════════════════════════════ */
+const NASHAT_BADANI_URL = "https://script.google.com/macros/s/AKfycbwIW1rHvLfSR3q-G1cKmg8xKESA38rGTSLdcOBFf15UXT5-OLAas4eUp7bGo5f6TeA4/exec";
+const NASHAT_BADANI_CACHE_KEY = "tbc_nashat_badani_cache_v2";
+
+const NASHAT = {
+  loaded: false,
+  loading: false,
+  error: "",
+  rows: [], // التوزيع_التفصيلي بعد التطبيع (صف واحد لكل شركة×منطقة×صنف)
+  itemsGuide: [], // دليل_الأصناف بعد التطبيع (صف واحد لكل شركة×صنف — بدون تفصيل منطقة)
+  byCompanyRaw: [], // ملخص_حسب_الشركة (خام، غير مفلتر — مرجعي فقط)
+  byRegionRaw: [], // ملخص_حسب_المنطقة (خام، غير مفلتر — مرجعي فقط)
+  timestamp: null,
+  sort: { key: null, dir: "asc" },
+  pag: { cur: 0, size: 25 },
+};
+window.NASHAT = NASHAT;
+const NASHAT_REGIONS = ["جدة", "الطائف", "المدينة", "مكة"];
+
+function _nashatN(v) {
+  if (v === null || v === undefined || v === "" || String(v).toLowerCase() === "nan") return null;
+  const f = parseFloat(String(v).replace(/,/g, ""));
+  return isFinite(f) ? f : null;
+}
+function _nashatS(v) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+
+function parseNashatDistRow(r) {
+  return {
+    شركة: _nashatS(r["الشركة"]),
+    منطقة: _nashatS(r["المنطقة"]),
+    صنف: _nashatS(r["الصنف"]),
+    سعر: _nashatN(r["سعر_الوحدة"]),
+    مخصص: _nashatN(r["الكمية_المخصصة"]),
+    موّرد: _nashatN(r["الكمية_الموردة"]),
+    متبقي: _nashatN(r["المتبقي"]),
+    نسبة: _nashatN(r["نسبة_الإنجاز"]),
+    ملاحظة: _nashatS(r["ملاحظة"]),
+  };
+}
+function parseNashatItemRow(r) {
+  return {
+    شركة: _nashatS(r["الشركة"]),
+    صنف: _nashatS(r["الصنف"]),
+    سعر: _nashatN(r["سعر_الوحدة"]),
+    اجمالي: _nashatN(r["الكمية_الإجمالية_للبند"]),
+    مخصص: _nashatN(r["الكمية_المخصصة_للبند"]),
+    موّرد: _nashatN(r["الكمية_الموردة_الإجمالية"]),
+  };
+}
+
+function _nashatApply(json) {
+  const d = (json && json.data) || {};
+  const sa = (v) => (Array.isArray(v) ? v : []);
+  NASHAT.rows = sa(d.distribution).map(parseNashatDistRow);
+  NASHAT.itemsGuide = sa(d.itemsGuide).map(parseNashatItemRow);
+  NASHAT.byCompanyRaw = sa(d.byCompany);
+  NASHAT.byRegionRaw = sa(d.byRegion);
+  NASHAT.timestamp = json.timestamp || null;
+  NASHAT.loaded = true;
+}
+
+async function loadNashatBadaniData(forceNetwork) {
+  if (NASHAT.loading) return;
+  NASHAT.loading = true;
+  try {
+    if (!forceNetwork && !NASHAT.loaded && window._idb) {
+      try {
+        const cached = await window._idb.get(NASHAT_BADANI_CACHE_KEY);
+        if (cached) {
+          _nashatApply(cached);
+          _nashatRenderAll();
+        }
+      } catch (_) {}
+    }
+    if (!NASHAT_BADANI_URL || NASHAT_BADANI_URL.indexOf("PASTE_") === 0) {
+      NASHAT.error = "لسه محطوطش رابط ملف Apps Script بتاع مبادرة النشاط البدني (NASHAT_BADANI_URL) في dashboard.js";
+      if (!NASHAT.loaded) _nashatRenderError();
+      return;
+    }
+    const resp = await fetch(NASHAT_BADANI_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const json = await resp.json();
+    if (json && json.status === "error") throw new Error(json.message || "خطأ من Apps Script");
+    if (window._idb) window._idb.set(NASHAT_BADANI_CACHE_KEY, json);
+    _nashatApply(json);
+    NASHAT.error = "";
+    _nashatRenderAll();
+  } catch (err) {
+    NASHAT.error = err && err.message ? err.message : String(err);
+    if (!NASHAT.loaded) _nashatRenderError();
+  } finally {
+    NASHAT.loading = false;
+  }
+}
+
+function _nashatRenderError() {
+  const el = document.getElementById("nashat-badani-content");
+  if (!el) return;
+  el.innerHTML = `
+  <div class="card" style="text-align:center;padding:40px">
+    <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+    <div style="font-weight:700;margin-bottom:6px">تعذّر تحميل بيانات مبادرة النشاط البدني</div>
+    <div style="color:${CSS_TOKENS.txMuted()};font-size:13px;margin-bottom:14px">${esc(NASHAT.error || "")}</div>
+    <button class="export-btn" onclick="loadNashatBadaniData(true)">إعادة المحاولة</button>
+  </div>`;
+}
+
+function renderNashatBadaniTab() {
+  const el = document.getElementById("nashat-badani-content");
+  if (!el) return;
+  if (!NASHAT.loaded) {
+    el.innerHTML = `
+    <div class="card loading-placeholder">
+      <div class="loading-placeholder-icon">🤸</div>
+      <div class="loading-placeholder-text">جاري التحميل…</div>
+    </div>`;
+    loadNashatBadaniData(false);
+    return;
+  }
+  _nashatRenderAll();
+}
+
+// ── فلترة صفوف التوزيع (شركة×منطقة×صنف) — أساس كل الكروت والتشارتات والجدول ──
+function getNashatFiltered() {
+  const fCompany = (document.getElementById("nashat-f-company")?.value || "").trim();
+  const fRegion = (document.getElementById("nashat-f-region")?.value || "").trim();
+  const fSearch = (document.getElementById("nashat-f-search")?.value || "").trim().toLowerCase();
+  return NASHAT.rows.filter((r) => {
+    if (fCompany && r.شركة !== fCompany) return false;
+    if (fRegion && r.منطقة !== fRegion) return false;
+    if (fSearch && !r.صنف.toLowerCase().includes(fSearch)) return false;
+    return true;
+  });
+}
+
+// ── فلترة دليل الأصناف (شركة×صنف، بدون منطقة) — تُستخدم فقط لقيمة/كمية
+// "التعاقد الإجمالي" اللي مالهاش توزيع منطقي موثوق ──
+function getNashatItemsFiltered() {
+  const fCompany = (document.getElementById("nashat-f-company")?.value || "").trim();
+  const fSearch = (document.getElementById("nashat-f-search")?.value || "").trim().toLowerCase();
+  return NASHAT.itemsGuide.filter((r) => {
+    if (fCompany && r.شركة !== fCompany) return false;
+    if (fSearch && !r.صنف.toLowerCase().includes(fSearch)) return false;
+    return true;
+  });
+}
+
+function _nashatAggByCompany(rows) {
+  const m = {};
+  rows.forEach((r) => {
+    const key = r.شركة || "غير محدد";
+    if (!m[key]) m[key] = { الشركة: key, أصناف: new Set(), valAlloc: 0, valDelivered: 0, hasVal: false };
+    if (r.صنف) m[key].أصناف.add(r.صنف);
+    if (r.سعر !== null && r.مخصص !== null) { m[key].valAlloc += r.سعر * r.مخصص; m[key].hasVal = true; }
+    if (r.سعر !== null && r.موّرد !== null) { m[key].valDelivered += r.سعر * r.موّرد; m[key].hasVal = true; }
+  });
+  return Object.values(m).map((g) => ({ ...g, عدد_الأصناف: g.أصناف.size }));
+}
+
+// ── تجميع حسب المنطقة — مستقل عن فلتر المنطقة نفسه (أساس تشارت "حسب المنطقة") ──
+function _nashatAggByRegion() {
+  const fCompany = (document.getElementById("nashat-f-company")?.value || "").trim();
+  const fSearch = (document.getElementById("nashat-f-search")?.value || "").trim().toLowerCase();
+  const m = {};
+  NASHAT_REGIONS.forEach((r) => (m[r] = { منطقة: r, مخصص: 0, مورّد: 0 }));
+  NASHAT.rows.forEach((r) => {
+    if (fCompany && r.شركة !== fCompany) return;
+    if (fSearch && !r.صنف.toLowerCase().includes(fSearch)) return;
+    if (!m[r.منطقة]) return;
+    if (r.مخصص !== null) m[r.منطقة].مخصص += r.مخصص;
+    if (r.موّرد !== null) m[r.منطقة].مورّد += r.موّرد;
+  });
+  return Object.values(m);
+}
+
+function _nashatRerender() {
+  NASHAT.pag.cur = 0;
+  _nashatRenderAll();
+}
+
+function _nashatSortArrow(key) {
+  return _tajSortArrowGeneric(NASHAT.sort, key);
+}
+function _nashatSortBy(key) {
+  _tajSortToggleGeneric(NASHAT.sort, key);
+  NASHAT.pag.cur = 0;
+  _nashatRenderAll();
+}
+
+function _nashatRenderAll() {
+  const el = document.getElementById("nashat-badani-content");
+  if (!el) return;
+
+  const companyNames = Array.from(new Set(NASHAT.rows.map((r) => r.شركة).filter(Boolean))).sort();
+  const fCompany = document.getElementById("nashat-f-company")?.value || "";
+  const fRegion = document.getElementById("nashat-f-region")?.value || "";
+  const fSearch = document.getElementById("nashat-f-search")?.value || "";
+
+  const filteredRows = getNashatFiltered();
+  const filteredItems = getNashatItemsFiltered();
+  const companyAgg = _nashatAggByCompany(filteredRows);
+  const regionAgg = _nashatAggByRegion();
+  const activeCompanies = new Set(filteredRows.map((r) => r.شركة)).size;
+
+  // ── الكمية/القيمة المخصصة والموردة: من صفوف التوزيع (منطقة-حساسة) ──
+  const qtyAllocTot = filteredRows.reduce((a, r) => a + (r.مخصص || 0), 0);
+  const hasQtyAlloc = filteredRows.some((r) => r.مخصص !== null);
+  const qtyDelTot = filteredRows.reduce((a, r) => a + (r.موّرد || 0), 0);
+  const hasQtyDel = filteredRows.some((r) => r.موّرد !== null);
+  const qtyPct = qtyAllocTot > 0 && hasQtyDel ? (qtyDelTot / qtyAllocTot) * 100 : null;
+
+  const totAlloc = filteredRows.reduce((a, r) => a + (r.سعر !== null && r.مخصص !== null ? r.سعر * r.مخصص : 0), 0);
+  const hasAlloc = filteredRows.some((r) => r.سعر !== null && r.مخصص !== null);
+  const totDelivered = filteredRows.reduce((a, r) => a + (r.سعر !== null && r.موّرد !== null ? r.سعر * r.موّرد : 0), 0);
+  const hasDelivered = filteredRows.some((r) => r.سعر !== null && r.موّرد !== null);
+  const finPct = totAlloc > 0 && hasDelivered ? (totDelivered / totAlloc) * 100 : null;
+
+  // ── قيمة "التعاقد الإجمالي": من دليل الأصناف (مالهاش توزيع منطقي موثوق) —
+  // بتتعرض فقط لما مفيش فلتر منطقة مفعّل ──
+  const totContract = filteredItems.reduce((a, r) => a + (r.سعر !== null && r.اجمالي !== null ? r.سعر * r.اجمالي : 0), 0);
+  const hasContract = !fRegion && filteredItems.some((r) => r.سعر !== null && r.اجمالي !== null);
+
+  el.innerHTML = `
+  <div class="filters-row" style="margin-bottom:18px">
+    <div class="fg">
+      <div class="fg-lbl">الشركة</div>
+      <select class="fsel" id="nashat-f-company" onchange="_nashatRerender()" style="min-width:200px">
+        <option value="">الكل</option>
+        ${companyNames.map((c) => `<option value="${esc(c)}" ${fCompany === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">المنطقة</div>
+      <select class="fsel" id="nashat-f-region" onchange="_nashatRerender()" style="min-width:140px">
+        <option value="">الكل</option>
+        ${NASHAT_REGIONS.map((r) => `<option value="${esc(r)}" ${fRegion === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">بحث (اسم الصنف)</div>
+      <input class="finp" id="nashat-f-search" type="text" placeholder="بحث…" value="${esc(fSearch)}" oninput="smartSearchRerender(this, _nashatRerender)">
+    </div>
+    <button class="f-clear" onclick="document.getElementById('nashat-f-company').value='';document.getElementById('nashat-f-region').value='';document.getElementById('nashat-f-search').value='';_nashatRerender()">✕ مسح</button>
+    <div style="margin-right:auto;display:flex;gap:8px;align-items:center">
+      <button class="export-btn export-btn-csv" onclick="exportNashatCSV(_nashatApplySort(getNashatFiltered()))">⬇ CSV</button>
+      <button class="export-btn export-btn-excel" onclick="exportNashatExcel(_nashatApplySort(getNashatFiltered()))">⬇ Excel</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom:18px">
+    <div class="kpi kc-blue">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></div>
+      <div class="kpi-val">${numFmt(activeCompanies)}</div>
+      <div class="kpi-lbl">عدد الشركات${fCompany ? "" : " (من أصل " + numFmt(companyNames.length) + ")"}</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/></svg></div>
+      <div class="kpi-val">${hasQtyAlloc ? numFmt(qtyAllocTot) : "—"}${fRegion ? " — " + fRegion : ""}</div>
+      <div class="kpi-lbl">إجمالي الكمية المخصصة</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></div>
+      <div class="kpi-val">${hasQtyDel ? numFmt(qtyDelTot) : "—"}${fRegion ? " — " + fRegion : ""}</div>
+      <div class="kpi-lbl">إجمالي الكمية الموردة</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+      <div class="kpi-val">${qtyPct === null ? "—" : pctFmt(qtyPct)}</div>
+      <div class="kpi-lbl">نسبة الإنجاز بالكمية</div>
+    </div>
+  </div>
+
+  <div class="card-title" style="margin-bottom:10px">
+    <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+    المؤشرات المالية
+  </div>
+  <div class="kpi-grid" style="margin-bottom:18px">
+    <div class="kpi kc-navy">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></div>
+      <div class="kpi-val" style="font-size:18px">${hasContract ? sarFmt(totContract) : "—"}</div>
+      <div class="kpi-lbl">إجمالي قيمة التعاقد${fRegion ? " (غير متاح حسب المنطقة)" : ""}</div>
+    </div>
+    <div class="kpi kc-blue">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/></svg></div>
+      <div class="kpi-val" style="font-size:18px">${hasAlloc ? sarFmt(totAlloc) : "—"}${fRegion ? " — " + fRegion : ""}</div>
+      <div class="kpi-lbl">إجمالي القيمة المخصصة</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></div>
+      <div class="kpi-val" style="font-size:18px">${hasDelivered ? sarFmt(totDelivered) : "—"}${fRegion ? " — " + fRegion : ""}</div>
+      <div class="kpi-lbl">إجمالي القيمة الموردة</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+      <div class="kpi-val">${finPct === null ? "—" : pctFmt(finPct)}</div>
+      <div class="kpi-lbl">نسبة الإنجاز المالي (المورد/المخصص)</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+        نسبة الإنجاز حسب المنطقة (بالكمية)
+      </div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-nashat-region"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
+        القيمة المخصصة مقابل الموردة حسب الشركة
+      </div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-nashat-company"></canvas></div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+        إجمالي الكمية: مخصص مقابل موّرد
+      </div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-nashat-status"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/></svg></span>
+        أكثر 10 أصناف احتياجًا (الكمية المتبقية)
+      </div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-nashat-topitems"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F0F9FF;color:#0284C7"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+      ملخص حسب الشركة
+      <span class="sub">${companyAgg.length} شركة</span>
+    </div>
+    <div class="tbl-wrap" style="max-height:260px">
+      <table>
+        <thead><tr><th>الشركة</th><th>عدد الأصناف</th><th>القيمة المخصصة</th><th>القيمة الموردة</th><th>نسبة الإنجاز</th></tr></thead>
+        <tbody>
+          ${companyAgg
+            .slice()
+            .sort((a, b) => b.valAlloc - a.valAlloc)
+            .map(
+              (r) => `<tr>
+              <td>${esc(r["الشركة"])}</td>
+              <td>${numFmt(r.عدد_الأصناف)}</td>
+              <td>${r.hasVal ? sarFmt(r.valAlloc) : "—"}</td>
+              <td>${r.hasVal ? sarFmt(r.valDelivered) : "—"}</td>
+              <td>${r.hasVal && r.valAlloc > 0 ? pctFmt((r.valDelivered / r.valAlloc) * 100) : "—"}</td>
+            </tr>`,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">
+      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
+      جدول التوزيع التفصيلي (شركة × منطقة × صنف)
+      <span class="sub" id="nashat-tbl-count"></span>
+    </div>
+    <div class="tbl-wrap" style="max-height:420px">
+      <table>
+        <thead><tr>
+          <th onclick="_nashatSortBy('شركة')" style="cursor:pointer;user-select:none">الشركة${_nashatSortArrow("شركة")}</th>
+          <th onclick="_nashatSortBy('منطقة')" style="cursor:pointer;user-select:none">المنطقة${_nashatSortArrow("منطقة")}</th>
+          <th onclick="_nashatSortBy('صنف')" style="cursor:pointer;user-select:none">الصنف${_nashatSortArrow("صنف")}</th>
+          <th onclick="_nashatSortBy('سعر')" style="cursor:pointer;user-select:none">سعر الوحدة${_nashatSortArrow("سعر")}</th>
+          <th onclick="_nashatSortBy('مخصص')" style="cursor:pointer;user-select:none">الكمية المخصصة${_nashatSortArrow("مخصص")}</th>
+          <th onclick="_nashatSortBy('موّرد')" style="cursor:pointer;user-select:none">الكمية الموردة${_nashatSortArrow("موّرد")}</th>
+          <th onclick="_nashatSortBy('متبقي')" style="cursor:pointer;user-select:none">المتبقي${_nashatSortArrow("متبقي")}</th>
+          <th onclick="_nashatSortBy('نسبة')" style="cursor:pointer;user-select:none">نسبة الإنجاز${_nashatSortArrow("نسبة")}</th>
+          <th onclick="_nashatSortBy('ملاحظة')" style="cursor:pointer;user-select:none">ملاحظة${_nashatSortArrow("ملاحظة")}</th>
+        </tr></thead>
+        <tbody id="nashat-tbl-body"></tbody>
+      </table>
+    </div>
+    <div class="pag-bar" id="nashat-tbl-pag"><span class="pag-info"></span><div class="pag-btns"></div></div>
+  </div>
+  `;
+
+  requestAnimationFrame(() => {
+    killChart("ch-nashat-region");
+    const regionRows = regionAgg
+      .slice()
+      .sort((a, b) => (b.مخصص > 0 ? (b.مورّد / b.مخصص) * 100 : 0) - (a.مخصص > 0 ? (a.مورّد / a.مخصص) * 100 : 0));
+    CHARTS["ch-nashat-region"] = new Chart(document.getElementById("ch-nashat-region"), {
+      type: "bar",
+      data: {
+        labels: regionRows.map((r) => r["منطقة"]),
+        datasets: [
+          {
+            label: "نسبة الإنجاز",
+            data: regionRows.map((r) => +((r.مخصص > 0 ? (r.مورّد / r.مخصص) * 100 : 0).toFixed(1))),
+            backgroundColor: CSS_TOKENS.info() + "cc",
+            borderRadius: 5,
+          },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `  ${ctx.raw}%` } } },
+        scales: { x: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + "%" } } },
+      },
+    });
+
+    killChart("ch-nashat-company");
+    const compRows = companyAgg.slice().sort((a, b) => b.valAlloc - a.valAlloc);
+    CHARTS["ch-nashat-company"] = new Chart(document.getElementById("ch-nashat-company"), {
+      type: "bar",
+      data: {
+        labels: compRows.map((r) => r["الشركة"]),
+        datasets: [
+          { label: "مخصص", data: compRows.map((r) => r.valAlloc), backgroundColor: CSS_TOKENS.warning() + "cc", borderRadius: 5 },
+          { label: "موّرد", data: compRows.map((r) => r.valDelivered), backgroundColor: CSS_TOKENS.positive() + "cc", borderRadius: 5 },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: (v) => sarFmt(v) } } },
+      },
+    });
+
+    killChart("ch-nashat-status");
+    CHARTS["ch-nashat-status"] = new Chart(document.getElementById("ch-nashat-status"), {
+      type: "doughnut",
+      data: {
+        labels: ["موّرد", "متبقي"],
+        datasets: [{ data: [qtyDelTot, Math.max(0, qtyAllocTot - qtyDelTot)], backgroundColor: [CSS_TOKENS.positive() + "cc", CSS_TOKENS.warning() + "cc"] }],
+      },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { font: { size: 10 } } } } },
+    });
+
+    killChart("ch-nashat-topitems");
+    const byItem = {};
+    filteredRows.forEach((r) => {
+      if (!r.صنف || r.متبقي === null) return;
+      byItem[r.صنف] = (byItem[r.صنف] || 0) + (r.متبقي || 0);
+    });
+    const topItems = Object.entries(byItem)
+      .filter((e) => e[1] > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    CHARTS["ch-nashat-topitems"] = new Chart(document.getElementById("ch-nashat-topitems"), {
+      type: "bar",
+      data: {
+        labels: topItems.map((e) => e[0]),
+        datasets: [{ label: "الكمية المتبقية", data: topItems.map((e) => e[1]), backgroundColor: CSS_TOKENS.danger() + "cc", borderRadius: 5 }],
+      },
+      options: {
+        indexAxis: "y",
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true }, y: { ticks: { font: { size: 10 } } } },
+      },
+    });
+  });
+
+  _nashatRenderTable();
+}
+
+function _nashatApplySort(rows) {
+  const { key, dir } = NASHAT.sort;
+  if (!key) return rows;
+  const mul = dir === "asc" ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    let va = a[key], vb = b[key];
+    const na = typeof va === "number", nb = typeof vb === "number";
+    if (na || nb) {
+      const xa = na ? va : va === null || va === undefined || va === "" ? -Infinity : Number(va);
+      const xb = nb ? vb : vb === null || vb === undefined || vb === "" ? -Infinity : Number(vb);
+      return (xa - xb) * mul;
+    }
+    return String(va || "").localeCompare(String(vb || ""), "ar") * mul;
+  });
+}
+
+function _nashatRenderTable() {
+  const rows = _nashatApplySort(getNashatFiltered());
+  const countEl = document.getElementById("nashat-tbl-count");
+  if (countEl) countEl.textContent = `${numFmt(rows.length)} سجل`;
+  renderTajheezTable(
+    "nashat-tbl-body",
+    rows,
+    [
+      (r) => `<td>${esc(r.شركة)}</td>`,
+      (r) => `<td>${esc(r.منطقة)}</td>`,
+      (r) => `<td>${esc(r.صنف)}</td>`,
+      (r) => `<td>${r.سعر === null ? "—" : sarFmt(r.سعر)}</td>`,
+      (r) => `<td>${r.مخصص === null ? "—" : numFmt(r.مخصص)}</td>`,
+      (r) => `<td>${r.موّرد === null ? "—" : numFmt(r.موّرد)}</td>`,
+      (r) => `<td>${r.متبقي === null ? "—" : numFmt(r.متبقي)}</td>`,
+      (r) => `<td>${r.نسبة === null ? "—" : pctFmt(r.نسبة * (r.نسبة <= 1 ? 100 : 1))}</td>`,
+      (r) => `<td style="max-width:260px;white-space:normal;font-size:11px;color:${CSS_TOKENS.txMuted()}">${esc(r.ملاحظة || "—")}</td>`,
+    ],
+    NASHAT.pag,
+    "nashat-tbl-pag",
+    _nashatRenderTable,
+  );
+}
+
+function exportNashatCSV(rows) {
+  const headers = ["الشركة", "المنطقة", "الصنف", "سعر_الوحدة", "الكمية_المخصصة", "الكمية_الموردة", "المتبقي", "نسبة_الإنجاز", "ملاحظة"];
+  const csv = [headers.map((h) => `"${h}"`).join(",")];
+  rows.forEach((r) => {
+    csv.push(
+      [r.شركة, r.منطقة, r.صنف, r.سعر, r.مخصص, r.موّرد, r.متبقي, r.نسبة, r.ملاحظة]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    );
+  });
+  const blob = new Blob(["﻿" + csv.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "مبادرة_النشاط_البدني_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+}
+
+function exportNashatExcel(rows) {
+  const headers = ["الشركة", "المنطقة", "الصنف", "سعر الوحدة", "الكمية المخصصة", "الكمية الموردة", "المتبقي", "نسبة الإنجاز", "ملاحظة"];
+  const dataArr = [headers];
+  rows.forEach((r) => dataArr.push([r.شركة, r.منطقة, r.صنف, r.سعر, r.مخصص, r.موّرد, r.متبقي, r.نسبة, r.ملاحظة]));
+  const ws = XLSX.utils.aoa_to_sheet(dataArr);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "النشاط البدني");
+  XLSX.writeFile(wb, "مبادرة_النشاط_البدني_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+}
+/* ══════════════════════════════════ نهاية تبويب مبادرة النشاط البدني ══════════════════════════════════ */
+
 
 
 
@@ -26226,6 +26790,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ["tajheez",         function(){ renderTajheezInventoryTab(); }],
     ["tajheez-supplies", function(){ renderTajheezSuppliesTab(); }],
     ["tajheez-contracts", function(){ renderTajheezContractsTab(); }],
+    ["nashat-badani",    function(){ if (typeof renderNashatBadaniTab === "function") renderNashatBadaniTab(); }],
     ["gatekeepers",     function(){ if (typeof renderGatekeepersTab === "function") renderGatekeepersTab(); }],
     ["recruitment",     function(){ if (typeof renderRecruitmentTab === "function") renderRecruitmentTab(); }],
     ["khanadeq",        function(){ renderKhanadeqTab(); }],
@@ -26393,7 +26958,8 @@ var PORTAL_CATEGORIES = {
     tabs: [
       { name: "tajheez",           label: "المخصص والاحتياج" },
       { name: "tajheez-supplies",  label: "التوريدات" },
-      { name: "tajheez-contracts", label: "عقود التجهيزات" }
+      { name: "tajheez-contracts", label: "عقود التجهيزات" },
+      { name: "nashat-badani",     label: "مبادرة النشاط البدني" }
     ]
   },
   contracts: {

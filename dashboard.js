@@ -3580,7 +3580,13 @@ let __bgRevalidatedOnce = false;
       });
       RAW.forEach(r => {
         const id = normId_(r.minId || r.schoolSeq);
-        r.alerts = aMap[id] || r.alerts || 0;
+        // 🩹 2026-08-25: كان فيه fallback على r.alerts القديمة (`|| r.alerts || 0`)
+        // بيخلي أي مدرسة اتزوّدلها alerts في مرة سابقة (أو جالها رقم قديم من
+        // عمود "عدد_البلاغات" في شيت المباني قبل ما تتحمّل بيانات COW أصلاً)
+        // تفضل شايلة نفس الرقم القديم للأبد حتى لو مبقاش عندها بلاغات فعلية
+        // دلوقتي (aMap[id] undefined) — العدد لازم يبقى دايمًا مطابق 100%
+        // لعدد سجلات RAW_BALAGH الفعلي المرتبط بالمدرسة دي، صفر لو مفيش.
+        r.alerts = aMap[id] || 0;
       });
       // إجمالي البلاغات الحقيقي = عدد سجلات البلاغات الفعلي دايماً (مش مجموع
       // البلاغات اللي نجحنا نربطها بمبنى) — عشان أي بلاغ برقم مدرسة مش متطابق
@@ -3588,6 +3594,13 @@ let __bgRevalidatedOnce = false;
       window.__BALAGH_TOTAL_EXACT__ = window.RAW_BALAGH.length;
       const totalEl = document.getElementById("k-alerts-total");
       if (totalEl) totalEl.textContent = window.RAW_BALAGH.length.toLocaleString();
+      // 🗺️ لو تبويب الخريطة مفتوح فعلاً وقت ما البلاغات خلصت تحميل (تحميل
+      // منفصل غير متزامن — ممكن ياخد وقت أطول من فتح المستخدم للتبويب)،
+      // نعيد رسمها فورًا عشان طبقة "البلاغات" وشريط فئاتها يظهروا بالأرقام
+      // الصحيحة من غير ما يحتاج المستخدم يبدّل تبويب يدويًا.
+      if (document.getElementById("tab-map")?.classList.contains("active")) {
+        try { renderMap(); } catch (e) { console.warn("[map][balagh-refresh]", e); }
+      }
     };
     window.loadBalaghSeparate = async function(forceNetwork = false) {
       // 1) من الكاش أولاً (يشتغل حتى بعد F5) — عرض فوري بدون انتظار الشبكة
@@ -3704,7 +3717,46 @@ let __bgRevalidatedOnce = false;
    ════════════════════════════════════════════════════════════ */
 let _map = null,
   _mapLayer = null,
-  _mapMode = "fca";
+  _mapMode = "fca",
+  // ── حالة فلتر الخريطة المحلي (2026-08-25) — بناءً على طلب صريح: فلتر
+  // على البلاغات وعلى كل وضع عرض تاني، بدون التأثير على باقي التبويبات
+  // (لا يلمس FILTERED العام ولا window.applyFilters) ──
+  _mapTierFilter = "",   // "" = الكل، وإلا مفتاح فئة (critical/fair/good/vgood لـ FCA/البيئة، أو رقم فئة 0-4 للبلاغات)
+  _mapTopN = 0,          // 0 = الكل، وإلا أعلى N مدرسة بعدد البلاغات (وضع البلاغات فقط)
+  _mapFilterUIMode = null, // آخر mode اتبنى فلتره — لمنع إعادة تصفير اختيار المستخدم في كل رندر
+  _mapBalaghQuartiles = { q1: 0, q2: 0, q3: 0 },
+  // آخر مجموعة مدارس اتعرضت فعليًا على الخريطة (بعد كل الفلاتر: العامة +
+  // المحلية + شرط وجود إحداثيات) — مصدر زر "تنزيل بيانات الخريطة" عشان
+  // الملف المُصدَّر يطابق بالظبط اللي المستخدم شايفه على الخريطة لحظة الضغط.
+  _mapLastRows = [];
+
+// ── ألوان/تسميات فئات البلاغات الأربع + فئة "لا بلاغات" (بنفس أسلوب
+// الألوان الثابتة المستخدم بالفعل في buildLegendHTML لباقي الأوضاع) —
+// الترتيب تصاعدي حسب الخطورة: index 0 = لا بلاغات … index 4 = الأعلى ──
+const BALAGH_TIER_COLORS = ["#94A3B8", "#059669", "#D97706", "#EA580C", "#DC2626"],
+  BALAGH_TIER_LABELS = ["لا بلاغات", "منخفض", "متوسط", "مرتفع", "الأعلى"];
+
+// تقسيم المدارس لأربع فئات حسب عدد البلاغات (الأكثر/الأقل) — بناءً على
+// طلب صريح. التقسيم نسبي (Quartiles) محسوب من المدارس اللي عندها بلاغات
+// فعلاً ضمن المجموعة المعروضة حالياً (بعد الفلاتر العامة)، مش عتبات ثابتة،
+// عشان يتكيّف تلقائياً مع حجم/توزيع البيانات الفعلي بدل أرقام مخمّنة.
+function computeBalaghQuartiles(counts) {
+  const sorted = counts.filter((c) => c > 0).sort((a, b) => a - b);
+  const q = (p) => {
+    if (!sorted.length) return 0;
+    const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1));
+    return sorted[idx];
+  };
+  return { q1: q(0.25), q2: q(0.5), q3: q(0.75) };
+}
+function getBalaghTier(count) {
+  if (!count) return 0;
+  const q = _mapBalaghQuartiles;
+  if (count <= q.q1) return 1;
+  if (count <= q.q2) return 2;
+  if (count <= q.q3) return 3;
+  return 4;
+}
 function getMarkerStyle(r, mode) {
   if ("fca" === mode) {
     if (null == r.fca) return { color: CSS_TOKENS.txMuted(), label: "—" };
@@ -3715,6 +3767,11 @@ function getMarkerStyle(r, mode) {
     if (null == r.envScore) return { color: CSS_TOKENS.txMuted(), label: "—" };
     const t = getTier(r.envScore);
     return { color: TIER[t].color, label: pct(r.envScore) };
+  }
+  if ("balagh" === mode) {
+    const count = r.alerts || 0;
+    const tier = getBalaghTier(count);
+    return { color: BALAGH_TIER_COLORS[tier], label: `${count.toLocaleString()} بلاغ · ${BALAGH_TIER_LABELS[tier]}` };
   }
   if ("gender" === mode) {
     return {
@@ -3734,32 +3791,172 @@ function buildLegendHTML(mode) {
   if ("fca" === mode || "env" === mode) {
     return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#059669"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>جيد جداً · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>لا توجد بيانات</div>`;
   }
+  if ("balagh" === mode) {
+    return `<div class="map-legend-title">📢 عدد البلاغات <span style="font-weight:600">(نسبي)</span></div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[4]}"></div>الأعلى · أكثر من ${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[3]}"></div>مرتفع · ${_mapBalaghQuartiles.q2 + 1}–${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[2]}"></div>متوسط · ${_mapBalaghQuartiles.q1 + 1}–${_mapBalaghQuartiles.q2}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[1]}"></div>منخفض · 1–${_mapBalaghQuartiles.q1}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[0]}"></div>لا بلاغات</div>`;
+  }
   return "gender" === mode
     ? '<div class="map-legend-title">👦👧 الجنس</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>بنات</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>بنين</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
     : "owner" === mode
       ? '<div class="map-legend-title">🏛️ الملكية</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>حكومي</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>مستأجر</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
       : "";
 }
+// ── بناء/تحديث واجهة فلتر الخريطة المحلي حسب وضع العرض الحالي — بيتنفّذ
+// مرة واحدة بس عند تغيّر الـ mode فعلياً (مش كل رندر) عشان ما يمسحش
+// اختيار المستخدم الحالي في الفلتر من غير داعي ──
+function updateMapFilterUI() {
+  if (_mapFilterUIMode === _mapMode) return;
+  _mapFilterUIMode = _mapMode;
+  _mapTierFilter = "";
+  _mapTopN = 0;
+  const row = document.getElementById("map-filters-row"),
+    tierSel = document.getElementById("mapTierFilter"),
+    topnWrap = document.getElementById("map-fg-topn"),
+    topnSel = document.getElementById("mapTopN"),
+    statBarFca = document.getElementById("map-stat-bar"),
+    statBarBal = document.getElementById("map-stat-bar-balagh"),
+    statBarGender = document.getElementById("map-stat-bar-gender"),
+    statBarOwner = document.getElementById("map-stat-bar-owner");
+  if (topnSel) topnSel.value = "0";
+  // ── إخفاء كل أشرطة إحصائيات الخريطة الأول، وبعدين إظهار اللي يخص الوضع
+  // الحالي بس — أوضح وأضمن (خصوصًا مع زيادة عدد الأوضاع) من تكرار سطر
+  // إخفاء/إظهار مقابل لكل شرط ──
+  [statBarFca, statBarBal, statBarGender, statBarOwner].forEach((el) => { if (el) el.style.display = "none"; });
+  if (!row || !tierSel) return;
+
+  if ("fca" === _mapMode || "env" === _mapMode) {
+    row.style.display = "flex";
+    if (topnWrap) topnWrap.style.display = "none";
+    tierSel.innerHTML =
+      '<option value="">الكل</option>' +
+      ["critical", "fair", "good", "vgood"].map((k) => `<option value="${k}">${TIER[k].label}</option>`).join("");
+    if (statBarFca) statBarFca.style.display = "";
+  } else if ("balagh" === _mapMode) {
+    row.style.display = "flex";
+    if (topnWrap) topnWrap.style.display = "";
+    tierSel.innerHTML =
+      '<option value="">الكل</option>' +
+      [4, 3, 2, 1, 0].map((t) => `<option value="${t}">${BALAGH_TIER_LABELS[t]}</option>`).join("");
+    if (statBarBal) statBarBal.style.display = "";
+  } else if ("gender" === _mapMode) {
+    row.style.display = "none";
+    if (statBarGender) statBarGender.style.display = "";
+  } else if ("owner" === _mapMode) {
+    row.style.display = "none";
+    if (statBarOwner) statBarOwner.style.display = "";
+  } else {
+    row.style.display = "none";
+  }
+}
+// ── تظليل بطاقة الإحصائية اللي بتطابق فلتر الفئة المفعّل حاليًا (سواء
+// اتحدد من القائمة المنسدلة أو بالضغط على البطاقة نفسها) — بتشتغل على
+// شريطَي FCA/البيئة والبلاغات، أشرطة الجنس/الملكية مالهاش فلتر محلي فمفيش
+// بطاقات قابلة للضغط فيها أصلاً ──
+function syncMapStatCardActive() {
+  document.querySelectorAll('#map-stat-bar [data-tier], #map-stat-bar-balagh [data-tier]').forEach((card) => {
+    card.classList.toggle("active-tier", "" !== _mapTierFilter && card.dataset.tier === _mapTierFilter);
+  });
+}
+window.setMapTierFilter = function (val) {
+  _mapTierFilter = val;
+  const sel = document.getElementById("mapTierFilter");
+  if (sel) sel.value = val;
+  renderMap();
+};
+window.setMapTopN = function (val) {
+  _mapTopN = parseInt(val, 10) || 0;
+  renderMap();
+};
+window.clearMapFilters = function () {
+  _mapTierFilter = "";
+  _mapTopN = 0;
+  const t = document.getElementById("mapTierFilter"),
+    n = document.getElementById("mapTopN");
+  if (t) t.value = "";
+  if (n) n.value = "0";
+  renderMap();
+};
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🗺️  JS تبويب: الخريطة
    ║  (tab-map) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
 function renderMap() {
   const D = FILTERED,
-    withCoords = D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1),
-    noCoords = D.length - withCoords.length,
-    statCrit = D.filter((r) => null != r.fca && r.fca < 25).length,
-    statFair = D.filter((r) => null != r.fca && r.fca >= 25 && r.fca < 50).length,
-    statGood = D.filter((r) => null != r.fca && r.fca >= 50 && r.fca < 75).length,
-    statVgood = D.filter((r) => null != r.fca && r.fca >= 75).length;
-  if (
-    (setText("ms-crit", statCrit.toLocaleString()),
+    withCoordsAll = D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1),
+    noCoords = D.length - withCoordsAll.length,
+    // ── حقل الدرجة اللي بتتحسب منه بطاقات الإحصائيات فوق الخريطة يتغيّر
+    // حسب وضع العرض المختار: FCA أو البيئة المدرسية — قبل كده كانت
+    // البطاقات دايمًا بتعرض توزيع r.fca حتى في وضع "البيئة المدرسية" وهو
+    // خطأ لأنه بيوهم إن الأرقام بتاعة البيئة، دلوقتي بتتغيّر فعليًا حسب
+    // اللي مختارو المستخدم ──
+    scoreField = "env" === _mapMode ? "envScore" : "fca",
+    statCrit = D.filter((r) => null != r[scoreField] && r[scoreField] < 25).length,
+    statFair = D.filter((r) => null != r[scoreField] && r[scoreField] >= 25 && r[scoreField] < 50).length,
+    statGood = D.filter((r) => null != r[scoreField] && r[scoreField] >= 50 && r[scoreField] < 75).length,
+    statVgood = D.filter((r) => null != r[scoreField] && r[scoreField] >= 75).length;
+  (setText("ms-crit", statCrit.toLocaleString()),
     setText("ms-fair", statFair.toLocaleString()),
     setText("ms-good", statGood.toLocaleString()),
     setText("ms-vgood", statVgood.toLocaleString()),
-    setText("ms-nocoord", noCoords.toLocaleString()),
-    !_map)
-  ) {
+    setText("ms-nocoord", noCoords.toLocaleString()));
+
+  // ── واجهة الفلتر المحلي (تُبنى/تتحدّث مرة واحدة بس عند تغيّر الـ mode) ──
+  updateMapFilterUI();
+
+  // ── فئات البلاغات الأربع (نسبية Quartiles) — تُحسب دايمًا من المدارس
+  // ذات الإحداثيات ضمن الفلاتر العامة الحالية (withCoordsAll)، بغض النظر
+  // عن الـ mode المختار، عشان شريط إحصائيات البلاغات يفضل صحيح حتى لو
+  // المستخدم واقف على وضع عرض تاني ──
+  _mapBalaghQuartiles = computeBalaghQuartiles(withCoordsAll.map((r) => r.alerts || 0));
+  const balTierCounts = [0, 0, 0, 0, 0];
+  withCoordsAll.forEach((r) => { balTierCounts[getBalaghTier(r.alerts || 0)]++; });
+  (setText("ms-bal-none", balTierCounts[0].toLocaleString()),
+    setText("ms-bal-low", balTierCounts[1].toLocaleString()),
+    setText("ms-bal-med", balTierCounts[2].toLocaleString()),
+    setText("ms-bal-high", balTierCounts[3].toLocaleString()),
+    setText("ms-bal-top", balTierCounts[4].toLocaleString()),
+    setText("ms-bal-nocoord", noCoords.toLocaleString()));
+
+  // ── بطاقات إحصائيات "الجنس" و"الملكية" — بتتحدّث دايمًا (زي باقي
+  // الأشرطة) بغض النظر عن الوضع الحالي، عشان تبقى جاهزة فورًا لحظة
+  // التبديل من غير أي وميض أو تأخير ──
+  const genderCounts = { boys: 0, girls: 0, other: 0 },
+    ownerCounts = { gov: 0, rent: 0, other: 0 };
+  D.forEach((r) => {
+    "بنين" === r.gender ? genderCounts.boys++ : "بنات" === r.gender ? genderCounts.girls++ : genderCounts.other++;
+    "حكومي" === r.ownership ? ownerCounts.gov++ : "مستأجر" === r.ownership ? ownerCounts.rent++ : ownerCounts.other++;
+  });
+  (setText("ms-gen-boys", genderCounts.boys.toLocaleString()),
+    setText("ms-gen-girls", genderCounts.girls.toLocaleString()),
+    setText("ms-gen-other", genderCounts.other.toLocaleString()),
+    setText("ms-gen-nocoord", noCoords.toLocaleString()));
+  (setText("ms-own-gov", ownerCounts.gov.toLocaleString()),
+    setText("ms-own-rent", ownerCounts.rent.toLocaleString()),
+    setText("ms-own-other", ownerCounts.other.toLocaleString()),
+    setText("ms-own-nocoord", noCoords.toLocaleString()));
+
+  // ── تطبيق فلتر الخريطة المحلي (فئة/أعلى N مدرسة) — تصفية إضافية فوق
+  // withCoordsAll، محلية بالكامل لتبويب الخريطة، لا تلمس FILTERED العام ──
+  let withCoords = withCoordsAll;
+  if ("balagh" === _mapMode) {
+    if ("" !== _mapTierFilter) {
+      const wantTier = parseInt(_mapTierFilter, 10);
+      withCoords = withCoords.filter((r) => getBalaghTier(r.alerts || 0) === wantTier);
+    }
+    if (_mapTopN > 0) {
+      withCoords = [...withCoords].sort((a, b) => (b.alerts || 0) - (a.alerts || 0)).slice(0, _mapTopN);
+    }
+  } else if (("fca" === _mapMode || "env" === _mapMode) && "" !== _mapTierFilter) {
+    withCoords = withCoords.filter((r) => {
+      const val = "fca" === _mapMode ? r.fca : r.envScore;
+      return null != val && getTier(val) === _mapTierFilter;
+    });
+  }
+  _mapLastRows = withCoords;
+  const dlBtn = document.getElementById("map-download-csv");
+  if (dlBtn) dlBtn.querySelector(".map-dl-count") && (dlBtn.querySelector(".map-dl-count").textContent = `(${withCoords.length.toLocaleString()})`);
+  syncMapStatCardActive();
+
+  if (!_map) {
     ((_map = L.map("map-container", {
       center: [24.7, 46.7],
       zoom: 10,
@@ -3788,7 +3985,12 @@ function renderMap() {
   const markers = [];
   (withCoords.forEach((r) => {
     const { color: color, label: label } = getMarkerStyle(r, _mapMode),
-      radius = "fca" === _mapMode && null != r.fca ? Math.max(6, Math.min(14, r.fca / 10)) : 8,
+      radius =
+        "fca" === _mapMode && null != r.fca
+          ? Math.max(6, Math.min(14, r.fca / 10))
+          : "balagh" === _mapMode
+            ? Math.max(6, Math.min(16, 6 + (r.alerts || 0)))
+            : 8,
       circle = L.circleMarker([r.lat, r.lng], {
         radius: radius,
         fillColor: color,
@@ -3807,10 +4009,25 @@ function renderMap() {
           : "",
       alertsLine =
         null != r.alerts
-          ? `<div class="map-popup-row"><span class="map-popup-lbl">البلاغات</span><span class="map-popup-val">${r.alerts}</span></div>`
+          ? `<div class="map-popup-row"><span class="map-popup-lbl">البلاغات</span><span class="map-popup-val" style="color:${BALAGH_TIER_COLORS[getBalaghTier(r.alerts || 0)]}">${r.alerts}</span></div>`
+          : "",
+      // ── معلومات الموقع الإضافية (بناءً على طلب صريح: المنطقة/المحافظة
+      // وأي معلومة تانية عن الموقع) — نفس تسلسل التقسيم الإداري الفعلي:
+      // المنطقة/المدينة الرئيسية ← المحافظة ← الحي ──
+      minIdLine =
+        r.minId
+          ? `<div class="map-popup-row"><span class="map-popup-lbl">الرقم الوزاري</span><span class="map-popup-val" style="font-family:monospace">${esc(r.minId)}</span></div>`
+          : "",
+      cityLine =
+        r.city
+          ? `<div class="map-popup-row"><span class="map-popup-lbl">المنطقة الرئيسية</span><span class="map-popup-val">${esc(r.city)}</span></div>`
+          : "",
+      sectorLine =
+        r.sector
+          ? `<div class="map-popup-row"><span class="map-popup-lbl">المحافظة</span><span class="map-popup-val">${esc(r.sector)}</span></div>`
           : "";
     (circle.bindPopup(
-      `\n      <div style="min-width:190px;direction:rtl;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif">\n        <div class="map-popup-name">${esc(r.name)}</div>\n        <div style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};border:1px solid ${color}44;margin-bottom:8px">${label}</div>\n        ${fcaLine}${envLine}\n        <div class="map-popup-row"><span class="map-popup-lbl">الحي</span><span class="map-popup-val">${esc(r.district) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">المرحلة</span><span class="map-popup-val">${esc(r.stage) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الجنس</span><span class="map-popup-val">${esc(r.gender) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الملكية</span><span class="map-popup-val">${esc(r.ownership) || "—"}</span></div>\n        ${alertsLine}\n      </div>\n    `,
+      `\n      <div style="min-width:190px;direction:rtl;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif">\n        <div class="map-popup-name">${esc(r.name)}</div>\n        <div style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};border:1px solid ${color}44;margin-bottom:8px">${label}</div>\n        ${fcaLine}${envLine}\n        ${minIdLine}${cityLine}${sectorLine}\n        <div class="map-popup-row"><span class="map-popup-lbl">الحي</span><span class="map-popup-val">${esc(r.district) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">المرحلة</span><span class="map-popup-val">${esc(r.stage) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الجنس</span><span class="map-popup-val">${esc(r.gender) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الملكية</span><span class="map-popup-val">${esc(r.ownership) || "—"}</span></div>\n        ${alertsLine}\n      </div>\n    `,
       { maxWidth: 260, className: "map-popup-custom" },
     ),
       markers.push(circle));
@@ -3824,6 +4041,59 @@ function renderMap() {
     _map && _map.invalidateSize();
   }, 150);
 }
+// ── تنزيل بيانات الخريطة المفلترة كملف CSV — بناءً على طلب صريح: زر
+// لتنزيل بالضبط نفس المدارس المعروضة حاليًا على الخريطة (بعد الفلاتر
+// العامة + فلتر الخريطة المحلي + شرط وجود إحداثيات)، مش كل RAW/FILTERED.
+// نفس تنسيق أعمدة exportTableCSV (تبويب الجدول التفصيلي) للاتساق، مع
+// إضافة أعمدة خاصة بسياق الخريطة: البلاغات والإحداثيات ──
+window.exportMapDataCSV = function () {
+  try {
+    const rows = _mapLastRows || [],
+      isEn = "en" === LANG;
+    if (!rows.length) {
+      if (typeof showToast === "function") showToast("لا توجد مدارس معروضة على الخريطة حاليًا للتصدير", "warn");
+      return;
+    }
+    const headers = isEn
+      ? [
+          "School Name", "Main Region", "Governorate", "District", "Min. ID",
+          "Gender", "Stage", "Ownership", "FCA%", "Env%", "Complaints",
+          "Latitude", "Longitude",
+        ]
+      : [
+          "اسم المدرسة", "المنطقة الرئيسية", "المحافظة", "الحي", "الرقم الوزاري",
+          "الجنس", "المرحلة", "الملكية", "FCA%", "البيئة%", "البلاغات",
+          "خط العرض", "خط الطول",
+        ],
+      csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`,
+      csvRows = [headers.map(csvCell).join(",")];
+    rows.forEach((r) => {
+      csvRows.push(
+        [
+          r.name, r.city, r.sector, r.district, r.minId,
+          r.gender, r.stage, r.ownership,
+          null != r.fca ? r.fca.toFixed(1) : "",
+          null != r.envScore ? r.envScore.toFixed(1) : "",
+          r.alerts ?? "",
+          r.lat ?? "", r.lng ?? "",
+        ].map(csvCell).join(","),
+      );
+    });
+    const modeLabelAr = { fca: "درجة_FCA", env: "البيئة_المدرسية", balagh: "البلاغات", gender: "الجنس", owner: "الملكية" }[_mapMode] || _mapMode;
+    const blob = new Blob(["﻿" + csvRows.join("\r\n")], { type: "text/csv;charset=utf-8;" }),
+      url = URL.createObjectURL(blob),
+      a = document.createElement("a");
+    a.href = url;
+    a.download = `بيانات_الخريطة_${modeLabelAr}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
+  } catch (err) {
+    console.warn("[exportMapDataCSV] خطأ:", err);
+    if (typeof showToast === "function") showToast("تعذّر تصدير بيانات الخريطة", "warn");
+  }
+};
 /* ╔════════════════════════════════════════════════════════════╗
    ║  👨‍🎓  JS تبويب: الطلاب وعمر المبنى
    ║  (tab-students) — الدوال الخاصة بهذا التبويب تبدأ هنا
@@ -17246,6 +17516,28 @@ function exportNashatExcel(rows) {
     return { tier: "جيد جداً 🟢", action: "مراقبة روتينية ضمن خطة الصيانة الوقائية العامة." };
   }
 
+  // ── استخراج عدد المدارس المطلوب من نص السؤال نفسه (2026-08-25) — بناءً
+  // على طلب صريح: "عاوز 10 مدارس" أو "أعلى 20 مدرسة" لازم يرجّعوا فعلاً
+  // بالعدد ده مباشرة، من غير سقف تعسفي بـ5. بيدور على رقم صريح (بحد أقصى
+  // معقول 50) أو صيغة عربية شائعة (عشرة/عشرين/خمسطاشر...)، وإلا يرجع
+  // العدد الافتراضي المُمرَّر ──
+  function fcbParseRequestedTopN(text, fallback) {
+    if (!text) return fallback;
+    const s = String(text);
+    const digitMatch = s.match(/\b(\d{1,3})\b/);
+    if (digitMatch) {
+      const n = parseInt(digitMatch[1], 10);
+      if (n >= 1 && n <= 50) return n;
+    }
+    const wordMap = {
+      خمسطاشر: 15, "خمسة عشر": 15, "خمسه عشر": 15,
+      عشرين: 20, عشرة: 10, عشره: 10,
+      ثلاثين: 30, أربعين: 40, خمسين: 50,
+    };
+    for (const w in wordMap) if (s.includes(w)) return wordMap[w];
+    return fallback;
+  }
+
   // ⚡ كاش الجزء الثقيل (map/filter/sort على كامل RAW) — يُعاد حسابه فقط
   // لما تتغيّر البيانات فعلياً (window.__DATA_REV__)، وليس مع كل رسالة شات.
   // القص حسب topN يبقى يُنفَّذ طازجاً كل مرة (عملية رخيصة) فوق النتيجة المخزّنة.
@@ -17346,11 +17638,14 @@ function exportNashatExcel(rows) {
     return "📊 هذا مخطط تجريبي مبني على بيانات اللوحة الحالية:\n\n```chart\n" + JSON.stringify(spec) + "\n```";
   }
 
-  /* رد ديناميكي: أولويات وحلول فعلية من محرك الأولويات (يعمل بدون مفتاح API) */
-  function fcbDynamicPriorityReply() {
-    const p = fcbBuildPriorityActions(8);
+  /* رد ديناميكي: أولويات وحلول فعلية من محرك الأولويات (يعمل بدون مفتاح API)
+     — العدد المعروض يتحدد من نص السؤال نفسه (مثلاً "10 مدارس" أو "أعلى 20")،
+     والافتراضي 10 لو محددش رقم. */
+  function fcbDynamicPriorityReply(userText) {
+    const topN = fcbParseRequestedTopN(userText, 10);
+    const p = fcbBuildPriorityActions(topN);
     if (!p || !p.top.length) return null;
-    let md = "🧮 **محرك الأولويات** — ترتيب المباني حسب درجة الحالة الفعلية من 100 (مبنية على FCA + عمر المبنى + البيئة + البلاغات):\n\n";
+    let md = `🧮 **محرك الأولويات** — أعلى ${p.top.length} مبنى حسب درجة الحالة الفعلية من 100 (مبنية على FCA + عمر المبنى + البيئة + البلاغات):\n\n`;
     md += "| المبنى | الدرجة من 100 | التصنيف |\n|---|---|---|\n";
     p.top.forEach((r) => { md += `| ${r.name} | ${r.conditionScore} | ${r.tier} |\n`; });
     md += "\n**الإجراء المقترح للحالة الأكثر احتياجاً:**\n" + p.top[0].action;
@@ -17359,8 +17654,8 @@ function exportNashatExcel(rows) {
   }
 
   function fcbReplyFor(text) {
-    if (/حل|حلول|أولوي|اولوي|priority|priorities|إيش أعمل|ايش اعمل|توصي|اقترح/i.test(text)) {
-      const p = fcbDynamicPriorityReply();
+    if (/حل|حلول|أولوي|اولوي|يستحق|أشد|أخطر|أهم|أسوأ|الأسوأ|سيئ|priority|priorities|urgent|worst|إيش أعمل|ايش اعمل|توصي|اقترح/i.test(text)) {
+      const p = fcbDynamicPriorityReply(text);
       if (p) return p;
     }
     if (/جدول|table/i.test(text)) {
@@ -17866,11 +18161,13 @@ function exportNashatExcel(rows) {
   }
 
   /* ── 4) استعلام عام على كل البلاغات (مش مقيّد بمدرسة واحدة) — يدعم
-     نفس فلاتر تبويب البلاغات نفسه. ── */
-  function aiBalaghSearchReports_(q) {
+     نفس فلاتر تبويب البلاغات نفسه.
+     🔧 2026-08-25: الفلترة نفسها اتقلعت لدالة منفصلة (aiBalaghApplyFilters_)
+     من غير ترتيب ولا قصّ — عشان تُستخدم برضو في تجميع "أعلى مدارس بلاغات"
+     (aiBalaghSchoolAgg_) اللي محتاجة تحسب من *كل* الصفوف المطابقة للفلتر،
+     مش بس أول 80/250 صف بعد الترتيب بالتاريخ زي اللي بيترجع هنا. ── */
+  function aiBalaghApplyFilters_(rows, q) {
     q = q || {};
-    const idx = aiBalaghGetIndex_();
-    let rows = q.school ? aiBalaghGetReportsForSchool_(q.school) : idx.rows;
     if (q.status) rows = rows.filter((r) => String(r.status || "").includes(q.status));
     // 🏙️ فلتر المدينة — أُضيف 2026-08-23 عشان أسئلة عامة زي "بلاغات جدة"
     // من غير اسم مدرسة. بنفحص city (TBC مدينة) و linkedCity (مدينة المدرسة
@@ -17889,6 +18186,13 @@ function exportNashatExcel(rows) {
       const isHighRiskFn = window.__balaghIsHighRiskPriority || (() => false);
       rows = rows.filter((r) => isHighRiskFn(r.priority));
     }
+    return rows;
+  }
+  function aiBalaghSearchReports_(q) {
+    q = q || {};
+    const idx = aiBalaghGetIndex_();
+    let rows = q.school ? aiBalaghGetReportsForSchool_(q.school) : idx.rows;
+    rows = aiBalaghApplyFilters_(rows, q);
     const sortKey = q.sort || "date_desc";
     rows = [...rows].sort((a, b) => {
       const ta = a.creationDateObj ? a.creationDateObj.getTime() : -Infinity;
@@ -17911,6 +18215,63 @@ function exportNashatExcel(rows) {
     };
   }
 
+  /* ── 4.1) تجميع "أعلى/أقل مدارس بلاغات" — 2026-08-25، بناءً على طلب صريح:
+     كان السؤال العام (زي "أكتر 10 مدارس بلاغات في جدة") بيرجّع أحدث 80
+     بلاغ بس من غير أي تجميع، فمكانش فيه إجمالي حقيقي لكل مدرسة، والمساعد
+     كان بيتحفّظ (وبحق) عن الترتيب. هنا بنجمّع *كل* الصفوف المطابقة للفلتر
+     (مش عيّنة الـ80) حسب المدرسة فعلياً، وبنرجّع أعلى/أقل topN مدرسة بعدد
+     بلاغاتها الإجمالي — رقم حقيقي 100% من RAW_BALAGH، من غير أي تخمين.
+
+     2026-08-25 (توسيع): "أقل مدارس بلاغات" مختلفة جوهرياً عن "أعلى" — لازم
+     تشمل كمان المدارس اللي مالهاش أي بلاغ خالص (صفر)، وإلا الترتيب هيبقى
+     مضلّل (يقارن بس بين المدارس اللي عندها بلاغات، ويتجاهل الأفضل أداءً
+     فعلياً). لو opts.leastMode=true و opts.population اتمرّر (كل مدارس
+     النطاق المطلوب — كل اللوحة أو مدينة بعينها)، بندمج المدارس اللي
+     مالهاش صفوف في rows أصلاً بعدد صفر قبل الترتيب التصاعدي. ── */
+  function aiBalaghTallyBySchool_(rows) {
+    const byId = new Map(); // key: schoolKey (أو الاسم لو مفيش) → { مدرسة, الرقم_الوزاري, المدينة, إجمالي_البلاغات, مفتوحة, مغلقة, عاجلة }
+    const isHighRiskFn = window.__balaghIsHighRiskPriority || (() => false);
+    rows.forEach((r) => {
+      const name = r.linkedSchoolName || r.schoolName || "غير محدد";
+      const key = r.schoolKey || name;
+      if (!byId.has(key)) {
+        byId.set(key, { مدرسة: name, الرقم_الوزاري: r.linkedMinId || r.schoolNumber || null, المدينة: r.city || r.linkedCity || null, إجمالي_البلاغات: 0, مفتوحة: 0, مغلقة: 0, عاجلة: 0 });
+      }
+      const o = byId.get(key);
+      o.إجمالي_البلاغات++;
+      if (r.isOpen) o.مفتوحة++;
+      if (r.isClosed) o.مغلقة++;
+      if (isHighRiskFn(r.priority)) o.عاجلة++;
+    });
+    return byId;
+  }
+  function aiBalaghSchoolAgg_(rows, topN, opts) {
+    opts = opts || {};
+    const byId = aiBalaghTallyBySchool_(rows);
+    // 🟢 وضع "أقل مدارس بلاغات" — ندمج مدارس النطاق (population) اللي
+    // مالهاش أي صف في rows أصلاً بعدد صفر، عشان الترتيب التصاعدي يبقى
+    // معناه فعلاً "الأفضل أداءً" مش بس "أقل مدرسة من ضمن اللي اتشتكى منها".
+    if (opts.leastMode && Array.isArray(opts.population)) {
+      opts.population.forEach((s) => {
+        const key = s.schoolKey || s.minId || s.name;
+        if (!key || byId.has(key)) return;
+        byId.set(key, { مدرسة: s.name, الرقم_الوزاري: s.minId || null, المدينة: s.city || null, إجمالي_البلاغات: 0, مفتوحة: 0, مغلقة: 0, عاجلة: 0 });
+      });
+    }
+    const all = [...byId.values()].sort((a, b) =>
+      opts.leastMode ? a.إجمالي_البلاغات - b.إجمالي_البلاغات : b.إجمالي_البلاغات - a.إجمالي_البلاغات
+    );
+    return {
+      إجمالي_البلاغات_المطابقة_للفلتر: rows.length,
+      عدد_المدارس_المتأثرة: all.length,
+      [opts.leastMode ? "أقل_مدارس" : "أعلى_مدارس"]: all.slice(0, topN),
+      note: opts.leastMode
+        ? "هذا التجميع تصاعدي (الأقل بلاغات أولاً) ويشمل المدارس اللي مالهاش أي بلاغ خالص (إجمالي_البلاغات=0) ضمن نفس نطاق الفلتر (كل اللوحة أو مدينة الفلتر إن وُجدت) — عدد_المدارس_المتأثرة هنا يعني كل مدارس النطاق، مش بس اللي عندها بلاغات."
+        : "هذا التجميع محسوب من كل البلاغات المطابقة للفلتر (إجمالي_البلاغات_المطابقة_للفلتر) وليس من عيّنة محدودة — رقم إجمالي_البلاغات لكل مدرسة هنا هو العدد الحقيقي الكامل، يصلح للترتيب والاستشهاد به مباشرة.",
+      source: "RAW_BALAGH",
+    };
+  }
+
   /* ── 4.5) نظرة عامة ذكية على كل البلاغات لما مفيش مدرسة محددة في
      السؤال — أُضيفت 2026-08-23 بطلب صريح من المستخدم: عاوز الـ AI "يقرأ
      كل شيت البلاغات" ويجاوب أي سؤال عام (مش بس عن مدرسة بعينها). قبل كده
@@ -17920,6 +18281,255 @@ function exportNashatExcel(rows) {
      بيها لو اتكشف أي فلتر، (2) في كل الأحوال نرجّع كمان إحصائيات إجمالية
      شاملة (توزيعات كاملة + اتجاه شهري) عشان أي سؤال عام — حتى لو مفيهوش
      كلمة فلترة واضحة — يلاقي بيانات حقيقية كافية. ── */
+  /* ── تجميع "توزيع حسب قيمة" (فئة/فئة فرعية/أولوية/إلخ) من *كل* الصفوف
+     المُمرَّرة (مش عيّنة الـ80) — قابلة لإعادة الاستخدام مع أي مجموعة صفوف
+     (كل البلاغات، أو صفوف مفلترة بالكامل حسب مدينة/حالة/فئة/إلخ). بترجّع
+     كمان عدد القيم الفريدة الكلي وإجمالي السجلات اللي ليها قيمة، عشان
+     الموديل يقدر يوضّح إن ده رقم كامل ومش عيّنة زمنية. 2026-08-25 */
+  function aiBalaghCountBy_(rowsArr, key, topN) {
+    const n = topN || 15;
+    const m = {};
+    let withValue = 0;
+    (rowsArr || []).forEach((r) => {
+      const v = r[key];
+      if (v) { m[v] = (m[v] || 0) + 1; withValue++; }
+    });
+    const entries = Object.entries(m).sort((a, b) => b[1] - a[1]);
+    return {
+      القيم: entries.slice(0, n).map(([k, v]) => ({
+        القيمة: k,
+        العدد: v,
+        النسبة_المئوية: withValue ? +((v / withValue) * 100).toFixed(1) : null,
+      })),
+      عدد_القيم_الفريدة_الكلي: entries.length,
+      إجمالي_السجلات_التي_لها_قيمة: withValue,
+    };
+  }
+
+  /* ── تحليل تكرار الكلمات في نص وصف البلاغ الحر (problemDescription) عبر
+     *كل* الصفوف المُمرَّرة — لأسئلة زي "أكتر الأعطال/الكلمات تكراراً في
+     وصف البلاغات". محسوب فعلياً في JS من كل نصوص الوصف (مش محتاج حقن كل
+     الـ85,895 نص وصف كامل في الـ prompt)، فبيرجّع رقم حقيقي دقيق مش تخمين
+     من عيّنة. 2026-08-25 */
+  const AI_BALAGH_STOPWORDS_ = new Set([
+    "من", "في", "على", "الي", "إلى", "عن", "هذا", "هذه", "ذلك", "تلك", "التي", "الذي",
+    "اللذين", "اللتين", "الذين", "اللواتي", "او", "أو", "ما", "لا", "لم", "لن", "قد",
+    "كان", "كانت", "يكون", "تكون", "يوجد", "توجد", "بها", "به", "لها", "له", "لهم",
+    "عدم", "غير", "جدا", "جداً", "تم", "يتم", "لدي", "لدى", "حيث", "حتي", "حتى",
+    "ثم", "بعد", "قبل", "عند", "عندما", "كل", "بعض", "ان", "أن", "إن", "هو", "هي",
+    "هم", "انه", "أنه", "انها", "أنها", "يا", "نحن", "انتم", "أنتم", "مع", "بين",
+    "داخل", "خارج", "فوق", "تحت", "ايضا", "أيضا", "أيضاً", "جميع", "اكثر", "أكثر",
+    "اقل", "أقل", "بشكل", "بسبب", "نتيجة", "رقم", "البلاغ", "بلاغ", "المدرسة",
+    "مدرسة", "وجود", "الرجاء", "رجاء", "فضلا", "فضلاً", "هناك", "منها", "فيها",
+    "عليها", "لكن", "لان", "لأن", "الان", "الآن", "سوف", "لقد", "نفس", "كافه",
+    "كافة", "جميعها", "يرجى", "برجاء", "الموضوع", "بخصوص", "بشان", "بشأن",
+  ]);
+
+  // 🔧 2026-08-25: توحيد الصيغ/المرادفات المختلفة لنفس الكلمة قبل العدّ —
+  // من غير كده "تكييف"/"مكيف"/"التكييف" هتظهر كـ3 كلمات منفصلة في النتيجة
+  // بدل كلمة واحدة موحّدة بعددها الحقيقي الكامل. المفاتيح والقيم هنا بصيغة
+  // ما بعد fcbNormalizeArabic (كل التاء المربوطة ة→ه، وكل صور الألف أ/إ/آ→ا).
+  // ⚠️ الكلمات هنا بالصيغة *بعد* fcbStripAl_ (شيل "أل" التعريف) — يعني
+  // "التكييف"/"المكيف" بيوصلوا هنا وهم أصلاً "تكييف"/"مكيف" (اتشالت الألف
+  // واللام قبل كده)، فمفيش داعي لمفاتيح بادئة بـ"ال" هنا؛ لو حد اتضاف
+  // بالغلط هيفضل ميت (محدش هيوصله أبداً).
+  const AI_BALAGH_SYNONYMS_ = {
+    "مكيف": "تكييف", "مكيفات": "تكييف", "تكييفات": "تكييف",
+    "تسريب": "تسرب", "تسربات": "تسرب", "تنقيط": "تسرب", "نقط": "تسرب",
+    "اضاءات": "اضاءه", "اناره": "اضاءه",
+    "تماس": "تماس_كهربائي",
+    "مصرف": "صرف", "بياره": "صرف", "بيارات": "صرف",
+  };
+  function aiBalaghCanonicalWord_(word) {
+    return AI_BALAGH_SYNONYMS_[word] || word;
+  }
+
+  // 🔧 توكينايزيشن موحّد يُستخدم لتحليل الكلمات والعبارات معاً، عشان
+  // الاتنين يشتغلوا على نفس القاموس المطبّع (تطبيع عربي → تقسيم كلمات →
+  // شيل "أل" التعريف → شيل كلمات الوقف → توحيد المرادفات).
+  function aiBalaghTokenize_(text) {
+    return fcbNormalizeArabic(text)
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(fcbStripAl_)
+      .filter((w) => w.length >= 3 && !AI_BALAGH_STOPWORDS_.has(w))
+      .map(aiBalaghCanonicalWord_);
+  }
+  function aiBalaghBuildNgrams_(tokens, size) {
+    const out = [];
+    for (let i = 0; i <= tokens.length - size; i++) out.push(tokens.slice(i, i + size).join(" "));
+    return out;
+  }
+
+  /* ── تحليل تكرار الكلمات المفردة (بعد توحيد المرادفات) عبر *كل* الصفوف
+     المُمرَّرة — محسوب فعلياً في JS من كل نصوص الوصف (مش محتاج حقن كل
+     نصوص الوصف كاملة في الـ prompt)، فبيرجّع رقم حقيقي دقيق مش تخمين من
+     عيّنة. 2026-08-25 */
+  var __aiBalaghWordFreqCache = null;
+  function aiBalaghWordFreq_(rowsArr, field, topN) {
+    const n = topN || 30;
+    // كاش بسيط مربوط بنفس مرجع مصفوفة الصفوف (بيتغيّر بس لما تتحدّث بيانات
+    // البلاغات فعلياً) — عشان ما نعيدش تحليل نص كل الـ85 ألف بلاغ في كل
+    // سؤال عام جديد من المستخدم.
+    if (__aiBalaghWordFreqCache && __aiBalaghWordFreqCache.srcRows === rowsArr && __aiBalaghWordFreqCache.field === field) {
+      return __aiBalaghWordFreqCache.result(n);
+    }
+    const m = {};
+    let docsWithText = 0;
+    (rowsArr || []).forEach((r) => {
+      const txt = r[field];
+      if (!txt) return;
+      docsWithText++;
+      const uniqueTokens = new Set(aiBalaghTokenize_(txt)); // عدّ مرة واحدة لكل بلاغ حتى لو الكلمة اتكررت جوه نفس الوصف
+      uniqueTokens.forEach((w) => { m[w] = (m[w] || 0) + 1; });
+    });
+    const entries = Object.entries(m).sort((a, b) => b[1] - a[1]);
+    const build = (topK) => ({
+      الكلمات: entries.slice(0, topK).map(([k, v]) => ({
+        الكلمة: k.replace(/_/g, " "),
+        عدد_البلاغات: v,
+        النسبة_المئوية: docsWithText ? +((v / docsWithText) * 100).toFixed(1) : null,
+      })),
+      عدد_الكلمات_الفريدة_الكلي: entries.length,
+      عدد_البلاغات_التي_لها_وصف_نصي: docsWithText,
+      ملاحظة: "العدد = عدد البلاغات المختلفة التي احتوى وصفها على هذه الكلمة (وليس عدد مرات التكرار الإجمالي)، محسوب فعلياً من كل البلاغات التي لها نص وصف، وليس عيّنة. الصيغ المتشابهة (مكيف/تكييف/التكييف مثلاً) موحّدة في كلمة واحدة.",
+    });
+    __aiBalaghWordFreqCache = { srcRows: rowsArr, field, result: build };
+    return build(n);
+  }
+
+  /* ── تحليل تكرار العبارات (كلمتين/ثلاث كلمات متتالية) — أدق من الكلمة
+     المفردة في توضيح المشكلة (مثال: "تسرب مياه" أوضح من "مياه" لوحدها).
+     2026-08-25 */
+  var __aiBalaghPhraseFreqCache = null;
+  function aiBalaghPhraseFreq_(rowsArr, field, topN) {
+    const n = topN || 30;
+    if (__aiBalaghPhraseFreqCache && __aiBalaghPhraseFreqCache.srcRows === rowsArr && __aiBalaghPhraseFreqCache.field === field) {
+      return __aiBalaghPhraseFreqCache.result(n);
+    }
+    const m = {};
+    let docsWithText = 0;
+    (rowsArr || []).forEach((r) => {
+      const txt = r[field];
+      if (!txt) return;
+      docsWithText++;
+      const tokens = aiBalaghTokenize_(txt);
+      const phrases = new Set([...aiBalaghBuildNgrams_(tokens, 2), ...aiBalaghBuildNgrams_(tokens, 3)]);
+      phrases.forEach((p) => { m[p] = (m[p] || 0) + 1; });
+    });
+    const entries = Object.entries(m).sort((a, b) => b[1] - a[1]);
+    const build = (topK) => ({
+      العبارات: entries.slice(0, topK).map(([k, v]) => ({
+        العبارة: k.replace(/_/g, " "),
+        عدد_البلاغات: v,
+        النسبة_المئوية: docsWithText ? +((v / docsWithText) * 100).toFixed(1) : null,
+      })),
+      عدد_العبارات_الفريدة_الكلي: entries.length,
+      عدد_البلاغات_التي_لها_وصف_نصي: docsWithText,
+      ملاحظة: "عبارات من كلمتين أو ثلاث كلمات متتالية (بعد شيل كلمات الوقف)، محسوبة من كل البلاغات وليس عيّنة. العدد = عدد البلاغات المختلفة التي ظهرت فيها العبارة.",
+    });
+    __aiBalaghPhraseFreqCache = { srcRows: rowsArr, field, result: build };
+    return build(n);
+  }
+
+  /* ── تصنيف الأعطال (مش مجرد عدّ كلمات) — مطابقة نمطية (regex) على نص
+     الوصف المطبّع، بتحوّل الوصف الحر لعطل+نظام مفهومين، عشان "أكتر
+     الأعطال تكراراً" تجاوب بأعطال حقيقية (زي "تسرب مياه"/"تعطل تكييف")
+     مش كلمات مبعثرة. القاموس مبني على أشهر أعطال منشآت مدرسية ويمكن
+     توسيعه لاحقاً (أبواب/نوافذ/أرضيات/خزانات/مضخات/طفايات حريق/مصاعد).
+     الأنماط مكتوبة بالصيغة بعد fcbNormalizeArabic (ة→ه، أ/إ/آ→ا). 2026-08-25 */
+  const AI_BALAGH_FAULT_PATTERNS_ = [
+    { fault: "تعطل التكييف", system: "التكييف", patterns: [
+      // ⚠️ "مكيفات" (جمع) بتاخد فعل بصيغة الجمع/المؤنث "لا تعمل" مش "لا
+      // يعمل" — لازم الصيغتين وإلا بلاغات الجمع ما تتصنّفش (2026-08-25).
+      /(تكييف|مكيف)[\s\S]{0,15}(تعطل|عطلان|لا يعمل|لايعمل|لا تعمل|لاتعمل|توقف|خربان|معطل)/,
+      /(تعطل|عطلان|لا يعمل|لايعمل|لا تعمل|لاتعمل|توقف|خربان|معطل)[\s\S]{0,15}(تكييف|مكيف)/,
+    ]},
+    { fault: "ضعف تبريد التكييف", system: "التكييف", patterns: [
+      /(ضعف|قله|عدم)[\s\S]{0,10}تبريد/,
+      /(تكييف|مكيف)[\s\S]{0,15}(لا يبرد|لايبرد|حار|ضعيف)/,
+    ]},
+    { fault: "تسرب مياه", system: "شبكة المياه", patterns: [
+      /(تسرب|تسريب|تنقيط|نقط)[\s\S]{0,15}(مياه|ماء)/,
+      /(مياه|ماء)[\s\S]{0,15}(تسرب|تسريب|تنقيط)/,
+    ]},
+    { fault: "انسداد الصرف", system: "شبكة الصرف", patterns: [
+      /(انسداد|مسدود|مسدوده)[\s\S]{0,15}(صرف|مجاري|بياره)/,
+      /(صرف|مجاري|بياره)[\s\S]{0,15}(انسداد|مسدود|مسدوده|ممتلئ|طافح)/,
+    ]},
+    { fault: "عطل إنارة", system: "الكهرباء", patterns: [
+      // "لا توجد اضاءة"/"انقطاع الإنارة" صيغة شائعة بنفس معنى "تعطل" —
+      // لازم تتغطى برضه مش بس "تعطل/احتراق" الصريحة (2026-08-25).
+      /(اضاءه|اناره|لمبه|لمبات)[\s\S]{0,15}(تعطل|لا تعمل|لاتعمل|احتراق|منطفئه|فيوز|لا توجد|لا يوجد|منقطعه|مقطوعه)/,
+      /(تعطل|لا تعمل|لاتعمل|احتراق|فيوز|لا توجد|لا يوجد|منقطعه|مقطوعه)[\s\S]{0,15}(اضاءه|اناره|لمبه)/,
+    ]},
+    { fault: "تماس كهربائي", system: "الكهرباء", patterns: [
+      /تماس[\s\S]{0,10}كهرب/,
+      /كهرب[\s\S]{0,10}تماس/,
+    ]},
+    { fault: "عطل باب أو قفل", system: "الأبواب والنوافذ", patterns: [
+      /(باب|ابواب|قفل|كالون)[\s\S]{0,15}(تعطل|كسر|مكسور|خربان|لا يقفل|لايقفل|لا تقفل|لاتقفل|عطلان)/,
+    ]},
+    { fault: "زجاج مكسور", system: "الأبواب والنوافذ", patterns: [
+      /(زجاج|شباك|نافذه)[\s\S]{0,15}(كسر|مكسور|مهشم)/,
+    ]},
+    { fault: "تشقق أو تقشر دهانات", system: "التشطيبات والدهانات", patterns: [
+      /(دهان|دهانات|حوائط|جدار|جدران)[\s\S]{0,15}(تقشر|تشقق|شرخ|متضرر)/,
+    ]},
+    { fault: "تسرب سقف أو تشقق مبنى", system: "الهيكل الإنشائي", patterns: [
+      /(سقف|اسقف)[\s\S]{0,15}(تسرب|تسريب|شرخ|تشقق)/,
+    ]},
+    { fault: "عطل دورة مياه", system: "دورات المياه", patterns: [
+      /(دوره مياه|حمام|حمامات|مرحاض)[\s\S]{0,15}(تعطل|عطلان|لا يعمل|لايعمل|لا تعمل|لاتعمل|مسدود|خربان)/,
+    ]},
+  ];
+  var __aiBalaghFaultCache = null;
+  function aiBalaghExtractFaults_(rowsArr, field, topN) {
+    const n = topN || 30;
+    if (__aiBalaghFaultCache && __aiBalaghFaultCache.srcRows === rowsArr && __aiBalaghFaultCache.field === field) {
+      return __aiBalaghFaultCache.result(n);
+    }
+    const m = new Map();
+    let docsWithText = 0;
+    (rowsArr || []).forEach((r) => {
+      const raw = r[field];
+      if (!raw) return;
+      docsWithText++;
+      const normed = fcbNormalizeArabic(raw);
+      AI_BALAGH_FAULT_PATTERNS_.forEach((rule) => {
+        // كل بلاغ يُحسب مرة واحدة لكل عطل مطابق (مش عدد مرات التكرار
+        // الإجمالي)، حتى لو أنماطه المتعددة طابقت أكتر من مرة في نفس النص.
+        const matched = rule.patterns.some((p) => p.test(normed));
+        if (!matched) return;
+        const key = rule.system + "|" + rule.fault;
+        if (!m.has(key)) m.set(key, { النظام: rule.system, العطل: rule.fault, عدد_البلاغات: 0 });
+        m.get(key).عدد_البلاغات++;
+      });
+    });
+    const entries = [...m.values()].sort((a, b) => b.عدد_البلاغات - a.عدد_البلاغات);
+    const build = (topK) => ({
+      الأعطال: entries.slice(0, topK).map((e) => ({
+        ...e,
+        النسبة_المئوية: docsWithText ? +((e.عدد_البلاغات / docsWithText) * 100).toFixed(1) : null,
+      })),
+      عدد_تصنيفات_الأعطال_المكتشفة: entries.length,
+      عدد_البلاغات_التي_لها_وصف_نصي: docsWithText,
+      ملاحظة: "تصنيف مبني على مطابقة نمطية (regex) لعبارات شائعة في نص الوصف، وليس عدّ كلمات مفردة — كل بلاغ يُحسب مرة واحدة لكل عطل مطابق (وقد يُحسب لأكثر من عطل لو وصفه ذكر أكثر من مشكلة). القاموس الحالي يغطي أشهر أنواع أعطال المنشآت المدرسية وقابل للتوسعة لاحقاً (أبواب/نوافذ/أرضيات/خزانات/مضخات/طفايات حريق/مصاعد). بلاغ لم يُطابق أي نمط معروف لا يظهر هنا — لتغطية أوسع راجع 'أكثر_الكلمات_تكراراً' أو 'أكثر_العبارات_تكراراً'.",
+    });
+    __aiBalaghFaultCache = { srcRows: rowsArr, field, result: build };
+    return build(n);
+  }
+
+  /* ── نقطة الدخول الموصى بها: تحليل شامل واحد يجمع كلمات + عبارات + أعطال
+     مصنّفة لنفس مجموعة الصفوف بدل استدعاء الثلاث دوال منفصلة. 2026-08-25 */
+  function aiBalaghAnalyzeDescriptions_(rowsArr, field, topN) {
+    return {
+      أكثر_الكلمات_تكراراً: aiBalaghWordFreq_(rowsArr, field, topN),
+      أكثر_العبارات_تكراراً: aiBalaghPhraseFreq_(rowsArr, field, topN),
+      أكثر_الأعطال_المصنّفة_تكراراً: aiBalaghExtractFaults_(rowsArr, field, topN),
+    };
+  }
+
   function aiBalaghGeneralOverview_(userText) {
     const idx = aiBalaghGetIndex_();
     const rows = idx.rows;
@@ -17933,6 +18543,10 @@ function exportNashatExcel(rows) {
     if (/مغلق|منتهي|تم حله|تم الحل|\bclosed\b/i.test(t)) statusFilter = "closed";
     else if (/مفتوح|قيد التنفيذ|لسه شغال|\bopen\b/i.test(t)) statusFilter = "open";
     const urgentFilter = /عاجل|طارئ|حرج|خطور[ةه]|urgent|critical/i.test(t);
+    // ⏱️ 2026-08-25: فلتر "متأخر SLA" — منفصل عن حالة مفتوح/مغلق (بلاغ ممكن
+    // يكون مفتوح ومتأخر SLA مع بعض)، بيطابق نفس قيمة isOverdue الحقيقية
+    // (slaStatus === "تم اختراقه") المستخدمة في باقي المحرك.
+    const slaOverdueFilter = /متأخر[ةه]?\s*sla|sla\s*متأخر[ةه]?|تجاوز.*sla|اخترق.*sla|overdue/i.test(t);
 
     // 🏷️ اكتشاف فئة رئيسية مذكورة — من قيم الفئات الحقيقية الموجودة فعلياً
     // في البيانات (مش قائمة ثابتة مكتوبة يدوياً) عشان تفضل صحيحة مهما اتغيّرت
@@ -17940,17 +18554,65 @@ function exportNashatExcel(rows) {
     const knownCategories = [...new Set(rows.map((r) => r.category).filter(Boolean))].sort((a, b) => b.length - a.length);
     const categoryMatch = knownCategories.find((c) => t.includes(c)) || null;
 
-    const hasFilter = !!(cityMatch || statusFilter || urgentFilter || categoryMatch);
+    // 📉 2026-08-25: "أقل مدارس بلاغات" (Least) لازم تختلف جوهرياً عن
+    // "أعلى" — بتشمل المدارس اللي مالهاش بلاغات خالص. بنكشفها من كلمات
+    // صريحة عشان الافتراضي يفضل "أعلى" (الأكثر شيوعاً في الأسئلة).
+    const leastFilter = /أقل|الأقل|أدنى|least|fewest/i.test(t);
+
+    // 📝 2026-08-25: سؤال عن "أكتر الأعطال/الكلمات/المشاكل تكراراً" من نص
+    // وصف البلاغ الحر — يحتاج تحليل كلمات فعلي (aiBalaghWordFreq_) مش
+    // استنتاج من عيّنة أحدث 80 بلاغ.
+    const wordFreqRequested = /أعطال|كلم[ةه]|كلمات|أكثر\s*تكرار|الأكثر\s*تكرار|متكرر[ةه]?|شيوع|أكثر\s*شيوعاً|مشاكل\s*متكرر/i.test(t);
+
+    const hasFilter = !!(cityMatch || statusFilter || urgentFilter || categoryMatch || slaOverdueFilter);
+    // العدد المطلوب من المدارس في الترتيب (لو مذكور صراحة في السؤال — مثلاً
+    // "أكتر 10 مدارس" أو "أعلى 20") — 2026-08-25
+    const topNSchools = fcbParseRequestedTopN(t, 10);
+    // 🎯 نطاق مدارس "التعبئة بصفر" لوضع الأقل — كل مدارس اللوحة، أو مدارس
+    // مدينة الفلتر بس لو اتذكرت مدينة، عشان الترتيب التصاعدي يشمل فعلياً
+    // المدارس اللي مالهاش بلاغ واحد ضمن نفس النطاق المطلوب.
+    const leastPopulation = leastFilter
+      ? (typeof RAW !== "undefined" && Array.isArray(RAW) ? RAW : [])
+          .filter((r) => !cityMatch || (r.city && r.city.includes(cityMatch)))
+          .map((r) => ({ schoolKey: r.minId ? "ID::" + r.minId : null, minId: r.minId, name: r.name, city: r.city }))
+      : null;
     let filtered = null;
+    let topSchoolsFiltered = null;
+    let categoryBreakdownFiltered = null;
     if (hasFilter) {
-      filtered = aiBalaghSearchReports_({
+      const filterQ = {
         city: cityMatch,
         category: categoryMatch,
         openOnly: statusFilter === "open",
         closedOnly: statusFilter === "closed",
         urgentOnly: urgentFilter,
-        limit: 80,
-      });
+        sla: slaOverdueFilter ? "تم اختراقه" : null,
+      };
+      filtered = aiBalaghSearchReports_({ ...filterQ, limit: 80 });
+      // 🎯 2026-08-25: تجميع "أعلى/أقل مدارس بلاغات" من *كل* الصفوف المطابقة
+      // للفلتر (مش عيّنة الـ80 المرتبة بالتاريخ فوق) — عشان أسئلة زي "أكتر
+      // 10 مدارس بلاغات في جدة" تتجاوب برقم إجمالي حقيقي لكل مدرسة، مش
+      // بتخمين من عيّنة حديثة الزمن بس. راجع aiBalaghSchoolAgg_.
+      const allFilteredRows = aiBalaghApplyFilters_(idx.rows, filterQ);
+      topSchoolsFiltered = aiBalaghSchoolAgg_(allFilteredRows, topNSchools, { leastMode: leastFilter, population: leastPopulation });
+      // 🎯 2026-08-25: نفس المنطق لكن لتوزيع الفئة/الفئة الفرعية *ضمن نطاق
+      // الفلتر نفسه* (زي "أكتر الفئات الفرعية تكراراً في جدة") — محسوب من
+      // كل الصفوف المطابقة للفلتر مش عيّنة الـ80.
+      categoryBreakdownFiltered = {
+        فئة_رئيسية: aiBalaghCountBy_(allFilteredRows, "category"),
+        فئة_فرعية: aiBalaghCountBy_(allFilteredRows, "subCategory"),
+        إجمالي_البلاغات_ضمن_الفلتر: allFilteredRows.length,
+        // 🎯 2026-08-25: بس لو السؤال فعلاً عن كلمات/عبارات/أعطال متكررة —
+        // تحليل نص الوصف لصفوف مفلترة مش متكاش زي النطاق العالمي، فبنحسبه
+        // بس وقت الحاجة الفعلية. يشمل كلمات مفردة + عبارات (2-3 كلمات) +
+        // أعطال مصنّفة (regex) — راجع aiBalaghAnalyzeDescriptions_.
+        تحليل_نص_وصف_البلاغات: wordFreqRequested ? aiBalaghAnalyzeDescriptions_(allFilteredRows, "problemDescription") : null,
+      };
+    } else if (leastFilter) {
+      // 📉 "أقل مدارس بلاغات" من غير أي فلتر تاني (لا مدينة ولا حالة) —
+      // لسه محتاجين نمرّ بمسار التجميع (مش بس الإحصائيات الإجمالية تحت)
+      // عشان يشمل صفر البلاغات لكل مدارس اللوحة.
+      topSchoolsFiltered = aiBalaghSchoolAgg_(idx.rows, topNSchools, { leastMode: true, population: leastPopulation });
     }
 
     // 📊 إحصائيات إجمالية شاملة — بتترجع دايماً بصرف النظر عن وجود فلتر،
@@ -17959,11 +18621,6 @@ function exportNashatExcel(rows) {
     const open = rows.filter((r) => r.isOpen).length;
     const closed = rows.filter((r) => r.isClosed).length;
     const overdue = rows.filter((r) => r.isOverdue).length;
-    const countBy = (key) => {
-      const m = {};
-      rows.forEach((r) => { const v = r[key]; if (v) m[v] = (m[v] || 0) + 1; });
-      return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => ({ القيمة: k, العدد: v }));
-    };
     const byMonth = {};
     rows.forEach((r) => {
       if (!r.creationDateObj) return;
@@ -17972,26 +18629,59 @@ function exportNashatExcel(rows) {
     });
     const monthlyTrend = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([k, v]) => ({ الشهر: k, العدد: v }));
 
+    const baseNote = leastFilter
+      ? "السؤال عن *أقل* مدارس بلاغات — استخدم قسم 'أعلى_مدارس_ضمن_الفلتر' (بيحتوي مفتاح 'أقل_مدارس' مش 'أعلى_مدارس' في وضع الترتيب التصاعدي ده). القائمة هنا بتشمل فعلياً المدارس اللي عندها صفر بلاغات ضمن نفس النطاق (كل اللوحة أو مدينة appliedFilters.مدينة لو موجودة) — دي أفضل المدارس أداءً فعلاً، مش بس أقل مدرسة من ضمن اللي اشتكى منها حد."
+      : hasFilter
+        ? "تم اكتشاف فلتر تلقائياً من نص السؤال (مذكور في appliedFilters) — لو السؤال عن ترتيب/أعلى مدارس استخدم قسم 'أعلى_مدارس_ضمن_الفلتر' (رقم إجمالي حقيقي كامل لكل مدرسة، وليس عيّنة)، ولو عن بلاغات فردية استخدم 'نتيجة_مفلترة'، والإحصائيات_الإجمالية كسياق عام إضافي."
+        : "لا توجد مدرسة ولا فلتر واضح في السؤال — هذه إحصائيات إجمالية شاملة عبر كل المدارس (وليست خاصة بمدرسة بعينها). لو المستخدم يقصد مدرسة معينة، اسأله يحددها. لو سأل عن أعلى/أكتر مدارس بلاغات بدون تحديد مدينة أو فلتر، استخدم الإحصائيات_الإجمالية.أعلى_مدارس_بلاغات_عالمياً (رقم إجمالي حقيقي كامل لكل مدرسة عبر كل المدن).";
+    // 📝 2026-08-25: توضيح صريح لأسئلة الفئة/الفئة الفرعية/كلمات الوصف
+    // المتكررة — عشان الموديل ميرجعش يتحفّظ بحجة "عيّنة الـ80 مش كافية"
+    // رغم إن التوزيعات دي محسوبة فعلياً من كل البلاغات مش من العيّنة.
+    const catNote = " ⚠️ لأي سؤال عن أكتر فئة/فئة فرعية تكراراً: استخدم "
+      + (hasFilter ? "توزيع_الفئات_ضمن_الفلتر (محسوب من كل البلاغات المطابقة للفلتر)" : "الإحصائيات_الإجمالية.توزيع_حسب_الفئة_الرئيسية/الفرعية (محسوبة من كل البلاغات)")
+      + " مباشرة بثقة كاملة — دي مش عيّنة الـ80 في 'نتيجة_مفلترة'، دي أرقام حقيقية شاملة."
+      + (wordFreqRequested
+          ? " ولأي سؤال عن أكتر الأعطال/الكلمات/العبارات تكراراً في نص وصف البلاغ نفسه: استخدم "
+            + (hasFilter ? "توزيع_الفئات_ضمن_الفلتر.تحليل_نص_وصف_البلاغات" : "الإحصائيات_الإجمالية.تحليل_نص_وصف_البلاغات")
+            + " — فيه 3 مستويات: .أكثر_الأعطال_المصنّفة_تكراراً (الأدق — أعطال حقيقية زي 'تسرب مياه'، فضّله للسؤال عن 'أعطال')، .أكثر_العبارات_تكراراً (عبارات كلمتين-تلاتة)، .أكثر_الكلمات_تكراراً (كلمات مفردة). كل ده تحليل فعلي لكل نصوص الوصف (مش عيّنة، ومش تخمين)، فأجب مباشرة من غير أي اعتذار عن نقص بيانات."
+          : "");
     return {
       status: "ok",
-      note: hasFilter
-        ? "تم اكتشاف فلتر تلقائياً من نص السؤال (مذكور في appliedFilters) — استخدم بيانات القسم 'نتيجة_مفلترة' كإجابة مباشرة، والإحصائيات_الإجمالية كسياق عام إضافي."
-        : "لا توجد مدرسة ولا فلتر واضح في السؤال — هذه إحصائيات إجمالية شاملة عبر كل المدارس (وليست خاصة بمدرسة بعينها). لو المستخدم يقصد مدرسة معينة، اسأله يحددها.",
-      appliedFilters: hasFilter ? { مدينة: cityMatch, حالة: statusFilter, عاجل: urgentFilter || null, فئة: categoryMatch } : null,
+      note: baseNote + catNote,
+      appliedFilters: (hasFilter || leastFilter) ? { مدينة: cityMatch, حالة: statusFilter, عاجل: urgentFilter || null, فئة: categoryMatch, متأخر_SLA: slaOverdueFilter || null, الترتيب: leastFilter ? "الأقل أولاً" : "الأكثر أولاً" } : null,
       نتيجة_مفلترة: filtered,
+      أعلى_مدارس_ضمن_الفلتر: topSchoolsFiltered,
+      // 🎯 2026-08-25: توزيع الفئة/الفئة الفرعية ضمن نطاق appliedFilters نفسه
+      // (لو فيه فلتر) — محسوب من *كل* الصفوف المطابقة للفلتر، مش عيّنة الـ80.
+      // null لو مفيش فلتر (استخدم الإحصائيات_الإجمالية.توزيع_حسب_الفئة_* بدلاً).
+      توزيع_الفئات_ضمن_الفلتر: categoryBreakdownFiltered,
       الإحصائيات_الإجمالية: {
         إجمالي_البلاغات: total,
         مفتوحة: open,
         مغلقة: closed,
         متأخرة_SLA: overdue,
-        توزيع_حسب_الفئة_الرئيسية: countBy("category"),
-        توزيع_حسب_الفئة_الفرعية: countBy("subCategory"),
-        توزيع_حسب_الأولوية: countBy("priority"),
-        توزيع_حسب_الحالة: countBy("status"),
-        توزيع_حسب_حالة_SLA: countBy("slaStatus"),
-        توزيع_حسب_المدينة: countBy("city"),
-        توزيع_حسب_المقاول: countBy("contractor"),
+        // 🎯 2026-08-25: كل توزيعات القيم دي محسوبة من الـ 85,895+ بلاغ
+        // بالكامل (مش عيّنة أحدث 80) — يصح الاستشهاد بها مباشرة بثقة كاملة
+        // لأي سؤال عن "الأكثر تكراراً" على مستوى الفئة/الفئة الفرعية/إلخ.
+        توزيع_حسب_الفئة_الرئيسية: aiBalaghCountBy_(rows, "category"),
+        توزيع_حسب_الفئة_الفرعية: aiBalaghCountBy_(rows, "subCategory"),
+        توزيع_حسب_الأولوية: aiBalaghCountBy_(rows, "priority"),
+        توزيع_حسب_الحالة: aiBalaghCountBy_(rows, "status"),
+        توزيع_حسب_حالة_SLA: aiBalaghCountBy_(rows, "slaStatus"),
+        توزيع_حسب_المدينة: aiBalaghCountBy_(rows, "city"),
+        توزيع_حسب_المقاول: aiBalaghCountBy_(rows, "contractor"),
         الاتجاه_الشهري_آخر_12_شهر: monthlyTrend,
+        // 🎯 2026-08-25: أعلى مدارس بلاغات عالمياً (كل المدن) — دايماً متاح
+        // بصرف النظر عن وجود فلتر، عشان أسئلة زي "أكتر 10 مدارس بلاغات"
+        // من غير ذكر مدينة تتجاوب برقم حقيقي كامل مباشرة.
+        أعلى_مدارس_بلاغات_عالمياً: aiBalaghSchoolAgg_(rows, topNSchools),
+        // 🎯 2026-08-25: تحليل نص وصف البلاغات الحر — محسوب فعلياً من نص كل
+        // البلاغات (مش عيّنة)، لأسئلة زي "أكتر الأعطال/الكلمات تكراراً في
+        // وصف البلاغات". يشمل كلمات مفردة (بعد توحيد مرادفات زي مكيف/تكييف)
+        // + عبارات من كلمتين-تلاتة (أدق من الكلمة المفردة) + أعطال مصنّفة
+        // فعلياً (regex) لعطل+نظام حقيقيين. بيتحسب بس لو السؤال فعلاً عن كده
+        // (wordFreqRequested) — ومكاش بعد أول مرة فمش هيتكرر حسابه لأسئلة تانية.
+        تحليل_نص_وصف_البلاغات: wordFreqRequested ? aiBalaghAnalyzeDescriptions_(rows, "problemDescription") : null,
       },
       source: "RAW_BALAGH",
     };
@@ -18243,6 +18933,18 @@ function exportNashatExcel(rows) {
     detectIntent: aiBalaghDetectIntent_,
     isDataReady: aiBalaghIsDataReady_,
     resolve: aiBalaghResolve_,
+    // 🔧 2026-08-25: نظرة عامة/مفلترة + تجميع "أعلى مدارس بلاغات" — معروضة
+    // هنا كمان (بالإضافة لاستخدامها الداخلي في fcbAskOpenAI) عشان تبقى
+    // قابلة للاختبار/الاستخدام المباشر بدون الحاجة لمحاكاة استدعاء OpenAI كامل.
+    generalOverview: aiBalaghGeneralOverview_,
+    schoolAgg: aiBalaghSchoolAgg_,
+    countBy: aiBalaghCountBy_,
+    wordFreq: aiBalaghWordFreq_,
+    phraseFreq: aiBalaghPhraseFreq_,
+    extractFaults: aiBalaghExtractFaults_,
+    analyzeDescriptions: aiBalaghAnalyzeDescriptions_,
+    tokenize: aiBalaghTokenize_,
+    canonicalWord: aiBalaghCanonicalWord_,
   };
 
   function fcbDetectTopics(text) {
@@ -18258,7 +18960,11 @@ function exportNashatExcel(rows) {
       أنظمة:     /نظام|تكييف|كهرباء|سباكة|hvac|درجة.*نظام/i.test(t),
       تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t) || !!tajheezMatch,
       مدفوعات:   /دفع|مدفوع|متبقي|صرف.*ميزانية|payment/i.test(t),
-      أولويات:   /أولوي|حل|يستحق|أشد|أخطر|أهم|urgent/i.test(t),
+      // 🔧 2026-08-25: "أسوأ"/"الأسوأ"/"worst" كانت مش متعرّفة كسؤال أولويات
+      // خالص، فسؤال زي "أسوأ 10" كان بيقع بره الـ topic ده تمامًا وبالتالي
+      // بيوصله محرك الأولويات بالعدد الافتراضي الصغير (5) بدل العدد المطلوب
+      // فعليًا في السؤال — راجع fcbParseRequestedTopN اللي بتستخدم بعد كده.
+      أولويات:   /أولوي|حل|يستحق|أشد|أخطر|أهم|أسوأ|الأسوأ|سيئ|urgent|worst/i.test(t),
       طلاب:      /طالب|طلاب|عمر.*مبنى|مبنى.*قديم/i.test(t),
       قطع:       /قطع.*غيار|قطعة|spare/i.test(t) || !!sparePartMatch,
       مصاعد:     /مصعد|مصاعد|elevator/i.test(t),
@@ -18609,8 +19315,11 @@ function exportNashatExcel(rows) {
       base.المدفوعات = بدون;
     }
 
-    // ── أولويات: نضيف محرك الأولويات كامل بس لو سألها ──
-    const priorityData = topics.أولويات ? fcbBuildPriorityActions(10) : fcbBuildPriorityActions(5);
+    // ── أولويات: نضيف محرك الأولويات كامل بس لو سألها — العدد يتحدد من
+    // نص السؤال نفسه (مثلاً "أعلى 10 مدارس" أو "20 مدرسة") بدل سقف ثابت
+    // بـ10، عشان لو المستخدم طلب 15/20 يكون العدد الفعلي متوفر في السياق
+    // ومفيش داعي للنموذج يتحفّظ إن "البيانات مش كافية" ──
+    const priorityData = topics.أولويات ? fcbBuildPriorityActions(fcbParseRequestedTopN(userText, 20)) : fcbBuildPriorityActions(5);
 
     // ── بيانات خام إضافية لو السؤال يحتاجها بالتفصيل ──
     let extraContext = "";
@@ -19002,8 +19711,75 @@ function exportNashatExcel(rows) {
    لأي سؤال عام حتى لو مش مطابق 100% لفلتر واضح. لو appliedFilters ليها
    قيمة (مدينة/حالة/عاجل/فئة اتكشفت تلقائياً من نص سؤال المستخدم)، هيبقى
    فيه كمان قسم نتيجة_مفلترة (نفس شكل بيانات aiBalaghSearchReports_: total/
-   returned/rows لحد 80 صف) — استخدمه كإجابة مباشرة ومحددة للسؤال، ولو
-   total فيه أكبر من returned وضّح إن دي عيّنة مش كل النتائج.
+   returned/rows لحد 80 صف) — استخدمه لعرض أمثلة/بلاغات فردية، ولو total
+   فيه أكبر من returned وضّح إن دي عيّنة مش كل النتائج.
+   ⚠️ 3.1 أسئلة "أعلى/أكتر N مدرسة بلاغات" (زي "أكتر 10 مدارس بلاغات في
+   جدة" أو "أعلى 20 مدرسة الأكثر بلاغات"، أو نفس الفكرة بفلتر حالة/فئة/
+   عاجل/متأخر SLA بدل مدينة، أو أي تركيبة منهم مع بعض): ممنوع تستنتج
+   الترتيب من عيّنة نتيجة_مفلترة (دي مرتبة بالتاريخ مش بالعدد، وممكن
+   ماتغطيش كل البلاغات). استخدم بدل منها:
+     • لو فيه appliedFilters (مدينة/حالة/فئة/عاجل/متأخر_SLA — أي تركيبة):
+       قسم "أعلى_مدارس_ضمن_الفلتر" — فيه أعلى_مدارس (مصفوفة مرتبة تنازلياً
+       بـ إجمالي_البلاغات لكل مدرسة، محسوبة من *كل* البلاغات المطابقة
+       للفلتر بكل شروطه مع بعض مش عيّنة)، وكمان إجمالي_البلاغات_المطابقة_
+       للفلتر وعدد_المدارس_المتأثرة. ده الرقم الحقيقي الكامل ويصلح
+       للاستشهاد به مباشرة بثقة كاملة.
+     • لو مفيش فلتر خالص (سؤال عام بدون مدينة ولا حالة ولا فئة): الإحصائيات_
+       الإجمالية.أعلى_مدارس_بلاغات_عالمياً — نفس الشكل، لكن عبر كل
+       المدارس/المدن.
+   عدد الصفوف اللي بترجع في أعلى_مدارس بالفعل مطابق للعدد اللي طلبه
+   المستخدم في سؤاله (أو 10 افتراضياً لو محددش رقم) — اعرضهم كلهم مباشرة
+   بترتيبهم من غير أي تحفّظ عن "بيانات غير كافية"، لأنهم محسوبين من
+   الإجمالي الحقيقي فعلاً وليسوا عيّنة زمنية.
+   ⚠️ 3.2 أسئلة "أقل/أدنى N مدرسة بلاغات" (عكس 3.1 تماماً — زي "أقل 10
+   مدارس بلاغات" أو "أدنى 5 مدارس بلاغات في الرياض"): appliedFilters.
+   الترتيب هيكون "الأقل أولاً"، وقسم "أعلى_مدارس_ضمن_الفلتر" هيحتوي مفتاح
+   "أقل_مدارس" (مش "أعلى_مدارس") — مصفوفة تصاعدية تشمل *فعلياً* المدارس
+   اللي عندها صفر بلاغات خالص (مش بس أقل مدرسة من ضمن اللي اشتكى منها
+   حد)، ضمن نفس نطاق appliedFilters.مدينة لو موجودة وإلا كل اللوحة. دي
+   أفضل المدارس أداءً من ناحية البلاغات — اعرضهم بنفس الثقة الكاملة
+   المذكورة في 3.1، أرقامهم حقيقية 100%.
+   ⚠️ 3.3 أسئلة عن بلاغات "متأخرة SLA" تحديداً (زي "أكتر مدارس بلاغاتها
+   متأخرة SLA"): دي فلتر منفصل عن حالة مفتوح/مغلق (بلاغ ممكن يكون مفتوح
+   *ومتأخر* مع بعض) — appliedFilters.متأخر_SLA هيبقى true لو اتكشف، ونفس
+   منطق 3.1/3.2 بينطبق (أعلى_مدارس_ضمن_الفلتر محسوب من البلاغات المتأخرة
+   بس ضمن أي فلتر تاني مذكور مع بعض).
+   ⚠️ 3.4 أسئلة عن "أكتر فئة/فئة فرعية تكراراً" على مستوى البلاغات (زي "أكتر
+   الفئات الفرعية شيوعاً" أو "إيه أكتر نوع عطل بيتكرر"): ممنوع تستنتج من
+   عيّنة نتيجة_مفلترة (لحد 80 صف) — استخدم بدل منها:
+     • لو فيه appliedFilters (مدينة/حالة/فئة/عاجل/متأخر_SLA): قسم
+       "توزيع_الفئات_ضمن_الفلتر.فئة_رئيسية" أو ".فئة_فرعية" — محسوب من *كل*
+       البلاغات المطابقة للفلتر، وفيه عدد كل قيمة ونسبتها المئوية الحقيقية.
+     • لو مفيش فلتر: الإحصائيات_الإجمالية.توزيع_حسب_الفئة_الرئيسية أو
+       .توزيع_حسب_الفئة_الفرعية — نفس الشكل، لكن عبر كل البلاغات (85,000+).
+   استشهد بالأرقام دي مباشرة بثقة كاملة (فيها عدد_القيم_الفريدة_الكلي
+   وإجمالي_السجلات_التي_لها_قيمة يوضّحوا إنه احتساب كامل مش عيّنة) — من غير
+   أي تحفّظ عن "البيانات غير كافية" أو "عيّنة محدودة".
+   ⚠️ 3.5 أسئلة عن "أكتر الأعطال/الكلمات/العبارات/المشاكل تكراراً" في *نص
+   وصف البلاغ الحر* نفسه (مش في حقل الفئة المصنّف — زي "إيه أكتر كلمة
+   بتتكرر في وصف البلاغات" أو "أكتر الأعطال شيوعاً حسب وصف المستخدمين"):
+   ده تحليل فعلي لنصوص الوصف محسوب مسبقاً في الكود (مش محتاج حقن كل نصوص
+   الوصف كاملة في السياق، ولا هو تخمين من عيّنة) — استخدم قسم:
+     • لو فيه appliedFilters: "توزيع_الفئات_ضمن_الفلتر.تحليل_نص_وصف_البلاغات"
+     • لو مفيش فلتر: "الإحصائيات_الإجمالية.تحليل_نص_وصف_البلاغات"
+   وجواه 3 مستويات تفصيل — اختر الأنسب لصيغة السؤال:
+     • .أكثر_الأعطال_المصنّفة_تكراراً — الأدق والموصى به لسؤال عن "أعطال":
+       كل عنصر فيه النظام (تكييف/كهرباء/شبكة المياه/الصرف/إلخ) والعطل
+       بالاسم الحقيقي (زي "تسرب مياه"، "تعطل التكييف"، "تماس كهربائي")
+       وعدد البلاغات، محسوب بمطابقة نمطية على النص مش عدّ كلمات. القاموس
+       الحالي يغطي أشهر الأعطال ومش شامل 100% (بلاغ نادر الصياغة ممكن ما
+       يتصنّفش) — لو عدد_تصنيفات_الأعطال_المكتشفة قليل نسبة لإجمالي
+       البلاغات، وضّح إن فيه بلاغات تانية لغتها مختلفة ولم تُصنَّف، وارجع
+       لمستوى العبارات/الكلمات لتغطية أوسع بدل الافتراض إنها الصورة الكاملة.
+     • .أكثر_العبارات_تكراراً — عبارات من كلمتين-تلاتة (زي "تسرب مياه")،
+       أدق من الكلمة المفردة لكن مش مصنّفة لنظام/عطل رسمي.
+     • .أكثر_الكلمات_تكراراً — كلمات مفردة بعد توحيد المرادفات (مكيف/
+       تكييف/التكييف = كلمة واحدة)، للتغطية الأوسع.
+   كل مستوى فيه عدد البلاغات (عدد البلاغات المختلفة، مش تكرار إجمالي)
+   ونسبته المئوية من إجمالي البلاغات اللي ليها نص وصف — أرقام حقيقية
+   محسوبة من كل النصوص فعلياً. لو القيمة null معناها السؤال ماتكشفش
+   كـ"سؤال تحليل نصي" تلقائياً — وضّح إنك محتاج صياغة أوضح بدل الاعتذار
+   عن نقص البيانات.
 4. status = "not_ready": بيانات البلاغات لسه بتحمّل أو محصلش تحميلها.
    قل بوضوح إنها لسه مش جاهزة واقترح المحاولة تاني بعد لحظات — ممنوع
    تماماً اعتبار غياب البيانات = صفر بلاغات، وممنوع تقول "لا توجد بلاغات"
@@ -19019,6 +19795,16 @@ function exportNashatExcel(rows) {
    المتوسط) — لو المتوسط بدا مرتفع بشكل غير متوقع لمقاول معيّن، قارنه
    بالوسيط ووضّح الفرق. topSlaOutliers = أعلى 5 بلاغات SLA عبر كل
    المقاولين (للتشخيص) — استخدمها لو المستخدم سأل عن سبب رقم مرتفع.
+7. ⚠️ مهم جداً — لا تكرر تحفّظات قديمة من ردودك السابقة في هذه المحادثة:
+   لو لاحظت إن رد سابق لك (في سجل المحادثة أسفله) قال إن التحليل مبني على
+   عيّنة محدودة (زي "80 بلاغاً بس")، أو إنك مش قادر تحلل نص وصف البلاغات
+   الحر، أو أي تحفّظ مشابه عن نقص بيانات — هذا كان **قبل تحديث الأداة**،
+   والقيود دي بقت غير صحيحة الآن. لا تُعِد ذكر هذا التحفظ ولا تعتذر عنه
+   ولا تفترض إنه لسه صحيح لمجرد إنك قلته قبل كده في نفس المحادثة. اعتمد
+   حصرياً على DATA_RESULT المحقون في *هذه* الرسالة تحديداً (خصوصاً
+   الإحصائيات_الإجمالية/توزيع_الفئات_ضمن_الفلتر وتحليل_نص_وصف_البلاغات
+   جواهم) لأنه دايماً محسوب لحظياً من كامل البيانات الحالية، بغض النظر
+   عمّا قلته إنت نفسك في ردود سابقة.
 
 ══════════════════════════════════════════════════════
 ⚠️ حماية من التخمين (Hallucination) — قواعد صارمة
@@ -19528,6 +20314,12 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 ▸ أسئلة عن الأولويات والحلول:
   استخدم محرك_الأولويات + تحليل_FCA + البيئة_المدرسية + البلاغات.
   قدّم: (1) المشكلة بالأرقام (2) السبب (3) خطوة فورية (4) متابعة متوسط المدى.
+  لو المستخدم طلب عدداً معيناً من المدارس (مثلاً "10 مدارس" أو "أعلى 20") ←
+  القائمة المرفقة في محرك_الأولويات مبنية بالفعل على نفس العدد المطلوب (حتى
+  50 مدرسة) — اعرض كل الصفوف الموجودة فيها مباشرة بترتيبها بدون أي تحفّظ أو
+  ادّعاء نقص بيانات، لأنها كلها مأخوذة فعلياً من نفس المصدر ونفس منهجية
+  الترتيب المُبيَّنة في الحقول (FCA + عمر المبنى + البيئة + البلاغات). التحفّظ
+  عن التخمين يبقى مطلوباً فقط لو طُلب عدد أكبر من طول القائمة المرفقة فعلاً.
 
 ▸ أسئلة عن العقود والمستحقات:
   استخدم عقود_FM للعقود غير المجال، والعقود للمجال، والمدفوعات للدفعات.
@@ -19758,6 +20550,11 @@ ${(() => {
   window.fcbSaveMemory    = window.fcbSaveMemory    || fcbSaveMemory;
   window.fcbMaybeLearnFact = window.fcbMaybeLearnFact || fcbMaybeLearnFact;
   window.fcbForgetAll     = window.fcbForgetAll     || fcbForgetAll;
+  // 🔧 2026-08-25: تعريض قراءة فقط لكشف المواضيع + محرك الأولويات — عشان
+  // يبقوا قابلين للاختبار المباشر (بدون محاكاة استدعاء OpenAI كامل).
+  window.fcbDetectTopics  = window.fcbDetectTopics  || fcbDetectTopics;
+  window.fcbBuildPriorityActions = window.fcbBuildPriorityActions || fcbBuildPriorityActions;
+  window.fcbParseRequestedTopN = window.fcbParseRequestedTopN || fcbParseRequestedTopN;
 
   /* ════════════════════════════════════════════════════════════════
      📨 إرسال الرسالة — يجرّب OpenAI أولاً، ولو فشل أو ما فيه مفتاح
@@ -28336,6 +29133,27 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(76, 'click', function (event) { setMapMode('env') });
   bind(77, 'click', function (event) { setMapMode('gender') });
   bind(78, 'click', function (event) { setMapMode('owner') });
+  bind(201, 'click', function (event) { setMapMode('balagh') });
+  bind(202, 'change', function (event) { setMapTierFilter(this.value) });
+  bind(203, 'change', function (event) { setMapTopN(this.value) });
+  bind(204, 'click', function (event) { clearMapFilters() });
+  bind(205, 'click', function (event) { exportMapDataCSV() });
+  // بطاقات إحصائيات الخريطة (FCA/البيئة + البلاغات) قابلة للضغط كاختصار
+  // سريع لفلتر الفئة — تفويض حدث (delegation) على الشريط نفسه عشان يغطي
+  // كل البطاقات اللي جواه من غير ما نربط كل بطاقة لوحدها. الضغط تاني على
+  // نفس البطاقة المفعّلة يمسح الفلتر (toggle).
+  bind(206, 'click', function (event) {
+    const card = event.target.closest('.map-stat[data-tier]');
+    if (!card || !this.contains(card)) return;
+    const tier = card.dataset.tier;
+    window.setMapTierFilter(_mapTierFilter === tier ? '' : tier);
+  });
+  bind(207, 'click', function (event) {
+    const card = event.target.closest('.map-stat[data-tier]');
+    if (!card || !this.contains(card)) return;
+    const tier = card.dataset.tier;
+    window.setMapTierFilter(_mapTierFilter === tier ? '' : tier);
+  });
   bind(79, 'click', function (event) { showTab('NEW_ID',this) });
   bind(80, 'click', function (event) { showTab('NEW_ID',this) });
   bind(81, 'click', function (event) { showTab('NEW_ID',this) });
@@ -28840,6 +29658,12 @@ var DIGITAL_SYSTEMS_DATA = [
     nameEn: "Fares",
     category: "بوابة الطلبات التشغيلية",
     logo: "FR",
+    /* لا يوجد رابط شعار خارجي موثوق تم تزويده — بدل الاكتفاء بحروف افتراضية
+       بلا هوية، صُمم شعار مصغّر مستوحى من معنى الاسم نفسه ("فارس" = Knight)
+       برمز الفارس ♞ + النص، بلون أخضر وزارة التعليم، بدون أي اعتماد على
+       شبكة خارجية — إن توفر لديك ملف الشعار الرسمي أرسله وسنستبدله بصورة
+       حقيقية فوراً */
+    logoStyle: "fares",
     desc: "منصة تابعة لوزارة التعليم لإدارة الطلبات والاحتياجات التشغيلية — رفع طلبات العهد والأصول، تقديم احتياجات التجهيزات المدرسية، وطلب الأثاث والمستلزمات.",
     features: [
       "رفع طلبات العهد والأصول إلكترونياً",
@@ -28883,6 +29707,10 @@ var DIGITAL_SYSTEMS_DATA = [
     nameEn: "TBC HR System",
     category: "الموارد البشرية والهيكل التنظيمي",
     logo: "HR",
+    /* نظام داخلي خاص بـ TBC بدون شعار رسمي معروف — صُمم شعار مصغّر بهوية
+       الموارد البشرية (أيقونة أشخاص + HR) بدون أي اعتماد على شبكة خارجية —
+       إن توفر لديك ملف الشعار الرسمي أرسله وسنستبدله بصورة حقيقية فوراً */
+    logoStyle: "hr",
     desc: "نظام الموارد البشرية والهيكل التنظيمي للمشروع — يوثّق الهيكلة التنظيمية للشركات العاملة (الاستشاري والمقاول وTBC)، ويدير عمليات التوظيف وتقييم الأداء لجميع الأطراف، بما يضمن وضوح خطوط المسؤولية والتبعية داخل المشروع.",
     features: [
       "توثيق الهيكل التنظيمي الكامل للمشروع (الاستشاري، المقاول، TBC)",
@@ -28960,6 +29788,18 @@ function openDigitalSystemsPage() {
       html += '    <div class="digi-sys-card-logo digi-sys-logo-flame">' +
               '<span class="digi-logo-flame-icon">🔥</span>' +
               '<span class="digi-logo-flame-txt">' + sys.logo + '</span>' +
+              '</div>';
+    } else if (sys.logoStyle === "fares") {
+      /* شعار مصمّم مستوحى من معنى اسم "فارس" (Knight) — بدون صورة خارجية */
+      html += '    <div class="digi-sys-card-logo digi-sys-logo-fares">' +
+              '<span class="digi-logo-fares-icon">♞</span>' +
+              '<span class="digi-logo-fares-txt">' + sys.logo + '</span>' +
+              '</div>';
+    } else if (sys.logoStyle === "hr") {
+      /* شعار مصمّم بهوية الموارد البشرية — بدون صورة خارجية */
+      html += '    <div class="digi-sys-card-logo digi-sys-logo-hr">' +
+              '<span class="digi-logo-hr-icon">👥</span>' +
+              '<span class="digi-logo-hr-txt">' + sys.logo + '</span>' +
               '</div>';
     } else {
       html += '    <div class="digi-sys-card-logo">' + sys.logo + '</div>';

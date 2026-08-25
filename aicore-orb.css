@@ -570,7 +570,12 @@
   position: relative; z-index: 2; flex: 1; min-height: 0; overflow-y: auto;
   padding: 16px 22px 22px;
   display: flex; flex-direction: column; gap: 20px;
-  scroll-behavior: smooth;
+  /* 🔧 2026-08-25: شيلنا "scroll-behavior: smooth" من هنا — الحاوية دي
+     بيتحدّث scrollTop بتاعها برمجيًا كل 26ms أثناء ظهور رد المساعد
+     تدريجيًا (راجع acScrollToBottom/step في aicore-orb.js)، والسكرول
+     الناعم (CSS animation) كان بياخد وقت أطول من الـ26ms دي فبيتقاطع مع
+     نفسه في كل تحديث جديد، وده اللي كان بيخلّي الشات "يتأخر" عن آخر رسالة
+     أو ميوصلش لتحتها خالص بدل ما ينزل فورًا زي المفروض. */
 }
 #aicore-panel .ac-body::-webkit-scrollbar { width: 4px; }
 #aicore-panel .ac-body::-webkit-scrollbar-thumb { background: rgba(13,47,64,.12); border-radius: 4px; }

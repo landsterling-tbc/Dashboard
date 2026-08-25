@@ -1342,6 +1342,18 @@ tbody tr:last-child td { border-bottom: none; }
   letter-spacing: .02em;
 }
 
+/* بطاقات إحصائيات الخريطة القابلة للضغط (2026-08-25) — اختصار سريع لفلتر
+   الفئة بدل فتح القائمة المنسدلة، بنفس فلتر الخريطة المحلي الموجود */
+.map-stat[data-tier] {
+  cursor: pointer;
+}
+
+.map-stat[data-tier].active-tier {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgba(13, 132, 156, .25), var(--sh-d8);
+  transform: translateY(-1px);
+}
+
 .map-controls {
   display: flex;
   gap: 8px;
@@ -5796,6 +5808,32 @@ tbody tr:last-child td:last-child {
 .digi-logo-flame-txt {
   font-size: 10px; font-weight: 800; color: #fff;
   letter-spacing: .5px; line-height: 1; margin-top: 2px;
+}
+
+/* شعار "فارس" المصمّم بالكود (بدون صورة خارجية) — أخضر وزارة التعليم +
+   رمز الفارس ♞ (تورية على اسم النظام نفسه) */
+.digi-sys-logo-fares {
+  background: linear-gradient(160deg, #0d5c3a, #16855a);
+  border-color: rgba(13,92,58,.4);
+  flex-direction: column; gap: 0;
+}
+.digi-logo-fares-icon { font-size: 18px; line-height: 1; color: #fff; }
+.digi-logo-fares-txt {
+  font-size: 9px; font-weight: 800; color: #fff;
+  letter-spacing: .8px; line-height: 1; margin-top: 3px;
+}
+
+/* شعار "نظام إدارة الموارد" المصمّم بالكود (بدون صورة خارجية) — هوية
+   الموارد البشرية بأيقونة أشخاص + HR */
+.digi-sys-logo-hr {
+  background: linear-gradient(160deg, #5b2a86, #8447b8);
+  border-color: rgba(91,42,134,.4);
+  flex-direction: column; gap: 0;
+}
+.digi-logo-hr-icon { font-size: 15px; line-height: 1; }
+.digi-logo-hr-txt {
+  font-size: 10px; font-weight: 800; color: #fff;
+  letter-spacing: .8px; line-height: 1; margin-top: 3px;
 }
 
 .digi-sys-card-titles { min-width: 0; }

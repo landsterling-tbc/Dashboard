@@ -1114,14 +1114,43 @@
     /* Smart autoscroll: only snap to bottom if the user was already near
        the bottom (or force=true, e.g. right after their own message).
        Without this, reading earlier history while a reply streams in
-       gets interrupted every ~26ms by a forced jump. */
+       gets interrupted every ~26ms by a forced jump.
+
+       🔧 2026-08-25: القياس القديم كان بيحسب "قريب من القاع؟" بعد ما
+       الرسالة الجديدة تتضاف فعلاً للـ DOM — يعني لو المستخدم كان بالظبط
+       في القاع (مسافة = 0) ثم اتضافت رسالة ولو 150px، بقى الفرق فجأة
+       أكبر من 80px فيحسبها "مش قريب" ومايعملش سكرول — رغم إن المستخدم
+       كان بالظبط تحت! الحل: نتابع حالة "ملتصق بالقاع" بمستمع scroll
+       مستقل، بيتحدّث بناءً على آخر وضع فعلي للمستخدم (سواء تمرير يدوي
+       أو سكرول برمجي سابق)، مش بحساب بعد كل إضافة محتوى.
+
+       🔧 2026-08-25 (اكتشاف أهم): #ac-chat-thread عنده overflow-y:auto
+       ومساحة محدودة خاصة بيه (max-height في CSS) — يعني هو حاوية تمرير
+       مستقلة تمامًا عن .ac-body، مش مجرد جزء منها زي ما كان مفترض قبل
+       كده. فكل تعديلاتنا اللي كانت بتحرك body.scrollTop بس كانت بتوصّل
+       لبداية منطقة المحادثة (بعد أقسام الملخص)، لكن *جوه* صندوق الرسائل
+       نفسه كان فاضل واقف عند أول رسالة على طول لأن حد محاله محدش كان
+       بيحرّك threadEl.scrollTop خالص. ده السبب الحقيقي وراء إن الشات
+       كان "بيفضل عند أول رسالة" حتى بعد كل الإصلاحات اللي فاتت. */
+    var acStickBottom = true;
     function acScrollToBottom(force) {
-      /* الحاوية القابلة للتمرير فعلياً هي .ac-body (تحتوي أقسام الملخص + خيط
-         المحادثة معاً)، وليست #ac-chat-thread نفسه — فهو بلا overflow خاص به. */
-      if (!body) return;
-      var nearBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 80;
-      if (force || nearBottom) body.scrollTop = body.scrollHeight;
+      if (force || acStickBottom) {
+        if (body) body.scrollTop = body.scrollHeight;
+        if (threadEl) threadEl.scrollTop = threadEl.scrollHeight;
+      }
     }
+    function acNearBottom(el) {
+      return el ? (el.scrollHeight - el.scrollTop - el.clientHeight) < 80 : true;
+    }
+    [body, threadEl].forEach(function(scroller) {
+      if (!scroller) return;
+      scroller.addEventListener('scroll', function() {
+        /* أي من الحاويتين ممكن يبقى فيه سكرول يدوي من المستخدم — لو أي
+           واحدة فيهم بعيدة عن قاعها، يبقى المستخدم قاعد يقرا تاريخ قديم
+           ومش عايزين نقاطعه بسكرول إجباري لحد ما يرجع لتحت بنفسه. */
+        acStickBottom = acNearBottom(body) && acNearBottom(threadEl);
+      }, { passive: true });
+    });
 
     function acAppendMsg(html, who, rawText) {
       var safeHtml = (html != null && String(html).trim() !== '')
@@ -1284,6 +1313,13 @@
       acSetSendMode('stop');
       setState('generating');
       var row = acAppendMsg('<span class="ac-caret"></span>', 'bot', rawReply);
+      // 🔧 2026-08-25: acAppendMsg بتعمل سكرول "ذكي" بس (force=false) لأي
+      // رسالة بوت، عشان ما تقاطعش القارئ لو راجع يقرأ محادثة قديمة. لكن
+      // هنا تحديدًا هي بداية ردّ فعلي على رسالة المستخدم اللي هو لسه واقف
+      // مستني عليها (بعد "بيفكر...") — نفس لحظة إرسال رسالته وظهور مؤشر
+      // الكتابة اللي بتتعمل لهم سكرول إجباري، فلازم نفس الإجبار هنا كمان
+      // حتى لو المستخدم كان اتحرّك شوية أثناء الانتظار.
+      acScrollToBottom(true);
       var contentEl = row.querySelector('.ac-msg-content');
       var text = String(rawReply || '');
       var chunks = text.split(/(\s+)/); // keep whitespace tokens
@@ -1312,7 +1348,12 @@
         clearTimeout(acStreamTimer);
         acStreamFinish = null;
         contentEl.innerHTML = acRenderMarkdown(text);
+        /* 🔧 2026-08-25: الـ Markdown الكامل (جداول/رسوم بيانية) غالبًا أطول
+           من النص المتدرّج اللي كان ظاهر أثناء الكتابة، فالطول الكلي للمحتوى
+           بيتغيّر هنا فجأة — لازم سكرول تاني عشان آخر جزء من الرد يفضل ظاهر. */
+        acScrollToBottom(false);
         acMountPendingCharts();
+        acScrollToBottom(false);
         [pdfBtnEl, copyBtnEl].forEach(function(b) { if (b) b.disabled = false; });
         acSetSendMode('send');
         setState('idle');
@@ -1336,12 +1377,17 @@
       if (/^(انسَ|انسى|امسح الذاكرة|امسح ذاكرتك)\s*(كل شيء|الكل)?\.?$/i.test(text)) {
         if (typeof window.fcbForgetAll === 'function') window.fcbForgetAll();
         acAppendMsg('🗑️ تم مسح كل الذاكرة والمحادثات المحفوظة.', 'bot');
+        /* 🔧 2026-08-25: acAppendMsg بترد force=false لأي رسالة بوت (عشان
+           ما تقاطعش قارئ محادثة قديمة)، لكن دي رد فوري على أمر المستخدم
+           اللي هو واقف مستنيه دلوقتي — لازم سكرول إجباري زي أي رد تاني. */
+        acScrollToBottom(true);
         return;
       }
       if (typeof window.fcbMaybeLearnFact === 'function') {
         var learned = window.fcbMaybeLearnFact(text);
         if (learned) {
           acAppendMsg('✅ تم الحفظ في الذاكرة: "' + acEscHtml(learned) + '"', 'bot');
+          acScrollToBottom(true);
           return;
         }
       }
@@ -1357,6 +1403,7 @@
         stopThinking('جاهز');
         acSetSendMode('send');
         acAppendMsg('<p>⚠️ خدمة الذكاء الاصطناعي غير متاحة حالياً — تحقق من تهيئة dashboard.js.</p>', 'bot');
+        acScrollToBottom(true);
         return;
       }
 
@@ -1376,6 +1423,7 @@
             : '<p>⚠️ فشل الاتصال — إليك إجابة مبدئية محدودة:</p>';
         var fallback = typeof window.fcbReplyFor === 'function' ? window.fcbReplyFor(text) : '';
         var errRow = acAppendMsg(prefix + (fallback ? acRenderMarkdown(fallback) : ''), 'bot');
+        acScrollToBottom(true);
         errRow.classList.add('ac-msg-error');
         var retryBtn = el('button', 'ac-retry-btn', 'إعادة المحاولة');
         retryBtn.type = 'button';

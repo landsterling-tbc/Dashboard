@@ -202,10 +202,16 @@
         <div class="portal-card-desc">MAXIMO، TAKAMUL، TFMP، UniFire، Fares</div>
       </div>
 
-      <div class="portal-card" id="portal-card-assessment" data-category="assessment" data-wm="📊">
+      <div class="portal-card" id="portal-card-fca" data-category="fca" data-wm="📈">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></div>
-        <div class="portal-card-title">التقييمات والحالة الفنية</div>
-        <div class="portal-card-desc">تحليل FCA، مقارنة المراحل، FCA المرجعي، البيئة المدرسية، تقييم عاين، الأنظمة الرئيسية والتفصيلية</div>
+        <div class="portal-card-title">تحليل ومؤشرات FCA</div>
+        <div class="portal-card-desc">نظرة عامة، تحليل FCA، مقارنة المراحل، FCA المرجعي، الأنظمة الرئيسية والتفصيلية</div>
+      </div>
+
+      <div class="portal-card" id="portal-card-otherAssessments" data-category="otherAssessments" data-wm="📋">
+        <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg></div>
+        <div class="portal-card-title">تقييمات أخرى</div>
+        <div class="portal-card-desc">البيئة المدرسية، تقييم عاين، تقييم منصة أصول، المرحلة الدراسية</div>
       </div>
 
       <div class="portal-card" id="portal-card-assets" data-category="assets" data-wm="🏗️">
@@ -229,7 +235,7 @@
       <div class="portal-card" id="portal-card-operations" data-category="operations" data-wm="⚙️">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="portal-card-title">التشغيل</div>
-        <div class="portal-card-desc">مؤشرات الأداء، التدريب، تقييم الموظفين، البوابين</div>
+        <div class="portal-card-desc">مؤشرات الأداء، التدريب، البوابين</div>
       </div>
 
       <div class="portal-card" id="portal-card-safety" data-category="safety" data-wm="📢">
@@ -358,7 +364,7 @@
 
     <div class="fg">
       <div class="fg-lbl" data-ar="بحث" data-en="Search">بحث بالاسم أو الرقم الوزاري</div>
-      <input class="finp" id="fSearch" placeholder="🔍 اسم المدرسة أو الرقم الوزاري..." data-evt="16">
+      <input class="finp" id="fSearch" placeholder="🔍 ابحث باسم المدرسة أو الرقم الوزاري..." data-evt="16">
     </div>
 
     <button class="f-clear" data-evt="17"><span data-ar="✕ مسح الكل" data-en="✕ Clear All">✕ مسح الكل</span></button>
@@ -498,7 +504,7 @@
     <div class="tab" data-evt="30">خنادق الصرف</div>
     <div class="tab" data-evt="31">خطة استبدال المكيفات</div>
     <div class="tab" data-evt="32">البلاغات</div>
-    <div class="tab" data-evt="33">الأمن والسلامة</div>
+    <div class="tab" data-evt="33">بلاغات الأمن والسلامة</div>
     <div class="tab" data-evt="34">المخصص والاحتياج</div>
     <div class="tab" data-evt="51">التوريدات</div>
     <div class="tab" data-evt="52">عقود التجهيزات</div>
@@ -513,7 +519,6 @@
     <div class="tab" data-evt="44">مؤشرات أداء الاستشاري</div>
     <div class="tab" data-evt="46">السيارات</div>
     <div class="tab" data-evt="47">برامج التدريب</div>
-    <div class="tab" data-evt="48">تقييم الموظفين</div>
     <div class="tab" data-evt="49">📦 حصر الأصول</div>
   </div>
 
@@ -543,6 +548,16 @@
       <div class="card">
         <div class="card-title">توزيع درجات البيئة المدرسية</div>
         <div class="chart-box" style="height:270px"><canvas id="ch-env-hist"></canvas></div>
+      </div>
+    </div>
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">أسوأ 20 مدرسة — FCA <span class="sub">أدنى درجة أولاً</span></div>
+        <div class="chart-box" style="height:500px"><canvas id="ch-fca-bot"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">أفضل 20 مدرسة — FCA <span class="sub">أعلى درجة أولاً</span></div>
+        <div class="chart-box" style="height:500px"><canvas id="ch-fca-top"></canvas></div>
       </div>
     </div>
     <div class="g2" style="grid-template-columns:repeat(2,minmax(0,1fr))">
@@ -581,32 +596,13 @@
 ║     4. أضف "NEW_ID"===name && renderNewTab() في دالتَي showTab() و applyFilters()
 ╚════════════════════════════════════════════════════════════════════╝
 -->
-  <div class="panel" id="tab-fca">
-    <div class="g2 mb14">
-      <div class="card">
-        <div class="card-title">أسوأ 20 مدرسة — FCA <span class="sub">أدنى درجة أولاً</span></div>
-        <div class="chart-box" style="height:500px"><canvas id="ch-fca-bot"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">أفضل 20 مدرسة — FCA <span class="sub">أعلى درجة أولاً</span></div>
-        <div class="chart-box" style="height:500px"><canvas id="ch-fca-top"></canvas></div>
-      </div>
-    </div>
-    <div class="card mb14">
-      <div class="card-title">متوسط FCA حسب الحي <span class="sub">أعلى 20 حي</span></div>
-      <div class="chart-box" style="height:300px"><canvas id="ch-fca-dist"></canvas></div>
-    </div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-title">متوسط FCA حسب المرحلة</div>
-        <div class="chart-box" style="height:230px"><canvas id="ch-fca-stage"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">متوسط FCA حسب حجم المدرسة</div>
-        <div class="chart-box" style="height:230px"><canvas id="ch-fca-size"></canvas></div>
-      </div>
-    </div>
-  </div>
+  <!-- تحليل FCA: تشارتات الأسوأ/الأفضل انتقلت إلى "نظرة عامة" بناءً على طلب
+       صريح، والتشارتات الثلاثة الأخرى (الحي/المرحلة/الحجم) اتحذفت لأنها كانت
+       بايظة ومش بتظهر غالباً. المحتوى المتبقي هنا يُبنى ديناميكياً بالكامل
+       بواسطة طبقة "mx-fca" (أسفل الملف) اللي بتضيف بدائل تعتمد فقط على بيانات
+       فعلاً متاحة (توزيع مستويات FCA، توزيع الدرجات، ومتوسطات حسب أي بُعد
+       متوفر) — فمفيش تشارت هيتحط هنا ويفضل فاضي أو بايظ. -->
+  <div class="panel" id="tab-fca"></div>
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗

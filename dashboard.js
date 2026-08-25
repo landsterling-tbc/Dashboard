@@ -4,7 +4,7 @@
 /* dashboard.js — updated 2026-06-24 07:40 */
 /* 🩹 PATCH MARKER — لو ظهر هذا في console يبقى الملف الجديد فعلاً هو
    اللي شغّال (استخدمها للتأكد إن المتصفح مش بيقرا نسخة قديمة من كاش) */
-window.__BALAGH_AI_PATCH_VERSION = "school-detail-fuzzy-match-2026-08-20";
+window.__BALAGH_AI_PATCH_VERSION = "school-360-unified-profile-2026-08-24";
 console.log("[Dashboard] patch version:", window.__BALAGH_AI_PATCH_VERSION);
 
 /* ════════════════════════════════════════════════════════════════
@@ -416,6 +416,11 @@ let RAW = [],
   autoTimer = null,
   retryCount = 0,
   _filterTimer = null;
+// جسر لـ window.CHARTS: CHARTS كائن ثابت المرجع (يتغيّر بالتعديل على
+// خصائصه فقط عبر CHARTS[id]=...، وما بيتغيّرش الكائن نفسه أبداً) — فربطه
+// مرة واحدة هنا كافٍ ويفضل متزامن تلقائياً. مطلوب لطبقة "mx-fca" (أسفل
+// الملف) اللي بتقرأ window.CHARTS لرسم/حذف الرسوم البديلة.
+window.CHARTS = CHARTS;
 const TBL = { cur: 0, PAGE: 50 };
 function getVal(row, field) {
   for (const k of COLS[field] || [field]) {
@@ -947,6 +952,10 @@ function applyFilters() {
           !r.sector.toLowerCase().includes(search)
         ),
     );
+    // جسر لـ window.FILTERED: FILTERED هنا مصفوفة جديدة كل مرة (rebind
+    // مش تعديل بالمكان)، فلازم نعيد الربط هنا في كل استدعاء. مطلوب لطبقة
+    // "mx-fca" (أسفل الملف) اللي بتقرأ window.FILTERED فقط.
+    window.FILTERED = FILTERED;
 
     DataService.invalidateCache();
     renderKPIs();
@@ -1474,111 +1483,40 @@ function renderOverviewCharts() {
     makeDoughnut("ch-link", linkMap, { مستقل: CSS_TOKENS.info(), مشترك: CSS_TOKENS.special() }),
     // حالة الاشتراك — يعتمد على حالة_الاشتراك
     makeDoughnut("ch-sub-status", subMap, {}));
+
+  // أسوأ/أفضل 20 مدرسة (FCA) — انتقلت هنا من تبويب "تحليل FCA" بناءً على طلب صريح
+  const withFca = D.filter((r) => null != r.fca).sort((a, b) => a.fca - b.fca),
+    fcaBot = withFca.slice(0, 20),
+    fcaTop = [...withFca].reverse().slice(0, 20);
+  makeHBar(
+    "ch-fca-bot",
+    fcaBot.map((r) => r.name),
+    fcaBot.map((r) => +r.fca.toFixed(1)),
+    fcaBot.map((r) => tierColor(r.fca) + "BB"),
+    100,
+    fcaBot.map((r) => r.name),
+  );
+  makeHBar(
+    "ch-fca-top",
+    fcaTop.map((r) => r.name),
+    fcaTop.map((r) => +r.fca.toFixed(1)),
+    fcaTop.map((r) => tierColor(r.fca) + "BB"),
+    100,
+    fcaTop.map((r) => r.name),
+  );
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📈  JS تبويب: تحليل FCA
    ║  (tab-fca) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
 function renderFcaCharts() {
-  const D = FILTERED,
-    withFca = D.filter((r) => null != r.fca).sort((a, b) => a.fca - b.fca),
-    bot = withFca.slice(0, 20),
-    top = [...withFca].reverse().slice(0, 20);
-  (makeHBar(
-    "ch-fca-bot",
-    bot.map((r) => r.name),
-    bot.map((r) => +r.fca.toFixed(1)),
-    bot.map((r) => tierColor(r.fca) + "BB"),
-    100,
-    bot.map((r) => r.name),
-  ),
-    makeHBar(
-      "ch-fca-top",
-      top.map((r) => r.name),
-      top.map((r) => +r.fca.toFixed(1)),
-      top.map((r) => tierColor(r.fca) + "BB"),
-      100,
-      top.map((r) => r.name),
-    ));
-  const dMap = {};
-  D.forEach((r) => {
-    r.district &&
-      null != r.fca &&
-      (dMap[r.district] || (dMap[r.district] = []), dMap[r.district].push(r.fca));
-  });
-  const distData = Object.entries(dMap)
-    .map(([k, v]) => ({ k: k, a: avg(v) }))
-    .sort((a, b) => b.a - a.a)
-    .slice(0, 20);
-  (killChart("ch-fca-dist"),
-    makeVBar(
-      "ch-fca-dist",
-      distData.map((x) => x.k),
-      [
-        {
-          label: "متوسط FCA",
-          data: distData.map((x) => +x.a.toFixed(1)),
-          backgroundColor: distData.map((x) => tierColor(x.a) + "BB"),
-          borderColor: distData.map((x) => tierColor(x.a)),
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-      ],
-      "الحي",
-      "متوسط FCA (%)",
-    ));
-  const stMap = {};
-  D.forEach((r) => {
-    r.stage &&
-      null != r.fca &&
-      (stMap[r.stage] || (stMap[r.stage] = []), stMap[r.stage].push(r.fca));
-  });
-  const stData = Object.entries(stMap).map(([k, v]) => ({ k: k, a: avg(v) }));
-  (killChart("ch-fca-stage"),
-    makeVBar(
-      "ch-fca-stage",
-      stData.map((x) => x.k),
-      [
-        {
-          label: "متوسط FCA",
-          data: stData.map((x) => +x.a.toFixed(1)),
-          // PHASE 1 (توحيد الألوان): الخلفية كانت لون تيل مختلف شوية عن
-          // borderColor نفسه (اللي بالفعل بيستخدم CSS_TOKENS.info()) —
-          // وحّدناهم لنفس اللون
-          backgroundColor: CSS_TOKENS.info() + "BB",
-          borderColor: CSS_TOKENS.info(),
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-      ],
-      "المرحلة",
-      "متوسط FCA (%)",
-    ));
-  const szMap = {};
-  D.forEach((r) => {
-    r.schoolSize &&
-      null != r.fca &&
-      (szMap[r.schoolSize] || (szMap[r.schoolSize] = []), szMap[r.schoolSize].push(r.fca));
-  });
-  const szData = Object.entries(szMap).map(([k, v]) => ({ k: k, a: avg(v) })),
-    szColors = { كبير: CSS_TOKENS.primary(), متوسط: CSS_TOKENS.info(), صغير: CSS_TOKENS.positive() };
-  (killChart("ch-fca-size"),
-    makeVBar(
-      "ch-fca-size",
-      szData.map((x) => x.k),
-      [
-        {
-          label: "متوسط FCA",
-          data: szData.map((x) => +x.a.toFixed(1)),
-          backgroundColor: szData.map((x) => (szColors[x.k] || CSS_TOKENS.txMuted()) + "BB"),
-          borderColor: szData.map((x) => szColors[x.k] || CSS_TOKENS.txMuted()),
-          borderWidth: 1,
-          borderRadius: 4,
-        },
-      ],
-      "حجم المدرسة",
-      "متوسط FCA (%)",
-    ));
+  // ملاحظة (طلب صريح): تشارتات "أسوأ/أفضل 20 مدرسة" انتقلت لتبويب "نظرة
+  // عامة" (renderOverviewCharts) — وتشارتات "متوسط FCA حسب الحي/المرحلة/
+  // الحجم" اتحذفت نهائياً لأنها كانت بايظة (بتختفي غالباً لقلة التصنيفات
+  // المتاحة). محتوى تبويب "تحليل FCA" دلوقتي بالكامل من طبقة "mx-fca"
+  // (طبقة ذكية أسفل الملف) اللي بتبني بدائل تعتمد على بيانات فعلاً متوفرة
+  // — الدالة هنا بقت فاضية عمداً لكن اتسابت موجودة عشان مفيش كود تاني
+  // (showTab/applyFilters وغيرهم) يتكسّر.
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🌿  JS تبويب: البيئة المدرسية
@@ -3039,6 +2977,380 @@ let __bgRevalidatedOnce = false;
       console.log("[FCA] latestFcaMap:", Object.keys(latestFcaMap).length, "مدرسة مقيّمة");
     })();
 
+    // ══════════════════════════════════════════════════════════════════════
+    // 🆕 2026-08-23: ملف الأنظمة الرئيسية/التفصيلية الجديد (شيت المدارس_والأنظمة)
+    // بقى بفورمات مختلف تمامًا عن القديم: صف واحد = زيارة تفتيش كاملة (Work
+    // Order) لمدرسة، وفيه عمود Rating/Band/Priority/Weighted Score/Cost لكل
+    // نظام فرعي (بدل صف منفصل لكل نظام فرعي زي قبل). كمان اتجاه التقييم
+    // اتقلب: هنا 1 = ممتاز (أفضل تقييم) و5 = ضعيف (أسوأ تقييم) — عكس
+    // الافتراض القديم. بنعرض الرقم زي ما هو في الملف دايمًا، ومنطق الألوان/
+    // الترتيب هو اللي بيتصلح عشان يفهم الاتجاه الصح (مش الأرقام نفسها).
+    //
+    // القاعدة المتفق عليها مع المستخدم: "الأحدث تاريخًا يفوز دائمًا" — لو
+    // مدرسة عندها أكتر من زيارة (نفس الرقم الوزاري)، بناخد بس أحدث زيارة
+    // (Completed At) كمصدر معتمد لكل حاجة، وكمان تقييم FCA نفسه (b.fca في
+    // كل الداشبورد) بيتحدد بمقارنة تاريخ آخر تقييم من تقييمات_FCA_المراحل
+    // مع تاريخ آخر زيارة أنظمة من هنا — أيهما أحدث هو الفايز (راجع
+    // pickUnifiedFca تحت).
+    // ══════════════════════════════════════════════════════════════════════
+
+    // خريطة بيانات أساسية للمدرسة (اسم/مدينة/محافظة) من شيت "المباني" —
+    // بنستخدمها لتحديد مدينة/محافظة كل مدرسة في ملف الأنظمة الجديد، لأن
+    // عمود "Site" في الملف الجديد إنجليزي ومش مطابق نصيًا لأسماء المدن
+    // العربية (المدينة الرئيسية) اللي باقي فلاتر الداشبورد شغالة عليها —
+    // مع العلم إنها نفس المدن ونفس المدارس بالظبط (تأكيد من المستخدم).
+    const schoolMetaMap = {}; // key: رقم_وزاري (بعد normSchoolId) → { name, city, sector }
+    buildings.forEach((b) => {
+      const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
+      if (!id || schoolMetaMap[id]) return;
+      schoolMetaMap[id] = {
+        name: String(b["اسم_المدرسة"] ?? "").trim(),
+        city: String(b["المدينة_الرئيسية"] ?? "").trim(),
+        sector: String(b["المحافظة"] ?? "").trim(),
+      };
+    });
+
+    // ترجمة فئة الحالة الكلية (Excellent/Good/Fair/Poor) لنفس مسميات
+    // SYS_TIER العربية القديمة (حرج/متوسط/جيد/جيد جداً) — تطابق تام بالترتيب.
+    const SYS_BAND_AR = { Excellent: "جيد جداً", Good: "جيد", Fair: "متوسط", Poor: "حرج" };
+
+    // تحليل تاريخ "Completed At" بصيغة DD/MM/YYYY HH:MM (تأكدنا من الصيغة
+    // من عينات الملف الفعلي — فيها تواريخ زي 31/05/2026 يستحيل تتفسر
+    // كـ MM/DD لأن 31 مش شهر، فالصيغة يوم/شهر/سنة مؤكدة).
+    function parseSystemsDate(v) {
+      if (!v) return null;
+      const s = String(v).trim();
+      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+      if (!m) {
+        const d = new Date(s);
+        return isNaN(d) ? null : d;
+      }
+      const [, dd, mm, yyyy, hh, min] = m;
+      return new Date(+yyyy, +mm - 1, +dd, +(hh || 0), +(min || 0));
+    }
+
+    // اكتشاف مجموعات الأعمدة (كل نظام فرعي) ديناميكيًا من أول صف بيانات —
+    // أي عمود بينتهي بـ" — Rating" هو نظام فرعي، واسمه هو الجزء اللي قبل
+    // " — Rating". النظام الرئيسي = نفس الاسم بعد ما نشيل رقم/حرف الترتيب
+    // من آخره (مثال: "HVAC 6A" → النظام الرئيسي "HVAC"، الفرعي "HVAC 6A").
+    let SYS_SUBSYSTEM_KEYS = [];
+    (function detectSystemGroups() {
+      const sample = allSystems.find((r) => r && typeof r === "object") || {};
+      SYS_SUBSYSTEM_KEYS = Object.keys(sample)
+        .filter((k) => k.endsWith(" — Rating"))
+        .map((k) => k.slice(0, -" — Rating".length));
+    })();
+
+    // 🩺 2026-08-23: تشخيص واضح لو تبويبَي الأنظمة طلعوا فاضيين — بنفس
+    // أسلوب تشخيص "تقييم (منصة أصول)" فوق — عشان لو حصلت مشكلة تبان
+    // فورًا في الـ Console بدل ما تفضل مخبّية.
+    (() => {
+      if (!allSystems.length) {
+        console.warn(
+          '⚠️ [الأنظمة] شيت "المدارس_والأنظمة" رجع 0 صف من Apps Script. ' +
+          "الاحتمالات: (1) لسه محطوطش بيانات في الشيت، أو (2) Apps Script " +
+          "بيرجّع نسخة مخزّنة (كاش) قديمة من قبل التحديث — الكاش عنده مدة " +
+          "10 دقائق، جرّب تفتح رابط الـ GAS في المتصفح وتضيف ?refresh=1 " +
+          "في الآخر عشان تجبره يقرأ الشيت من جديد، أو استنى 10 دقائق وأعد تحميل الداشبورد.",
+        );
+      } else if (!SYS_SUBSYSTEM_KEYS.length) {
+        console.warn(
+          '⚠️ [الأنظمة] شيت "المدارس_والأنظمة" فيه ' + allSystems.length +
+          ' صف، لكن ملقيتش ولا عمود اسمه ينتهي بـ" — Rating" (زي "Emergency Exits 1 — Rating"). ' +
+          "تأكد إن أسماء الأعمدة في الشيت مطابقة تمامًا لأسماء الملف الأصلي (نفس الشرطة الطويلة — em dash — والمسافات). " +
+          "الأعمدة الموجودة فعليًا في أول صف: " + Object.keys(allSystems[0] || {}).join(" | "),
+        );
+      } else {
+        const sample = allSystems.find((r) => r && typeof r === "object") || {};
+        if (!Object.prototype.hasOwnProperty.call(sample, "Ministry ID")) {
+          console.warn(
+            '⚠️ [الأنظمة] ملقيتش عمود اسمه "Ministry ID" بالظبط في شيت "المدارس_والأنظمة" — وهو المفتاح المعتمد لربط كل صف بمدرسته. ' +
+            "الأعمدة الموجودة فعليًا: " + Object.keys(sample).join(" | "),
+          );
+        }
+      }
+    })();
+    function mainSystemOf(subLabel) {
+      const m = String(subLabel || "").match(/^(.*?)\s+\d+[A-Za-z]?$/);
+      return m ? m[1].trim() : String(subLabel || "").trim();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 🇸🇦 2026-08-23: ترجمة أسماء الأنظمة الرئيسية (والفرعية بالتبعية) —
+    // ملف المصدر بييجي بأسماء إنجليزية بحتة، والمستخدم عايز كل حاجة في
+    // تبويبَي الأنظمة تكون بالعربي. المفتاح الإنجليزي الخام لسه محفوظ
+    // جنب الاسم العربي (keyEn/mainSystemEn) لأي استخدام تقني مستقبلي (زي
+    // مطابقة عمود في الشيت)، لكن كل حاجة معروضة (للمستخدم أو للـ AI)
+    // بقت عربي بالكامل.
+    // ══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════════
+    // 🇸🇦 2026-08-24: تجميع الـ11 نظام فرعي (زي ما بييجوا من الملف الخام)
+    // في 7 أقسام رئيسية معتمدة من المستخدم — بدل ما كل نظام فرعي يظهر
+    // كقسم رئيسي مستقل زي الأول. القرار: التقييم الإنشائي/المدني +
+    // المعماري + الحواف الواقية/أسوار الأسطح كلهم تحت "الأعمال المدنية
+    // والمعمارية"، والطوارئ + إنذار وإطفاء الحريق كلهم تحت "السلامة
+    // والطوارئ"، وتنسيق الموقع تحت "الزراعة والري". الاسم الإنجليزي الخام
+    // (mainSystemEn) لسه محفوظ منفصل لأي استخدام تقني (مطابقة عمود شيت).
+    // ══════════════════════════════════════════════════════════════════════
+    const ARABIC_SYSTEM_NAMES = {
+      "Emergency Exits": "السلامة والطوارئ",
+      "Upstands / Edge Protection": "الأعمال المدنية والمعمارية",
+      "FLS - Fire Alarm": "السلامة والطوارئ",
+      "FLS - Fire Fighting": "السلامة والطوارئ",
+      "Civil / Structural Assessment": "الأعمال المدنية والمعمارية",
+      "HVAC": "التكييف والتهوية",
+      "Electrical": "الكهرباء",
+      "Plumbing": "السباكة وشبكات المياه",
+      "Architectural": "الأعمال المدنية والمعمارية",
+      "Playgrounds": "الملاعب والمرافق الرياضية",
+      "Landscaping": "الزراعة والري",
+      // 🇸🇦 2026-08-24: أقسام كانت ناقصة من القاموس فكانت بتظهر بالإنجليزي الخام
+      "Pest Control Program": "مكافحة الحشرات والقوارض",
+      "Elevators": "نظام المصاعد",
+      "Cleaning": "النظافة",
+      "Guards": "الحراسة والبوابين",
+      "Key System": "نظام المفاتيح",
+    };
+    // ══════════════════════════════════════════════════════════════════════
+    // 🇸🇦 2026-08-24: معاني الأنظمة الفرعية التفصيلية — بدل ما يظهر رمز غريب
+    // زي "4A" أو "5C" أو "7B" بعد اسم القسم الرئيسي، بنستبدله بمعنى حقيقي
+    // مأخوذ من نموذج التقييم الرسمي (Condition Assessment v3 — عربي/إنجليزي).
+    // المفتاح هنا هو "رمز البند" زي ما بيتحط آخر اسم العمود الخام في الشيت
+    // (مثال: "HVAC 6A" → الرمز "6A")، والقيمة هي {ar, en} معنى البند الفعلي.
+    // ══════════════════════════════════════════════════════════════════════
+    const SUBSYSTEM_ITEM_MEANING = {
+      // 🇸🇦 2026-08-25: أرقام بدون حرف (زي "1"، "5"، "9") لبنود بتتشارك في
+      // نفس "الدلو" المُجمّع (زي "السلامة والطوارئ" أو "الأعمال المدنية
+      // والمعمارية" اللي بيتحط تحتها أكتر من بند مختلف) — هنا لازم نفرّق
+      // بينهم، عشان "1" و"3" مثلاً كلاهما تحت "السلامة والطوارئ" لكنهم
+      // بندين مختلفين تمامًا (مخارج طوارئ ضد نظام إنذار حريق).
+      "1": { ar: "مخارج الطوارئ", en: "Emergency Exits" },
+      "2": { ar: "حواجز السطح / الحماية الطرفية", en: "Upstands / Edge Protection" },
+      "3": { ar: "نظام الإنذار من الحريق", en: "FLS - Fire Alarm" },
+      "4": { ar: "أنظمة إطفاء الحريق", en: "FLS - Fire Fighting" },
+      "5": { ar: "التقييم الإنشائي والمدني", en: "Civil / Structural Assessment" },
+      "9": { ar: "المعماري والتشطيبات", en: "Architectural & Finishes (Building Fabric)" },
+      "4A": { ar: "طفايات حريق", en: "Fire Extinguishers" },
+      "4B": { ar: "رشاشات / هيدرنت / أخرى", en: "Sprinklers / Hydrant / Other" },
+      "4C": { ar: "مضخات الحريق", en: "Fire Pumps" },
+      "4D": { ar: "نظام إطفاء الحريق واللوحات الخاصة به", en: "Suppression System Panels" },
+      "5A": { ar: "السلامة الإنشائية", en: "Structural integrity" },
+      "5B": { ar: "تقارير الفحص", en: "Test reports" },
+      "5C": { ar: "العزل المائي", en: "Water proofing" },
+      "6A": { ar: "مكيفات الشباك", en: "Window AC" },
+      "6B": { ar: "مكيفات سبليت", en: "Split AC" },
+      "6C": { ar: "مكيفات كبيرة (باكدج / مجاري)", en: "Package / Ducted AC" },
+      "7A": { ar: "إدارة الكوابل", en: "Cable Management" },
+      "7B": { ar: "حالة لوحات التوزيع", en: "DBs Condition" },
+      "7C": { ar: "حالة المخارج الكهربائية", en: "Sockets Condition" },
+      "7D": { ar: "زيادة الأحمال", en: "Power Overloading" },
+      "8A": { ar: "شبكة تغذية المياه", en: "Water Supply Network" },
+      "8B": { ar: "شبكة الصرف", en: "Drainage Network" },
+      "8C": { ar: "دورات المياه والمناطق الرطبة", en: "Toilets & Wet Areas" },
+      "8D": { ar: "الحالة الفيزيائية للخزانات", en: "Tanks — physical condition" },
+      "8E": { ar: "النظافة وتقارير الفحص والملصقات", en: "Cleaning + test reports + stickers" },
+      "8F": { ar: "حالة خزانات الصرف", en: "Sewage Tanks Condition" },
+      "11A": { ar: "المناطق وشبكة الري", en: "Areas / irrigation network" },
+      "11B": { ar: "صحة النباتات وتفاصيل الري", en: "Plant health + irrigation detail" },
+      "14A": { ar: "حالة النظام", en: "System condition" },
+      "14B": { ar: "صيانة وقائية معتمدة وقطع غيار", en: "3rd-party PPM + spare parts" },
+    };
+    // أيقونة كل قسم رئيسي مُجمّع (السبعة) — تُستخدم في الكروت وقائمة تصفح
+    // الأنظمة. مفتاح الماب هنا هو الاسم العربي المُجمّع (بعد الدمج)، مش
+    // الاسم الإنجليزي الخام.
+    const SYS_GROUP_ICON_AR = {
+      "السلامة والطوارئ": "🚨",
+      "الأعمال المدنية والمعمارية": "🏗️",
+      "التكييف والتهوية": "❄️",
+      "الكهرباء": "⚡",
+      "السباكة وشبكات المياه": "🚿",
+      "الملاعب والمرافق الرياضية": "🏀",
+      "الزراعة والري": "🌳",
+    };
+    function arabicMainSystemName(mainEn) {
+      return ARABIC_SYSTEM_NAMES[mainEn] || mainEn; // fallback بالإنجليزي لو ظهر نظام جديد مش في القاموس (بدل ما يختفي)
+    }
+    function sysGroupIcon(mainAr) {
+      return SYS_GROUP_ICON_AR[mainAr] || "⚙️"; // أيقونة افتراضية لو ظهر قسم جديد مش في القاموس
+    }
+    window.sysGroupIcon = sysGroupIcon; // متاحة لأي كود عرض تاني (كروت/مودال) يحتاج نفس الأيقونة
+    // اسم فرعي عربي كامل = الاسم الرئيسي بالعربي + معنى البند الحقيقي —
+    // بدل ما نلزّق رمز خام زي "6A"/"7B" (مش مفهوم لوحده)، بندوّر عليه في
+    // SUBSYSTEM_ITEM_MEANING ونحط معناه الفعلي. لو الرمز مش موجود في
+    // القاموس:
+    //   • ولو الرمز رقم صرف من غير حرف (زي بعض الأقسام اللي مش متقسّمة
+    //     لبنود فرعية بحرف — بترجع كده من الشيت الخام) → الاسم الرئيسي
+    //     المُترجَم غالبًا كافي ووحيد لوحده، فبنرجّعه لوحده من غير ما
+    //     نلزّق الرقم (بدل "الزراعة والري 11" → "الزراعة والري" بس).
+    //   • ولو فيه حرف في الرمز (زي "9Z" بند جديد لسه ملوش معنى مُسجَّل) →
+    //     نرجع للسلوك القديم (نلزّق الرمز الخام) بدل ما البند يختفي
+    //     تمامًا من الواجهة، عشان يبان إنه بند جديد محتاج تحديث القاموس.
+    // مثال: "HVAC 6A" → "التكييف والتهوية - مكيفات الشباك" بدل "التكييف والتهوية 6A"
+    function arabicSubSystemLabel(labelEn) {
+      const mainEn = mainSystemOf(labelEn);
+      const arMain = arabicMainSystemName(mainEn);
+      const suffix = String(labelEn || "").slice(mainEn.length).trim();
+      if (!suffix) return arMain;
+      const meaning = SUBSYSTEM_ITEM_MEANING[suffix];
+      if (meaning) return `${arMain} - ${meaning.ar}`;
+      return /^\d+$/.test(suffix) ? arMain : `${arMain} ${suffix}`;
+    }
+    // نسخة إنجليزية من نفس الاسم (لو احتجناها في أي تصدير/عرض ثنائي اللغة) —
+    // بترجع معنى البند الحقيقي بالإنجليزي بدل الرمز الخام، بنفس منطق
+    // arabicSubSystemLabel أعلاه تمامًا (رقم صرف بلا معنى → المين وحده).
+    function englishSubSystemLabel(labelEn) {
+      const mainEn = mainSystemOf(labelEn);
+      const suffix = String(labelEn || "").slice(mainEn.length).trim();
+      if (!suffix) return mainEn;
+      const meaning = SUBSYSTEM_ITEM_MEANING[suffix];
+      if (meaning) return `${mainEn} - ${meaning.en}`;
+      return /^\d+$/.test(suffix) ? mainEn : `${mainEn} ${suffix}`;
+    }
+    window.englishSubSystemLabel = englishSubSystemLabel;
+    const SYS_PRIORITY_AR = { High: "مرتفعة", Medium: "متوسطة", Low: "منخفضة" };
+
+    // تطبيع كل صف (زيارة/Work Order) من الملف الجديد لسجل موحّد —
+    // + بناء خريطة "آخر زيارة لكل مدرسة" (الأحدث بتاريخ Completed At يفوز).
+    const allSystemsNorm = [];
+    const latestSystemsMap = {}; // key: رقم_وزاري → آخر سجل موحّد للمدرسة دي
+    let __sysSkippedNoId = 0;
+    allSystems.forEach((row) => {
+      const ministryIdRaw = String(row["Ministry ID"] ?? "").trim();
+      const schoolIdNorm = window.normSchoolId(ministryIdRaw);
+      if (!schoolIdNorm) { __sysSkippedNoId++; return; } // صف بدون رقم وزاري صالح — نتجاهله
+      const meta = schoolMetaMap[schoolIdNorm] || null;
+      const completedAtRaw = String(row["Completed At"] ?? "").trim();
+      const completedAtObj = parseSystemsDate(completedAtRaw);
+      const submissionScorePct = (() => {
+        const v = parseFloat(row["Submission Total Score %"]);
+        return isNaN(v) ? null : v;
+      })();
+      const overallBandRaw = String(row["Overall Condition Band"] ?? "").trim();
+      const subsystems = SYS_SUBSYSTEM_KEYS.map((label) => {
+        const ratingRaw = row[label + " — Rating"];
+        const rating = ratingRaw != null && String(ratingRaw).trim() !== "" && !isNaN(parseFloat(ratingRaw))
+          ? parseFloat(ratingRaw) : null;
+        const priorityEn = String(row[label + " — Priority"] ?? "").trim() || null;
+        return {
+          key: arabicSubSystemLabel(label), // 🇸🇦 الاسم المعروض (عربي بالكامل)
+          keyEn: label, // احتياطي: اسم العمود الإنجليزي الخام في الشيت
+          mainSystem: arabicMainSystemName(mainSystemOf(label)), // 🇸🇦
+          mainSystemEn: mainSystemOf(label), // احتياطي
+          rating, // 1 = ممتاز (أفضل) ... 5 = ضعيف (أسوأ) — زي ما هو في الملف
+          band: String(row[label + " — Band"] ?? "").trim() || null,
+          bandAr: SYS_BAND_AR[String(row[label + " — Band"] ?? "").trim()] || null,
+          priority: priorityEn,
+          priorityAr: SYS_PRIORITY_AR[priorityEn] || priorityEn,
+          weightedScore: (() => { const v = parseFloat(row[label + " — Weighted Score"]); return isNaN(v) ? 0 : v; })(),
+          costSAR: (() => { const v = parseFloat(row[label + " — Cost Total (SAR)"]); return isNaN(v) ? 0 : v; })(),
+        };
+      }).filter((s) => s.rating != null); // نستبعد الأنظمة اللي معندهاش تقييم في الزيارة دي (فاضية)
+
+      const rec = {
+        ministryId: ministryIdRaw,
+        schoolId: schoolIdNorm,
+        schoolName: (meta && meta.name) || String(row["School Name"] ?? "").trim(),
+        city: (meta && meta.city) || null,
+        sector: (meta && meta.sector) || null,
+        siteRaw: String(row["Site"] ?? "").trim(), // نص إنجليزي خام من الملف — للمرجعية فقط، مش مصدر الفلترة
+        workOrder: String(row["Work Order #"] ?? "").trim(),
+        locationCode: String(row["Location Code"] ?? "").trim(),
+        inspectorName: String(row["Inspector Name"] ?? "").trim(),
+        completedAtRaw,
+        completedAtObj,
+        submissionScorePct,
+        overallBandRaw,
+        overallBandAr: SYS_BAND_AR[overallBandRaw] || null,
+        moeCompliant: String(row["MOE Question (12) — Compliant?"] ?? "").trim() || null,
+        subsystems,
+      };
+      allSystemsNorm.push(rec);
+
+      // "الأحدث يفوز دائمًا": لو مفيش سجل قبل كده للمدرسة، أو السجل ده أحدث
+      // تاريخًا من المخزّن، يبقى هو المعتمد.
+      const existing = latestSystemsMap[schoolIdNorm];
+      if (!existing) {
+        latestSystemsMap[schoolIdNorm] = rec;
+      } else if (completedAtObj && (!existing.completedAtObj || completedAtObj > existing.completedAtObj)) {
+        latestSystemsMap[schoolIdNorm] = rec;
+      }
+    });
+    window.RAW_SYSTEMS_NORM = allSystemsNorm; // كل الزيارات (سجل تاريخي — احتياطي لأي استخدام مستقبلي)
+    window.LATEST_SYSTEMS_MAP = latestSystemsMap; // مدرسة واحدة → آخر زيارة بس (المعتمدة في كل تبويبات الأنظمة)
+    console.log("[الأنظمة] latestSystemsMap:", Object.keys(latestSystemsMap).length, "مدرسة —", allSystemsNorm.length, "زيارة إجمالاً");
+    if (allSystems.length && __sysSkippedNoId) {
+      console.warn(`⚠️ [الأنظمة] ${__sysSkippedNoId} من أصل ${allSystems.length} صف في شيت "المدارس_والأنظمة" اتجاهل لعدم وجود "Ministry ID" صالح فيه.`);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 🔗 توحيد مصدر تقييم FCA: "الأحدث تاريخًا يفوز دائمًا" بين مصدرين —
+    // (1) تقييمات_FCA_المراحل (latestFcaMap) و(2) آخر زيارة أنظمة جديدة
+    // (latestSystemsMap، عمود Submission Total Score % هو نفسه تقييم FCA
+    // حسب تأكيد المستخدم). النتيجة (pickUnifiedFca) هي المصدر الوحيد
+    // المعتمد لـ b.fca في كل الداشبورد من هنا فصاعدًا.
+    // ══════════════════════════════════════════════════════════════════════
+    function pickUnifiedFca(schoolIdNorm) {
+      const a = latestFcaMap[schoolIdNorm]; // { score, dateObj, dateRaw }
+      const s = latestSystemsMap[schoolIdNorm]; // { submissionScorePct, completedAtObj, completedAtRaw }
+      const bEntry = s && s.submissionScorePct != null
+        ? { score: s.submissionScorePct, dateObj: s.completedAtObj, dateRaw: s.completedAtRaw, source: "الأنظمة" }
+        : null;
+      const aEntry = a ? { ...a, source: "تقييمات_FCA_المراحل" } : null;
+      if (aEntry && bEntry) {
+        if (!aEntry.dateObj && !bEntry.dateObj) return aEntry; // نفضّل الأقدم تعريفًا لو مفيش تاريخ في الاتنين
+        if (!aEntry.dateObj) return bEntry;
+        if (!bEntry.dateObj) return aEntry;
+        return bEntry.dateObj > aEntry.dateObj ? bEntry : aEntry;
+      }
+      return aEntry || bEntry || null;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 🔁 2026-08-23: طبقة توافق (Adapter) — كل كود عرض تبويبي "الأنظمة
+    // الرئيسية" و"الأنظمة التفصيلية" (renderSysMain, renderSysDetail,
+    // sysBrowse*، دوال التصدير) مبني على فورمات قديم: صف واحد = مدرسة ×
+    // نظام فرعي، بمفاتيح عربية ثابتة ("رقم المدرسة"، "القسم الرئيسي"،
+    // "التقييم (1–5)"، ...إلخ). بدل ما نعيد كتابة كل الكود ده من الصفر (خطر
+    // كبير على استقرار حاجة شغالة ومختبرة)، بنبني هنا مصفوفة بنفس الفورمات
+    // والمفاتيح القديمة بالظبط، لكن مبنية من window.LATEST_SYSTEMS_MAP
+    // (آخر زيارة فقط لكل مدرسة، من الملف الجديد). النتيجة: كل الكود
+    // القديم بيشتغل زي ما هو (فلاتر، بحث، فرز، تصدير CSV/Excel، Modal
+    // التصفح) من غير ما نلمسه، وبيعرض دايمًا آخر تقييم فقط لكل مدرسة
+    // زي ما المستخدم طلب. الرقم بيتعرض زي ما هو في الملف (1=أفضل...5=
+    // أسوأ) — الألوان/الفرز بس اتصلحوا في أماكنهم فوق عشان يفهموا الاتجاه
+    // الصح.
+    // ══════════════════════════════════════════════════════════════════════
+    const systemsFlatForUI = [];
+    Object.values(latestSystemsMap).forEach((rec) => {
+      const baseFields = {
+        "رقم المدرسة": rec.ministryId || rec.schoolId,
+        "رقم_وزاري": rec.ministryId,
+        "رقم وزاري": rec.ministryId,
+        "اسم المدرسة": rec.schoolName,
+        "المدينة الرئيسية": rec.city,
+        "المحافظة": rec.sector,
+        "تاريخ الزيارة": rec.completedAtRaw,
+        "اسم المهندس": rec.inspectorName,
+        "الدرجة الموزونة الكلية للمبنى": rec.submissionScorePct,
+        "فئة الدرجة الموزونة الكلية": rec.overallBandAr,
+      };
+      if (!rec.subsystems || !rec.subsystems.length) {
+        systemsFlatForUI.push({ ...baseFields, "القسم الرئيسي": null, "النظام الفرعي": null, "التقييم (1–5)": null, "فئة التقييم": null });
+        return;
+      }
+      rec.subsystems.forEach((sub) => {
+        systemsFlatForUI.push({
+          ...baseFields,
+          "القسم الرئيسي": sub.mainSystem,
+          "النظام الفرعي": sub.key,
+          "التقييم (1–5)": sub.rating,
+          "فئة التقييم": sub.bandAr,
+        });
+      });
+    });
+    window.RAW_ALL_SYSTEMS = systemsFlatForUI; // 🔁 الآن بيغذي تبويبَي الأنظمة من آخر تقييم فقط لكل مدرسة (الفورمات القديم، بيانات جديدة)
+    window.RAW_ALL_SYSTEMS_SHEET_RAW = allSystems; // نسخة احتياطية من صفوف الشيت الخام كما وصلت (لأي تشخيص مستقبلي)
+
     // 🔄 رقم إصدار البيانات — يزيد كل مرة تُعاد فيها بناء RAW من الشيت
     // (يُستخدم في fcbBuildDashboardSummary لعمل كاش ذكي: نحسب الملخص
     // الثقيل مرة واحدة فقط عند تحديث البيانات، مش مع كل رسالة شات).
@@ -3083,22 +3395,28 @@ let __bgRevalidatedOnce = false;
             linkType: String(b["نوع_المبنى"] ?? "").trim(),
             lng: num(b["خط_الطول"]),
             lat: num(b["خط_العرض"]),
+            // 🔗 2026-08-23: تقييم FCA الموحّد — "الأحدث تاريخًا يفوز دائمًا"
+            // بين تقييمات_FCA_المراحل وآخر زيارة أنظمة (Submission Total
+            // Score %). راجع pickUnifiedFca فوق لتفاصيل المنطق.
             fca: (() => {
-              // آخر تقييم FCA من ملف تقييمات_FCA_المراحل
-              // 🔑 نفس الدالة الموحّدة (window.normSchoolId)
               const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
-              const entry = latestFcaMap[id];
+              const entry = pickUnifiedFca(id);
               return entry ? entry.score : null;
             })(),
             fcaDate: (() => {
               const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
-              const entry = latestFcaMap[id];
+              const entry = pickUnifiedFca(id);
               return entry ? (entry.dateRaw ?? null) : null;
             })(),
             fcaDateObj: (() => {
               const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
-              const entry = latestFcaMap[id];
+              const entry = pickUnifiedFca(id);
               return entry ? (entry.dateObj ?? null) : null;
+            })(),
+            fcaSource: (() => {
+              const id = window.normSchoolId(b["رقم_وزاري"] ?? b["رقم_المدرسة_الوزاري"]);
+              const entry = pickUnifiedFca(id);
+              return entry ? (entry.source ?? null) : null;
             })(),
             envScore: num(b["درجة_البيئة_المدرسية"]),
             envRating: String(b["تقدير_البيئة_المدرسية"] ?? "").trim(),
@@ -3168,9 +3486,22 @@ let __bgRevalidatedOnce = false;
         null != sp.quantity && (r.quantity = sp.quantity),
         null != sp.unitValue && (r.unitValue = sp.unitValue));
     }),
+      // 🛠️ إصلاح 2026-08-23: window.RAW كان دايماً undefined لأن RAW مُعرَّفة
+      // بـ "let" في أعلى المستوى (سطر 413) — وده لا يُنشئ خاصية window.RAW
+      // تلقائياً (بعكس "var"). أي كود بيقرأ "window.RAW" (مش المتغيّر RAW
+      // العاري) كان بيشتغل دايماً على undefined بصمت — وده كان بيعطّل بالكامل:
+      // fcbSchoolNames() (اكتشاف اسم مدرسة في سؤال المستخدم)، aiSchoolSnapshot_
+      // (لقطة بيانات المدرسة)، وبالتبعية كل محرك AIBalaghat (بيانات البلاغات
+      // الكاملة لمدرسة بعينها) — يعني الـ AI كان عملياً عمره ما قدر يربط سؤال
+      // عن مدرسة ببياناتها الحقيقية أو ببلاغاتها. الحل: نعكس window.RAW على
+      // نفس RAW الحقيقية في كل مرة تُعاد بناؤها، زي باقي window.RAW_* هنا بالظبط.
+      (window.RAW = RAW),
       (window.RAW_FCA_HISTORY = fcaHistory),
       (window.RAW_SPARE_PARTS = spareParts),
-      (window.RAW_ALL_SYSTEMS = allSystems),
+      // 🔁 2026-08-23: window.RAW_ALL_SYSTEMS اتبنى فوق بالفعل من طبقة
+      // التوافق (systemsFlatForUI، آخر تقييم فقط لكل مدرسة بالفورمات
+      // القديم) — ما ينفعش نعيد تعيينه هنا لصفوف الشيت الخام تاني (كانت
+      // بتلغي عمل الـ Adapter بالكامل وترجّع الأعمدة الإنجليزية الخام).
       (window.RAW_ELEVATORS = elevators),
       (window.RAW_FM_CONTRACTS = fmContracts),
       (retryCount = 0),
@@ -4625,7 +4956,7 @@ function renderSecuritySafetyTab(_fromDate, _toDate) {
   el.innerHTML = `
   <div class="card mb14">
     <div class="card-title">
-      <span>لوحة الأمن والسلامة</span>
+      <span>لوحة بلاغات الأمن والسلامة</span>
       <span class="sub">${total.toLocaleString()} بلاغ</span>
     </div>
 
@@ -6465,6 +6796,23 @@ function sysScoreDot(score) {
   if (isNaN(s)) return '<span style="color:var(--tx-muted)">—</span>';
   return `<span style="font-weight:800;color:${["", CSS_TOKENS.danger(), CSS_TOKENS.warning(), CSS_TOKENS.warning(), CSS_TOKENS.positive(), CSS_TOKENS.info()][Math.round(s)] || CSS_TOKENS.txMuted()}">${s.toFixed(0)}</span>`;
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// 🔁 2026-08-23: نسخة جديدة لملف الأنظمة الجديد — هنا 1 = أفضل تقييم
+// (ممتاز) و5 = أسوأ تقييم (ضعيف)، عكس sysScoreDot القديمة فوق (اللي كانت
+// مبنية على افتراض 1=الأسوأ). بنعرض الرقم زي ما هو دايمًا (بدون قلب)،
+// وبس بنقلب الألوان عشان تطابق المعنى الصح: 1 = أزرق (ممتاز) ... 5 = أحمر (ضعيف).
+// ══════════════════════════════════════════════════════════════════════
+function sysScoreDotNew(score) {
+  const s = parseFloat(score);
+  if (isNaN(s)) return '<span style="color:var(--tx-muted)">—</span>';
+  return `<span style="font-weight:800;color:${["", CSS_TOKENS.info(), CSS_TOKENS.positive(), CSS_TOKENS.warning(), CSS_TOKENS.warning(), CSS_TOKENS.danger()][Math.round(s)] || CSS_TOKENS.txMuted()}">${s.toFixed(1)}</span>`;
+}
+// فئة نصية (زي SYS_TIER) من متوسط تقييم رقمي بالاتجاه الجديد (1 أفضل...5 أسوأ)
+function sysCatFromRatingNew(v) {
+  if (isNaN(v)) return null;
+  return v <= 1.5 ? "جيد جداً" : v <= 2.5 ? "جيد" : v <= 3.5 ? "متوسط" : "حرج";
+}
 /* ╔════════════════════════════════════════════════════════════╗
    ║  ⚙️  JS تبويب: الأنظمة الرئيسية
    ║  (tab-sys-main) — الدوال الخاصة بهذا التبويب تبدأ هنا
@@ -6512,9 +6860,12 @@ function renderSysMain() {
       !HIDDEN_SYSTEMS.includes(s) &&
       ((sysSum[s] = (sysSum[s] || 0) + v), (sysCnt[s] = (sysCnt[s] || 0) + 1));
   });
+  // 🔁 2026-08-23: في الملف الجديد 1=أفضل تقييم و5=أسوأ — فالفرز تنازلي
+  // (الأسوأ/الأرقام الأعلى أولاً) عشان يفضل نفس منطق "الأولوية" القديم
+  // (الأنظمة الأسوأ تظهر فوق).
   const sysAvg = Object.keys(sysSum)
       .map((k) => ({ name: k, avg: sysSum[k] / sysCnt[k] }))
-      .sort((a, b) => a.avg - b.avg),
+      .sort((a, b) => b.avg - a.avg),
     tierRows = {};
   data.forEach((r) => {
     const sys = r["القسم الرئيسي"],
@@ -6560,7 +6911,7 @@ function renderSysMain() {
   const mainSystems = [...new Set(data.map((r) => r["القسم الرئيسي"]).filter(Boolean))]
     .filter((s) => !HIDDEN_SYSTEMS.includes(s))
     .sort();
-  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية FCA والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1–5)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
+  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية FCA والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1=الأفضل ← 5=الأضعف)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
     tierRows,
   )
     .filter(([k]) => "6" !== k)
@@ -6607,8 +6958,9 @@ function renderSysMain() {
     requestAnimationFrame(() => {
       const avgLabels = sysAvg.filter((s) => "6" !== s.name).map((s) => s.name),
         avgVals = sysAvg.filter((s) => "6" !== s.name).map((s) => +s.avg.toFixed(2)),
+        // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد — الألوان معكوسة
         barColors = avgVals.map((v) =>
-          v >= 4 ? CSS_TOKENS.info() : v >= 3 ? CSS_TOKENS.positive() : v >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(),
+          v <= 1.5 ? CSS_TOKENS.info() : v <= 2.5 ? CSS_TOKENS.positive() : v <= 3.5 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(),
         );
       (killChart("ch-sys-avg"),
         (CHARTS["ch-sys-avg"] = new Chart(document.getElementById("ch-sys-avg"), {
@@ -6635,7 +6987,7 @@ function renderSysMain() {
                 min: 0,
                 max: 5,
                 ticks: { stepSize: 1, font: { size: 10 } },
-                title: { display: !0, text: "التقييم (1–5)", font: { size: 10 } },
+                title: { display: !0, text: "التقييم (1=الأفضل ← 5=الأضعف)", font: { size: 10 } },
               },
               y: { ticks: { font: { size: 10 } } },
             },
@@ -6703,7 +7055,8 @@ function fillSysMainTable(rows) {
                   if (!sg)
                     return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
                   const av = sg.sum / sg.cnt;
-                  return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av >= 4 ? CSS_TOKENS.info() : av >= 3 ? CSS_TOKENS.positive() : av >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${av.toFixed(1)}</td>`;
+                  // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد
+                  return `<td style="padding:8px 6px;text-align:center;font-weight:700;color:${av <= 1.5 ? CSS_TOKENS.info() : av <= 2.5 ? CSS_TOKENS.positive() : av <= 3.5 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${av.toFixed(1)}</td>`;
                 } catch (_) {
                   return '<td style="padding:8px 6px;text-align:center;color:var(--tx-muted)">—</td>';
                 }
@@ -6750,15 +7103,20 @@ function fillSysMainTable(rows) {
               const raw   = Array.isArray(window.RAW) ? window.RAW : [];
 
               // 1. الربط بالرقم الوزاري أولاً (الأدق)
+              // 🔑 2026-08-23: لازم نستخدم window.normSchoolId (تجريد كامل
+              // من أي حروف/شرطات/مسافات ومطابقة بالأرقام الصافية بس) — مش
+              // مقارنة نصية بسيطة (trim+uppercase) — لأن "رقم المدرسة" في
+              // ملف الأنظمة الجديد بييجي بصيغ زي "S-141681" أو "M3934408"،
+              // ولازم يتطابق مع نفس المدرسة في شيت المباني حتى لو كانت
+              // بصيغة مختلفة تمامًا (زي "141681" بس أو بأصفار بادئة).
               let match = null;
               if (minId) {
-                const normV = function (v) {
-                  return String(v || "").replace(/\uFEFF/g, "").trim().toUpperCase();
-                };
-                const normMinId = normV(minId);
-                match = raw.find(function (s) {
-                  return normV(s.minId) === normMinId || normV(s.schoolSeq) === normMinId;
-                });
+                const normMinId = window.normSchoolId(minId);
+                match = normMinId
+                  ? raw.find(function (s) {
+                      return window.normSchoolId(s.minId) === normMinId || window.normSchoolId(s.schoolSeq) === normMinId;
+                    })
+                  : null;
               }
 
               // 2. الربط بالاسم + المدينة (لو مفيش رقم وزاري)
@@ -6805,19 +7163,25 @@ function fillSysMainTable(rows) {
 /* حالة الـ Modal: null = قائمة الرئيسية، string = نظام رئيسي محدد */
 window._sysBrowseState = null;
 
-/* أيقونات لكل نظام رئيسي شائع (تزيينية فقط) */
+/* أيقونات لكل نظام رئيسي شائع (تزيينية فقط) — ملاحظة تحديث 2026-08-24:
+   بعد تجميع الـ11 نظام في 7 أقسام معتمدة (راجع ARABIC_SYSTEM_NAMES و
+   SYS_GROUP_ICON_AR فوق في detectSystemGroups)، بقى عندنا مصدر واحد
+   موثوق للأيقونات (sysGroupIcon، متاحة على window)، فبنستخدمه هنا بدل
+   القاموس القديم اللي كان بيخمّن بالـ substring. لو لأي سبب الدالة
+   مش متاحة وقت التنفيذ، بنرجع لقاموس احتياطي مطابق تمامًا للسبعة أسماء. */
 const SYS_ICONS = {
-  "الكهرباء": "⚡", "التكييف": "❄️", "السباكة": "🚿",
-  "الأمن والسلامة": "🛡️", "المصاعد": "🛗",
-  "الإنشائي": "🏗️", "المدني": "🏗️",
-  "الاتصالات": "📡", "الإطفاء": "🔥",
-  "التشطيبات": "🪟", "الإنارة": "💡",
-  "المولدات": "⚙️", "الصرف الصحي": "🌊",
+  "السلامة والطوارئ": "🚨",
+  "الأعمال المدنية والمعمارية": "🏗️",
+  "التكييف والتهوية": "❄️",
+  "الكهرباء": "⚡",
+  "السباكة وشبكات المياه": "🚿",
+  "الملاعب والمرافق الرياضية": "🏀",
+  "الزراعة والري": "🌳",
 };
 
 function _sysBrowseIcon(name) {
-  for (const k in SYS_ICONS) if (name && name.includes(k.replace(/.*\|/, ""))) return SYS_ICONS[k];
-  return "⚙️";
+  if (typeof window.sysGroupIcon === "function") return window.sysGroupIcon(name);
+  return (name && SYS_ICONS[name]) || "⚙️";
 }
 
 /* فتح الـ Modal على قائمة الأنظمة الرئيسية */
@@ -6884,7 +7248,8 @@ function _sysBrowseRenderMain() {
     const info = sysMap[s];
     const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
     const avgNum = parseFloat(avg);
-    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum >= 4 ? CSS_TOKENS.info() : avgNum >= 3 ? CSS_TOKENS.positive() : avgNum >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+    // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد — الألوان معكوسة
+    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum <= 1.5 ? CSS_TOKENS.info() : avgNum <= 2.5 ? CSS_TOKENS.positive() : avgNum <= 3.5 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
     const icon = _sysBrowseIcon(s);
     const schoolsCnt = info.schools.size;
     return `<div onclick="sysBrowseSelectMain('${s.replace(/'/g,"\\'")}')
@@ -6953,9 +7318,11 @@ function sysBrowseSelectMain(mainSys) {
     const info = subMap[s];
     const avg = info.cnt ? (info.sum / info.cnt).toFixed(1) : "—";
     const avgNum = parseFloat(avg);
-    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum >= 4 ? CSS_TOKENS.info() : avgNum >= 3 ? CSS_TOKENS.positive() : avgNum >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+    // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد — الألوان معكوسة،
+    // وعرض الشريط بقى يمثل "الجودة" (كلما قل الرقم زاد الشريط) مش الرقم الخام.
+    const clr = isNaN(avgNum) ? CSS_TOKENS.txMuted() : avgNum <= 1.5 ? CSS_TOKENS.info() : avgNum <= 2.5 ? CSS_TOKENS.positive() : avgNum <= 3.5 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
     const bar = info.cnt
-      ? Math.round((avgNum / 5) * 100)
+      ? Math.round(((5 - avgNum) / 4) * 100)
       : 0;
     const barClr = clr;
     const schoolsCnt = info.schools.size;
@@ -7054,9 +7421,11 @@ function renderSysDetail() {
       !HIDDEN_SYSTEMS.includes(s) &&
       ((subSum[s] = (subSum[s] || 0) + v), (subCnt[s] = (subCnt[s] || 0) + 1), (subMainMap[s] = m));
   });
+  // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد — فرز تنازلي عشان
+  // يفضل "من الأسوأ للأفضل" زي عنوان الرسم تحت بالظبط.
   const subAvg = Object.keys(subSum)
       .map((k) => ({ name: k, avg: subSum[k] / subCnt[k], main: subMainMap[k], cnt: subCnt[k] }))
-      .sort((a, b) => a.avg - b.avg),
+      .sort((a, b) => b.avg - a.avg),
     subTiers = {};
   data.forEach((r) => {
     const s = r["النظام الفرعي"],
@@ -7131,7 +7500,8 @@ function renderSysDetail() {
               const sg = s.systems[sys];
               if (!sg) return '<td style="text-align:center;color:var(--tx-muted)">—</td>';
               const v = sg.sum / sg.cnt;
-              return `<td style="text-align:center;font-weight:700;color:${v >= 4 ? CSS_TOKENS.info() : v >= 3 ? CSS_TOKENS.positive() : v >= 2 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${v.toFixed(1)}</td>`;
+              // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد
+              return `<td style="text-align:center;font-weight:700;color:${v <= 1.5 ? CSS_TOKENS.info() : v <= 2.5 ? CSS_TOKENS.positive() : v <= 3.5 ? CSS_TOKENS.warning() : CSS_TOKENS.danger()}">${v.toFixed(1)}</td>`;
             })
             .join("");
         return `<tr>\n      <td style="white-space:nowrap">${esc(s.id || "—")}</td>\n      <td style="white-space:normal;word-break:break-word">${esc(s.name || "")}</td>\n      <td style="text-align:center;font-weight:800;color:${scoreClr};white-space:nowrap">${sc > 0 ? sc.toFixed(1) + "%" : "—"}</td>\n      ${cells}\n    </tr>`;
@@ -7151,12 +7521,13 @@ function renderSysDetail() {
       const cats = subTiers[row.name] || {},
         total = row.cnt,
         pctCrit = total ? (((cats["حرج"] || 0) / total) * 100).toFixed(1) : "0.0",
+        // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد
         avgClr =
-          row.avg >= 4
+          row.avg <= 1.5
             ? CSS_TOKENS.info()
-            : row.avg >= 3
+            : row.avg <= 2.5
               ? CSS_TOKENS.positive()
-              : row.avg >= 2
+              : row.avg <= 3.5
                 ? CSS_TOKENS.warning()
                 : CSS_TOKENS.danger(),
         riskW = parseFloat(pctCrit);
@@ -7170,8 +7541,9 @@ function renderSysDetail() {
           s.name,
         ),
         subVals = subAvg.map((s) => +s.avg.toFixed(2)),
+        // 🔁 2026-08-23: 1=أفضل...5=أسوأ في الملف الجديد
         subColors = subVals.map((v) =>
-          v >= 4 ? CSS_TOKENS.info() + "99" : v >= 3 ? CSS_TOKENS.positive() + "99" : v >= 2 ? CSS_TOKENS.warning() + "99" : CSS_TOKENS.danger() + "99",
+          v <= 1.5 ? CSS_TOKENS.info() + "99" : v <= 2.5 ? CSS_TOKENS.positive() + "99" : v <= 3.5 ? CSS_TOKENS.warning() + "99" : CSS_TOKENS.danger() + "99",
         );
       (killChart("ch-syd-avg"),
         (CHARTS["ch-syd-avg"] = new Chart(document.getElementById("ch-syd-avg"), {
@@ -7200,7 +7572,7 @@ function renderSysDetail() {
                 ticks: { stepSize: 1, font: { size: 9 } },
                 title: {
                   display: !0,
-                  text: "التقييم (1–5)",
+                  text: "التقييم (1=الأفضل ← 5=الأضعف)",
                   color: CSS_TOKENS.txMuted(),
                   font: { size: 10, weight: "700" },
                 },
@@ -15470,9 +15842,39 @@ function exportNashatExcel(rows) {
       const AI_MAX_REPLY_TOKENS = 8000;
       // 🔁 لو الموديل لسه اتقطع رغم الحد الكبير ده (تقرير ضخم جداً)، نبعت
       // تلقائياً طلب "كمل" ونلزّق الرد ببعضه — بدل ما نسيب المستخدم يواجه
-      // رد ناقص أو يضطر يكتب "كمل" بنفسه. حد أقصى 3 استكمالات (٤ طلبات
-      // إجمالاً لنفس السؤال) عشان ميحصلش استهلاك غير منطقي للحصة الشهرية.
-      const AI_MAX_CONTINUATIONS = 3;
+      // رد ناقص أو يضطر يكتب "كمل" بنفسه. رفعناها من 3 إلى 6 (٧ طلبات
+      // إجمالاً لنفس السؤال، حتى ~56000 توكن) بطلب صريح من المستخدم في
+      // 2026-08-23: عاوز أي سؤال — مهما طال أو احتاج تفكير — يتجاوب عليه
+      // كامل من غير ما يتقطع، حتى لو استهلك أكتر من الحصة الشهرية.
+      const AI_MAX_CONTINUATIONS = 6;
+
+      // 🛡️ تحمّل الأخطاء العابرة (شبكة/مهلة/429/5xx) — 2026-08-23:
+      // قبل كده أي فشل في أول طلب كان بيوقّف كل حاجة فوراً ويوريّ المستخدم
+      // "⚠️ فشل الاتصال" حتى لو السبب مؤقت بحت (بطء شبكة، انقطاع لحظي،
+      // ازدحام على الموديل). دلوقتي: نعيد المحاولة تلقائياً لحد 2 مرة
+      // إضافية (3 محاولات إجمالاً) بفاصل متزايد، وبعد مهلة معقولة لكل
+      // طلب (120 ثانية) عشان الأسئلة اللي تحتاج تفكير طويل ماتتقطعش قبل
+      // ما تخلص، لكن كمان ما تسيبش المستخدم واقف يستنى للأبد لو فعلاً
+      // الاتصال معلّق.
+      const AI_REQUEST_TIMEOUT_MS = 120000;
+      const AI_MAX_RETRIES = 2;
+      const AI_RETRY_DELAYS_MS = [1500, 4000];
+
+      const isUserAbort = () => !!(window.__FCB_ABORT && window.__FCB_ABORT.signal && window.__FCB_ABORT.signal.aborted);
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const isTransientError = (err) => {
+        if (isUserAbort()) return false; // المستخدم نفسه ألغى — ما نعيدش المحاولة
+        if (err && err.code === "TIMEOUT") return true;
+        if (err && err.code === "REQUEST_FAILED") {
+          // أخطاء شبكة عامة (fetch نفسها فشلت قبل الوصول لسيرفر) أو حالات
+          // مؤقتة معروفة (429 ازدحام، 5xx مشكلة مؤقتة في السيرفر/الوسيط)
+          if (err.status === 429 || (err.status >= 500 && err.status < 600)) return true;
+          if (!err.status && /network|fetch|failed to fetch|load failed/i.test(err.message || "")) return true;
+        }
+        return false;
+      };
+      const isContextLengthError = (err) =>
+        !!(err && /context[_\s-]?length|maximum context|too many tokens|context_length_exceeded|reduce the length|too long/i.test(err.message || ""));
 
       const buildPayload = (msgs) =>
         useFileSearch
@@ -15489,48 +15891,116 @@ function exportNashatExcel(rows) {
               max_completion_tokens: AI_MAX_REPLY_TOKENS,
             };
 
-      const singleRequest = async (msgs) => {
-        const resp = await fetch(targetUrl, {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(buildPayload(msgs)),
-          signal: window.__FCB_ABORT ? window.__FCB_ABORT.signal : undefined, // Task 3
-        });
-        if (!resp.ok) {
-          let errMsg = "HTTP " + resp.status;
+      const singleAttempt = async (msgs) => {
+        // نربط مهلة الطلب (timeout) بإلغاء المستخدم اليدوي (لو موجود) في
+        // controller واحد محلي، عشان لو أي منهم اتفعّل نوقف الـ fetch فوراً.
+        const localController = new AbortController();
+        const extSignal = window.__FCB_ABORT ? window.__FCB_ABORT.signal : null;
+        const onExtAbort = () => localController.abort();
+        if (extSignal) {
+          if (extSignal.aborted) localController.abort();
+          else extSignal.addEventListener("abort", onExtAbort);
+        }
+        const timer = setTimeout(() => localController.abort(), AI_REQUEST_TIMEOUT_MS);
+        try {
+          let resp;
           try {
-            const errJson = await resp.json();
-            errMsg = errJson?.error?.message || errMsg;
-          } catch (_) {}
-          const err = new Error(errMsg);
-          err.code = resp.status === 401 ? "INVALID_KEY" : "REQUEST_FAILED";
-          throw err;
+            resp = await fetch(targetUrl, {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify(buildPayload(msgs)),
+              signal: localController.signal,
+            });
+          } catch (fetchErr) {
+            if (isUserAbort()) { const e = new Error("ABORTED"); e.code = "ABORTED"; throw e; }
+            if (fetchErr && fetchErr.name === "AbortError") { const e = new Error("انتهت مهلة الاتصال بالخادم"); e.code = "TIMEOUT"; throw e; }
+            const e = new Error(fetchErr && fetchErr.message ? fetchErr.message : "تعذّر الوصول للخادم");
+            e.code = "REQUEST_FAILED";
+            throw e;
+          }
+          if (!resp.ok) {
+            let errMsg = "HTTP " + resp.status;
+            try {
+              const errJson = await resp.json();
+              errMsg = errJson?.error?.message || errMsg;
+            } catch (_) {}
+            const err = new Error(errMsg);
+            err.code = resp.status === 401 ? "INVALID_KEY" : "REQUEST_FAILED";
+            err.status = resp.status;
+            throw err;
+          }
+          const data = await resp.json();
+          // نقرأ الرد من الصيغتين: Responses API (output/output_text) أو chat/completions (choices)
+          let text = null;
+          if (typeof data?.output_text === "string" && data.output_text.trim()) {
+            text = data.output_text.trim();
+          } else if (Array.isArray(data?.output)) {
+            text = data.output
+              .filter((it) => it?.type === "message")
+              .flatMap((it) => it.content || [])
+              .filter((c) => c?.type === "output_text" && c.text)
+              .map((c) => c.text)
+              .join("\n")
+              .trim() || null;
+          }
+          if (!text) text = data?.choices?.[0]?.message?.content?.trim();
+          if (!text) {
+            const err = new Error("EMPTY_RESPONSE");
+            err.code = "EMPTY_RESPONSE";
+            throw err;
+          }
+          // كشف القطع بسبب حد الطول تحديداً (مش أي سبب توقف تاني زي stop العادي)
+          const truncated = useFileSearch
+            ? data?.status === "incomplete" && data?.incomplete_details?.reason === "max_output_tokens"
+            : data?.choices?.[0]?.finish_reason === "length";
+          return { text, truncated };
+        } finally {
+          clearTimeout(timer);
+          if (extSignal) extSignal.removeEventListener("abort", onExtAbort);
         }
-        const data = await resp.json();
-        // نقرأ الرد من الصيغتين: Responses API (output/output_text) أو chat/completions (choices)
-        let text = null;
-        if (typeof data?.output_text === "string" && data.output_text.trim()) {
-          text = data.output_text.trim();
-        } else if (Array.isArray(data?.output)) {
-          text = data.output
-            .filter((it) => it?.type === "message")
-            .flatMap((it) => it.content || [])
-            .filter((c) => c?.type === "output_text" && c.text)
-            .map((c) => c.text)
-            .join("\n")
-            .trim() || null;
+      };
+
+      // ✂️ تقليص السياق تلقائياً لو الخطأ بسبب تجاوز الحد الأقصى للتوكنز —
+      // نسيب أول رسالة (system prompt) وآخر رسالة (سؤال المستخدم الحالي)
+      // زي ما هم، ونشيل من "منتصف" السياق (سجل المحادثة السابق) تدريجياً
+      // بدل ما نفشل نهائياً ونضيّع السؤال كله.
+      const trimForContextLength = (msgs) => {
+        if (msgs.length <= 2) return null; // مفيش تاريخ نقدر نشيله أصلاً
+        const dropCount = Math.max(2, Math.floor((msgs.length - 2) / 2));
+        const head = msgs.slice(0, 1);
+        const tail = msgs.slice(-1);
+        const middle = msgs.slice(1, -1);
+        const trimmedMiddle = middle.slice(dropCount);
+        return head.concat(trimmedMiddle, tail);
+      };
+
+      /** طلب واحد + إعادة محاولة تلقائية عند فشل عابر + تقليص تلقائي عند تجاوز حد التوكنز */
+      const singleRequest = async (msgs) => {
+        let attemptMsgs = msgs;
+        let lastErr = null;
+        for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
+          try {
+            return await singleAttempt(attemptMsgs);
+          } catch (err) {
+            lastErr = err;
+            console.error("[AIService.chat] فشلت المحاولة", attempt + 1, "من", AI_MAX_RETRIES + 1, "— الكود:", err?.code, "— الرسالة:", err?.message);
+            if (err && err.code === "ABORTED") throw err; // إلغاء يدوي — لا تعيد المحاولة
+            if (isContextLengthError(err)) {
+              const trimmed = trimForContextLength(attemptMsgs);
+              if (trimmed) {
+                console.warn("[AIService.chat] تجاوز حد السياق — تقليص تلقائي لسجل المحادثة وإعادة المحاولة.");
+                attemptMsgs = trimmed;
+                continue; // نعيد فوراً بنفس رقم المحاولة الحالية بسياق أصغر
+              }
+            }
+            if (attempt < AI_MAX_RETRIES && isTransientError(err)) {
+              await sleep(AI_RETRY_DELAYS_MS[attempt] || 4000);
+              continue;
+            }
+            throw err;
+          }
         }
-        if (!text) text = data?.choices?.[0]?.message?.content?.trim();
-        if (!text) {
-          const err = new Error("EMPTY_RESPONSE");
-          err.code = "EMPTY_RESPONSE";
-          throw err;
-        }
-        // كشف القطع بسبب حد الطول تحديداً (مش أي سبب توقف تاني زي stop العادي)
-        const truncated = useFileSearch
-          ? data?.status === "incomplete" && data?.incomplete_details?.reason === "max_output_tokens"
-          : data?.choices?.[0]?.finish_reason === "length";
-        return { text, truncated };
+        throw lastErr;
       };
 
       let working = messages.slice();
@@ -15763,6 +16233,11 @@ function exportNashatExcel(rows) {
     // ⚙️ تبويب الأنظمة الرئيسية والتفصيلية (window.RAW_ALL_SYSTEMS)
     // ════════════════════════════════════════════════════════════════
     try {
+      // 🔁 2026-08-23: window.RAW_ALL_SYSTEMS بقى مبني من آخر تقييم فقط لكل
+      // مدرسة (شيت المدارس_والأنظمة الجديد، عبر طبقة التوافق). مهم جدًا:
+      // في المصدر الجديد 1 = أفضل تقييم (ممتاز) و5 = أسوأ تقييم (ضعيف) —
+      // عكس المتوقع لأي نموذج تقييم تقليدي، فلازم نوضّح ده صراحةً للـ AI
+      // عشان ما يفسّرش رقم قريب من 5 على إنه "ممتاز".
       const sysRaw = Array.isArray(window.RAW_ALL_SYSTEMS) ? window.RAW_ALL_SYSTEMS : [];
       if (sysRaw.length) {
         const schoolScores = {};
@@ -15787,12 +16262,19 @@ function exportNashatExcel(rows) {
             sysCnt[s] = (sysCnt[s] || 0) + 1;
           }
         });
+        const catFromAvgNew = (v) => v <= 1.5 ? "جيد جداً" : v <= 2.5 ? "جيد" : v <= 3.5 ? "متوسط" : "حرج";
+        // ترتيب تنازلي (الأسوأ/الأعلى رقمًا أولاً) عشان يطابق اسم الحقل "من الأضعف للأقوى"
         const متوسط_كل_نظام_رئيسي = Object.keys(sysSum)
-          .map((k) => ({ النظام: k, المتوسط_من_5: +(sysSum[k] / sysCnt[k]).toFixed(2), عدد_التقييمات: sysCnt[k] }))
-          .sort((a, b) => a.المتوسط_من_5 - b.المتوسط_من_5);
+          .map((k) => {
+            const avg = +(sysSum[k] / sysCnt[k]).toFixed(2);
+            return { النظام: k, متوسط_التقييم_1_أفضل_5_أسوأ: avg, الفئة: catFromAvgNew(avg), عدد_التقييمات: sysCnt[k] };
+          })
+          .sort((a, b) => b.متوسط_التقييم_1_أفضل_5_أسوأ - a.متوسط_التقييم_1_أفضل_5_أسوأ);
         const مدن = [...new Set(sysRaw.map((r) => r["المدينة الرئيسية"]).filter(Boolean))];
         summary.الأنظمة_الرئيسية_والتفصيلية = {
-          مصدر: "تبويب الأنظمة الرئيسية والتفصيلية — ملف جميع_المدن_جميع_الانظمة",
+          مصدر: "تبويب الأنظمة الرئيسية والتفصيلية — شيت المدارس_والأنظمة (آخر زيارة تفتيش فقط لكل مدرسة)",
+          "⚠️_مهم_اتجاه_التقييم": "في هذا المصدر 1 = أفضل تقييم (ممتاز) و5 = أسوأ تقييم (ضعيف) — عكس الافتراض المعتاد. لا تفسّر رقمًا قريبًا من 5 على إنه جيد.",
+          ملاحظة_الربط_بـFCA: "الدرجة الموزونة الكلية للمبنى هنا (Submission Total Score %) هي نفسها مصدر تقييم FCA لهذه المدرسة إذا كانت زيارة الأنظمة أحدث من آخر تقييم في تقييمات_FCA_المراحل — راجع حقل fca/fcaSource لكل مدرسة في summary.مدارس أو RAW.",
           إجمالي_سجلات_التقييم: sysRaw.length,
           عدد_المدارس_المقيّمة_بالأنظمة: Object.keys(schoolScores).length,
           متوسط_الدرجة_الموزونة_الكلية_للمباني: avgScore,
@@ -16731,79 +17213,12 @@ function exportNashatExcel(rows) {
       }
     } catch(e) { summary.حصر_الأصول = { تنبيه: "تعذّر تلخيص بيانات حصر الأصول: " + (e?.message||e) }; }
 
-    // ════════════════════════════════════════════════════════════════
-    // 👥 تبويب تقييم الموظفين — ملخص للشاتبوت
-    // ════════════════════════════════════════════════════════════════
-    // ⚠️  AI MAINTAINER NOTE:
-    // إذا أضفت تبويباً جديداً في المستقبل، أضف ملخصه هنا بنفس النمط
-    // حتى يعرف الشاتبوت عنه ويقدر يجاوب أسئلة المستخدمين.
-    // النمط: summary.اسم_التبويب = { بيانات... }
-    // ════════════════════════════════════════════════════════════════
-    try {
-      const empRows = window.RAW_EMP_KPI || [];
-      if (empRows.length) {
-        const n_ = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
-        const str = v => String(v||'').trim();
-        const total = empRows.length;
-
-        /* إحصاءات التقديرات */
-        const gradeCount = {};
-        ['ممتاز','جيد جداً','جيد','يحتاج تحسين','ضعيف'].forEach(g => {
-          gradeCount[g] = empRows.filter(r=>str(r['التقدير'])===g).length;
-        });
-
-        /* متوسطات المؤشرات */
-        const avgOf = key => +(empRows.reduce((s,r)=>s+n_(r[key]),0)/total).toFixed(1);
-
-        /* توزيع حسب المنطقة */
-        const regionMap = {};
-        empRows.forEach(r => {
-          const reg = str(r['المنطقة']); if (!reg) return;
-          if (!regionMap[reg]) regionMap[reg] = { count:0, scoreSum:0 };
-          regionMap[reg].count++;
-          regionMap[reg].scoreSum += n_(r['الدرجة']);
-        });
-        const byRegion = Object.entries(regionMap).map(([reg, v]) => ({
-          المنطقة: reg,
-          عدد_الموظفين: v.count,
-          متوسط_الدرجة: +(v.scoreSum/v.count).toFixed(1),
-        })).sort((a,b)=>b.متوسط_الدرجة-a.متوسط_الدرجة);
-
-        /* أفضل 5 وأدنى 5 موظفين */
-        const sorted = [...empRows].sort((a,b)=>n_(b['الدرجة'])-n_(a['الدرجة']));
-        const top5   = sorted.slice(0,5).map(r=>({ الاسم:str(r['اسم الموظف']), الدور:str(r['الدور']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
-        const bot5   = sorted.slice(-5).reverse().map(r=>({ الاسم:str(r['اسم الموظف']), الدور:str(r['الدور']), المنطقة:str(r['المنطقة']), الدرجة:n_(r['الدرجة']), التقدير:str(r['التقدير']) }));
-
-        summary.تقييم_الموظفين = {
-          ملاحظة: "بيانات تبويب تقييم الموظفين — تقييم أداء الموظفين الميدانيين",
-          إجمالي_الموظفين: total,
-          عدد_المناطق: Object.keys(regionMap).length,
-          متوسط_الدرجة_الكلية: avgOf('الدرجة'),
-          توزيع_التقديرات: {
-            ممتاز:        { عدد: gradeCount['ممتاز'],        نسبة: ((gradeCount['ممتاز']||0)/total*100).toFixed(1)+'%' },
-            جيد_جداً:    { عدد: gradeCount['جيد جداً'],    نسبة: ((gradeCount['جيد جداً']||0)/total*100).toFixed(1)+'%' },
-            جيد:          { عدد: gradeCount['جيد'],          نسبة: ((gradeCount['جيد']||0)/total*100).toFixed(1)+'%' },
-            يحتاج_تحسين: { عدد: gradeCount['يحتاج تحسين'], نسبة: ((gradeCount['يحتاج تحسين']||0)/total*100).toFixed(1)+'%' },
-            ضعيف:         { عدد: gradeCount['ضعيف'],         نسبة: ((gradeCount['ضعيف']||0)/total*100).toFixed(1)+'%' },
-          },
-          متوسط_المؤشرات: {
-            الإنجاز:         avgOf('الإنجاز %'),
-            توثيق_بالصور:   avgOf('توثيق بالصور %'),
-            التعليقات:       avgOf('التعليقات %'),
-            جودة_التقرير:   avgOf('جودة التقرير %'),
-            وقت_الزيارة:     avgOf('وقت الزيارة %'),
-          },
-          الأداء_حسب_المنطقة: byRegion,
-          أفضل_5_موظفين: top5,
-          أدنى_5_موظفين: bot5,
-        };
-      } else {
-        summary.تقييم_الموظفين = {
-          تنبيه: "لم تُحمَّل بيانات تقييم الموظفين بعد.",
-          تعليمات_للمساعد: "أخبر المستخدم إن البيانات غير متاحة — تأكد من وجود شيت 'تقييم_الموظفين' في Google Sheet وأن الـ Apps Script يقرأها.",
-        };
-      }
-    } catch(e) { summary.تقييم_الموظفين = { تنبيه: "تعذّر تلخيص بيانات تقييم الموظفين: " + (e?.message||e) }; }
+    // ⛔ تبويب "تقييم الموظفين" أُخفي بالكامل من اللوحة بطلب صريح من
+    // المستخدم في 2026-08-23 (بيانات غير جاهزة/مرتبة بعد — هيُضاف بيانات
+    // صحيحة لاحقاً) — تم شيل تلخيصه هنا عمداً عشان الـ AI ميرجعش يذكره أو
+    // يجاوب عليه بأرقام قديمة، بما إن التبويب نفسه بقى غير موجود في اللوحة.
+    // الكود اللي بيقرأ window.RAW_EMP_KPI وبيرسم التبويب لسه موجود من غير
+    // حذف (احتياطاً لحد ما تتوفر بيانات صحيحة)، بس مبقاش بيوصل للـ AI.
 
 
     // ⛔ تبويب "مؤشرات أداء فريق السلامة" أُخفي بالكامل من اللوحة بطلب صريح
@@ -17457,6 +17872,10 @@ function exportNashatExcel(rows) {
     const idx = aiBalaghGetIndex_();
     let rows = q.school ? aiBalaghGetReportsForSchool_(q.school) : idx.rows;
     if (q.status) rows = rows.filter((r) => String(r.status || "").includes(q.status));
+    // 🏙️ فلتر المدينة — أُضيف 2026-08-23 عشان أسئلة عامة زي "بلاغات جدة"
+    // من غير اسم مدرسة. بنفحص city (TBC مدينة) و linkedCity (مدينة المدرسة
+    // المرتبطة من ملف المباني) معاً لأن أحياناً واحد منهم فاضي والتاني لأ.
+    if (q.city) rows = rows.filter((r) => String(r.city || "").includes(q.city) || String(r.linkedCity || "").includes(q.city));
     if (q.priority) rows = rows.filter((r) => String(r.priority || "").includes(q.priority));
     if (q.category) rows = rows.filter((r) => String(r.category || "").includes(q.category));
     if (q.subcategory) rows = rows.filter((r) => String(r.subCategory || "").includes(q.subcategory));
@@ -17482,11 +17901,98 @@ function exportNashatExcel(rows) {
       total: rows.length,
       returned: Math.min(rows.length, limit),
       rows: rows.slice(0, limit).map((r) => ({
-        رقم: r.recordNo, مدرسة: r.linkedSchoolName || r.schoolName, حالة: r.status,
+        رقم: r.recordNo, مدرسة: r.linkedSchoolName || r.schoolName, مدينة: r.city || r.linkedCity || null, حالة: r.status,
         فئة: r.category, فئة_فرعية: r.subCategory, أولوية: r.priority, sla: r.slaStatus,
         SLA_أيام: r.slaDurationDays ?? null, المرحلة: r.stage || null, الجنس: r.gender || null, المقاول: r.contractor || null,
         تاريخ: r.creationDate, وصف: (r.problemDescription || "").slice(0, 120),
       })),
+      appliedFilters: q,
+      source: "RAW_BALAGH",
+    };
+  }
+
+  /* ── 4.5) نظرة عامة ذكية على كل البلاغات لما مفيش مدرسة محددة في
+     السؤال — أُضيفت 2026-08-23 بطلب صريح من المستخدم: عاوز الـ AI "يقرأ
+     كل شيت البلاغات" ويجاوب أي سؤال عام (مش بس عن مدرسة بعينها). قبل كده
+     كان السؤال العام بيرجّع أعلى 30 بلاغ مفتوح بس ومفيش أي تفصيل تاني.
+     دلوقتي: (1) نكتشف فلاتر بسيطة من نص السؤال نفسه (مدينة/حالة مفتوح-
+     مغلق-عاجل/فئة رئيسية موجودة فعلياً في البيانات) وننده aiBalaghSearchReports_
+     بيها لو اتكشف أي فلتر، (2) في كل الأحوال نرجّع كمان إحصائيات إجمالية
+     شاملة (توزيعات كاملة + اتجاه شهري) عشان أي سؤال عام — حتى لو مفيهوش
+     كلمة فلترة واضحة — يلاقي بيانات حقيقية كافية. ── */
+  function aiBalaghGeneralOverview_(userText) {
+    const idx = aiBalaghGetIndex_();
+    const rows = idx.rows;
+    const t = String(userText || "");
+
+    // 🏙️ اكتشاف مدينة مذكورة في السؤال (نفس قائمة المدن المستخدمة في باقي المحرك)
+    const cityMatch = t.match(/(?:في|ب|مدينة|مدينه)\s*(مكة|جدة|الطائف|المدينة|القنفذة|الليث|ينبع|العلا|المهد)/)?.[1] || null;
+
+    // 🔓🔒 اكتشاف حالة مذكورة صراحة
+    let statusFilter = null;
+    if (/مغلق|منتهي|تم حله|تم الحل|\bclosed\b/i.test(t)) statusFilter = "closed";
+    else if (/مفتوح|قيد التنفيذ|لسه شغال|\bopen\b/i.test(t)) statusFilter = "open";
+    const urgentFilter = /عاجل|طارئ|حرج|خطور[ةه]|urgent|critical/i.test(t);
+
+    // 🏷️ اكتشاف فئة رئيسية مذكورة — من قيم الفئات الحقيقية الموجودة فعلياً
+    // في البيانات (مش قائمة ثابتة مكتوبة يدوياً) عشان تفضل صحيحة مهما اتغيّرت
+    // فئات الشيت. بنرتب الأطول أولاً لتفادي تطابق جزئي مضلل.
+    const knownCategories = [...new Set(rows.map((r) => r.category).filter(Boolean))].sort((a, b) => b.length - a.length);
+    const categoryMatch = knownCategories.find((c) => t.includes(c)) || null;
+
+    const hasFilter = !!(cityMatch || statusFilter || urgentFilter || categoryMatch);
+    let filtered = null;
+    if (hasFilter) {
+      filtered = aiBalaghSearchReports_({
+        city: cityMatch,
+        category: categoryMatch,
+        openOnly: statusFilter === "open",
+        closedOnly: statusFilter === "closed",
+        urgentOnly: urgentFilter,
+        limit: 80,
+      });
+    }
+
+    // 📊 إحصائيات إجمالية شاملة — بتترجع دايماً بصرف النظر عن وجود فلتر،
+    // عشان أي سؤال عام (حتى لو مفهوش كلمة فلترة واضحة) يلاقي صورة كاملة.
+    const total = rows.length;
+    const open = rows.filter((r) => r.isOpen).length;
+    const closed = rows.filter((r) => r.isClosed).length;
+    const overdue = rows.filter((r) => r.isOverdue).length;
+    const countBy = (key) => {
+      const m = {};
+      rows.forEach((r) => { const v = r[key]; if (v) m[v] = (m[v] || 0) + 1; });
+      return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => ({ القيمة: k, العدد: v }));
+    };
+    const byMonth = {};
+    rows.forEach((r) => {
+      if (!r.creationDateObj) return;
+      const key = r.creationDateObj.getFullYear() + "-" + String(r.creationDateObj.getMonth() + 1).padStart(2, "0");
+      byMonth[key] = (byMonth[key] || 0) + 1;
+    });
+    const monthlyTrend = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([k, v]) => ({ الشهر: k, العدد: v }));
+
+    return {
+      status: "ok",
+      note: hasFilter
+        ? "تم اكتشاف فلتر تلقائياً من نص السؤال (مذكور في appliedFilters) — استخدم بيانات القسم 'نتيجة_مفلترة' كإجابة مباشرة، والإحصائيات_الإجمالية كسياق عام إضافي."
+        : "لا توجد مدرسة ولا فلتر واضح في السؤال — هذه إحصائيات إجمالية شاملة عبر كل المدارس (وليست خاصة بمدرسة بعينها). لو المستخدم يقصد مدرسة معينة، اسأله يحددها.",
+      appliedFilters: hasFilter ? { مدينة: cityMatch, حالة: statusFilter, عاجل: urgentFilter || null, فئة: categoryMatch } : null,
+      نتيجة_مفلترة: filtered,
+      الإحصائيات_الإجمالية: {
+        إجمالي_البلاغات: total,
+        مفتوحة: open,
+        مغلقة: closed,
+        متأخرة_SLA: overdue,
+        توزيع_حسب_الفئة_الرئيسية: countBy("category"),
+        توزيع_حسب_الفئة_الفرعية: countBy("subCategory"),
+        توزيع_حسب_الأولوية: countBy("priority"),
+        توزيع_حسب_الحالة: countBy("status"),
+        توزيع_حسب_حالة_SLA: countBy("slaStatus"),
+        توزيع_حسب_المدينة: countBy("city"),
+        توزيع_حسب_المقاول: countBy("contractor"),
+        الاتجاه_الشهري_آخر_12_شهر: monthlyTrend,
+      },
       source: "RAW_BALAGH",
     };
   }
@@ -17581,12 +18087,35 @@ function exportNashatExcel(rows) {
     if (!minId || !Array.isArray(window.RAW)) return "";
     const schoolRow = window.RAW.find((x) => x.minId === minId);
     if (!schoolRow) return "";
+
+    // 🔗 2026-08-23: نحقن كمان آخر زيارة أنظمة لنفس المدرسة (لو موجودة) —
+    // الربط دايمًا بالرقم الوزاري بعد window.normSchoolId (تجريد كامل من
+    // أي حروف/شرطات/مسافات) عشان يتطابق حتى لو الصيغة مختلفة بين الملفين
+    // (زي "S-141681" في ملف الأنظمة مقابل "141681" في ملف المباني).
+    let systemsSnapshot = null;
+    try {
+      const normId = window.normSchoolId(schoolRow.minId || schoolRow.schoolSeq);
+      const sysRec = normId ? (window.LATEST_SYSTEMS_MAP || {})[normId] : null;
+      if (sysRec) {
+        systemsSnapshot = {
+          آخر_زيارة_تفتيش: sysRec.completedAtRaw || null,
+          الدرجة_الكلية_Submission_Score: sysRec.submissionScorePct ?? null,
+          الفئة_الكلية: sysRec.overallBandAr || null,
+          "⚠️_اتجاه_التقييم": "لكل نظام فرعي تحت: 1 = أفضل تقييم (ممتاز)، 5 = أسوأ تقييم (ضعيف) — لا تقلب الاتجاه.",
+          الأنظمة_الفرعية: (sysRec.subsystems || []).map((s) => ({
+            النظام: s.key, التقييم_1_أفضل_5_أسوأ: s.rating, الفئة: s.bandAr, الأولوية: s.priorityAr,
+          })),
+        };
+      }
+    } catch (_) {}
+
     return (
       `\n\nلقطة بيانات عامة لمدرسة "${schoolRow.name}" (مصدرها RAW — ملف المباني، نفس بيانات تبويبات FCA/البيئة المدرسية/تقييم عاين/تقييم منصة أصول):\n` +
       JSON.stringify({
         الاسم: schoolRow.name,
         الرقم_الوزاري: schoolRow.minId,
         نسبة_FCA: schoolRow.fca ?? null,
+        مصدر_تقييم_FCA: schoolRow.fcaSource ?? null, // "تقييمات_FCA_المراحل" أو "الأنظمة" — أيهما كان أحدث تاريخًا
         نسبة_البيئي: schoolRow.envScore ?? null,
         تصنيف_بيئي: schoolRow.envRating ?? null,
         تقييم_عاين: schoolRow.ayenScore ?? null,
@@ -17599,7 +18128,8 @@ function exportNashatExcel(rows) {
         عمر_المبنى: schoolRow.buildingAge ?? null,
         عدد_الفصول: schoolRow.classrooms ?? null,
         تاريخ_آخر_تقييم_FCA: schoolRow.fcaDate ?? null,
-        source: "RAW (ملف المباني)",
+        الأنظمة_الرئيسية_والتفصيلية_لهذه_المدرسة: systemsSnapshot, // null لو لسه مفيش زيارة أنظمة مرتبطة بالرقم الوزاري ده
+        source: "RAW (ملف المباني) + آخر زيارة أنظمة من شيت المدارس_والأنظمة",
         ملاحظة: "لا يحتوي عدد بلاغات — لعدد البلاغات استخدم DATA_RESULT (بلاغات) فقط لو موجود في نفس الرسالة.",
       })
     );
@@ -17945,6 +18475,47 @@ function exportNashatExcel(rows) {
     return { عمليات_محسوبة: ops.map(fcbRunCalcOp) };
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     🔌 محرك الاستعلام الحر للبلاغات (balagh_query) — أُضيف 2026-08-23
+     بطلب صريح من المستخدم: "عاوز نربط الـ AI نفسه بالبلاغات" — يعني
+     الموديل نفسه يقدر "يطلب" استعلام حقيقي من محرك AIBalaghat لما
+     يحتاجه، بدل ما يكون مقتصراً بس على اللي محقون تلقائياً قبل السؤال
+     (زي محرك calc بالظبط، بس هنا بيرجع بيانات بلاغات حقيقية من
+     RAW_BALAGH مش نتيجة حساب). راجع تعليمات "محرك استعلام البلاغات
+     الحر" في systemPrompt للصيغة الكاملة. ── */
+  function fcbExtractAndRunBalaghQuery(replyText) {
+    const m = String(replyText || "").match(/```balagh_query\s*([\s\S]*?)```/);
+    if (!m) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(m[1].trim());
+    } catch (e) {
+      return { خطأ_تحليل: "تعذّر قراءة صيغة استعلام البلاغات المطلوبة: " + e.message };
+    }
+    try {
+      if (!aiBalaghIsDataReady_()) {
+        return { status: "not_ready", note: "بيانات البلاغات لسه بتحمّل أو محصلش تحميلها بعد." };
+      }
+      if (parsed && typeof parsed.school === "string" && parsed.school.trim()) {
+        const found = aiBalaghFindSchool_(parsed.school.trim());
+        if (found.status === "ambiguous") {
+          return { status: "ambiguous", candidates: found.candidates.map((c) => c.name), note: "فيه أكتر من مدرسة بنفس درجة التشابه — اسأل المستخدم يحدد أنهي مدرسة بالضبط." };
+        }
+        if (found.status !== "found" || !found.school) {
+          return { status: "not_found", note: 'لم يتم العثور على مدرسة بالاسم "' + parsed.school.trim() + '" فعلياً في بيانات المباني — تأكد من الاسم أو اسأل المستخدم يوضحه، ولا تخترع بيانات لمدرسة غير موجودة.' };
+        }
+        const result = aiBalaghGetSchoolStats_(found.school);
+        result.query = "school";
+        return result;
+      }
+      const result = aiBalaghSearchReports_(parsed || {});
+      result.query = "filtered";
+      return result;
+    } catch (e) {
+      return { خطأ_تنفيذ: "تعذّر تنفيذ استعلام البلاغات: " + (e?.message || e) };
+    }
+  }
+
 
   /* ════════════════════════════════════════════════════════════════
      ⚙️ محرك الاستعلامات الذكي (Smart Query Engine)
@@ -18121,18 +18692,10 @@ function exportNashatExcel(rows) {
         extraContext += aiSchoolSnapshot_(r.matchedSchoolId);
         __snapshotSchoolIdInjected = r.matchedSchoolId;
       } else if (balaghResolution.status === "not_found") {
-        // مفيش مدرسة محددة في السؤال ولا في السياق — نظرة عامة على كل المدارس
-        const idx = aiBalaghGetIndex_();
-        const open30 = idx.rows.filter((r) => r.isOpen).slice(0, 30).map((r) => ({
-          رقم: r.recordNo, حالة: r.status, فئة: r.category, فئة_فرعية: r.subCategory,
-          أولوية: r.priority, مدرسة: r.linkedSchoolName || r.schoolName, مدينة: r.city,
-          sla: r.slaStatus, مشكلة: (r.problemDescription || "").slice(0, 80),
-        }));
-        extraContext += `\n\nDATA_RESULT (لا توجد مدرسة محددة في السؤال):\n${JSON.stringify({
-          status: "not_found_school",
-          note: "لم يُذكر اسم مدرسة محدد ولا يوجد سياق سابق — هذه بيانات عامة عبر كل المدارس (أعلى 30 بلاغ مفتوح)، وليست خاصة بمدرسة بعينها. وضّح ذلك للمستخدم لو رد بأرقام منها.",
-          أعلى_30_بلاغ_مفتوح: open30,
-        })}`;
+        // مفيش مدرسة محددة في السؤال ولا في السياق — نظرة عامة ذكية (فلتر
+        // تلقائي لو اتكشف + إحصائيات إجمالية شاملة). راجع aiBalaghGeneralOverview_.
+        const overview = aiBalaghGeneralOverview_(userText);
+        extraContext += `\n\nDATA_RESULT (لا توجد مدرسة محددة في السؤال — نظرة عامة/مفلترة):\n${JSON.stringify(overview)}`;
       }
     }
 
@@ -18283,10 +18846,49 @@ function exportNashatExcel(rows) {
 
 1) الأنظمة الرئيسية FCA / الأنظمة التفصيلية FCA (تبويبَي sys-main و
    sys-detail، من ملف "المدارس_والأنظمة"): دي الأنظمة الإنشائية/الفنية
-   (كهرباء، سباكة، تكييف، سلامة... إلخ) اللي تقييمها هو **سبب** درجة
-   FCA للمدرسة — يعني كل نظام فرعي بياخد تقييم من 1-5، ومتوسط كل الأنظمة
-   دي هو اللي بيحدد درجة FCA. لو حد سأل عن "أسوأ نظام" أو "الأنظمة
-   المتضررة" في سياق تقييم المباني/الصيانة الفنية، فده المقصود.
+   (كهرباء، سباكة، تكييف، سلامة... إلخ) اللي تقييمها مرتبط مباشرة بدرجة
+   FCA للمدرسة — كل نظام فرعي بياخد تقييم من 1-5، ومتوسط كل الأنظمة دي
+   هو اللي بيحدد الدرجة الكلية للمبنى (Submission Total Score %).
+
+   ⚠️ اتجاه التقييم (مهم جداً، اتغيّر في 2026-08-23): في هذا المصدر
+   **1 = أفضل تقييم (ممتاز) و5 = أسوأ تقييم (ضعيف)** — عكس أي افتراض
+   تقليدي بإن الرقم الأعلى أحسن. لو حد سأل عن "أسوأ نظام" فالمقصود
+   النظام اللي متوسطه **أقرب لـ5**، ولو سأل عن "أفضل نظام" فالمقصود
+   الأقرب لـ1. متوسط_كل_نظام_رئيسي_من_الأضعف_للأقوى في ملخص اللوحة
+   مرتب بالفعل من الأسوأ (الأعلى رقمًا) للأفضل (الأقل رقمًا) — استخدمه
+   زي ما هو من غير ما تقلب الترتيب.
+
+   ⚠️ آخر تقييم فقط: لو مدرسة اتزارت أكتر من مرة، البيانات هنا بتعرض
+   دايمًا آخر زيارة تفتيش بس (بتاريخ Completed At) — بالظبط زي مبدأ
+   "آخر تقييم FCA" المعتاد.
+
+   📖 دليل مسميات الأنظمة الفرعية (مُحدَّث 2026-08-24): كل نظام فرعي
+   بيظهر لك دلوقتي باسم واضح كامل بصيغة "القسم الرئيسي - معنى البند"
+   (مثال: "التكييف والتهوية - مكيفات الشباك"، "الكهرباء - حالة لوحات
+   التوزيع") بدل رمز خام زي "6A" أو "7B" وحده. لو المستخدم سأل برمز
+   خام قديم (زي "4A" أو "5C" أو "8F") بدل الاسم الكامل، طابقه بالجدول
+   ده وارجعله بالاسم الكامل مش الرمز:
+   4A=طفايات حريق · 4B=رشاشات/هيدرنت/أخرى · 4C=مضخات الحريق ·
+   4D=نظام إطفاء الحريق واللوحات الخاصة به · 5A=السلامة الإنشائية ·
+   5B=تقارير الفحص · 5C=العزل المائي · 6A=مكيفات الشباك ·
+   6B=مكيفات سبليت · 6C=مكيفات كبيرة (باكدج/مجاري) ·
+   7A=إدارة الكوابل · 7B=حالة لوحات التوزيع · 7C=حالة المخارج
+   الكهربائية · 7D=زيادة الأحمال · 8A=شبكة تغذية المياه ·
+   8B=شبكة الصرف · 8C=دورات المياه والمناطق الرطبة ·
+   8D=الحالة الفيزيائية للخزانات · 8E=النظافة وتقارير الفحص
+   والملصقات · 8F=حالة خزانات الصرف · 11A=المناطق وشبكة الري ·
+   11B=صحة النباتات وتفاصيل الري · 14A=حالة النظام (المصاعد) ·
+   14B=صيانة وقائية معتمدة وقطع غيار (المصاعد).
+   والبنود اللي معندهاش رمز (زي "مخارج الطوارئ"، "النظافة"، "الحراسة
+   والبوابين"، "نظام المفاتيح"، "مكافحة الحشرات والقوارض") أسماؤها
+   واضحة من الأساس وموجودة بالعربي بالكامل، مفيش رمز يحتاج ترجمة.
+
+   🔗 الربط بـ FCA: تقييم FCA لكل مدرسة (حقل fca في بيانات المدرسة)
+   بقى موحّد من مصدرين — تقييمات_FCA_المراحل وآخر زيارة أنظمة هنا —
+   وأيهما أحدث تاريخًا هو اللي بيُعتمد دايمًا (حقل fcaSource بيوضح
+   المصدر الفعلي: "تقييمات_FCA_المراحل" أو "الأنظمة"). يعني ممكن جدًا
+   تلاقي تقييم FCA لمدرسة جاي فعليًا من زيارة الأنظمة الأخيرة، مش من
+   ملف تقييمات_FCA_المراحل القديم.
 
 2) أنظمة حصر الأصول (تبويب "حصر الأصول"، من window.HASR): دي **حاجة
    مختلفة تمامًا** — قوائم فعلية للأصول المادية (تكييفات، مصاعد، أجهزة
@@ -18392,9 +18994,16 @@ function exportNashatExcel(rows) {
      الآن: SLA_أيام، المرحلة، الجنس، المقاول — لكل بلاغ على حدة.
 2. status = "ambiguous": فيه أكتر من مدرسة بنفس درجة التشابه — لا تختار
    واحدة عشوائياً ولا تفترض. اذكر أسماء candidates واسأل المستخدم يحدد.
-3. status = "not_found_school": لم يُذكر اسم مدرسة محدد ولا يوجد سياق
-   سابق — أي أرقام مرفقة (أعلى_30_بلاغ_مفتوح) عامة عبر كل المدارس؛ وضّح
-   ذلك صراحة ولا تنسبها لمدرسة بعينها.
+3. DATA_RESULT (لا توجد مدرسة محددة في السؤال — نظرة عامة/مفلترة): لم
+   يُذكر اسم مدرسة محدد ولا يوجد سياق سابق — الأرقام هنا عامة عبر كل
+   المدارس؛ وضّح ذلك صراحة ولا تنسبها لمدرسة بعينها. القسم فيه دايماً
+   الإحصائيات_الإجمالية (توزيعات كاملة حسب الفئة/الفئة الفرعية/الأولوية/
+   الحالة/SLA/المدينة/المقاول + الاتجاه_الشهري لآخر 12 شهر) — استخدمها
+   لأي سؤال عام حتى لو مش مطابق 100% لفلتر واضح. لو appliedFilters ليها
+   قيمة (مدينة/حالة/عاجل/فئة اتكشفت تلقائياً من نص سؤال المستخدم)، هيبقى
+   فيه كمان قسم نتيجة_مفلترة (نفس شكل بيانات aiBalaghSearchReports_: total/
+   returned/rows لحد 80 صف) — استخدمه كإجابة مباشرة ومحددة للسؤال، ولو
+   total فيه أكبر من returned وضّح إن دي عيّنة مش كل النتائج.
 4. status = "not_ready": بيانات البلاغات لسه بتحمّل أو محصلش تحميلها.
    قل بوضوح إنها لسه مش جاهزة واقترح المحاولة تاني بعد لحظات — ممنوع
    تماماً اعتبار غياب البيانات = صفر بلاغات، وممنوع تقول "لا توجد بلاغات"
@@ -18658,6 +19267,29 @@ function exportNashatExcel(rows) {
 لا تستخدم صيغة calc للأسئلة التي أجوبتها جاهزة بالفعل في "نتائج_المحرك_التحليلي" أو الملخص أدناه (عدّ/توزيع/متوسط/أعلى/أدنى) — استخدمها فقط لعمليات حسابية إضافية (قسمة/ضرب/نسب/فروق) غير موجودة كناتج جاهز.
 
 ══════════════════════════════════════════════════════
+محرك استعلام البلاغات الحر — لأي سؤال بلاغات لم تُجب عليه DATA_RESULT
+══════════════════════════════════════════════════════
+أنت متصل مباشرة بمحرك AIBalaghat الذي يقرأ شيت البلاغات الفعلي كاملاً —
+لست مقتصراً على DATA_RESULT المحقون تلقائياً فوق. لو سؤال المستخدم عن
+بلاغات يحتاج فلترة أو تركيبة غير موجودة فعلياً في DATA_RESULT أو
+الإحصائيات_الإجمالية المحقونة (مثلاً: بلاغات مقاول معيّن بالاسم، فئة
+فرعية محددة، مرحلة دراسية أو جنس معيّن، مدرسة لم تُذكر صراحة في هذه
+الرسالة، أو أي تركيبة فلاتر مخصصة)، لا تقل "البيانات غير متاحة" ولا
+تخمّن — اطلب الاستعلام الفعلي بصيغة balagh_query وسيرسل لك المحرك
+الناتج الحقيقي في رسالة تالية لتصيغ الرد النهائي بناءً عليه:
+
+الصيغة (كل الحقول اختيارية — أرسل بس اللي محتاجه فعلاً لسؤال المستخدم):
+\`\`\`balagh_query
+{"school": "اسم مدرسة (اختياري — لو موجود تُرجع كل تفاصيل بلاغاتها)", "city": "اسم مدينة", "status": "نص جزء من الحالة", "category": "الفئة الرئيسية", "subcategory": "الفئة الفرعية", "priority": "الأولوية", "contractor": "اسم المقاول", "stage": "المرحلة الدراسية", "gender": "بنين/بنات", "openOnly": true, "closedOnly": false, "urgentOnly": false, "limit": 80}
+\`\`\`
+لو حددت "school"، يتجاهل المحرك باقي الفلاتر ويرجع كل إحصائيات وتفاصيل
+بلاغات هذه المدرسة تحديداً (نفس شكل DATA_RESULT بلاغات مدرسة). لو
+مفيش "school"، يُطبَّق أي فلتر آخر محدد على كل البلاغات. لا تستخدم
+balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
+الإحصائيات_الإجمالية المحقونة أعلاه — استخدمها فقط لما تحتاج فلترة أو
+تفصيلاً غير موجود كناتج جاهز فعلاً.
+
+══════════════════════════════════════════════════════
 اقتراح أسئلة متابعة — إلزامي في نهاية كل رد
 ══════════════════════════════════════════════════════
 اختم كل رد بسطر "💡 أسئلة مقترحة:" يتبعه 2-3 أسئلة قصيرة مرتبطة بالسؤال الحالي.
@@ -18792,9 +19424,8 @@ function exportNashatExcel(rows) {
 • عقود التجهيزات         → عقود_التجهيزات: من ملف ملخص_العقود.xlsx، إجمالي/مصروف/متبقي، عقود مكتملة، عقود عليها أمر إيقاف، حسب المورد (مختلف عن عقود_FM — لا تخلط بينهم؛ مفتاح الربط مع التوريدات: رقم_أمر_العمل)
 • التوريدات              → تجهيزات_الأثاث_المدرسية: من ملف الموقف_التنفيذي_للتجهيزات_المدرسية.xlsx (أثاث/مقاعد/رياض أطفال/صالات رياضية) — بيانات جزئية 4 موردين فقط من أصل 7، مستوى منطقة×مورد×صنف (مختلف عن تبويب "المخصص والاحتياج" لمواد التنظيف)
 • مبادرة النشاط البدني   → مبادرة_النشاط_البدني: من ملف الموقف_التنفيذي_للنشاط_البدني.xlsx — بيانات جزئية 5 شركات محددة فقط بالاسم، مستوى شركة×منطقة×صنف، بدون رقم أمر عمل
-• تقييم الموظفين          → تقييم_الموظفين: تقييمات أداء الموظفين (الاستشاري/المقاول/TBC)
 • مؤشرات أداء الاستشاري  → مؤشرات_أداء_الاستشاري: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف) — نفس منطق مؤشرات أداء المقاول لكن للاستشاري
-• الأمن والسلامة (البلاغات) → بلاغات_الأمن_والسلامة: إحصائيات بلاغات الأمن والسلامة (مختلف عن تبويب "البلاغات" العام)
+• بلاغات الأمن والسلامة → بلاغات_الأمن_والسلامة: إحصائيات بلاغات الأمن والسلامة (مختلف عن تبويب "البلاغات" العام)
 • متابعة الفواتير        → متابعة_الفواتير: إجمالي السجلات، إجمالي القيمة، توزيع حسب الحالة
 
 ══════════════════════════════════════════════════════
@@ -19086,6 +19717,26 @@ ${(() => {
         },
       ];
       reply = await AIService.chat(calcMessages);
+    }
+
+    // ── لو GPT طلب استعلام بلاغات حراً عبر ```balagh_query```، ننفّذه
+    //    فعلياً من محرك AIBalaghat (بيانات حقيقية من RAW_BALAGH) ونرجّع
+    //    الناتج له في دورة ثانية ليصيغ الرد النهائي بناءً عليه — نفس
+    //    فكرة محرك calc بالظبط، بس هنا للبلاغات. راجع
+    //    fcbExtractAndRunBalaghQuery للتفاصيل. ──
+    const balaghQueryRequest = fcbExtractAndRunBalaghQuery(reply);
+    if (balaghQueryRequest) {
+      const balaghQueryMessages = [
+        ...messages,
+        { role: "assistant", content: reply },
+        {
+          role: "user",
+          content:
+            "نتيجة استعلام البلاغات الفعلي من محرك AIBalaghat (بيانات حقيقية من شيت البلاغات — استخدمها حرفياً في ردك النهائي، ولا تعرض بلوك ```balagh_query``` للمستخدم، فقط اكتب الجواب بلغة طبيعية وواضحة مع الأرقام الحقيقية):\n" +
+            JSON.stringify(balaghQueryRequest),
+        },
+      ];
+      reply = await AIService.chat(balaghQueryMessages);
     }
 
     FCB_HISTORY.push({ role: "user", content: userText });
@@ -21021,6 +21672,315 @@ ${panelHTML}
       /* ── Leaflet popup override inside mini-map ── */
       .ix-mini-map-wrap .leaflet-popup-content-wrapper { border-radius: 10px; font-family: Tajawal, sans-serif; }
       .ix-mini-map-wrap .leaflet-popup-content { font-size: 12px; font-weight: 700; direction: rtl; }
+
+      /* ══════════════════════════════════════════════════════════════
+         🎨 REDESIGN v2 — School Panel + School 360° Profile + Source Drawer
+         طبقة عرض إضافية فقط: تحسين شكل نفس العناصر بدون تغيير المنطق
+         ══════════════════════════════════════════════════════════════ */
+
+      /* ── Panel shell ── */
+      .ix-school-panel {
+        border-radius: 0 22px 22px 0;
+        box-shadow: 6px 0 50px rgba(6,20,28,.22), 16px 0 80px ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};
+      }
+      .ix-panel-head {
+        position: relative;
+        padding: 24px 24px 18px;
+        background:
+          radial-gradient(120% 160% at 100% 0%, rgba(255,255,255,.09), transparent 55%),
+          linear-gradient(135deg, #051C25 0%, #0A3644 55%, #0D5468 100%);
+        gap: 10px;
+      }
+      .ix-panel-head::after {
+        content: ''; position: absolute; inset: auto 0 0 0; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+      }
+      .ix-panel-close {
+        top: 20px; left: 20px; border-radius: 10px; width: 30px; height: 30px;
+        background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14);
+      }
+      .ix-panel-close:hover { background: rgba(255,255,255,.22); transform: rotate(90deg); }
+      .ix-panel-school-name { font-size: 17px; padding-left: 42px; }
+      .ix-panel-badges { margin-top: 4px; }
+      .ix-panel-badge {
+        border-radius: 8px; padding: 4px 11px; display: inline-flex; align-items: center; gap: 4px;
+        background: rgba(255,255,255,.09); backdrop-filter: blur(2px);
+      }
+      .ix-panel-badge:first-child { background: rgba(22,164,191,.28); border-color: rgba(22,164,191,.5); }
+
+      .ix-panel-body { padding: 20px 22px 26px; }
+
+      /* ── Section titles ── */
+      .ix-section-title {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+        color: var(--tx-sec); border-bottom: none; margin: 24px 0 12px; padding-bottom: 0;
+      }
+      .ix-section-title:first-child { margin-top: 0; }
+      .ix-sec-ico {
+        width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+        background: ${CSS_TOKENS.α(CSS_TOKENS.info(),.12)};
+        display: flex; align-items: center; justify-content: center; font-size: 11.5px;
+        line-height: 1;
+      }
+      .ix-section-title::after {
+        content: ''; flex: 1; height: 1px;
+        background: linear-gradient(90deg, var(--bd-light), transparent);
+      }
+
+      /* ── Info / stats cards ── */
+      .ix-info-item2 {
+        border-radius: 13px; padding: 11px 14px; transition: border-color .15s, transform .15s;
+      }
+      .ix-info-item2:hover { border-color: var(--bd-mid); transform: translateY(-1px); }
+      .ix-info-lbl2 { display: flex; align-items: center; gap: 5px; }
+
+      /* ── Score cards → circular ring gauge ── */
+      /* شبكة مخصّصة لبطاقات التقييم: توزيع متساوٍ يتكيّف مع عدد البطاقات (1 إلى 3)
+         بدل استخدام شبكة العمودين العامة (ix-info-grid2) التي كانت تترك آخر
+         حلقة وحيدة في نصف العرض فقط — ده كان سبب اختلاف حجم/محاذاة الحلقات. */
+      .ix-scores-grid {
+        display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px;
+      }
+      .ix-scores-grid .ix-score-card {
+        flex: 1 1 0; min-width: 110px;
+      }
+      .ix-score-card {
+        border-radius: 15px; padding: 14px 12px 13px; transition: transform .18s, box-shadow .18s;
+        text-align: center; display: flex; flex-direction: column; align-items: center;
+      }
+      .ix-score-card:hover { transform: translateY(-2px); box-shadow: var(--sh-soft); }
+      .ix-score-card::before { display: none; }
+      .ix-score-ring { width: 82px; height: 82px; position: relative; margin: 0 auto 8px; flex-shrink: 0; }
+      .ix-score-ring svg { width: 100%; height: 100%; }
+      .ix-score-ring svg circle:nth-child(2) { transition: stroke-dashoffset .7s cubic-bezier(.22,.6,.34,1); }
+      .ix-score-ring-val {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        font-size: 16px; font-weight: 900; color: var(--ix-sc-color, var(--tx-main));
+      }
+      .ix-score-lbl { text-transform: none; margin-bottom: 2px; font-size: 10px; white-space: nowrap; }
+      .ix-score-tier { margin-top: 0; white-space: nowrap; }
+      .ix-score-val, .ix-score-bar { display: none; }
+      @media (max-width: 420px) {
+        .ix-scores-grid { flex-wrap: wrap; }
+        .ix-scores-grid .ix-score-card { flex: 1 1 40%; }
+      }
+
+      /* ── Contract rows ── */
+      .ix-contract-row {
+        border-radius: 13px; padding: 13px 15px 13px 15px; position: relative;
+        padding-right: 19px; overflow: hidden;
+      }
+      .ix-contract-row::before {
+        content: ''; position: absolute; top: 12px; bottom: 12px; right: 0; width: 3px;
+        border-radius: 0 4px 4px 0; background: var(--teal-2);
+      }
+
+      /* ── Action row → sticky footer feel ── */
+      .ix-panel-body { padding-bottom: 90px; }
+      .ix-action-row {
+        position: sticky; bottom: -22px; margin: -6px -22px 16px; padding: 12px 22px;
+        background: var(--bg-3); border-top: 1px solid var(--bd-light);
+        box-shadow: 0 -8px 20px -8px rgba(6,20,28,.08);
+        z-index: 2;
+      }
+      .ix-action-btn { border-radius: 11px; flex: 1; justify-content: center; padding: 10px 10px; }
+      .ix-action-btn.ix-btn-primary {
+        background: linear-gradient(135deg, var(--teal-2), var(--teal-3));
+        box-shadow: 0 6px 16px ${CSS_TOKENS.α(CSS_TOKENS.info(),.32)};
+        border: none;
+      }
+
+      /* ── Mini map polish ── */
+      .ix-mini-map-wrap { border-radius: 15px; box-shadow: 0 3px 14px rgba(6,20,28,.1); }
+      .ix-mini-map { height: 190px; }
+      .ix-map-pin-wrap { background: transparent; border: none; }
+      .ix-map-pin {
+        width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+        background: linear-gradient(145deg, var(--teal-2), var(--teal-3));
+        box-shadow: 0 6px 14px rgba(11,107,126,.45), 0 0 0 3px rgba(255,255,255,.9);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .ix-map-pin span { transform: rotate(45deg); font-size: 15px; }
+
+      /* ══════════════════════════════════════════════════════════════
+         🧠 SCHOOL 360° — Unified Cross-Tab Profile
+         ══════════════════════════════════════════════════════════════ */
+      .ix-profile-summary {
+        display: flex; align-items: center; justify-content: space-between; gap: 14px;
+        padding: 16px 17px; margin-bottom: 12px; border-radius: 16px;
+        background: linear-gradient(135deg, ${CSS_TOKENS.α(CSS_TOKENS.info(),.09)}, rgba(176,138,78,.08));
+        border: 1px solid var(--bd-light);
+      }
+      .ix-profile-summary-main { flex: 1; min-width: 0; }
+      .ix-profile-kicker {
+        font-size: 9.5px; font-weight: 900; letter-spacing: .1em; color: var(--teal);
+        text-transform: uppercase;
+      }
+      .ix-profile-title { font-size: 14.5px; font-weight: 900; color: var(--tx-main); margin-top: 3px; }
+      .ix-profile-sub { font-size: 10.5px; color: var(--tx-muted); margin-top: 4px; line-height: 1.7; max-width: 260px; }
+      .ix-profile-summary-counts { display: flex; gap: 8px; flex-shrink: 0; }
+      .ix-profile-summary-counts span {
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        min-width: 68px; padding: 9px 8px; border-radius: 12px;
+        background: var(--bg-3); border: 1px solid var(--bd-light); text-align: center;
+        font-size: 8.5px; color: var(--tx-muted); font-weight: 700;
+      }
+      .ix-profile-summary-counts b { font-size: 17px; color: var(--teal); font-weight: 900; line-height: 1.1; }
+
+      .ix-profile-source-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+      .ix-profile-source {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        width: 100%; text-align: right; cursor: pointer;
+        background: var(--bg-2); border: 1px solid var(--bd-light); border-radius: 13px;
+        padding: 11px 13px; font-family: inherit; transition: all .16s;
+      }
+      .ix-profile-source:hover {
+        background: var(--bg-3); border-color: var(--teal-2);
+        box-shadow: 0 4px 14px rgba(6,20,28,.08); transform: translateY(-1px);
+      }
+      .ix-profile-source-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .ix-profile-source-icon {
+        width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 15px;
+        background: ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};
+      }
+      .ix-profile-source-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .ix-profile-source-title { font-size: 12px; font-weight: 800; color: var(--tx-main); }
+      .ix-profile-source-hint { font-size: 9.5px; color: var(--tx-muted); font-weight: 600; }
+      .ix-profile-source-end { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+      .ix-profile-source-count {
+        font-size: 10px; font-weight: 800; color: var(--teal-3); padding: 4px 9px;
+        border-radius: 999px; background: ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};
+        border: 1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.18)}; white-space: nowrap;
+      }
+      .ix-profile-source-arrow {
+        font-size: 15px; color: var(--tx-muted); transition: transform .16s;
+      }
+      .ix-profile-source:hover .ix-profile-source-arrow { transform: translateX(-3px); color: var(--teal); }
+
+      .ix-profile-note {
+        display: flex; gap: 7px; align-items: flex-start; padding: 10px 12px; margin-top: 10px;
+        border-radius: 11px; background: var(--bg-2); border: 1px dashed var(--bd-mid);
+        color: var(--tx-muted); font-size: 10px; line-height: 1.7;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         📂 Source Detail Drawer (يظهر فوق البانل عند فتح مصدر من School 360°)
+         ══════════════════════════════════════════════════════════════ */
+      .ix-source-overlay {
+        position: fixed; inset: 0; z-index: 9100;
+        background: rgba(6,20,28,.4); backdrop-filter: blur(3px);
+        opacity: 0; visibility: hidden; transition: opacity .25s ease, visibility .25s;
+      }
+      .ix-source-overlay.ix-open { opacity: 1; visibility: visible; }
+
+      .ix-source-panel {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 9101;
+        width: min(460px, 92vw);
+        background: var(--bg-3);
+        box-shadow: 6px 0 40px rgba(6,20,28,.24);
+        display: flex; flex-direction: column;
+        transform: translateX(-100%); transition: transform .3s cubic-bezier(.22,.6,.34,1);
+        border-right: 1px solid var(--bd-light);
+      }
+      .ix-source-panel.ix-open { transform: translateX(0); }
+
+      .ix-source-head {
+        display: flex; align-items: center; gap: 10px;
+        padding: 18px 20px 16px; flex-shrink: 0;
+        background: linear-gradient(135deg, #051C25 0%, #0A3644 55%, #0D5468 100%);
+        color: #fff; position: relative;
+      }
+      .ix-source-head::after {
+        content: ''; position: absolute; inset: auto 0 0 0; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+      }
+      .ix-source-back {
+        width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+        background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); color: #fff;
+        font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background .18s;
+      }
+      .ix-source-back:hover { background: rgba(255,255,255,.22); }
+      .ix-source-head-copy { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+      .ix-source-head-icon {
+        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+        background: rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+      }
+      .ix-source-head-title { font-size: 14px; font-weight: 800; line-height: 1.35; }
+      .ix-source-head-sub { font-size: 10.5px; color: rgba(255,255,255,.6); margin-top: 2px; font-weight: 600; }
+      .ix-source-head-close {
+        width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+        background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); color: #fff;
+        font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background .18s;
+      }
+      .ix-source-head-close:hover { background: rgba(255,255,255,.22); }
+
+      .ix-source-body { flex: 1; overflow-y: auto; padding: 18px 20px 26px; }
+
+      .ix-source-context {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 11px 14px; margin-bottom: 14px; border-radius: 12px;
+        background: var(--bg-2); border: 1px solid var(--bd-light);
+      }
+      .ix-source-context-name { font-size: 12.5px; font-weight: 800; color: var(--tx-main); }
+      .ix-source-context span { font-size: 10.5px; color: var(--tx-muted); font-weight: 700; font-family: monospace; }
+
+      /* ── Records inside the drawer (reuses ix-profile-record markup) ── */
+      .ix-profile-record {
+        margin-top: 9px; border-radius: 12px; background: var(--bg-3);
+        border: 1px solid var(--bd-light); overflow: hidden;
+      }
+      .ix-profile-record:first-of-type { margin-top: 0; }
+      .ix-profile-record > summary {
+        list-style: none; cursor: pointer;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 13px; font-size: 11px; color: var(--tx-sec); font-weight: 800;
+        transition: background .15s;
+      }
+      .ix-profile-record > summary:hover { background: var(--bg-2); }
+      .ix-profile-record > summary::-webkit-details-marker { display: none; }
+      .ix-profile-record > summary span:last-child {
+        font-size: 9.5px; color: var(--teal-3); font-weight: 700;
+        background: ${CSS_TOKENS.α(CSS_TOKENS.info(),.1)}; padding: 3px 9px; border-radius: 999px;
+      }
+      .ix-profile-record[open] > summary { border-bottom: 1px solid var(--bd-light); }
+      .ix-profile-record-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 11px 13px;
+      }
+      .ix-profile-record-item {
+        min-width: 0; padding: 8px 10px; border-radius: 10px;
+        background: var(--bg-2); border: 1px solid var(--bd-light);
+      }
+      .ix-profile-record-label {
+        font-size: 9px; color: var(--tx-muted); font-weight: 700; margin-bottom: 3px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .ix-profile-record-value { font-size: 11px; color: var(--tx-main); font-weight: 700; word-break: break-word; line-height: 1.6; }
+
+      .ix-profile-mini-kpis {
+        display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin: 0 0 12px;
+      }
+      .ix-profile-mini-kpis > div {
+        padding: 10px 8px; border-radius: 11px; background: var(--bg-2);
+        border: 1px solid var(--bd-light); text-align: center;
+      }
+      .ix-profile-mini-kpis b { display: block; font-size: 15px; color: var(--teal-3); font-weight: 900; line-height: 1.25; }
+      .ix-profile-mini-kpis span { display: block; font-size: 9px; color: var(--tx-muted); font-weight: 700; margin-top: 2px; }
+
+      .ix-profile-more {
+        display: flex; gap: 7px; align-items: flex-start; padding: 10px 12px; margin-top: 10px;
+        border-radius: 11px; background: var(--bg-2); border: 1px dashed var(--bd-mid);
+        color: var(--tx-muted); font-size: 10px; line-height: 1.7;
+      }
+
+      @media (max-width: 640px) {
+        .ix-info-grid2 { grid-template-columns: 1fr 1fr; }
+        .ix-profile-record-grid { grid-template-columns: 1fr; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -21053,6 +22013,38 @@ ${panelHTML}
         </div>
       </div>
     `;
+
+    // ── Side panel داخلي للمصدر المحدد ──
+    const sourceOverlay = document.createElement("div");
+    sourceOverlay.id = "ix-source-overlay";
+    sourceOverlay.className = "ix-source-overlay";
+    sourceOverlay.setAttribute("aria-hidden", "true");
+    sourceOverlay.addEventListener("click", function(e){
+      if (e.target === sourceOverlay) closeSchoolSourcePanel();
+    });
+
+    const sourcePanel = document.createElement("aside");
+    sourcePanel.id = "ix-source-panel";
+    sourcePanel.className = "ix-source-panel";
+    sourcePanel.setAttribute("role", "dialog");
+    sourcePanel.setAttribute("aria-modal", "true");
+    sourcePanel.innerHTML = `
+      <div class="ix-source-head">
+        <button class="ix-source-back" type="button" onclick="window.__IXCloseSource()" aria-label="رجوع">‹</button>
+        <div class="ix-source-head-copy">
+          <div class="ix-source-head-icon" id="ix-source-icon">•</div>
+          <div>
+            <div class="ix-source-head-title" id="ix-source-title">تفاصيل المصدر</div>
+            <div class="ix-source-head-sub" id="ix-source-sub">—</div>
+          </div>
+        </div>
+        <button class="ix-source-head-close" type="button" onclick="window.__IXCloseSource()" aria-label="إغلاق">✕</button>
+      </div>
+      <div class="ix-source-body" id="ix-source-body"></div>
+    `;
+
+    document.body.appendChild(sourceOverlay);
+    document.body.appendChild(sourcePanel);
 
     document.body.appendChild(overlay);
     document.body.appendChild(panel);
@@ -21113,12 +22105,16 @@ ${panelHTML}
     panel.classList.add("ix-open");
     document.body.style.overflow = "hidden";
 
-    renderSchoolDetails(schoolRow);
+    const unifiedRow = (typeof window.__IXBuildUnifiedSchoolProfile === "function")
+      ? window.__IXBuildUnifiedSchoolProfile(schoolRow)
+      : schoolRow;
+    renderSchoolDetails(unifiedRow);
   }
 
   function closeSchoolPanel() {
     const overlay = document.getElementById("ix-school-overlay");
     const panel = document.getElementById("ix-school-panel");
+    closeSchoolSourcePanel();
     overlay.classList.remove("ix-open");
     panel.classList.remove("ix-open");
     document.body.style.overflow = "";
@@ -21128,6 +22124,487 @@ ${panelHTML}
   }
 
   window.__IXCloseSchool = closeSchoolPanel;
+  window.__IXOpenSchool = openSchoolPanel;
+
+  let __IXCurrentUnifiedProfile = null;
+
+  function closeSchoolSourcePanel(){
+    const overlay = document.getElementById("ix-source-overlay");
+    const panel = document.getElementById("ix-source-panel");
+    overlay?.classList.remove("ix-open");
+    panel?.classList.remove("ix-open");
+    overlay?.setAttribute("aria-hidden", "true");
+  }
+
+  function openSchoolSourcePanel(sourceKey){
+    const source = __IXCurrentUnifiedProfile?.__unified?.sections?.find(s => s.key === sourceKey);
+    const overlay = document.getElementById("ix-source-overlay");
+    const panel = document.getElementById("ix-source-panel");
+    const body = document.getElementById("ix-source-body");
+    const title = document.getElementById("ix-source-title");
+    const sub = document.getElementById("ix-source-sub");
+    const icon = document.getElementById("ix-source-icon");
+    if (!source || !overlay || !panel || !body) return;
+
+    title.textContent = source.label || "تفاصيل المصدر";
+    sub.textContent = `${source.rows.length.toLocaleString()} ${source.singular || "سجل"} مرتبط بالمدرسة`;
+    icon.textContent = source.icon || "•";
+    body.innerHTML = `
+      <div class="ix-source-context">
+        <div class="ix-source-context-name">${esc(__IXCurrentUnifiedProfile?.name || __IXCurrentUnifiedProfile?.buildingName || "المدرسة")}</div>
+        ${__IXCurrentUnifiedProfile?.minId ? `<span>🔢 ${esc(__IXCurrentUnifiedProfile.minId)}</span>` : ""}
+      </div>
+      ${_ixRenderSource(source, source.rows)}
+    `;
+
+    overlay.classList.add("ix-open");
+    panel.classList.add("ix-open");
+    overlay.setAttribute("aria-hidden", "false");
+  }
+
+  window.__IXOpenSource = openSchoolSourcePanel;
+  window.__IXCloseSource = closeSchoolSourcePanel;
+
+  /* ════════════════════════════════════════════════════════════════
+     🏫 UNIFIED SCHOOL PROFILE — Cross-Tab School Intelligence
+     ----------------------------------------------------------------
+     الهدف:
+       - لا يغيّر أي مصدر بيانات أو منطق تبويب.
+       - يستخدم الرقم الوزاري كمفتاح رئيسي بعد normSchoolId.
+       - يرجع للاسم كـ fallback فقط عندما لا يتوفر ID.
+       - يجمع ما يمكن ربطه فعليًا بكل مدرسة من مصادر الداشبورد
+         الموجودة بالفعل في الذاكرة.
+       - يعرض Summary + تفاصيل قابلة للفتح بدل إعادة رسم التبويبات.
+     ════════════════════════════════════════════════════════════════ */
+
+  const IX_SCHOOL_SOURCE_DEFS = [
+    { key:"RAW", label:"البيانات الأساسية / المباني", singular:"مبنى", icon:"🏫", rows:()=>window.RAW },
+    { key:"RAW_BALAGH", label:"البلاغات", singular:"بلاغ", icon:"📢", rows:()=>window.RAW_BALAGH },
+    { key:"RAW_ALL_SYSTEMS", label:"الأنظمة الرئيسية والتفصيلية", singular:"نظام", icon:"⚙️", rows:()=>window.RAW_ALL_SYSTEMS },
+    { key:"RAW_SYSTEMS_NORM", label:"سجل زيارات الأنظمة", singular:"زيارة", icon:"🧪", rows:()=>window.RAW_SYSTEMS_NORM },
+    { key:"RAW_FCA_HISTORY", label:"تاريخ تقييمات FCA", singular:"تقييم", icon:"📈", rows:()=>window.RAW_FCA_HISTORY },
+    { key:"RAW_ELEVATORS", label:"المصاعد", singular:"مصعد", icon:"🛗", rows:()=>window.RAW_ELEVATORS },
+    { key:"RAW_ELEVATOR_STATUS", label:"حالة المصاعد", singular:"مصعد", icon:"🔧", rows:()=>window.RAW_ELEVATOR_STATUS },
+    { key:"RAW_COST_ROWS", label:"التكلفة", singular:"بند تكلفة", icon:"💰", rows:()=>window.RAW_COST_STATE?.rows },
+    { key:"RAW_PAYMENTS", label:"المدفوعات والفواتير", singular:"فاتورة", icon:"💳", rows:()=>window.RAW_PAYMENTS },
+    { key:"RAW_FM_CONTRACTS", label:"العقود", singular:"عقد", icon:"📋", rows:()=>window.RAW_FM_CONTRACTS },
+    { key:"RAW_SPARE_PARTS", label:"قطع الغيار", singular:"قطعة", icon:"🔩", rows:()=>window.RAW_SPARE_PARTS },
+    { key:"RAW_SECURITY_SAFETY", label:"الأمن والسلامة", singular:"بند", icon:"🛡️", rows:()=>window.RAW_SECURITY_SAFETY },
+    { key:"RAW_CORRECTIONS_ESCALATIONS", label:"التصحيحات والتصعيدات", singular:"تصعيد", icon:"🚨", rows:()=>window.RAW_CORRECTIONS_ESCALATIONS },
+    { key:"RAW_FUEL", label:"الوقود", singular:"عملية تزويد", icon:"⛽", rows:()=>window.RAW_FUEL },
+    { key:"RAW_VEHICLES", label:"المركبات", singular:"مركبة", icon:"🚐", rows:()=>window.RAW_VEHICLES },
+    { key:"RAW_TRAINING", label:"التدريب", singular:"برنامج تدريبي", icon:"🎓", rows:()=>window.RAW_TRAINING },
+    { key:"RAW_GATEKEEPERS", label:"البوابون", singular:"بوّاب", icon:"👮", rows:()=>window.RAW_GATEKEEPERS },
+    { key:"RAW_RECRUITMENT", label:"التوظيف", singular:"طلب توظيف", icon:"👥", rows:()=>window.RAW_RECRUITMENT },
+    { key:"RAW_MAG_KPI", label:"مؤشرات أداء المقاول", singular:"مؤشر", icon:"📊", rows:()=>window.RAW_MAG_KPI },
+    { key:"RAW_CONSULTANT_KPI", label:"مؤشرات الاستشاري", singular:"مؤشر", icon:"🧭", rows:()=>window.RAW_CONSULTANT_KPI },
+    { key:"RAW_EMP_KPI", label:"مؤشرات الموظفين", singular:"مؤشر", icon:"👤", rows:()=>window.RAW_EMP_KPI },
+    { key:"RAW_SAFETY_KPI", label:"مؤشرات السلامة", singular:"مؤشر", icon:"🦺", rows:()=>window.RAW_SAFETY_KPI },
+    { key:"HASR", label:"حصر الأصول", singular:"أصل", icon:"📦", rows:()=>window.HASR?.data?.schools },
+  ];
+
+  const IX_ID_KEY_RE = /(?:ministry|school|building|site|location).*?(?:id|code|number|no)|رقم.*?(?:وزاري|المدرسة|المبنى)|(?:الرقم|الكود).*?(?:الوزاري|المدرسة)|school[_\s-]*code|school[_\s-]*id/i;
+  const IX_NAME_KEY_RE = /(?:school|building).*?(?:name)|اسم.*?(?:المدرسة|المبنى)|اسم المدرسة/i;
+
+  function _ixCleanText(v){
+    return String(v ?? "")
+      .replace(/\uFEFF/g, "")
+      .replace(/\u0640/g, "")
+      .replace(/[\u064B-\u065F\u0670]/g, "")
+      .replace(/[أإآٱ]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/[‐‑‒–—-]/g, " ")
+      .replace(/[()[\]{}'"`.,:;|/\\]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function _ixId(v){
+    const raw = String(v ?? "").trim();
+    if (!raw) return "";
+    try {
+      if (typeof window.normSchoolId === "function") {
+        const n = window.normSchoolId(raw);
+        if (n) return String(n).trim();
+      }
+    } catch (_) {}
+    return raw.replace(/^\uFEFF/, "").replace(/[^\d]/g, "");
+  }
+
+  function _ixRowId(row){
+    if (!row || typeof row !== "object") return "";
+    const keys = Object.keys(row);
+    const preferred = [
+      "minId","schoolId","school_id","schoolCode","school_code",
+      "رقم_وزاري","رقم وزاري","رقم المدرسة","رقم_المدرسة_الوزاري",
+      "Ministry ID","School ID","School Code","Code"
+    ];
+    for (const k of preferred){
+      if (row[k] != null && String(row[k]).trim()) {
+        const id = _ixId(row[k]);
+        if (id) return id;
+      }
+    }
+    for (const k of keys){
+      if (!IX_ID_KEY_RE.test(k)) continue;
+      const id = _ixId(row[k]);
+      if (id) return id;
+    }
+    return "";
+  }
+
+  function _ixRowName(row){
+    if (!row || typeof row !== "object") return "";
+    const preferred = [
+      "name","buildingName","schoolName","school_name",
+      "اسم_المدرسة","اسم المدرسة","اسم المبنى","School Name","schoolName"
+    ];
+    for (const k of preferred){
+      if (row[k] != null && String(row[k]).trim()) return String(row[k]).trim();
+    }
+    for (const k of Object.keys(row)){
+      if (!IX_NAME_KEY_RE.test(k)) continue;
+      const v = String(row[k] ?? "").trim();
+      if (v) return v;
+    }
+    return "";
+  }
+
+  function _ixRowMatches(row, target){
+    if (!row || typeof row !== "object") return false;
+    const targetId = _ixId(target?.minId || target?.schoolSeq || target?.buildingSeq);
+    const rowId = _ixRowId(row);
+    if (targetId && rowId) return targetId === rowId;
+
+    const targetName = _ixCleanText(target?.name || target?.buildingName);
+    const rowName = _ixCleanText(_ixRowName(row));
+    if (!targetName || !rowName) return false;
+    return targetName === rowName ||
+      targetName.includes(rowName) ||
+      rowName.includes(targetName);
+  }
+
+  function _ixRowsFor(def, target){
+    try{
+      const rows = typeof def.rows === "function" ? def.rows() : [];
+      if (!Array.isArray(rows)) return [];
+      return rows.filter(r => _ixRowMatches(r, target));
+    }catch(_){ return []; }
+  }
+
+  function _ixFormatValue(v){
+    if (v == null || v === "") return "";
+    if (Array.isArray(v)) return v.length ? `[${v.length} عنصر]` : "";
+    if (typeof v === "object"){
+      try{
+        const s = JSON.stringify(v);
+        return s.length > 360 ? s.slice(0,357) + "…" : s;
+      }catch(_){ return String(v); }
+    }
+    return String(v);
+  }
+
+  function _ixDisplayKey(k){
+    const map = {
+      "minId":"الرقم الوزاري","mainMinId":"الرقم الوزاري","schoolId":"رقم المدرسة","schoolCode":"كود المدرسة",
+      "schoolName":"اسم المدرسة","name":"الاسم","buildingName":"اسم المبنى",
+      "city":"المدينة","sector":"المحافظة","district":"الحي",
+      "stage":"المرحلة","gender":"الجنس","ownership":"الملكية",
+      "fca":"تقييم FCA","fcaDate":"تاريخ تقييم FCA","fcaSource":"مصدر تقييم FCA",
+      "envScore":"البيئة المدرسية","envRating":"تقدير البيئة المدرسية",
+      "ayenScore":"تقييم عاين","asolStatus":"تقييم منصة أصول",
+      "students":"عدد الطلاب","classrooms":"عدد الفصول",
+      "buildingAge":"عمر المبنى","subscriptionStatus":"حالة الاشتراك",
+      "schoolSize":"حجم المدرسة","buildingSize":"حجم المبنى","linkType":"نوع الارتباط",
+      "lat":"خط العرض","lng":"خط الطول",
+      "alerts":"عدد البلاغات","acUnits":"وحدات التكييف","notes":"ملاحظات",
+      "description":"الوصف","quantity":"الكمية","unitValue":"قيمة الوحدة",
+      "ministryId":"الرقم الوزاري","workOrder":"رقم أمر العمل","locationCode":"رمز الموقع",
+      "inspectorName":"اسم المفتش","completedAtRaw":"تاريخ الزيارة",
+      "submissionScorePct":"نسبة الدرجة الكلية","overallBandAr":"التصنيف العام",
+      "moeCompliant":"متوافق مع معايير الوزارة","subsystems":"الأنظمة الفرعية",
+      // مفاتيح إنجليزية خام تصل من بعض الشيتات كما هي (عقود، مدفوعات، موظفين،
+      // مصاعد...) — نضيفها هنا حرفيًا زي ما بتوصل عشان تترجم بدل ما تفضل إنجليزي.
+      "Category":"الفئة","Sub Category":"الفئة الفرعية","City":"المدينة","Region":"المنطقة","Zone":"النطاق",
+      "Status":"الحالة","Source":"المصدر","Link":"الرابط","REMARKS":"ملاحظات","SR":"الرقم التسلسلي",
+      "Score":"الدرجة","FCA":"تقييم FCA","Site":"الموقع",
+      "School ID":"رقم المدرسة","School Name":"اسم المدرسة","Ministry ID":"الرقم الوزاري",
+      "Work Order #":"رقم أمر العمل","Location Code":"رمز الموقع","Inspector Name":"اسم المفتش",
+      "Completed At":"تاريخ الإنجاز","Overall Condition Band":"التصنيف العام",
+      "Submission Total Score %":"نسبة الدرجة الكلية",
+      "Contract No.":"رقم العقد","Contract_No":"رقم العقد",
+      "Contract Start":"تاريخ بداية العقد","Contract End":"تاريخ نهاية العقد","Stop Date":"تاريخ التوقف",
+      "Base Contract Value (SAR)":"قيمة العقد الأساسية (ريال)","Base_Contract_Value_SAR":"قيمة العقد الأساسية (ريال)",
+      "Updated Contract Value (SAR)":"قيمة العقد المحدثة (ريال)","Updated_Contract_Value_SAR":"قيمة العقد المحدثة (ريال)",
+      "Payment Released (SAR)":"المبلغ المصروف (ريال)","Payment_Released_SAR":"المبلغ المصروف (ريال)",
+      "Remaining (SAR)":"المتبقي (ريال)","Remaining_SAR":"المتبقي (ريال)","Pct_Paid":"نسبة السداد",
+      "Total Deduction":"إجمالي الخصم","Total_Deduction":"إجمالي الخصم",
+      "KPI Deduction":"خصم مؤشر الأداء","KPI_Deduction":"خصم مؤشر الأداء","CONS Rate":"معدل الاستشاري",
+      "SLA DAYS":"أيام اتفاقية مستوى الخدمة",
+      "Quantity":"الكمية","Unit Measure":"وحدة القياس","Unit Price":"سعر الوحدة","Total Price":"السعر الإجمالي",
+      "Emp ID":"رقم الموظف","Emp Name":"اسم الموظف","Job Title (English)":"المسمى الوظيفي","DOJ":"تاريخ الالتحاق",
+      // مفاتيح camelCase الخاصة ببنود التكلفة (بعد تطبيع بيانات شيت التكلفة)
+      "schoolId":"رقم المدرسة","sr":"الرقم التسلسلي","category":"الفئة","subCategory":"الفئة الفرعية",
+      "link":"الرابط","unitMeasure":"وحدة القياس","unitPrice":"سعر الوحدة","totalPrice":"السعر الإجمالي",
+      "consRate":"معدل الاستشاري"
+    };
+    if (map[k]) return map[k];
+    // مطابقة غير حساسة لحالة الأحرف/المسافات — عشان أي تنويعة بالحروف الكبيرة/الصغيرة
+    // أو فراغات زايدة توصل من الشيتات الخام (زي "Sr" / "SR" / "sr"، أو "Cons Rate" / "CONS Rate")
+    // تترجم برضه بدل ما تفضل إنجليزي.
+    if (!_ixDisplayKey._norm){
+      _ixDisplayKey._norm = {};
+      for (const key in map){
+        _ixDisplayKey._norm[String(key).trim().toLowerCase().replace(/\s+/g," ")] = map[key];
+      }
+    }
+    const normKey = String(k).trim().toLowerCase().replace(/\s+/g," ");
+    if (_ixDisplayKey._norm[normKey]) return _ixDisplayKey._norm[normKey];
+    // تحويل المفاتيح غير المعروفة (خاصة الإنجليزية camelCase) لعنوان مقروء
+    return String(k)
+      .replace(/_/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/^./, c => c.toUpperCase())
+      .trim();
+  }
+
+  function _ixRelevantEntries(row){
+    if (!row || typeof row !== "object") return [];
+    const keys = Object.keys(row);
+    // حقول تسلسلية/تقنية داخلية لا تُعرض للمستخدم نهائيًا: إما مش مفيدة له
+    // (تسلسلات داخلية)، أو مكررة بنسخة عربية جاهزة أوضح منها (زي overallBandAr
+    // بدل overallBandRaw، وcompletedAtRaw بدل completedAtObj الخام بصيغة ISO).
+    const excluded = new Set([
+      "schoolSeq","buildingSeq","تسلسل_المدرسة","تسلسل_المبنى",
+      "completedAtObj","overallBandRaw","siteRaw","schoolId",
+      "link","Link","الرابط"
+    ]);
+    const identity = new Set([
+      "name","buildingName","schoolName","school_name","minId","schoolId","school_id",
+      "schoolCode","school_code","رقم_وزاري","رقم وزاري","رقم المدرسة","اسم_المدرسة","اسم المدرسة",
+      "city","sector","district","المدينة","المحافظة","الحي"
+    ]);
+    const out = [];
+    // الهوية أولاً ثم البيانات غير الفارغة.
+    for (const k of keys){
+      if (excluded.has(k)) continue;
+      if (!identity.has(k)) continue;
+      const val = _ixFormatValue(row[k]);
+      if (val) out.push([k,val]);
+    }
+    for (const k of keys){
+      if (out.length >= 18) break;
+      if (excluded.has(k)) continue;
+      if (identity.has(k)) continue;
+      if (k === "_raw") continue;
+      const val = _ixFormatValue(row[k]);
+      if (!val || val === "null" || val === "undefined") continue;
+      out.push([k,val]);
+    }
+    return out.slice(0,18);
+  }
+
+  // عنوان أوضح لكل سجل بدل "سجل 1 / سجل 2" المجرّد: نستخدم اسم مناسب لنوع
+  // المصدر نفسه (بلاغ، عقد، تقييم، مصعد...) بدل كلمة عامة، ونحاول نلقط قيمة
+  // مميزة (تاريخ أو حالة) من نفس الصف عشان يبان الفرق بين السجلات المتعددة.
+  function _ixRecordTitle(row, idx, singular){
+    const noun = singular || "سجل";
+    const base = `${noun} ${idx + 1}`;
+    if (!row || typeof row !== "object") return base;
+    const dateKey = Object.keys(row).find(k => /تاريخ|date/i.test(k) && _ixFormatValue(row[k]));
+    if (dateKey) return `${base} · ${_ixFormatValue(row[dateKey])}`;
+    const statusKey = Object.keys(row).find(k => /الحالة|status/i.test(k) && _ixFormatValue(row[k]));
+    if (statusKey) return `${base} · ${_ixFormatValue(row[statusKey])}`;
+    return base;
+  }
+
+  // ترجمة القيم الإنجليزية الشائعة (نعم/لا، تصنيفات الحالة) لعربي، بدل ما تفضل
+  // تطلع زي ما هي من ملف المصدر الخام.
+  const _IX_VALUE_MAP = {
+    "yes":"نعم","no":"لا","true":"نعم","false":"لا",
+    "excellent":"ممتاز","good":"جيد","fair":"متوسط","poor":"حرج",
+    "open":"مفتوح","closed":"مغلق","active":"نشط","inactive":"غير نشط",
+    "pending":"قيد الانتظار","completed":"مكتمل","in progress":"قيد التنفيذ",
+    "approved":"معتمد","rejected":"مرفوض","cancelled":"ملغي","canceled":"ملغي",
+    "expired":"منتهي","overdue":"متأخر","scheduled":"مجدول","delayed":"مؤجل",
+    "resolved":"تم الحل","new":"جديد","assigned":"مسند","male":"ذكور","female":"إناث",
+    "n/a":"غير متاح","na":"غير متاح"
+  };
+  function _ixTranslateValue(v){
+    const key = String(v ?? "").trim().toLowerCase();
+    return _IX_VALUE_MAP[key] || v;
+  }
+
+  function _ixRenderRecordCard(row, idx, singular){
+    const entries = _ixRelevantEntries(row);
+    if (!entries.length) return "";
+    return `
+      <details class="ix-profile-record">
+        <summary><span>${esc(_ixRecordTitle(row, idx, singular))}</span><span>عرض التفاصيل</span></summary>
+        <div class="ix-profile-record-grid">
+          ${entries.map(([k,v]) => `
+            <div class="ix-profile-record-item">
+              <div class="ix-profile-record-label">${esc(_ixDisplayKey(k))}</div>
+              <div class="ix-profile-record-value">${esc(_ixTranslateValue(v))}</div>
+            </div>`).join("")}
+        </div>
+      </details>`;
+  }
+
+  function _ixRenderSource(def, rows){
+    if (!rows.length) return "";
+    const shown = rows.length > 35 ? rows.slice(0,35) : rows;
+    const more = rows.length - shown.length;
+    const extra = more > 0
+      ? `<div class="ix-profile-more">${rows.length.toLocaleString()} سجل — يتم عرض أول 35 سجل.</div>`
+      : "";
+
+    let summary = "";
+    if (def.key === "RAW_BALAGH"){
+      const closed = rows.filter(r => (window.balaghIsClosed?.(r["الحالة"] ?? r.Status ?? r["Status"])) === true).length;
+      const open = Math.max(rows.length - closed, 0);
+      summary = `<div class="ix-profile-mini-kpis">
+        <div><b>${rows.length.toLocaleString()}</b><span>إجمالي</span></div>
+        <div><b>${open.toLocaleString()}</b><span>غير مغلق</span></div>
+        <div><b>${closed.toLocaleString()}</b><span>مغلق</span></div>
+      </div>`;
+    } else if (def.key === "RAW_FCA_HISTORY"){
+      const scores = rows.map(r => Number(r.score ?? r["الدرجة"] ?? r["FCA"] ?? r["Score"])).filter(Number.isFinite);
+      if (scores.length){
+        summary = `<div class="ix-profile-mini-kpis">
+          <div><b>${scores.length.toLocaleString()}</b><span>تقييم</span></div>
+          <div><b>${Math.min(...scores).toFixed(1)}%</b><span>الأقل</span></div>
+          <div><b>${Math.max(...scores).toFixed(1)}%</b><span>الأعلى</span></div>
+        </div>`;
+      }
+    } else if (def.key === "RAW_ALL_SYSTEMS"){
+      const mains = [...new Set(rows.map(r => r["القسم الرئيسي"]).filter(Boolean))];
+      const subs = [...new Set(rows.map(r => r["النظام الفرعي"]).filter(Boolean))];
+      summary = `<div class="ix-profile-mini-kpis">
+        <div><b>${mains.length.toLocaleString()}</b><span>رئيسي</span></div>
+        <div><b>${subs.length.toLocaleString()}</b><span>فرعي</span></div>
+        <div><b>${rows.length.toLocaleString()}</b><span>سجل</span></div>
+      </div>`;
+    }
+
+    return `
+      ${summary}
+      ${shown.slice(0,6).map((row, idx) => _ixRenderRecordCard(row, idx, def.singular)).join("")}
+      ${rows.length > 6 ? `<div class="ix-profile-more">يوجد ${rows.length - 6} ${def.singular || "سجل"} إضافي — افتح التبويب الأصلي لعرض القائمة الكاملة.</div>` : ""}
+      ${extra}`;
+  }
+
+  function buildUnifiedSchoolProfile(base){
+    const merged = { ...(base || {}) };
+    const sections = [];
+    let matchedSources = 0;
+    let totalMatchedRows = 0;
+
+    // البيانات المحسوبة أصلًا في RAW تبقى المرجع الأساسي.
+    try{
+      const balRows = _ixRowsFor({rows:()=>window.RAW_BALAGH}, base);
+      if (balRows.length) merged.alerts = balRows.length;
+    }catch(_){}
+
+    // بيانات الأنظمة المعتمدة: آخر زيارة.
+    try{
+      const id = _ixId(base?.minId || base?.schoolSeq || base?.buildingSeq);
+      const rec = id ? (window.LATEST_SYSTEMS_MAP || {})[id] : null;
+      if (rec){
+        merged.latestSystemsVisit = rec.completedAtRaw || null;
+        merged.systemsOverallBand = rec.overallBandAr || null;
+        merged.systemsSubmissionScore = rec.submissionScorePct ?? null;
+        merged.systemsSubsystemCount = Array.isArray(rec.subsystems) ? rec.subsystems.length : 0;
+      }
+    }catch(_){}
+
+    for (const def of IX_SCHOOL_SOURCE_DEFS){
+      const rows = _ixRowsFor(def, base);
+      if (!rows.length) continue;
+      matchedSources++;
+      totalMatchedRows += rows.length;
+      sections.push({ ...def, rows });
+    }
+
+    // HASR ليس دائمًا مصدراً خاماً، لكنه School-level object غني.
+    if (window.HASR?.data?.schools && !sections.some(s=>s.key==="HASR")){
+      const h = _ixRowsFor({rows:()=>window.HASR.data.schools}, base);
+      if (h.length){
+        sections.push({key:"HASR",label:"حصر الأصول",singular:"أصل",icon:"📦",rows:h});
+        matchedSources++;
+        totalMatchedRows += h.length;
+      }
+    }
+
+    merged.__unified = {
+      sections,
+      matchedSources,
+      totalMatchedRows,
+      builtAt: new Date().toISOString()
+    };
+    return merged;
+  }
+
+  function renderUnifiedCrossTabProfile(r){
+    const u = r?.__unified;
+    if (!u || !Array.isArray(u.sections) || !u.sections.length) return "";
+    __IXCurrentUnifiedProfile = r;
+    const isEn = (typeof LANG !== "undefined" && LANG === "en");
+    const t = {
+      title: isEn ? "All data linked to this school" : "كل البيانات المرتبطة بالمدرسة",
+      sub: isEn ? "A quick summary of linked sources — details appear when you open a source." : "ملخص بسيط للمصادر المرتبطة، والتفاصيل تظهر عند فتح المصدر.",
+      source: isEn ? "source" : "مصدر",
+      record: isEn ? "record" : "سجل",
+      hint: isEn ? "Tap to view data" : "اضغط لعرض البيانات",
+      note: isEn ? "Linking uses the ministry ID first, then falls back to the name." : "الربط يعتمد على الرقم الوزاري أولاً، ثم الاسم عند الحاجة."
+    };
+    const sectionHTML = u.sections.map((s) => {
+      return `
+        <button type="button" class="ix-profile-source" data-ix-source-key="${esc(s.key)}" onclick="window.__IXOpenSource('${String(s.key).replace(/'/g, "\\'")}')">
+          <span class="ix-profile-source-main">
+            <span class="ix-profile-source-icon">${s.icon}</span>
+            <span class="ix-profile-source-text">
+              <span class="ix-profile-source-title">${esc(s.label)}</span>
+              <span class="ix-profile-source-hint">${esc(t.hint)}</span>
+            </span>
+          </span>
+          <span class="ix-profile-source-end">
+            <span class="ix-profile-source-count">${s.rows.length.toLocaleString()} ${esc(t.record)}</span>
+            <span class="ix-profile-source-arrow">‹</span>
+          </span>
+        </button>`;
+    }).join("");
+    return `
+      ${_ixSecTitle("🧠","الملف الشامل","Full Profile")}
+      <div class="ix-profile-summary">
+        <div class="ix-profile-summary-main">
+          <div class="ix-profile-kicker">SCHOOL 360°</div>
+          <div class="ix-profile-title">${esc(t.title)}</div>
+          <div class="ix-profile-sub">${esc(t.sub)}</div>
+        </div>
+        <div class="ix-profile-summary-counts">
+          <span><b>${u.sections.length.toLocaleString()}</b> ${esc(t.source)}</span>
+          <span><b>${u.totalMatchedRows.toLocaleString()}</b> ${esc(t.record)}</span>
+        </div>
+      </div>
+      <div class="ix-profile-source-grid">${sectionHTML}</div>
+      <div class="ix-profile-note">
+        <span>ℹ️</span>
+        <span>${esc(t.note)}</span>
+      </div>`;
+  }
+
+  window.__IXBuildUnifiedSchoolProfile = buildUnifiedSchoolProfile;
+  window.__IXSchoolSourceDefs = IX_SCHOOL_SOURCE_DEFS;
+
+
+  // بناء عنوان قسم موحّد: أيقونة داخل دائرة + نص ثنائي اللغة (عربي/إنجليزي)
+  function _ixSecTitle(icon, ar, en) {
+    const txt = (typeof LANG !== "undefined" && LANG === "en" && en) ? en : ar;
+    return `<div class="ix-section-title"><span class="ix-sec-ico">${icon}</span>${esc(txt)}</div>`;
+  }
 
   function renderSchoolDetails(r) {
     const nameEl   = document.getElementById("ix-school-name-title");
@@ -21160,11 +22637,22 @@ ${panelHTML}
     const scoreCard = (label, v) => {
       if (v == null || isNaN(v)) return "";
       const c = fcaColor(v);
+      const pct = Math.max(0, Math.min(v, 100));
+      const r = 22, circ = 2 * Math.PI * r;
+      const offset = circ - (pct / 100) * circ;
       return `<div class="ix-score-card" style="--ix-sc-color:${c}">
+        <div class="ix-score-ring">
+          <svg width="56" height="56" viewBox="0 0 56 56">
+            <circle cx="28" cy="28" r="${r}" fill="none" stroke="var(--bd-light)" stroke-width="5"></circle>
+            <circle cx="28" cy="28" r="${r}" fill="none" stroke="${c}" stroke-width="5"
+              stroke-linecap="round" stroke-dasharray="${circ.toFixed(1)}"
+              stroke-dashoffset="${offset.toFixed(1)}"
+              transform="rotate(-90 28 28)"></circle>
+          </svg>
+          <div class="ix-score-ring-val">${v.toFixed(1)}%</div>
+        </div>
         <div class="ix-score-lbl">${label}</div>
-        <div class="ix-score-val">${v.toFixed(1)}%</div>
         <div class="ix-score-tier">${tierIcon(v)} ${tierLabel(v)}</div>
-        <div class="ix-score-bar2"><div class="ix-score-fill2" style="width:${Math.min(v,100)}%"></div></div>
       </div>`;
     };
 
@@ -21185,7 +22673,6 @@ ${panelHTML}
 
     const infoItemsHTML = [
       infoItem("الرقم الوزاري",              r.minId ? `<span style="font-family:monospace;font-size:14px;font-weight:800">${esc(r.minId)}</span>` : ""),
-      infoItem("رقم التسلسل",               (r.schoolSeq||r.buildingSeq) ? `<span style="font-family:monospace;font-size:12px">${esc(r.schoolSeq||r.buildingSeq)}</span>` : ""),
       infoItem("المدينة / المنطقة",          r.city ? esc(r.city) : ""),
       infoItem("المحافظة",                   r.sector ? esc(r.sector) : ""),
       infoItem("الحي",                       r.district ? esc(r.district) : ""),
@@ -21194,7 +22681,7 @@ ${panelHTML}
       infoItem("نوع الارتباط",               r.linkType ? esc(r.linkType) : ""),
     ].filter(Boolean).join("");
     const infoSectionHTML = infoItemsHTML
-      ? `<div class="ix-section-title">🏫 معلومات المدرسة</div><div class="ix-info-grid2">${infoItemsHTML}</div>`
+      ? `${_ixSecTitle("🏫","معلومات المدرسة","School Info")}<div class="ix-info-grid2">${infoItemsHTML}</div>`
       : "";
 
     const statsItemsHTML = [
@@ -21207,7 +22694,7 @@ ${panelHTML}
         r.buildingAge != null ? `<span style="${ageColor};font-size:15px">${r.buildingAge} سنة</span>` : ""),
     ].filter(Boolean).join("");
     const statsSectionHTML = statsItemsHTML
-      ? `<div class="ix-section-title">📊 الإحصائيات</div><div class="ix-info-grid2">${statsItemsHTML}</div>`
+      ? `${_ixSecTitle("📊","الإحصائيات","Statistics")}<div class="ix-info-grid2">${statsItemsHTML}</div>`
       : "";
 
     const scoreCardsHTML = [
@@ -21216,7 +22703,7 @@ ${panelHTML}
       scoreCard("تقييم عاين", ayen),
     ].filter(Boolean).join("");
     const scoresSectionHTML = scoreCardsHTML
-      ? `<div class="ix-section-title">🎯 التقييمات</div><div class="ix-info-grid2">${scoreCardsHTML}</div>`
+      ? `${_ixSecTitle("🎯","التقييمات","Ratings")}<div class="ix-scores-grid">${scoreCardsHTML}</div>`
       : "";
 
     // ── إحداثيات ──
@@ -21246,66 +22733,56 @@ ${panelHTML}
       contractRow("🧹","عقد النظافة", r.contractClean, r.contrClean, r.projClean, r.expClean),
     ].filter(Boolean).join("");
     const contractsSectionHTML = contractsHTML
-      ? `<div class="ix-section-title">📋 العقود</div>${contractsHTML}`
+      ? `${_ixSecTitle("📋","العقود","Contracts")}${contractsHTML}`
       : "";
 
     const notesSectionHTML = r.notes
-      ? `<div class="ix-section-title">📝 ملاحظات</div>
+      ? `${_ixSecTitle("📝","ملاحظات","Notes")}
         <div class="ix-info-item2 ix-full2" style="margin-bottom:12px">
           <div class="ix-info-val2" style="font-size:12px;line-height:1.7;font-weight:500">${esc(r.notes)}</div>
         </div>`
       : "";
 
-    // ── الأنظمة الرئيسية (متوسط كل قسم رئيسي من شيت المدارس_والأنظمة) ──
-    // الربط: 1) بالرقم الوزاري (minId/schoolSeq) أولاً — الأدق
-    //        2) بالاسم + المدينة كملاذ احتياطي لو الرقم غير متوفر بشيت الأنظمة
+    // ── الأنظمة الرئيسية (آخر تفتيش للمدرسة من شيت المدارس_والأنظمة الجديد) ──
+    // 🔁 2026-08-23: بقى المصدر window.LATEST_SYSTEMS_MAP (سجل واحد لكل
+    // مدرسة = آخر زيارة بتاريخ Completed At، مبني من الفورمات الجديد).
+    // الربط بالرقم الوزاري بعد window.normSchoolId (نفس المفتاح المعتمد
+    // في كل الداشبورد). الاتجاه هنا 1=أفضل...5=أسوأ — الرقم يتعرض زي ما
+    // هو، والفرز/الألوان بس هما اللي بيراعوا الاتجاه الصح (تنازلي: الأسوأ
+    // يظهر أولاً، زي ما كانت العادة قبل كده).
     const sysMainHTML = (function () {
-      const allSys = Array.isArray(window.RAW_ALL_SYSTEMS) ? window.RAW_ALL_SYSTEMS : [];
-      if (!allSys.length) return "";
+      const latestMap = window.LATEST_SYSTEMS_MAP || {};
+      const targetId = window.normSchoolId(r.minId || r.schoolSeq || r.buildingSeq || "");
+      const rec = targetId ? latestMap[targetId] : null;
+      if (!rec || !Array.isArray(rec.subsystems) || !rec.subsystems.length) return "";
 
-      const normV = v => String(v || "").replace(/\uFEFF/g, "").trim().toUpperCase();
-      const targetId   = normV(r.minId || r.schoolSeq || r.buildingSeq || "");
-      const targetName = String(r.name || r.buildingName || "").trim().toLowerCase();
-      const targetCity = String(r.city || r.sector || "").trim().toLowerCase();
-
-      let rows = targetId
-        ? allSys.filter(row => normV(row["رقم المدرسة"]) === targetId)
-        : [];
-      if (!rows.length && targetName) {
-        rows = allSys.filter(row =>
-          String(row["اسم المدرسة"] || "").trim().toLowerCase() === targetName &&
-          (!targetCity || String(row["المدينة الرئيسية"] || "").trim().toLowerCase() === targetCity)
-        );
-      }
-      if (!rows.length) return "";
-
-      const HIDDEN = (typeof HIDDEN_SYSTEMS !== "undefined") ? HIDDEN_SYSTEMS : [];
       const sumMap = {}, cntMap = {};
-      rows.forEach(row => {
-        const sec = row["القسم الرئيسي"];
-        const v = parseFloat(row["التقييم (1–5)"]);
-        if (!sec || isNaN(v) || v <= 0 || HIDDEN.includes(sec)) return;
-        sumMap[sec] = (sumMap[sec] || 0) + v;
-        cntMap[sec] = (cntMap[sec] || 0) + 1;
+      rec.subsystems.forEach(sub => {
+        if (!sub.mainSystem || sub.rating == null) return;
+        sumMap[sub.mainSystem] = (sumMap[sub.mainSystem] || 0) + sub.rating;
+        cntMap[sub.mainSystem] = (cntMap[sub.mainSystem] || 0) + 1;
       });
       const sections = Object.keys(sumMap);
       if (!sections.length) return "";
 
-      const catFromAvg = v => v >= 4.5 ? "جيد جداً" : v >= 3.5 ? "جيد" : v >= 2.5 ? "متوسط" : "حرج";
       const cards = sections
         .map(sec => ({ sec, avg: sumMap[sec] / cntMap[sec] }))
-        .sort((a, b) => a.avg - b.avg)
+        .sort((a, b) => b.avg - a.avg) // الأسوأ (رقم أعلى) أولاً
         .map(({ sec, avg }) => `
           <div class="ix-info-item2">
             <div class="ix-info-lbl2">${esc(sec)}</div>
             <div class="ix-info-val2" style="display:flex;align-items:center;gap:8px;margin-top:4px">
-              ${typeof sysScoreDot === "function" ? sysScoreDot(avg) : avg.toFixed(1)}
-              ${typeof sysBadge === "function" ? sysBadge(catFromAvg(avg)) : ""}
+              ${typeof sysScoreDotNew === "function" ? sysScoreDotNew(avg) : avg.toFixed(1)}
+              ${typeof sysBadge === "function" ? sysBadge(sysCatFromRatingNew(avg)) : ""}
             </div>
           </div>`)
         .join("");
 
-      return `<div class="ix-section-title">⚙️ الأنظمة الرئيسية</div>
+      const sysTitleTxt = (typeof LANG !== "undefined" && LANG === "en") ? "Main Systems" : "الأنظمة الرئيسية";
+      const sysVisitTxt = (typeof LANG !== "undefined" && LANG === "en") ? "Last inspection" : "آخر تفتيش";
+      return `<div class="ix-section-title"><span class="ix-sec-ico">⚙️</span>${esc(sysTitleTxt)}
+          <span style="font-size:10px;color:var(--tx-muted);font-weight:600">(${esc(sysVisitTxt)}: ${esc(rec.completedAtRaw || "—")})</span>
+        </div>
         <div class="ix-info-grid2">${cards}</div>`;
     })();
 
@@ -21337,7 +22814,7 @@ ${panelHTML}
       </div>
 
       <!-- ── الخريطة الصغيرة ── -->
-      <div class="ix-section-title">🗺️ الموقع على الخريطة</div>
+      ${_ixSecTitle("🗺️","الموقع على الخريطة","Map Location")}
       ${hasCoords
         ? `<div class="ix-mini-map-wrap"><div id="${mapId}" class="ix-mini-map"></div></div>`
         : `<div class="ix-mini-map-no-coords">
@@ -21360,6 +22837,9 @@ ${panelHTML}
 
       <!-- ── العقود ── -->
       ${contractsSectionHTML}
+
+      <!-- ── الملف الشامل عبر جميع التبويبات ── -->
+      ${typeof renderUnifiedCrossTabProfile === "function" ? renderUnifiedCrossTabProfile(r) : ""}
 
       ${notesSectionHTML}
     `;
@@ -21384,15 +22864,15 @@ ${panelHTML}
               maxZoom: 19
             }).addTo(miniMap);
 
-            // Marker مع popup باسم المدرسة
-            const marker = L.circleMarker([r.lat, r.lng], {
-              radius: 10,
-              fillColor: CSS_TOKENS.info(),
-              color: "#fff",
-              weight: 3,
-              opacity: 1,
-              fillOpacity: 0.92
-            }).addTo(miniMap);
+            // Marker مع popup باسم المدرسة — دبوس مصمم بدل النقطة العادية
+            const pinIcon = L.divIcon({
+              className: "ix-map-pin-wrap",
+              html: `<div class="ix-map-pin"><span>🏫</span></div>`,
+              iconSize: [34, 34],
+              iconAnchor: [17, 32],
+              popupAnchor: [0, -30]
+            });
+            const marker = L.marker([r.lat, r.lng], { icon: pinIcon }).addTo(miniMap);
 
             marker.bindPopup(
               `<div style="font-family:Tajawal,sans-serif;font-weight:700;font-size:12px;direction:rtl;text-align:right">
@@ -21756,11 +23236,25 @@ ${panelHTML}
       }
 
       const raw = getRaw();
-      const matches = raw.filter(r =>
-        (r.name || "").toLowerCase().includes(q) ||
-        String(r.minId || "").toLowerCase().includes(q) ||
-        (r.district || "").toLowerCase().includes(q)
-      ).slice(0, 10);
+      const qId = (typeof window.normSchoolId === "function") ? window.normSchoolId(q) : q.replace(/\D/g,"");
+      const qName = _ixCleanText(q);
+      const scored = raw.map(r => {
+        const name = _ixCleanText(r.name || r.buildingName || "");
+        const id = _ixId(r.minId || r.schoolSeq || r.buildingSeq || "");
+        const district = _ixCleanText(r.district || "");
+        let score = 0;
+        if (qId && id && id === qId) score += 1000;
+        if (name && name === qName) score += 900;
+        if (name && name.startsWith(qName)) score += 500;
+        if (name && name.includes(qName)) score += 300;
+        if (id && qId && id.includes(qId)) score += 250;
+        if (district && district.includes(qName)) score += 50;
+        return { r, score };
+      }).filter(x => x.score > 0)
+        .sort((a,b) => b.score - a.score || String(a.r.name||"").localeCompare(String(b.r.name||""),"ar"))
+        .slice(0,10)
+        .map(x => x.r);
+      const matches = scored;
 
       if (!matches.length) {
         suggestions.classList.remove("ix-open");
@@ -21786,7 +23280,10 @@ ${panelHTML}
             onkeydown="if(event.key==='Enter')this.click()"
             onclick="window.__IXSugClick(${i})">
             <div class="ix-sug-name">${highlight(m.name)}</div>
-            <div class="ix-sug-meta">${esc(m.city || "")} · ${esc(m.sector || "")} · ${esc(m.stage || "")} ${m.minId ? "· رقم: " + esc(String(m.minId)) : ""}</div>
+            <div class="ix-sug-meta">
+              ${esc(m.city || "")}${m.sector ? " · " + esc(m.sector) : ""}${m.stage ? " · " + esc(m.stage) : ""}
+              ${m.minId ? " · الرقم الوزاري: " + esc(String(m.minId)) : ""}
+            </div>
           </div>`;
       }).join("") + (raw.filter(r => (r.name || "").toLowerCase().includes(q)).length > 10
         ? `<div style="padding:8px 14px;font-size:10px;color:var(--tx-muted);text-align:center">وغيرها... دقّق البحث لنتائج أفضل</div>`
@@ -22264,7 +23761,7 @@ window.addEventListener('load', function () {
       kpis: ['أفضل منطقة أداءً','متوسط الأداء العام','التغير منذ بداية البيانات','توقع الأشهر القادمة']
     },
     {
-      id: 'security-safety', label: 'الأمن والسلامة',
+      id: 'security-safety', label: 'بلاغات الأمن والسلامة',
       keywords: [
         'أمن وسلامة','أمن','سلامة','حوادث','حادثة','حادث','security','safety','security safety',
         'بلاغات أمن','بلاغات سلامة','حوادث مدارس','إصابات','وفيات','حرج','تحقيق',
@@ -26810,7 +28307,6 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(44, 'click', function (event) { showTab('consultant-kpi',this) });
   bind(46, 'click', function (event) { showTab('vehicles',this) });
   bind(47, 'click', function (event) { showTab('training',this) });
-  bind(48, 'click', function (event) { showTab('emp-kpi',this) });
   bind(49, 'click', function (event) { showTab('hasr',this) });
   bind(51, 'click', function (event) { showTab('tajheez-supplies',this) });
   bind(52, 'click', function (event) { showTab('tajheez-contracts',this) });
@@ -27086,7 +28582,8 @@ document.addEventListener("DOMContentLoaded", function () {
    صراحةً — بترث currentColor من العنصر المحيط بيها فبتتلوّن تلقائياً
    بلون النص في كل مكان (بدل تكرار نظام --cat-accent في مكان تاني). */
 var CATEGORY_ICON_SVG = {
-  assessment: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg>',
+  fca: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg>',
+  otherAssessments: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
   assets:     '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg>',
   equipment:  '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12v4"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M17 6a2 2 0 0 1 1.414.586l3 3A2 2 0 0 1 22 11v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 .586-1.414l3-3A2 2 0 0 1 7 6z"/><path d="M2 14h20"/><path d="M8 12v4"/></svg>',
   contracts:  '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
@@ -27115,19 +28612,28 @@ var PORTAL_CATEGORIES = {
       { name: "sys-hr",      label: "نظام إدارة الموارد" }
     ]
   },
-  assessment: {
-    title: "التقييمات والحالة الفنية",
-    icon: "📊",
+  // كل حاجة ليها علاقة بـ FCA في مكان واحد (بناءً على طلب صريح) — بما فيها
+  // "نظرة عامة" لأنها بقت تستضيف تشارتات أسوأ/أفضل 20 مدرسة FCA
+  fca: {
+    title: "تحليل ومؤشرات FCA",
+    icon: "📈",
     tabs: [
       { name: "overview",     label: "نظرة عامة" },
       { name: "fca",          label: "تحليل FCA" },
       { name: "stage-compare",label: "مقارنة مراحل FCA" },
       { name: "fca-ref",      label: "FCA المرجعي" },
+      { name: "sys-main",     label: "الأنظمة الرئيسية FCA" },
+      { name: "sys-detail",   label: "الأنظمة التفصيلية FCA" }
+    ]
+  },
+  // التقييمات التانية اللي مالهاش علاقة مباشرة بـ FCA
+  otherAssessments: {
+    title: "تقييمات أخرى",
+    icon: "📋",
+    tabs: [
       { name: "env",          label: "البيئة المدرسية" },
       { name: "ayen",         label: "تقييم عاين" },
       { name: "asol",         label: "تقييم منصة أصول" },
-      { name: "sys-main",     label: "الأنظمة الرئيسية FCA" },
-      { name: "sys-detail",   label: "الأنظمة التفصيلية FCA" },
       { name: "stages",       label: "المرحلة الدراسية" }
     ]
   },
@@ -27171,7 +28677,6 @@ var PORTAL_CATEGORIES = {
       { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
       { name: "training",        label: "برامج التدريب" },
-      { name: "emp-kpi",         label: "تقييم الموظفين" },
       { name: "gatekeepers",     label: "البوابين" }
     ]
   },
@@ -27180,7 +28685,7 @@ var PORTAL_CATEGORIES = {
     icon: "📢",
     tabs: [
       { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
-      { name: "security-safety", label: "الأمن والسلامة" },
+      { name: "security-safety", label: "بلاغات الأمن والسلامة" },
       { name: "balagh",          label: "البلاغات" }
     ]
   },
@@ -27746,14 +29251,27 @@ if (document.readyState === "loading") {
    ══════════════════════════════════════════════════════════════════════ */
 function __portalSearchIndex() {
   var out = [];
-  if (typeof PORTAL_CATEGORIES === "undefined") return out;
-  Object.keys(PORTAL_CATEGORIES).forEach(function (catKey) {
-    var cat = PORTAL_CATEGORIES[catKey];
-    (cat.tabs || []).forEach(function (t) {
-      if (typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(t.name)) return;
-      out.push({ cat: catKey, catTitle: cat.title, name: t.name, label: t.label });
+  if (typeof PORTAL_CATEGORIES !== "undefined") {
+    Object.keys(PORTAL_CATEGORIES).forEach(function (catKey) {
+      var cat = PORTAL_CATEGORIES[catKey];
+      (cat.tabs || []).forEach(function (t) {
+        if (typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(t.name)) return;
+        out.push({ kind: "tab", cat: catKey, catTitle: cat.title, name: t.name, label: t.label });
+      });
     });
-  });
+  }
+  if (Array.isArray(window.RAW)) {
+    var seen = Object.create(null);
+    window.RAW.forEach(function (r) {
+      var name = String(r?.name || r?.buildingName || "").trim();
+      var minId = String(r?.minId || r?.schoolSeq || r?.buildingSeq || "").trim();
+      if (!name && !minId) return;
+      var key = (typeof window.normSchoolId === "function" ? window.normSchoolId(minId) : minId.replace(/[^0-9]/g, "")) || __portalSearchNormalize(name);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      out.push({ kind:"school", cat:"school", catTitle:"مدارس", name:name, label:name || ("مدرسة " + minId), minId:minId, city:String(r?.city || r?.sector || "").trim(), row:r });
+    });
+  }
   return out;
 }
 
@@ -27777,7 +29295,7 @@ function __initPortalSearch() {
   wrap.className = "portal-search-wrap";
   wrap.innerHTML =
     '<input type="text" id="portalSearchInput" class="portal-search-input" autocomplete="off" ' +
-    'placeholder="ابحث عن تبويب… (مثال: البلاغات، المصاعد، التكلفة)" aria-label="بحث سريع عن تبويب">' +
+    'placeholder="ابحث عن تبويب أو مدرسة…" aria-label="بحث سريع عن تبويب أو مدرسة">' +
     '<span class="portal-search-icon">🔍</span>' +
     '<div class="portal-search-results" id="portalSearchResults" style="display:none"></div>';
   // ⚠️ بنحطها بعد الـ hero مش جواه: الـ hero عنده overflow:hidden وكان
@@ -27796,15 +29314,15 @@ function __initPortalSearch() {
     matches = list;
     activeIdx = list.length ? 0 : -1;
     if (!list.length) {
-      box.innerHTML = '<div class="portal-search-empty">مفيش تبويب بالاسم ده</div>';
+      box.innerHTML = '<div class="portal-search-empty">لا توجد نتائج مطابقة</div>';
       box.style.display = "";
       return;
     }
     box.innerHTML = list
       .map(function (m, i) {
         return (
-          '<div class="portal-search-item' + (i === 0 ? " active" : "") + '" data-i="' + i + '">' +
-          "<span>" + m.label + "</span>" +
+          '<div class="portal-search-item portal-search-item-' + (m.kind === "school" ? "school" : "tab") + (i === 0 ? " active" : "") + '" data-i="' + i + '">' +
+          '<span class="portal-search-item-main"><span class="portal-search-item-icon">' + (m.kind === "school" ? "🏫" : "▦") + '</span><span>' + m.label + (m.kind === "school" && m.minId ? '<small>🔢 ' + m.minId + (m.city ? ' · ' + m.city : '') + '</small>' : '') + '</span></span>' +
           '<span class="portal-search-item-cat">' + m.catTitle + "</span>" +
           "</div>"
         );
@@ -27818,6 +29336,10 @@ function __initPortalSearch() {
     if (!m) return;
     close();
     input.value = "";
+    if (m.kind === "school") {
+      if (typeof window.__IXOpenSchool === "function" && m.row) window.__IXOpenSchool(m.row);
+      return;
+    }
     if (typeof openFavoriteTab === "function") openFavoriteTab(m.cat, m.name);
   }
 
@@ -27831,10 +29353,13 @@ function __initPortalSearch() {
     var q = __portalSearchNormalize(input.value);
     if (!q) return close();
     var list = __portalSearchIndex().filter(function (m) {
-      return (
-        __portalSearchNormalize(m.label).indexOf(q) !== -1 ||
-        __portalSearchNormalize(m.catTitle).indexOf(q) !== -1
+      var tabHit = __portalSearchNormalize(m.label).indexOf(q) !== -1 || __portalSearchNormalize(m.catTitle).indexOf(q) !== -1;
+      var schoolHit = m.kind === "school" && (
+        __portalSearchNormalize(m.name).indexOf(q) !== -1 ||
+        __portalSearchNormalize(m.minId).indexOf(q) !== -1 ||
+        __portalSearchNormalize(m.city).indexOf(q) !== -1
       );
+      return tabHit || schoolHit;
     });
     open(list.slice(0, 8));
   });
@@ -28288,7 +29813,7 @@ document.addEventListener("core-data-ready", function () {
   /* البيانات الأساسية (RAW) مشتركة بين كل الأقسام تقريباً — بمجرد
      اكتمالها تصبح كل الأقسام قابلة للفتح فوراً (التبويبات تُرسم عند
      الفتح كما كانت دائماً) */
-  ["assessment", "assets", "contracts", "operations", "geo", "explore"].forEach(function (key) {
+  ["fca", "otherAssessments", "assets", "contracts", "operations", "geo", "explore"].forEach(function (key) {
     var s = document.getElementById("portalStatus-" + key);
     if (s) { s.textContent = "جاهز"; s.className = "portal-card-status ready"; }
   });

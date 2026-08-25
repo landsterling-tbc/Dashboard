@@ -5090,7 +5090,8 @@ tbody tr:last-child td:last-child {
    بس القديمة أعلى تحديداً فبتكسب) فبيبان لون قديم مختلف عن لون الحدّ
    العلوي للكارت. سيبنا فقط قواعد hover الخاصة بالحدود/الظل (بلا تعارض،
    بتتغلب عليها القاعدة الأحدث تلقائياً بترتيب الملف). */
-[data-category="assessment"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
+[data-category="fca"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
+[data-category="otherAssessments"]:hover  { border-color: rgba(91,107,140,.3);  box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(91,107,140,.18), inset 0 1px 0 #fff; }
 
 [data-category="assets"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
 
@@ -5398,7 +5399,8 @@ tbody tr:last-child td:last-child {
    body الأساسية بالأعلى (Phase 12-A) بدل تكرارها هنا. ── */
 
 /* ── 15-B: خلفية + حدود كل كارت بلون فئته بشكل دائم (مش hover بس) ── */
-[data-category="assessment"] { background: linear-gradient(160deg, #ffffff 0%, rgba(13,132,156,.055) 100%);  border-color: rgba(13,132,156,.24); }
+[data-category="fca"]              { background: linear-gradient(160deg, #ffffff 0%, rgba(13,132,156,.055) 100%);  border-color: rgba(13,132,156,.24); }
+[data-category="otherAssessments"] { background: linear-gradient(160deg, #ffffff 0%, rgba(91,107,140,.06) 100%);   border-color: rgba(91,107,140,.26); }
 [data-category="assets"]     { background: linear-gradient(160deg, #ffffff 0%, rgba(11,107,126,.055) 100%);  border-color: rgba(11,107,126,.24); }
 [data-category="contracts"]  { background: linear-gradient(160deg, #ffffff 0%, rgba(176,138,78,.07) 100%);   border-color: rgba(176,138,78,.3); }
 [data-category="operations"] { background: linear-gradient(160deg, #ffffff 0%, rgba(22,61,82,.05) 100%);     border-color: rgba(22,61,82,.22); }
@@ -6096,7 +6098,8 @@ tbody tr:last-child td:last-child {
 /* لون accent لكل قسم — مسحوب من نفس لوحة الداشبورد "Ink & Brass".
    القيم مكتوبة صراحةً (مش color-mix) عشان تشتغل على أي متصفح من غير
    ما تسقط بصمت على المتصفحات الأقدم. */
-#portal-card-assessment { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13);  --cat-bd:rgba(13,132,156,.28);  }
+#portal-card-fca              { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13); --cat-bd:rgba(13,132,156,.28); }
+#portal-card-otherAssessments { --cat-accent:#5b6b8c; --cat-soft:rgba(91,107,140,.13);  --cat-bd:rgba(91,107,140,.28); }
 #portal-card-assets     { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);   }
 #portal-card-equipment  { --cat-accent:#a15c1f; --cat-soft:rgba(161,92,31,.13);   --cat-bd:rgba(161,92,31,.28);   }
 #portal-card-contracts  { --cat-accent:#b08a4e; --cat-soft:rgba(176,138,78,.15);  --cat-bd:rgba(176,138,78,.3);   }
@@ -6174,15 +6177,16 @@ tbody tr:last-child td:last-child {
    كارت "المفضلة" في نفس العمود الضيق (الشمال)، فمكانها الفاضي جوه
    شبكة الـ3×3 اتسدّ بنقل كارت RACI لمكانه بدل ما يفضل لوحده في صف رابع.
    (ترتيب العرض بس — ترتيب الـHTML نفسه ما اتغيرش) */
-#portal-card-assessment { order: 1; }
-#portal-card-safety     { order: 2; }
-#portal-card-assets     { order: 3; }
-#portal-card-equipment  { order: 4; }
-#portal-card-contracts  { order: 5; }
-#portal-card-operations { order: 6; }
-#portal-card-geo        { order: 7; }
-#portal-card-explore    { order: 8; }
-#portal-card-raci       { order: 9; }
+#portal-card-fca              { order: 1; }
+#portal-card-otherAssessments { order: 2; }
+#portal-card-safety     { order: 3; }
+#portal-card-assets     { order: 4; }
+#portal-card-equipment  { order: 5; }
+#portal-card-contracts  { order: 6; }
+#portal-card-operations { order: 7; }
+#portal-card-geo        { order: 8; }
+#portal-card-explore    { order: 9; }
+#portal-card-raci       { order: 10; }
 
 /* "الأنظمة الرقمية" تحت المفضلة في نفس العمود (عمود 4)، وبقت بنفس
    عرض وارتفاع الكارت اللي جمبها في صف 2 (تجهيزات/عقود/تشغيل) —
@@ -6195,10 +6199,256 @@ tbody tr:last-child td:last-child {
    ما تتقصّش — الكارت أوسع دلوقتي بس القائمة أوضح بعمود واحد برضه. */
 #portal-card-digital .portal-card-tabs-grid { grid-template-columns: 1fr; }
 
-/* شريط البحث ياخد عرض الصف بالكامل بدل ما يسيب ~900px فراغ جنبه */
-.portal-search-wrap { max-width: none; }
+/* شريط البحث الرئيسي — عرض متوازن ولا يتمدد بعرض الصفحة بالكامل */
+.portal-search-wrap { width: min(480px, 100%); max-width: 480px; margin: 12px auto 16px; }
 
 @media (max-width: 900px) {
   .portal-favorites-card { grid-column: 1 / -1; grid-row: auto; }
   #portal-card-digital   { grid-column: 1 / -1; grid-row: auto; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   SCHOOL 360° PROFILE — Cross-Tab Unified Panel
+   طبقة عرض فقط — لا تغيّر IDs أو منطق البيانات
+   ════════════════════════════════════════════════════════════════ */
+.ix-profile-hero{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 15px;margin:0 0 12px;border-radius:16px;
+  background:linear-gradient(135deg,rgba(13,132,156,.08),rgba(176,138,78,.08));
+  border:1px solid var(--bd-light);
+}
+.ix-profile-kicker{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--teal);text-transform:uppercase}
+.ix-profile-title{font-size:15px;font-weight:900;color:var(--tx-main);margin-top:2px}
+.ix-profile-sub{font-size:10px;color:var(--tx-muted);margin-top:4px;line-height:1.7}
+.ix-profile-hero-stats{display:flex;gap:7px;flex-shrink:0}
+.ix-profile-hero-stats>div{
+  min-width:76px;padding:8px 9px;border-radius:12px;background:rgba(255,255,255,.72);
+  border:1px solid var(--bd-light);text-align:center;
+}
+.ix-profile-hero-stats b{display:block;font-size:17px;color:var(--teal);font-weight:900;line-height:1.2}
+.ix-profile-hero-stats span{display:block;font-size:9px;color:var(--tx-muted);margin-top:3px;font-weight:700}
+.ix-profile-source-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.ix-profile-source{
+  background:var(--bg-2);border:1px solid var(--bd-light);border-radius:13px;overflow:hidden;
+}
+.ix-profile-source>summary,.ix-profile-record>summary{
+  list-style:none;cursor:pointer;
+}
+.ix-profile-source>summary::-webkit-details-marker,
+.ix-profile-record>summary::-webkit-details-marker{display:none}
+.ix-profile-source>summary{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px;
+}
+.ix-profile-source>summary:hover{background:rgba(13,132,156,.04)}
+.ix-profile-source-title{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--tx-main)}
+.ix-profile-source-icon{
+  width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(13,132,156,.08);font-size:15px;
+}
+.ix-profile-source-count{
+  font-size:9px;font-weight:800;color:var(--teal);padding:4px 8px;border-radius:999px;
+  background:rgba(13,132,156,.08);border:1px solid rgba(13,132,156,.15);white-space:nowrap;
+}
+.ix-profile-source-body{padding:0 10px 10px}
+.ix-profile-record{
+  margin-top:7px;border:1px solid var(--bd-light);border-radius:11px;background:#fff;
+  overflow:hidden;
+}
+.ix-profile-record>summary{
+  display:flex;align-items:center;justify-content:space-between;padding:8px 10px;
+  font-size:10px;color:var(--tx-sec);font-weight:800;
+}
+.ix-profile-record>summary span:last-child{font-size:9px;color:var(--tx-muted);font-weight:600}
+.ix-profile-record-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px;border-top:1px solid var(--bd-light);
+}
+.ix-profile-record-item{
+  min-width:0;padding:7px 9px;border-radius:9px;background:var(--bg-2);border:1px solid var(--bd-light);
+}
+.ix-profile-record-label{font-size:8.5px;color:var(--tx-muted);font-weight:700;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ix-profile-record-value{font-size:10px;color:var(--tx-main);font-weight:700;word-break:break-word;line-height:1.55}
+.ix-profile-mini-kpis{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0;
+}
+.ix-profile-mini-kpis>div{
+  padding:8px 7px;border-radius:10px;background:#fff;border:1px solid var(--bd-light);text-align:center;
+}
+.ix-profile-mini-kpis b{display:block;font-size:13px;color:var(--teal);font-weight:900;line-height:1.25}
+.ix-profile-mini-kpis span{display:block;font-size:8.5px;color:var(--tx-muted);font-weight:700;margin-top:2px}
+.ix-profile-more,.ix-profile-note{
+  display:flex;gap:7px;align-items:flex-start;padding:9px 10px;margin-top:8px;
+  border-radius:10px;background:var(--bg-2);border:1px dashed var(--bd-mid);
+  color:var(--tx-muted);font-size:9px;line-height:1.7;
+}
+.ix-profile-note{margin-top:4px}
+@media (max-width:640px){
+  .ix-profile-hero{align-items:flex-start;flex-direction:column}
+  .ix-profile-hero-stats{width:100%}
+  .ix-profile-hero-stats>div{flex:1}
+  .ix-profile-record-grid{grid-template-columns:1fr}
+  .ix-profile-mini-kpis{grid-template-columns:1fr 1fr}
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   SCHOOL 360 — SIMPLE EXECUTIVE PASS
+   يحافظ على شكل الـPanel الأصلي ويخفف كثافة الطبقة الموحدة.
+   ══════════════════════════════════════════════════════════════ */
+.portal-search-wrap {
+  width: min(480px, 100%);
+  max-width: 480px !important;
+  margin: 12px auto 16px;
+}
+.portal-search-input { height: 42px; }
+.portal-search-item { min-height: 48px; }
+.portal-search-item-main { display:flex; align-items:center; gap:9px; min-width:0; }
+.portal-search-item-main > span:last-child { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.portal-search-item-icon {
+  width:25px;height:25px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(13,132,156,.08);flex:0 0 25px;font-size:13px;
+}
+.portal-search-item-main small { font-size:9px; color:var(--tx-muted); font-weight:600; }
+.portal-search-item-school .portal-search-item-cat { color:var(--teal-3); background:rgba(13,132,156,.08); }
+
+.ix-school-panel { width:min(600px,94vw); }
+.ix-panel-head { padding:18px 22px 15px; }
+.ix-panel-school-name { font-size:17px; }
+.ix-panel-body { padding:18px 20px 24px; }
+.ix-section-title { margin:18px 0 9px; }
+.ix-info-grid2 { gap:8px; }
+.ix-info-item2 { padding:10px 12px; box-shadow:none; }
+.ix-score-card { box-shadow:none; }
+.ix-score-card:hover { transform:none; box-shadow:var(--sh-d4); }
+.ix-contract-row { box-shadow:none; }
+.ix-action-row { margin-bottom:12px; }
+
+/* الملف الشامل: ملخص صغير + شبكة مصادر، بدون بطاقات معلومات كثيرة أمام المستخدم. */
+.ix-profile-summary {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:11px 12px; margin-bottom:9px;
+  background:#fff; border:1px solid var(--bd-light); border-radius:12px;
+}
+.ix-profile-summary-main { min-width:0; }
+.ix-profile-kicker { font-size:8px; font-weight:800; letter-spacing:.08em; color:var(--teal); }
+.ix-profile-title { font-size:13px; font-weight:900; color:var(--tx-main); margin-top:2px; }
+.ix-profile-sub { font-size:9px; color:var(--tx-muted); margin-top:2px; }
+.ix-profile-summary-counts { display:flex; gap:6px; flex:0 0 auto; }
+.ix-profile-summary-counts span {
+  padding:6px 8px; border:1px solid var(--bd-light); border-radius:9px;
+  background:var(--bg-2); font-size:8px; color:var(--tx-muted); font-weight:700; white-space:nowrap;
+}
+.ix-profile-summary-counts b { color:var(--teal); font-size:12px; margin-left:2px; }
+.ix-profile-source-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.ix-profile-source { background:#fff; border:1px solid var(--bd-light); border-radius:11px; }
+.ix-profile-source>summary { padding:9px 10px; }
+.ix-profile-source-title { font-size:10px; }
+.ix-profile-source-icon { width:24px; height:24px; border-radius:7px; font-size:13px; }
+.ix-profile-source-count { font-size:8px; padding:3px 6px; }
+.ix-profile-source-body { padding:0 8px 8px; }
+.ix-profile-record { box-shadow:none; margin-top:6px; }
+.ix-profile-record-grid { grid-template-columns:1fr 1fr; gap:6px; padding:7px; }
+.ix-profile-record-item { padding:6px 7px; }
+.ix-profile-mini-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+.ix-profile-mini-kpis>div { padding:7px 5px; }
+.ix-profile-more,.ix-profile-note { font-size:8.5px; padding:8px 9px; }
+
+@media (max-width:700px){
+  .portal-search-wrap { width:min(100%,480px); }
+  .ix-profile-summary { align-items:flex-start; flex-direction:column; }
+  .ix-profile-summary-counts { width:100%; }
+  .ix-profile-summary-counts span { flex:1; text-align:center; }
+  .ix-profile-source-grid { grid-template-columns:1fr; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   SCHOOL SOURCE SIDE PANEL — تفاصيل المصدر عند الضغط
+   بسيط، تنفيذي، ومتناسق مع لوحة المدرسة الأصلية.
+   ══════════════════════════════════════════════════════════════ */
+.ix-source-overlay{
+  position:fixed; inset:0; z-index:9200;
+  background:rgba(7,24,34,.28);
+  opacity:0; visibility:hidden; pointer-events:none;
+  transition:opacity .22s ease, visibility .22s ease;
+}
+.ix-source-overlay.ix-open{
+  opacity:1; visibility:visible; pointer-events:auto;
+}
+.ix-source-panel{
+  position:fixed; top:0; bottom:0; left:0; z-index:9201;
+  width:min(520px,94vw);
+  background:var(--bg-3,#fff);
+  border-right:1px solid var(--bd-light);
+  box-shadow:var(--sh-d64);
+  transform:translateX(-102%);
+  transition:transform .30s var(--ease-std);
+  display:flex; flex-direction:column;
+  direction:rtl;
+}
+.ix-source-panel.ix-open{transform:translateX(0)}
+.ix-source-head{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;
+  background:linear-gradient(130deg,#12303f 0%,#1b4356 55%,#235068 100%);
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,.12);
+}
+.ix-source-back,.ix-source-head-close{
+  width:32px;height:32px;flex:0 0 32px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.10);
+  color:#fff;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:background .16s ease, transform .16s ease;
+}
+.ix-source-back{font-size:21px;line-height:1;transform:rotate(180deg)}
+.ix-source-back:hover,.ix-source-head-close:hover{background:rgba(255,255,255,.20)}
+.ix-source-back:hover{transform:rotate(180deg) translateX(2px)}
+.ix-source-head-copy{min-width:0;flex:1;display:flex;align-items:center;gap:10px}
+.ix-source-head-icon{
+  width:38px;height:38px;border-radius:11px;
+  background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);
+  display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 38px;
+}
+.ix-source-head-title{font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ix-source-head-sub{font-size:9px;color:rgba(255,255,255,.62);margin-top:2px}
+.ix-source-body{flex:1;overflow:auto;padding:14px 15px 24px;background:var(--bg-2)}
+.ix-source-context{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 11px;margin-bottom:10px;
+  background:var(--bg-3);border:1px solid var(--bd-light);border-radius:11px;
+}
+.ix-source-context-name{font-size:10px;font-weight:800;color:var(--tx-main);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ix-source-context span{font-size:9px;color:var(--tx-muted);white-space:nowrap}
+/* المصدر داخل اللوحة الفرعية يعرض المحتوى فورًا ولا يحتاج details */
+.ix-source-body .ix-profile-record{background:var(--bg-3)}
+.ix-source-body .ix-profile-more{margin-bottom:8px}
+
+/* Source cards — فهرس بسيط قابل للنقر */
+.ix-profile-source-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button.ix-profile-source{
+  appearance:none;-webkit-appearance:none;
+  width:100%;border:1px solid var(--bd-light);border-radius:12px;
+  background:var(--bg-3);padding:10px 11px;
+  color:inherit;text-align:right;font-family:inherit;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  cursor:pointer;transition:background .16s ease,border-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+button.ix-profile-source:hover{
+  background:#fff;border-color:var(--bd-mid);transform:translateY(-1px);box-shadow:var(--sh-d4)
+}
+.ix-profile-source-main{display:flex;align-items:center;gap:8px;min-width:0}
+.ix-profile-source-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ix-profile-source-title{font-size:10px;font-weight:800;color:var(--tx-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ix-profile-source-hint{font-size:8px;color:var(--tx-muted)}
+.ix-profile-source-end{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.ix-profile-source-arrow{font-size:16px;color:var(--teal);font-weight:900;line-height:1;transform:rotate(180deg)}
+
+@media (max-width:700px){
+  .ix-source-panel{width:min(100vw,520px)}
+  .ix-profile-source-grid{grid-template-columns:1fr}
 }

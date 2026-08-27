@@ -993,7 +993,6 @@ function applyFilters() {
       TBL.cur = 0;
       safeRun(renderTable, "table");
     }
-    if (activeId === "tab-ac-plan") safeRun(renderAcPlanTab, "ac-plan");
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
     if (activeId === "tab-security-safety-summary") safeRun(renderSecuritySafetySummaryTab, "security-safety-summary");
     if (activeId === "tab-corrections-escalations") safeRun(renderCorrectionsEscalationsTab, "corrections-escalations");
@@ -1171,7 +1170,10 @@ function showTab(name, el) {
   }
   (document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active")),
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active")),
-    document.getElementById("tab-" + name).classList.add("active"),
+    // 🛡️ 2026-08-27: حماية عامة — لو الاسم مش مطابق لأي panel موجود فعلاً
+    // (زي تبويب اتشال، أو رابط/history قديم)، نتجاهل بهدوء بدل ما نكسر
+    // باقي الكود (كان قبل كده بيرمي TypeError على null.classList).
+    document.getElementById("tab-" + name)?.classList.add("active"),
     el && el.classList.add("active"),
     (window.__ACTIVE_TAB__ = name),
     (window.__ACTIVE_TAB_LABEL__ = el ? (el.textContent || "").trim() : name),
@@ -1202,7 +1204,6 @@ function showTab(name, el) {
     "ayen" === name && renderAyenTab(),
     "asol" === name && renderAsolTab(),
     "table" === name && ((TBL.cur = 0), renderTable()),
-    "ac-plan" === name && renderAcPlanTab(),
     "mag-kpi" === name && renderMagKpiTab(),
     "consultant-kpi" === name && renderConsultantKpiTab(),
     "security-safety" === name && renderSecuritySafetyTab(),
@@ -4817,209 +4818,6 @@ function renderStudentsTab() {
         },
       });
     }));
-}
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  ❄️  JS تبويب: خطة استبدال المكيفات (شباك ↔ سبلت)
-   ║  (tab-ac-plan) — الدوال الخاصة بهذا التبويب تبدأ هنا
-   ║
-   ║  📝 لتعديل الأرقام فقط عدّل المصفوفة AC_PLAN_DATA بالأسفل مباشرة.
-   ║     كل عنصر = منطقة واحدة:
-   ║       region : اسم المنطقة (يظهر بالجدول والرسم)
-   ║       split  : عدد مكيفات السبلت
-   ║       window : عدد مكيفات الشباك
-   ║     لإضافة منطقة جديدة: أضف سطر { region: "...", split: 0, window: 0 }
-   ║     لحذف منطقة: احذف سطرها بالكامل
-   ╚════════════════════════════════════════════════════════════╝ */
-const AC_PLAN_DATA = [
-  { region: "جدة",        split: 610, window: 875 },
-  { region: "مكه",        split: 388, window: 775 },
-  { region: "الليث",      split: 95,  window: 75  },
-  { region: "القنفذة",    split: 207, window: 40  },
-  { region: "المدينة",    split: 401, window: 462 },
-  { region: "مهد الذهب",  split: 45,  window: 158 },
-  { region: "ينبع",       split: 60,  window: 81  },
-  { region: "العلا",      split: 42,  window: 45  },
-  { region: "الطائف",     split: 328, window: 461 },
-];
-
-function renderAcPlanTab() {
-  const el = document.getElementById("ac-plan-content");
-  if (!el) return;
-  const data = AC_PLAN_DATA,
-    COLOR_SPLIT = CSS_TOKENS.info(),
-    COLOR_WINDOW = CSS_TOKENS.warning(),
-    totalSplit = data.reduce((s, r) => s + (r.split || 0), 0),
-    totalWindow = data.reduce((s, r) => s + (r.window || 0), 0),
-    totalAll = totalSplit + totalWindow,
-    sortedByTotal = [...data].sort((a, b) => (b.split + b.window) - (a.split + a.window)),
-    topRegion = sortedByTotal[0];
-
-  el.innerHTML = `
-    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi kc-info">
-        <div class="kpi-val">${totalSplit.toLocaleString()}</div>
-        <div class="kpi-lbl">عدد مكيفات السبلت</div>
-        <div class="kpi-sub">${data.length.toLocaleString()} منطقة</div>
-      </div>
-      <div class="kpi kc-amber">
-        <div class="kpi-val">${totalWindow.toLocaleString()}</div>
-        <div class="kpi-lbl">عدد مكيفات الشباك</div>
-        <div class="kpi-sub">${data.length.toLocaleString()} منطقة</div>
-      </div>
-      <div class="kpi kc-green">
-        <div class="kpi-val">${totalAll.toLocaleString()}</div>
-        <div class="kpi-lbl">إجمالي المكيفات</div>
-        <div class="kpi-sub">سبلت + شباك</div>
-      </div>
-      <div class="kpi kc-purple">
-        <div class="kpi-val" style="font-size:20px">${topRegion ? topRegion.region : "—"}</div>
-        <div class="kpi-lbl">الأعلى احتياجاً</div>
-        <div class="kpi-sub">${topRegion ? (topRegion.split + topRegion.window).toLocaleString() : ""} مكيف إجمالي</div>
-      </div>
-    </div>
-
-    <div class="card mb14">
-      <div class="card-title">عدد المكيفات حسب المنطقة (سبلت / شباك)</div>
-      <div class="chart-box" style="height:380px"><canvas id="ch-ac-plan-bar"></canvas></div>
-    </div>
-
-    <div class="g2 mb14">
-      <div class="card">
-        <div class="card-title">إجمالي سبلت مقابل شباك</div>
-        <div class="chart-box" style="height:260px"><canvas id="ch-ac-plan-donut"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">نسبة كل منطقة من إجمالي المكيفات</div>
-        <div class="chart-box" style="height:260px"><canvas id="ch-ac-plan-share"></canvas></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title" style="margin-bottom:14px">
-        تفصيل خطة استبدال المكيفات حسب المنطقة
-        <span class="sub">${data.length.toLocaleString()} منطقة</span>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr>
-            <th style="text-align:right;padding-right:14px;min-width:160px">المنطقة</th>
-            <th style="min-width:120px">عدد مكيفات سبلت</th>
-            <th style="min-width:130px">عدد مكيفات الشباك</th>
-            <th style="min-width:110px">الإجمالي</th>
-          </tr></thead>
-          <tbody>
-            ${data
-              .map(
-                (r) => `<tr>
-              <td style="text-align:right;padding-right:14px;font-weight:600">${r.region}</td>
-              <td>${(r.split || 0).toLocaleString()}</td>
-              <td>${(r.window || 0).toLocaleString()}</td>
-              <td style="font-weight:700">${((r.split || 0) + (r.window || 0)).toLocaleString()}</td>
-            </tr>`,
-              )
-              .join("")}
-            <tr style="font-weight:800;background:var(--bg-2)">
-              <td style="text-align:right;padding-right:14px">الإجمالي</td>
-              <td>${totalSplit.toLocaleString()}</td>
-              <td>${totalWindow.toLocaleString()}</td>
-              <td>${totalAll.toLocaleString()}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-
-  requestAnimationFrame(() => {
-    killChart("ch-ac-plan-bar");
-    CHARTS["ch-ac-plan-bar"] = new Chart(document.getElementById("ch-ac-plan-bar"), {
-      type: "bar",
-      data: {
-        labels: data.map((r) => r.region),
-        datasets: [
-          {
-            label: "سبلت",
-            data: data.map((r) => r.split),
-            backgroundColor: COLOR_SPLIT + "AA",
-            borderColor: COLOR_SPLIT,
-            borderWidth: 1.5,
-            borderRadius: 4,
-          },
-          {
-            label: "شباك",
-            data: data.map((r) => r.window),
-            backgroundColor: COLOR_WINDOW + "AA",
-            borderColor: COLOR_WINDOW,
-            borderWidth: 1.5,
-            borderRadius: 4,
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: !1,
-        plugins: { legend: { position: "bottom" } },
-        scales: {
-          x: { ticks: { font: { size: 10 } } },
-          y: { beginAtZero: !0, ticks: { callback: (v) => v.toLocaleString() } },
-        },
-      },
-    });
-
-    killChart("ch-ac-plan-donut");
-    CHARTS["ch-ac-plan-donut"] = new Chart(document.getElementById("ch-ac-plan-donut"), {
-      type: "doughnut",
-      data: {
-        labels: ["سبلت", "شباك"],
-        datasets: [
-          {
-            data: [totalSplit, totalWindow],
-            backgroundColor: [COLOR_SPLIT + "DD", COLOR_WINDOW + "DD"],
-            borderWidth: 2,
-            borderColor: "#fff",
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: !1,
-        cutout: "60%",
-        plugins: {
-          legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 12, padding: 6 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${Math.round((ctx.raw / totalAll) * 100)}%)`,
-            },
-          },
-        },
-      },
-    });
-
-    const shareSorted = [...data].sort((a, b) => (b.split + b.window) - (a.split + a.window));
-    killChart("ch-ac-plan-share");
-    CHARTS["ch-ac-plan-share"] = new Chart(document.getElementById("ch-ac-plan-share"), {
-      type: "pie",
-      data: {
-        labels: shareSorted.map((r) => r.region),
-        datasets: [
-          {
-            data: shareSorted.map((r) => r.split + r.window),
-            backgroundColor: shareSorted.map((_, i) => PALETTE[i % PALETTE.length] + "DD"),
-            borderWidth: 2,
-            borderColor: "#fff",
-          },
-        ],
-      },
-      options: {
-        maintainAspectRatio: !1,
-        plugins: {
-          legend: { position: "bottom", labels: { font: { size: 9 }, boxWidth: 10, padding: 5 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${Math.round((ctx.raw / totalAll) * 100)}%)`,
-            },
-          },
-        },
-      },
-    });
-  });
 }
 /* ╔════════════════════════════════════════════════════════════╗
    ║  📊  JS تبويبات مؤشرات الأداء (المقاول + الاستشاري)
@@ -18215,31 +18013,6 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // ❄️ تبويب خطة استبدال المكيفات (RAW — من بيانات المباني الرئيسية)
-    // الحقول المستخدمة: acUnits, acWindowUnits, acSplitUnits, acPlanYear
-    // ════════════════════════════════════════════════════════════════
-    try {
-      const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
-      if (D.length) {
-        const withAC = D.filter(r => null != r.acUnits);
-        const totalWindow = D.reduce((s,r)=>s+(r.acWindowUnits||0),0);
-        const totalSplit  = D.reduce((s,r)=>s+(r.acSplitUnits||0),0);
-        const totalAC     = D.reduce((s,r)=>s+(r.acUnits||0),0);
-        const byPlanYear  = {};
-        D.forEach(r => { const y=r.acPlanYear||r.replacementYear; if(y) byPlanYear[y]=(byPlanYear[y]||0)+1; });
-        summary.خطة_استبدال_المكيفات = {
-          إجمالي_وحدات_التكييف: totalAC,
-          وحدات_شباك: totalWindow,
-          وحدات_سبلت: totalSplit,
-          مدارس_بها_وحدات_تكييف: withAC.length,
-          توزيع_خطة_الاستبدال_حسب_السنة: Object.entries(byPlanYear).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({السنة:k,عدد_المدارس:v})),
-        };
-      }
-    } catch (e) {
-      summary.خطة_استبدال_المكيفات = { تنبيه: "تعذّر تلخيص خطة المكيفات: " + (e?.message || e) };
-    }
-
-    // ════════════════════════════════════════════════════════════════
     // 🗺️ تبويب الخريطة — ملخص للمساعد (بيانات المباني مع الإحداثيات)
     // ════════════════════════════════════════════════════════════════
     try {
@@ -18383,7 +18156,7 @@ function exportNashatExcel(rows) {
           ? { النظام: acSystem.name, إجمالي_وحدات_التكييف: acSystem.total, ممتاز: acSystem.excellent, جيد: acSystem.good, سيئ: acSystem.bad, متهالك: acSystem.deteriorated, مدارس_بها_تكييف: acSchoolsBreakdown.length, أعلى_10_مدارس_تكييفاً: acSchoolsBreakdown.slice(0, 10) }
           : (acTotalFromSchools > 0
               ? { ملاحظة: "لا يوجد نظام تكييف مستقل — مجموع محسوب من أنظمة المدارس", إجمالي_وحدات_التكييف: acTotalFromSchools, مدارس_بها_تكييف: acSchoolsBreakdown.length, أعلى_10_مدارس_تكييفاً: acSchoolsBreakdown.slice(0, 10) }
-              : { ملاحظة: "لم يُرصد نظام تكييف منفصل في بيانات حصر الأصول — راجع تبويب خطة استبدال المكيفات للأرقام الإجمالية" });
+              : { ملاحظة: "لم يُرصد نظام تكييف منفصل في بيانات حصر الأصول" });
 
         summary.حصر_الأصول = {
           ملاحظة: "بيانات تبويب حصر الأصول — مسح ميداني شامل لأصول المدارس",
@@ -20491,7 +20264,7 @@ function exportNashatExcel(rows) {
         if (acPerSchool.length > 0) {
           extraContext += `\n\nتوزيع وحدات التكييف في حصر الأصول (${acPerSchool.length} مدرسة):\n${JSON.stringify(acPerSchool)}`;
         } else if (!acSys) {
-          extraContext += `\n\nملاحظة: لم يُعثر على نظام تكييف مستقل في بيانات حصر الأصول. بيانات التكييف الإجمالية (شباك/سبلت) موجودة في تبويب "خطة استبدال المكيفات" ضمن مفتاح خطة_استبدال_المكيفات في ملخص اللوحة.`;
+          extraContext += `\n\nملاحظة: لم يُعثر على نظام تكييف مستقل في بيانات حصر الأصول.`;
         }
       }
     }
@@ -21170,7 +20943,6 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 • الخريطة                → الخريطة: مباني بإحداثيات، توزيع حسب المدينة
 • الجدول التفصيلي        → بيانات كل مبنى (من RAW الرئيسي — FCA + بيئة + طلاب + عمر المبنى + تقييم عاين)
 • المدفوعات              → المدفوعات: قيمة العقود، مدفوع، متبقي، نسبة صرف
-• خطة استبدال المكيفات   → خطة_استبدال_المكيفات: شباك/سبلت، خطة حسب السنة
 • مؤشرات الأداء للمقاول  → مؤشرات_أداء_المقاول: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف)
 • حصر الأصول             → حصر_الأصول: إجمالي الأصول، توزيع الحالة (ممتاز/جيد/سيئ/متهالك)، المباني، الغرف، المعادة، أعلى 10 مدارس، أعلى 10 أنظمة، الأنظمة_الرئيسية_والفرعية_الكاملة (كل نظام رئيسي وكل نظام فرعي بداخله بالتفصيل الكامل)، أعلى المدن أصولاً
 • السيارات               → السيارات: إجمالي، لها/بدون مستخدم فعلي، تفويض له تاريخ انتهاء، توزيع حسب الماركة والحالة
@@ -21268,12 +21040,10 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
   الحالات الأربع: ممتاز 🟢 / جيد 🔵 / سيئ 🟡 / متهالك 🔴 — استخدم نفس الألوان عند العرض.
   نسبة التغطية = (المحصورة / الهدف_الإجمالي 3742) × 100.
 
-▸ أسئلة عن التكييف في حصر الأصول (مهم جداً — لا تخلط بين المصدرين):
-  ⚠️ حصر الأصول (HASR) وخطة استبدال المكيفات مصدران منفصلان تماماً:
-  • حصر_الأصول → التكييف_في_الحصر: بيانات التكييف من المسح الميداني لحصر الأصول (وحدات محصورة فعلياً في المدارس مع حالتها).
-  • خطة_استبدال_المكيفات: بيانات مختلفة من ملف المباني الرئيسي (وحدات شباك/سبلت + خطة الاستبدال السنوية).
+▸ أسئلة عن التكييف في حصر الأصول:
+  • حصر_الأصول → التكييف_في_الحصر: بيانات التكييف من المسح الميداني لحصر الأصول (وحدات محصورة فعلياً في المدارس مع حالتها) — هذا هو المصدر الوحيد المتاح لبيانات التكييف.
   لو السؤال عن "التكييف في حصر الأصول" أو "كم وحدة تكييف في الحصر" → اقرأ من حصر_الأصول → التكييف_في_الحصر + بيانات_التكييف_حصر_الأصول في extraContext.
-  لو بيانات التكييف_في_الحصر تحتوي على "لم يُرصد" → وضّح للمستخدم أن التكييف غير مدرج كنظام منفصل في بيانات الحصر، ووجّهه لتبويب خطة استبدال المكيفات للأرقام الإجمالية.
+  لو بيانات التكييف_في_الحصر تحتوي على "لم يُرصد" → وضّح للمستخدم أن التكييف غير مدرج كنظام منفصل في بيانات الحصر.
 
 ▸ أسئلة عن البوابين:
   قايمة البوابين الكاملة تُحقن تلقائياً في الـ context لما تُكشف كلمة "بواب" في السؤال.
@@ -22711,7 +22481,7 @@ ${(() => {
     "renderStageCompareTab","renderFcaRefTab","renderAllContracts","renderSysMain",
     "renderSysDetail","renderBalaghTab","renderTajheezInventoryTab","renderGatekeepersTab",
     "renderKhanadeqTab","renderSpareTab","renderStudentsTab","renderAyenTab",
-    "renderAcPlanTab","renderSecuritySafetyTab","renderFuelTab","renderVehiclesTab",
+    "renderSecuritySafetyTab","renderFuelTab","renderVehiclesTab",
     "renderTrainingTab"
   ];
 
@@ -25502,12 +25272,6 @@ window.addEventListener('load', function () {
       kpis: ['إجمالي الخنادق','خنادق تحتاج صيانة']
     },
     {
-      id: 'ac-plan', label: 'خطة استبدال المكيفات',
-      keywords: ['مكيفات','ac','air conditioning','تكييف','خطة استبدال','replacement plan','ac replacement','مكيف','استبدال مكيفات','ac plan','تبديل مكيفات','خطة تكييف','cooling','تبريد'],
-      charts: ['خطة استبدال المكيفات حسب السنة','توزيع المكيفات'],
-      kpis: ['إجمالي وحدات المكيفات','مكيفات مجدولة للاستبدال']
-    },
-    {
       id: 'balagh', label: 'البلاغات',
       keywords: ['بلاغات','بلاغ','complaint','complaints','ticket','tickets','issue','issues','شكوى','شكاوى','طلب صيانة','work order','أعطال','fault','عطل','بلاغ مفتوح','open ticket','بلاغ مغلق','closed ticket','بلاغات مفتوحة','بلاغات مغلقة','أولوية','priority','طوارئ','emergency','حالة بلاغ','ticket status','maintenance request','service request','خدمة عملاء'],
       charts: ['البلاغات حسب الحالة','البلاغات حسب الأولوية','البلاغات حسب المدينة','البلاغات حسب المقاول','البلاغات حسب المدرسة','تطور البلاغات عبر الزمن'],
@@ -25738,7 +25502,6 @@ ${tabList}
 قواعد الفهم الدلالي:
 - "بلاغ/بلاغات/شكوى/شكاوى/ticket/complaint/issue/work order" → تبويب البلاغات
 - "تكلفة/تكاليف/ميزانية/cost/budget/إنفاق" → تبويب التكلفة
-- "مكيفات/تكييف/ac/air conditioning/استبدال مكيفات" → تبويب خطة استبدال المكيفات
 - "مقاول/مقاولين/contractor/performance مقاول" → تبويب مؤشرات الأداء للمقاول
 - "استشاري/consultant" → تبويب مؤشرات أداء الاستشاري
 - "FCA/فسيزبيلتي/حالة المبنى/تقييم" → تبويبات FCA حسب السياق
@@ -30105,7 +29868,6 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(28, 'click', function (event) { showTab('elevators',this) });
   bind(29, 'click', function (event) { showTab('elevator-status',this) });
   bind(30, 'click', function (event) { showTab('khanadeq',this) });
-  bind(31, 'click', function (event) { showTab('ac-plan',this) });
   bind(32, 'click', function (event) { showTab('balagh',this) });
   bind(33, 'click', function (event) { showTab('security-safety',this) });
   bind(34, 'click', function (event) { showTab('tajheez',this) });
@@ -30333,7 +30095,6 @@ document.addEventListener("DOMContentLoaded", function () {
     ["students",        function(){ renderStudentsTab(); }],
     ["ayen",            function(){ renderAyenTab(); }],
     ["asol",            function(){ renderAsolTab(); }],
-    ["ac-plan",         function(){ renderAcPlanTab(); }],
     ["mag-kpi",         function(){ renderMagKpiTab(); }],
     ["consultant-kpi",  function(){ renderConsultantKpiTab(); }],
     ["security-safety", function(){ renderSecuritySafetyTab(); }],
@@ -30488,7 +30249,6 @@ var PORTAL_CATEGORIES = {
       { name: "elevators",       label: "المصاعد" },
       { name: "elevator-status", label: "حالة المصاعد" },
       { name: "khanadeq",        label: "خنادق الصرف" },
-      { name: "ac-plan",         label: "خطة استبدال المكيفات" },
       { name: "students",        label: "الطلاب وعمر المبنى" },
       { name: "vehicles",        label: "السيارات" }
     ]

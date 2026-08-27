@@ -21,7 +21,6 @@
 ║  16. 🔍  تقييم عاين                     (tab-ayen)
 ║  17. 💳  المدفوعات والعقود              (tab-payments)
 ║  18. 📅  الجدول التفصيلي                (tab-table)
-║  19. ❄️  خطة استبدال المكيفات           (tab-ac-plan)
 ║  20. 📊  مؤشرات الأداء للمقاول          (tab-mag-kpi)
 ╠════════════════════════════════════════════════════════════════════╣
 ║  📁 هيكل الملف:
@@ -217,7 +216,7 @@
       <div class="portal-card" id="portal-card-assets" data-category="assets" data-wm="🏗️">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg></div>
         <div class="portal-card-title">الأصول والمرافق</div>
-        <div class="portal-card-desc">حصر الأصول، قطع الغيار، المصاعد، خنادق الصرف، خطة استبدال المكيفات</div>
+        <div class="portal-card-desc">حصر الأصول، قطع الغيار، المصاعد، خنادق الصرف</div>
       </div>
 
       <div class="portal-card" id="portal-card-equipment" data-category="equipment" data-wm="🧰">
@@ -502,7 +501,6 @@
     <div class="tab" data-evt="28">المصاعد</div>
     <div class="tab" data-evt="29">حالة المصاعد</div>
     <div class="tab" data-evt="30">خنادق الصرف</div>
-    <div class="tab" data-evt="31">خطة استبدال المكيفات</div>
     <div class="tab" data-evt="32">البلاغات</div>
     <div class="tab" data-evt="33">بلاغات الأمن والسلامة</div>
     <div class="tab" data-evt="34">المخصص والاحتياج</div>
@@ -1553,19 +1551,6 @@
         <div class="loading-placeholder-text">جاري التحميل…</div>
       </div>
     </div>
-  </div>
-
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  ❄️  تبويب: خطة استبدال المكيفات (شباك ↔ سبلت)
-║  ID: tab-ac-plan
-║
-║  📌 لتعديل الأرقام: انزل لقسم JS بالأسفل وابحث عن "AC_PLAN_DATA"
-║     (موجود في تعليق يبدأ بـ AC_PLAN_DATA — كل مدينة لها صف واحد)
-╠════════════════════════════════════════════════════════════════════╣
--->
-  <div class="panel" id="tab-ac-plan">
-    <div id="ac-plan-content"></div>
   </div>
 
 <!--

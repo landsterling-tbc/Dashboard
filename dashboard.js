@@ -2187,6 +2187,27 @@ function renderStageCompareTab() {
   const stageFilter = stageFilterEl?.value||"";
   const sortMode    = document.getElementById("stageCompareSort")?.value||"avg_asc";
 
+  // 🆕 2026-08-26 — الإجمالي الحقيقي لعدد المدارس: من شيت المباني (window.RAW)
+  // فقط، فريدة بالرقم الوزاري (بموافقة المستخدم: "شيت المباني هو اللي رقمه
+  // الوزاري صح"). أي رقم وزاري ظاهر في شيت تقييمات_FCA_المراحل أو شيت
+  // المدارس_والأنظمة لكنه مش موجود في شيت المباني إطلاقًا ("رقم شبح") يتجاهل
+  // تمامًا من هذا الإجمالي — مش بس من "رقم الإجمالي" زي ما كان قبل كده
+  // (rows.length كان بيعدّه ضمن الإجمالي أصلاً، وده سبب رقم 3,997 الغلط اللي
+  // كان أكبر حتى من عدد صفوف شيت المباني نفسه). مستخدَم هنا في بطاقة KPI
+  // "إجمالي المدارس بعد الفلاتر" وفي دونات "تغطية البيانات" تحت، بنفس المنطق
+  // الموحّد بالظبط. بنفس فلتر المدينة/البحث المطبّق على "rows" فعلاً (عشان
+  // الأرقام تفضل متسقة)، لكن من غير فلتر المرحلة (عشان الإجمالي يبقى ثابت
+  // بغض النظر عن أي مرحلة مختارة، ويعكس حقيقي عدد مدارس شيت المباني).
+  const rawAllSchools = Array.isArray(window.RAW) ? window.RAW : [];
+  const totalSchoolKeys = new Set();
+  rawAllSchools.forEach(r=>{
+    const mid = getMinId(r), nm = getSchool(r), cty = getCity(r), sec = getSector(r);
+    if(cityFilter && cty!==cityFilter) return;
+    if(search && !(nm.toLowerCase().includes(search) || String(mid??"").toLowerCase().includes(search) || sec.toLowerCase().includes(search) || cty.toLowerCase().includes(search))) return;
+    totalSchoolKeys.add(mid ? "ID::"+mid : "NM::"+schoolKey(sec)+"::"+schoolKey(nm));
+  });
+  const totalSchoolsCount = totalSchoolKeys.size;
+
   /* ── تجميع البيانات per school ── */
   const groupKey = (r) => r.minId ? "ID::"+r.minId : "NM::"+schoolKey(r.sector)+"::"+r.schoolK;
   const bySchool = new Map();
@@ -2244,14 +2265,14 @@ function renderStageCompareTab() {
         <div class="kpi-sub">متوسط: ${avgV!=null?avgV.toFixed(1)+"%":"—"}</div>
       </div>`;
     }).join("")+`<div class="kpi kc-navy">
-      <div class="kpi-val">${rows.length}</div>
+      <div class="kpi-val">${totalSchoolsCount}</div>
       <div class="kpi-lbl">إجمالي المدارس</div>
-      <div class="kpi-sub">بعد الفلاتر</div>
+      <div class="kpi-sub">بعد الفلاتر (من شيت المباني)</div>
     </div>`;
   }
 
   const metaEl = document.getElementById("stageCompareMeta");
-  if(metaEl) metaEl.textContent = `${rows.length} مدرسة · ${allStages.length} مراحل · ${allMonthKeys.length} شهر`;
+  if(metaEl) metaEl.textContent = `${totalSchoolsCount} مدرسة · ${allStages.length} مراحل · ${allMonthKeys.length} شهر`;
 
   /* ── Chart 1: متوسط FCA لكل مرحلة (bar chart) ── */
   killChart("ch-stage-compare-main");
@@ -2373,24 +2394,8 @@ function renderStageCompareTab() {
   }
 
   /* ── Chart 4: تغطية البيانات — doughnut per stage ── */
-  // 🆕 2026-08-26 — تصحيح الإجمالي: قبل كده كان total=rows.length، وrows
-  // مبنية بس من مدارس عندها سجل مرحلة واحد ع الأقل (من أي مصدر) — يعني أي
-  // مدرسة معندهاش أي تقييم إطلاقًا كانت بتتشال من الإجمالي نفسه، مش بس من
-  // "المقيّمة"، فكان الإجمالي (مثلاً 3,530) أقل من العدد الحقيقي لكل مدارس
-  // شيت المباني (~3,600+). الحل (بموافقة المستخدم): نحسب الإجمالي من كل
-  // مدارس شيت المباني (window.RAW) نفسه — بنفس فلتر المدينة/البحث المطبّق
-  // على "rows" فعلاً (عشان الأرقام تفضل متسقة مع باقي الشاشة) لكن من غير
-  // فلتر المرحلة (لأن الهدف هنا إظهار تغطية كل مرحلة بمفردها). أي مدرسة
-  // مفيهاش أي تقييم لمرحلة معيّنة بتتحسب تلقائيًا ضمن "بدون تقييم".
-  const rawAllSchools = Array.isArray(window.RAW) ? window.RAW : [];
-  const totalSchoolKeys = new Set();
-  rawAllSchools.forEach(r=>{
-    const mid = getMinId(r), nm = getSchool(r), cty = getCity(r), sec = getSector(r);
-    if(cityFilter && cty!==cityFilter) return;
-    if(search && !(nm.toLowerCase().includes(search) || String(mid??"").toLowerCase().includes(search) || sec.toLowerCase().includes(search) || cty.toLowerCase().includes(search))) return;
-    totalSchoolKeys.add(mid ? "ID::"+mid : "NM::"+schoolKey(sec)+"::"+schoolKey(nm));
-  });
-  const totalSchoolsCount = totalSchoolKeys.size;
+  // (الإجمالي الحقيقي totalSchoolsCount محسوب فوق مع الفلاتر — نفس القيمة
+  // المستخدمة في بطاقة KPI "إجمالي المدارس بعد الفلاتر")
   const coverEl = document.getElementById("stageCoverCharts");
   if(coverEl){
     coverEl.innerHTML="";
@@ -15401,6 +15406,602 @@ function exportTajFinExcel(rows) {
 }
 /* ══════════════════════════════════ نهاية تبويب التوريدات ══════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════════
+   🌡️ [مؤقت] بانر + مودال "توريد وتركيب المكيفات" — أُضيف 2026-08-27
+   ──────────────────────────────────────────────────────────────────────
+   ⚠️ هذا القسم بالكامل مؤقت — الموضوع/المشروع نفسه مؤقت (متوقع يستمر
+   شهر إلى ثلاثة أشهر على الأكثر). لإزالته لاحقًا:
+     1) احذف هذا البلوك بالكامل (من هنا لعلامة "نهاية القسم المؤقت" تحت).
+     2) احذف استدعاء mokInit(); في نهاية الملف (ابحث عن "mokInit()").
+   لا حاجة لأي تعديل تاني في index.html أو dashboard.css — البانر والمودال
+   والـ CSS الخاص بيهم بيتحقنوا ديناميكيًا بالكامل من هنا فقط، عشان الحذف
+   يبقى نظيف وسريع وميسّيبش أي أثر في باقي الملفات.
+
+   المصدر: ملف Apps Script منفصل (mokayefat_tawreedat.gs) على ملف جوجل
+   شيتس مستقل "توريدات المكيفيات" (فيه شيتين: شركة الأساسية وشركة الزامل).
+   استبدل الرابط أدناه برابط /exec الحقيقي بعد نشر الملف.
+   ══════════════════════════════════════════════════════════════════════ */
+const MOKAYEFAT_URL = "https://script.google.com/macros/s/AKfycbwL7KgC18ZSLOGvC1k_ZrPgEEkXxD-u0E8oh8Yeq6E7rTI9CgZhZM5IO7MLPqNu8m7Y/exec";
+const MOKAYEFAT_CACHE_KEY = "tbc_mokayefat_cache_v1";
+
+const MOKAYEFAT = {
+  loaded: false,
+  loading: false,
+  error: "",
+  rows: [], // صف واحد لكل مدرسة×شركة×نوع وحدة (بعد التطبيع)
+  timestamp: null,
+  pag: { cur: 0, size: 25 },
+  sort: { key: null, dir: "asc" },
+};
+window.MOKAYEFAT = MOKAYEFAT;
+
+function _mokN(v) {
+  if (v === null || v === undefined || v === "" || String(v).toLowerCase() === "nan") return null;
+  const f = parseFloat(String(v).replace(/,/g, ""));
+  return isFinite(f) ? f : null;
+}
+function _mokS(v) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+
+// 🔑 نفس منطق شيت المباني: الرقم الوزاري بيتطبّع بالدالة الموحّدة الوحيدة
+// (window.normSchoolId) عشان أي ربط مستقبلي مع باقي الداشبورد يبقى صحيح.
+function _mokParseRow(r, company) {
+  const planned = _mokN(r["عدد المخطط"]) ?? 0;
+  const supplied = _mokN(r["عدد الموردة"]);
+  const remainingRaw = _mokN(r["المتبقي"]);
+  const remaining = remainingRaw !== null ? remainingRaw : supplied !== null ? Math.max(planned - supplied, 0) : planned;
+  const pct = supplied !== null && planned > 0 ? (supplied / planned) * 100 : supplied !== null ? 0 : null;
+  return {
+    company, // "الأساسية" | "الزامل"
+    city: _mokS(r["المدينة"]),
+    schoolName: _mokS(r["اسم المبنى المدرسي"]),
+    minId: window.normSchoolId ? window.normSchoolId(r["الرقم الوزاري"]) : _mokS(r["الرقم الوزاري"]),
+    // 🔑 طلب المستخدم 2026-08-27: شيت شركة الأساسية مفيهوش عمود "نوع
+    // الوحدة" أصلاً (بعكس الزامل اللي فيه اسبليت/شباك) — لكن المستخدم
+    // أكّد إن كل وحدات شركة الأساسية "سبليت" فعليًا، فبنعبّيها كده
+    // تلقائيًا بدل ما تفضل "—" فاضية في الجدول.
+    unitType: _mokS(r["نوع الوحدة"]) || (company === "الأساسية" ? "اسبليت" : null),
+    planned,
+    supplied, // null = لسه محصلش توريد فعلي (مش صفر بالضرورة)
+    remaining,
+    pct, // null = لا توجد بيانات توريد بعد
+  };
+}
+
+function _mokApply(json) {
+  const d = (json && json.data) || {};
+  const sa = (v) => (Array.isArray(v) ? v : []);
+  const basic = sa(d.basic).map((r) => _mokParseRow(r, "الأساسية"));
+  const zamil = sa(d.zamil).map((r) => _mokParseRow(r, "الزامل"));
+  MOKAYEFAT.rows = basic.concat(zamil);
+  MOKAYEFAT.timestamp = json.timestamp || null;
+  MOKAYEFAT.loaded = true;
+}
+
+async function loadMokayefatData(forceNetwork) {
+  if (MOKAYEFAT.loading) return;
+  MOKAYEFAT.loading = true;
+  try {
+    if (!forceNetwork && !MOKAYEFAT.loaded && window._idb) {
+      try {
+        const cached = await window._idb.get(MOKAYEFAT_CACHE_KEY);
+        if (cached) {
+          _mokApply(cached);
+          _mokRenderBadge();
+          _mokRenderModalIfOpen();
+        }
+      } catch (_) {}
+    }
+    if (!MOKAYEFAT_URL || MOKAYEFAT_URL.indexOf("PASTE_") === 0) {
+      MOKAYEFAT.error = "لسه محطوطش رابط ملف Apps Script بتاع المكيفات (MOKAYEFAT_URL) في dashboard.js";
+      if (!MOKAYEFAT.loaded) _mokRenderModalIfOpen();
+      return;
+    }
+    const resp = await fetch(MOKAYEFAT_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const json = await resp.json();
+    if (json && json.status === "error") throw new Error(json.message || "خطأ من Apps Script");
+    if (window._idb) window._idb.set(MOKAYEFAT_CACHE_KEY, json);
+    _mokApply(json);
+    MOKAYEFAT.error = "";
+    _mokRenderBadge();
+    _mokRenderModalIfOpen();
+  } catch (err) {
+    MOKAYEFAT.error = err && err.message ? err.message : String(err);
+    _mokRenderModalIfOpen();
+  } finally {
+    MOKAYEFAT.loading = false;
+  }
+}
+
+function _mokRenderModalIfOpen() {
+  const overlay = document.getElementById("mok-overlay");
+  if (overlay && overlay.classList.contains("mok-open")) _mokRenderModal();
+}
+
+// ── بطاقة "لمحة سريعة" على البانر نفسه — تتحدّث فور وصول البيانات ──
+function _mokRenderBadge() {
+  const el = document.getElementById("mok-banner-badge");
+  if (!el) return;
+  if (MOKAYEFAT.error && !MOKAYEFAT.loaded) {
+    el.textContent = "تعذّر التحميل";
+    return;
+  }
+  if (!MOKAYEFAT.loaded) {
+    el.textContent = "جاري التحميل…";
+    return;
+  }
+  const schools = new Set(MOKAYEFAT.rows.map((r) => r.minId || r.schoolName)).size;
+  const hasSupply = MOKAYEFAT.rows.some((r) => r.supplied !== null);
+  const totalPlanned = MOKAYEFAT.rows.reduce((a, r) => a + (r.planned || 0), 0);
+  el.textContent = hasSupply
+    ? `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة`
+    : `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة · لم يبدأ التوريد بعد`;
+}
+
+function getMokFiltered() {
+  const fCity = (document.getElementById("mok-f-city")?.value || "").trim();
+  const fCompany = (document.getElementById("mok-f-company")?.value || "").trim();
+  const fSearch = (document.getElementById("mok-f-search")?.value || "").trim().toLowerCase();
+  return MOKAYEFAT.rows.filter((r) => {
+    if (fCity && r.city !== fCity) return false;
+    if (fCompany && r.company !== fCompany) return false;
+    if (fSearch && !(r.schoolName.toLowerCase().includes(fSearch) || String(r.minId || "").toLowerCase().includes(fSearch))) return false;
+    return true;
+  });
+}
+
+function _mokAggByCity(rows) {
+  const m = {};
+  rows.forEach((r) => {
+    const key = r.city || "غير محدد";
+    if (!m[key]) m[key] = { المدينة: key, مخطط: 0, موردة: 0, hasSupply: false };
+    m[key].مخطط += r.planned || 0;
+    if (r.supplied !== null) {
+      m[key].موردة += r.supplied;
+      m[key].hasSupply = true;
+    }
+  });
+  return Object.values(m);
+}
+
+// 🔑 بطاقة "توزيع حسب المدينة" لشركة واحدة بس — بتتنادى مرتين (الأساسية
+// والزامل) عشان الاتنين ميتلخبطوش في نفس الجدول أبدًا، حتى مع فلتر "الكل".
+function _mokCityTableCard(companyName, cityAgg) {
+  return `<div class="card">
+    <div class="card-title">
+      توزيع حسب المدينة — شركة ${esc(companyName)}
+      <span class="sub">${cityAgg.length} مدينة</span>
+    </div>
+    <div class="tbl-wrap" style="max-height:260px">
+      <table>
+        <thead><tr><th>المدينة</th><th>مخطط</th><th>موردة</th><th>متبقي</th><th>نسبة الإنجاز</th></tr></thead>
+        <tbody>
+          ${
+            cityAgg.length
+              ? cityAgg
+                  .map(
+                    (r) => `<tr>
+              <td>${esc(r.المدينة)}</td>
+              <td>${numFmt(r.مخطط)}</td>
+              <td>${r.hasSupply ? numFmt(r.موردة) : "—"}</td>
+              <td>${r.hasSupply ? numFmt(r.مخطط - r.موردة) : numFmt(r.مخطط)}</td>
+              <td>${r.hasSupply && r.مخطط > 0 ? pctFmt((r.موردة / r.مخطط) * 100) : "—"}</td>
+            </tr>`,
+                  )
+                  .join("")
+              : `<tr><td colspan="5" style="text-align:center;color:${CSS_TOKENS.txMuted()};padding:16px">لا توجد بيانات ضمن الفلاتر الحالية</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function _mokAggByCompany(rows) {
+  const m = { الأساسية: { الشركة: "الأساسية", مخطط: 0, موردة: 0, hasSupply: false }, الزامل: { الشركة: "الزامل", مخطط: 0, موردة: 0, hasSupply: false } };
+  rows.forEach((r) => {
+    const g = m[r.company];
+    if (!g) return;
+    g.مخطط += r.planned || 0;
+    if (r.supplied !== null) {
+      g.موردة += r.supplied;
+      g.hasSupply = true;
+    }
+  });
+  return Object.values(m);
+}
+
+function mokRerender() {
+  MOKAYEFAT.pag.cur = 0;
+  _mokRenderModal();
+}
+function _mokSortArrow(key) {
+  return _tajSortArrowGeneric(MOKAYEFAT.sort, key);
+}
+function _mokSortBy(key) {
+  _tajSortToggleGeneric(MOKAYEFAT.sort, key);
+  MOKAYEFAT.pag.cur = 0;
+  _mokRenderModal();
+}
+function _mokVal(r, key) {
+  return r[key];
+}
+
+function exportMokCSV(rows) {
+  const headers = ["المدينة", "الشركة", "المدرسة", "الرقم الوزاري", "نوع الوحدة", "مخطط", "موردة", "متبقي", "نسبة الإنجاز %"];
+  const csv = [headers.map((h) => `"${h}"`).join(",")];
+  rows.forEach((r) => {
+    csv.push([r.city, r.company, r.schoolName, r.minId, r.unitType || "—", r.planned, r.supplied ?? "", r.remaining, r.pct != null ? r.pct.toFixed(1) : ""].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+  });
+  const blob = new Blob(["﻿" + csv.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "توريدات_المكيفات_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+}
+function exportMokExcel(rows) {
+  const headers = ["المدينة", "الشركة", "المدرسة", "الرقم الوزاري", "نوع الوحدة", "مخطط", "موردة", "متبقي", "نسبة الإنجاز %"];
+  const dataArr = [headers];
+  rows.forEach((r) => dataArr.push([r.city, r.company, r.schoolName, r.minId, r.unitType || "—", r.planned, r.supplied ?? "", r.remaining, r.pct != null ? +r.pct.toFixed(1) : ""]));
+  const ws = XLSX.utils.aoa_to_sheet(dataArr);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "توريدات المكيفات");
+  XLSX.writeFile(wb, "توريدات_المكيفات_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+}
+
+function openMokModal() {
+  const overlay = document.getElementById("mok-overlay");
+  const modal = document.getElementById("mok-modal");
+  if (!overlay || !modal) return;
+  overlay.classList.add("mok-open");
+  modal.classList.add("mok-open");
+  overlay.setAttribute("aria-hidden", "false");
+  if (!MOKAYEFAT.loaded && !MOKAYEFAT.loading) loadMokayefatData(false);
+  _mokRenderModal();
+}
+function closeMokModal() {
+  const overlay = document.getElementById("mok-overlay");
+  const modal = document.getElementById("mok-modal");
+  overlay?.classList.remove("mok-open");
+  modal?.classList.remove("mok-open");
+  overlay?.setAttribute("aria-hidden", "true");
+}
+window.openMokModal = openMokModal;
+window.closeMokModal = closeMokModal;
+
+function _mokRenderModal() {
+  const body = document.getElementById("mok-modal-body");
+  if (!body) return;
+
+  if (MOKAYEFAT.error && !MOKAYEFAT.loaded) {
+    body.innerHTML = `
+    <div style="text-align:center;padding:40px 20px">
+      <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+      <div style="font-weight:700;margin-bottom:6px">تعذّر تحميل بيانات توريدات المكيفات</div>
+      <div style="color:${CSS_TOKENS.txMuted()};font-size:13px;margin-bottom:14px">${esc(MOKAYEFAT.error || "")}</div>
+      <button class="export-btn" onclick="loadMokayefatData(true)">إعادة المحاولة</button>
+    </div>`;
+    return;
+  }
+  if (!MOKAYEFAT.loaded) {
+    body.innerHTML = `
+    <div class="loading-placeholder" style="padding:40px 20px">
+      <div class="loading-placeholder-icon">❄️</div>
+      <div class="loading-placeholder-text">جاري التحميل…</div>
+    </div>`;
+    return;
+  }
+
+  const cities = Array.from(new Set(MOKAYEFAT.rows.map((r) => r.city).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
+  const fCity = document.getElementById("mok-f-city")?.value || "";
+  const fCompany = document.getElementById("mok-f-company")?.value || "";
+  const fSearch = document.getElementById("mok-f-search")?.value || "";
+
+  const filteredRows = getMokFiltered();
+  // 🔑 طلب المستخدم 2026-08-27: توزيع المدينة لازم يبقى دايمًا مفصول
+  // شركة لوحدها (الأساسية بدأت التوريد، والزامل لسه ما بدأش)، عشان محدش
+  // يلخبط بين الاتنين في نفس الجدول — حتى لو فلتر "الشركة" على "الكل".
+  const cityAggBasic = _mokAggByCity(filteredRows.filter((r) => r.company === "الأساسية")).sort((a, b) => b.مخطط - a.مخطط - (b.موردة - a.موردة));
+  const cityAggZamil = _mokAggByCity(filteredRows.filter((r) => r.company === "الزامل")).sort((a, b) => b.مخطط - a.مخطط - (b.موردة - a.موردة));
+  const companyAgg = _mokAggByCompany(filteredRows);
+
+  const totalPlanned = filteredRows.reduce((a, r) => a + (r.planned || 0), 0);
+  const hasSupply = filteredRows.some((r) => r.supplied !== null);
+  const totalSupplied = filteredRows.reduce((a, r) => a + (r.supplied || 0), 0);
+  const overallPct = hasSupply && totalPlanned > 0 ? (totalSupplied / totalPlanned) * 100 : null;
+  const schoolCount = new Set(filteredRows.map((r) => r.minId || r.schoolName)).size;
+
+  const sortedRows = _tajSortRowsGeneric(filteredRows, MOKAYEFAT.sort, _mokVal);
+
+  body.innerHTML = `
+  <div style="background:#FFFBEB;border:1px solid #F0DFB0;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px">⏳</span>
+    <span>قسم <b>مؤقت</b> — البيانات هنا خاصة بمشروع توريد وتركيب المكيفات، ومتوقع إزالة هذا القسم من الداشبورد خلال شهر إلى ثلاثة أشهر على الأكثر.</span>
+  </div>
+
+  <div class="filters-row" style="margin-bottom:16px">
+    <div class="fg">
+      <div class="fg-lbl">المدينة</div>
+      <select class="fsel" id="mok-f-city" onchange="mokRerender()" style="min-width:140px">
+        <option value="">الكل</option>
+        ${cities.map((c) => `<option value="${esc(c)}" ${fCity === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">الشركة</div>
+      <select class="fsel" id="mok-f-company" onchange="mokRerender()" style="min-width:130px">
+        <option value="">الكل</option>
+        <option value="الأساسية" ${fCompany === "الأساسية" ? "selected" : ""}>الأساسية</option>
+        <option value="الزامل" ${fCompany === "الزامل" ? "selected" : ""}>الزامل</option>
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">بحث (مدرسة / رقم وزاري)</div>
+      <input class="finp" id="mok-f-search" type="text" placeholder="بحث…" value="${esc(fSearch)}" oninput="smartSearchRerender(this, mokRerender)">
+    </div>
+    <button class="f-clear" onclick="document.getElementById('mok-f-city').value='';document.getElementById('mok-f-company').value='';document.getElementById('mok-f-search').value='';mokRerender()">✕ مسح</button>
+    <div style="margin-right:auto;display:flex;gap:8px;align-items:center">
+      <button class="export-btn export-btn-csv" onclick="exportMokCSV(_tajSortRowsGeneric(getMokFiltered(), MOKAYEFAT.sort, _mokVal))">⬇ CSV</button>
+      <button class="export-btn export-btn-excel" onclick="exportMokExcel(_tajSortRowsGeneric(getMokFiltered(), MOKAYEFAT.sort, _mokVal))">⬇ Excel</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${numFmt(schoolCount)}</div>
+      <div class="kpi-lbl">عدد المدارس</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${numFmt(totalPlanned)}</div>
+      <div class="kpi-lbl">إجمالي الوحدات المخططة</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-val">${hasSupply ? numFmt(totalSupplied) : "—"}</div>
+      <div class="kpi-lbl">إجمالي الموردة</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${overallPct === null ? "—" : pctFmt(overallPct)}</div>
+      <div class="kpi-lbl">نسبة الإنجاز الكلية</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    ${companyAgg
+      .map(
+        (c) => `<div class="card">
+      <div class="card-title">شركة ${esc(c.الشركة)}</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi kc-navy"><div class="kpi-val" style="font-size:18px">${numFmt(c.مخطط)}</div><div class="kpi-lbl">مخطط</div></div>
+        <div class="kpi kc-teal"><div class="kpi-val" style="font-size:18px">${c.hasSupply ? numFmt(c.موردة) : "—"}</div><div class="kpi-lbl">موردة</div></div>
+        <div class="kpi kc-green"><div class="kpi-val" style="font-size:18px">${c.hasSupply && c.مخطط > 0 ? pctFmt((c.موردة / c.مخطط) * 100) : "—"}</div><div class="kpi-lbl">نسبة الإنجاز</div></div>
+      </div>
+    </div>`,
+      )
+      .join("")}
+  </div>
+
+  <div class="g2 mb14">
+    ${_mokCityTableCard("الأساسية", cityAggBasic)}
+    ${_mokCityTableCard("الزامل", cityAggZamil)}
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">
+      جدول تفصيلي (مدرسة × شركة)
+      <span class="sub">${sortedRows.length} سجل</span>
+    </div>
+    <div class="tbl-wrap" style="max-height:380px">
+      <table>
+        <thead><tr>
+          <th onclick="_mokSortBy('city')" style="cursor:pointer;user-select:none">المدينة${_mokSortArrow("city")}</th>
+          <th onclick="_mokSortBy('company')" style="cursor:pointer;user-select:none">الشركة${_mokSortArrow("company")}</th>
+          <th onclick="_mokSortBy('schoolName')" style="cursor:pointer;user-select:none">المدرسة${_mokSortArrow("schoolName")}</th>
+          <th onclick="_mokSortBy('minId')" style="cursor:pointer;user-select:none">الرقم الوزاري${_mokSortArrow("minId")}</th>
+          <th onclick="_mokSortBy('unitType')" style="cursor:pointer;user-select:none">نوع الوحدة${_mokSortArrow("unitType")}</th>
+          <th onclick="_mokSortBy('planned')" style="cursor:pointer;user-select:none">مخطط${_mokSortArrow("planned")}</th>
+          <th onclick="_mokSortBy('supplied')" style="cursor:pointer;user-select:none">موردة${_mokSortArrow("supplied")}</th>
+          <th onclick="_mokSortBy('remaining')" style="cursor:pointer;user-select:none">متبقي${_mokSortArrow("remaining")}</th>
+          <th onclick="_mokSortBy('pct')" style="cursor:pointer;user-select:none">نسبة الإنجاز${_mokSortArrow("pct")}</th>
+        </tr></thead>
+        <tbody id="mok-tbl-body"></tbody>
+      </table>
+    </div>
+    <div class="pag-bar" id="mok-tbl-pag"><span class="pag-info"></span><div class="pag-btns"></div></div>
+  </div>
+  `;
+
+  // 🔧 نفس منطق renderTajheezNeedTable/renderTajheezFaedTable: الأعمدة
+  // بتتحدد مرة واحدة، وonPageChange بيرجّع لنفس الدالة (_mokRenderModal)
+  // اللي بتعيد قراءة الفلاتر/الفرز الحاليين من الـDOM وتعيد رسم الجدول —
+  // فبكرة، الانتقال بين صفحات جدول المكيفات هيشتغل صح في كل الصفحات
+  // (مش بس أول صفحة زي ما كان قبل الإصلاح).
+  const mokTableCols = [
+    (r) => `<td>${esc(r.city)}</td>`,
+    (r) => `<td>${esc(r.company)}</td>`,
+    (r) => `<td>${esc(r.schoolName)}</td>`,
+    (r) => `<td>${esc(r.minId)}</td>`,
+    (r) => `<td>${esc(r.unitType || "—")}</td>`,
+    (r) => `<td>${numFmt(r.planned)}</td>`,
+    (r) => `<td>${r.supplied != null ? numFmt(r.supplied) : "—"}</td>`,
+    (r) => `<td>${numFmt(r.remaining)}</td>`,
+    (r) => `<td>${r.pct != null ? pctFmt(r.pct) : "—"}</td>`,
+  ];
+  renderTajheezTable("mok-tbl-body", sortedRows, mokTableCols, MOKAYEFAT.pag, "mok-tbl-pag", _mokRenderModal);
+}
+
+// ── حقن البانر + المودال ديناميكيًا في Portal Home (بدون أي تعديل في
+//    index.html) — عشان الحذف لاحقًا يبقى نظيف: بلوك واحد بس في dashboard.js ──
+function mokInit() {
+  try {
+    if (document.getElementById("mok-banner")) return; // منع الحقن المزدوج
+
+    const style = document.createElement("style");
+    style.id = "mok-temp-styles";
+    style.textContent = `
+      /* 🎨 2026-08-27: تحسين شكل الكارت — نفس لغة تصميم كروت البوابة
+         (portal-card): تدرّج خفيف، ظل متعدد الطبقات، شريط لوني علوي،
+         أيقونة داخل مربع دائري، وحركة hover ناعمة — لكن بهوية كهرمانية
+         مميزة (نفس --c-warning/--bg-warning) عشان يفضل واضح إنه قسم
+         "مؤقت" مختلف عن باقي كروت البوابة الدائمة.
+         الألوان بديل ثابت (مش var()) عمداً — الكارت بيتحقن ديناميكيًا
+         وبيُحذف بالكامل بعد شهر لـ3 شهور، فمفيش داعي لربطه بنظام
+         الألوان العام أو بالوضع الليلي. */
+      #mok-banner {
+        position:relative; overflow:hidden;
+        display:flex; align-items:center; gap:14px;
+        margin:16px 24px 0; padding:16px 20px;
+        background:linear-gradient(160deg,#FFFDF7 0%,#FFF8E8 100%);
+        border:1px solid rgba(180,131,45,.28);
+        border-radius:16px;
+        box-shadow:
+          0 1px 3px rgba(146,64,14,.06),
+          0 8px 24px rgba(146,64,14,.10),
+          inset 0 1px 0 rgba(255,255,255,.9);
+        cursor:pointer; font-family:'IBM Plex Sans Arabic',sans-serif;
+        transition: transform .2s cubic-bezier(.22,.8,.3,1), box-shadow .2s ease, border-color .2s ease;
+      }
+      #mok-banner::before {
+        content:""; position:absolute; inset:0 0 auto 0; height:3px;
+        background:linear-gradient(90deg,#D97706,#F59E0B 55%,#FBBF24);
+        opacity:.85;
+      }
+      #mok-banner:hover {
+        transform:translateY(-3px);
+        box-shadow:
+          0 2px 6px rgba(146,64,14,.08),
+          0 16px 36px rgba(146,64,14,.16),
+          0 0 0 1px rgba(180,131,45,.18),
+          inset 0 1px 0 rgba(255,255,255,.9);
+        border-color:rgba(180,131,45,.42);
+      }
+      #mok-banner:active { transform:translateY(-1px); }
+      #mok-banner-icon-wrap {
+        flex-shrink:0; width:50px; height:50px; border-radius:14px;
+        display:flex; align-items:center; justify-content:center;
+        background:linear-gradient(155deg,#FEF3C7,#FDE7B8);
+        border:1px solid rgba(180,131,45,.35);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+      }
+      #mok-banner-icon { font-size:24px; line-height:1; }
+      #mok-banner-text { flex:1; min-width:0; }
+      #mok-banner-title-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+      #mok-banner-title { font-weight:800; font-size:14.5px; color:#78350F; letter-spacing:-.005em; }
+      #mok-banner-badge-pill {
+        display:inline-flex; align-items:center; gap:5px;
+        font-size:10px; font-weight:800; letter-spacing:.02em;
+        background:linear-gradient(135deg,#B45309,#92400E); color:#fff;
+        padding:3px 10px 3px 8px; border-radius:99px;
+        box-shadow:0 1px 3px rgba(146,64,14,.25);
+      }
+      #mok-banner-live-dot {
+        width:6px; height:6px; border-radius:50%; background:#FDE68A;
+        box-shadow:0 0 0 0 rgba(253,230,138,.7);
+        animation: mokPulse 1.8s ease-out infinite;
+      }
+      @keyframes mokPulse {
+        0%   { box-shadow:0 0 0 0 rgba(253,230,138,.65); }
+        70%  { box-shadow:0 0 0 6px rgba(253,230,138,0); }
+        100% { box-shadow:0 0 0 0 rgba(253,230,138,0); }
+      }
+      #mok-banner-badge { font-size:12px; font-weight:600; color:#92400E; margin-top:4px; }
+      #mok-banner-sub { font-size:10.5px; color:#A16207; opacity:.8; margin-top:3px; line-height:1.5; }
+      #mok-banner-arrow-wrap {
+        flex-shrink:0; width:30px; height:30px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        background:rgba(180,131,45,.10); color:#92400E;
+        transition: transform .2s ease, background .2s ease;
+      }
+      #mok-banner:hover #mok-banner-arrow-wrap { background:rgba(180,131,45,.18); transform:translateX(-3px); }
+      #mok-banner-arrow { font-size:15px; line-height:1; }
+
+      #mok-overlay {
+        position:fixed; inset:0; background:rgba(13,47,64,.5); z-index:9999;
+        display:none; align-items:center; justify-content:center; padding:20px;
+        backdrop-filter:blur(2px);
+      }
+      #mok-overlay.mok-open { display:flex; }
+      #mok-modal {
+        background:#fff; border-radius:18px; width:min(1100px,100%); max-height:88vh;
+        display:flex; flex-direction:column; overflow:hidden;
+        box-shadow:0 20px 60px rgba(8,30,43,.35);
+        animation: mokModalIn .18s cubic-bezier(.22,.8,.3,1);
+      }
+      @keyframes mokModalIn {
+        from { opacity:0; transform:translateY(8px) scale(.98); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+      }
+      #mok-modal-head {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:18px 24px; border-bottom:1px solid rgba(13,47,64,.08);
+        background:linear-gradient(160deg,#FFFDF7 0%,#FFF8E8 100%);
+      }
+      #mok-modal-title { font-family:Tajawal,sans-serif; font-weight:800; font-size:16.5px; color:#0d2f40; display:flex; align-items:center; gap:10px; }
+      #mok-modal-title-icon {
+        width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+        background:linear-gradient(155deg,#FEF3C7,#FDE7B8); border:1px solid rgba(180,131,45,.35); font-size:17px;
+      }
+      #mok-modal-close {
+        background:rgba(13,47,64,.06); border:none; font-size:16px; cursor:pointer; color:#5b7684;
+        width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+        transition:background .15s ease, color .15s ease;
+      }
+      #mok-modal-close:hover { background:rgba(220,38,38,.10); color:#dc2626; }
+      #mok-modal-body { padding:18px 22px; overflow-y:auto; }
+      @media (max-width:640px) {
+        #mok-banner { margin:10px 12px 0; padding:14px 16px; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    const banner = document.createElement("div");
+    banner.id = "mok-banner";
+    banner.setAttribute("onclick", "openMokModal()");
+    banner.innerHTML = `
+      <div id="mok-banner-icon-wrap"><div id="mok-banner-icon">❄️</div></div>
+      <div id="mok-banner-text">
+        <div id="mok-banner-title-row">
+          <span id="mok-banner-title">توريد وتركيب المكيفات</span>
+          <span id="mok-banner-badge-pill"><span id="mok-banner-live-dot"></span>⏳ مؤقت</span>
+        </div>
+        <div id="mok-banner-badge">جاري التحميل…</div>
+        <div id="mok-banner-sub">قسم مؤقت لمتابعة مشروع توريد المكيفات — سيُزال خلال 1 إلى 3 أشهر</div>
+      </div>
+      <div id="mok-banner-arrow-wrap"><span id="mok-banner-arrow">‹</span></div>
+    `;
+
+    const overlay = document.createElement("div");
+    overlay.id = "mok-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.innerHTML = `
+      <div id="mok-modal">
+        <div id="mok-modal-head">
+          <div id="mok-modal-title"><span id="mok-modal-title-icon">❄️</span> توريد وتركيب المكيفات <span style="font-size:10px;font-weight:800;background:linear-gradient(135deg,#B45309,#92400E);color:#fff;padding:3px 10px;border-radius:99px">⏳ مؤقت</span></div>
+          <button id="mok-modal-close" onclick="closeMokModal()">✕</button>
+        </div>
+        <div id="mok-modal-body"></div>
+      </div>
+    `;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeMokModal();
+    });
+
+    const hero = document.querySelector("#portal-home .portal-hero");
+    if (hero && hero.parentNode) {
+      hero.parentNode.insertBefore(banner, hero.nextSibling);
+    } else {
+      document.getElementById("portal-home")?.prepend(banner);
+    }
+    document.body.appendChild(overlay);
+
+    loadMokayefatData(false);
+  } catch (e) {
+    console.warn("[mokayefat][init]", e);
+  }
+}
+/* ══════════════════════════════════ نهاية القسم المؤقت (توريد المكيفات) ══════════════════════════════════ */
+
 
 /* ══════════════════════════════════════════════════════════════════════
    🧾 كارت "التجهيزات والتوريدات" — تبويب "عقود التجهيزات"
@@ -17227,58 +17828,67 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 📈 تاريخ تقييمات FCA (window.RAW_FCA_HISTORY)
+    // 📈 تبويب "مقارنة مراحل FCA" — ⚠️ "مرحلة" هنا تعني مرحلة/جولة تقييم
+    // FCA شهرية (1=أبريل، 2=مايو، 3=يونيو، 4=أغسطس، 5=سبتمبر...، تترقّم
+    // تلقائيًا شهر بشهر) — تختلف كليًا عن "المرحلة الدراسية" (ابتدائي/
+    // متوسط/ثانوي) اللي هي تبويب منفصل تمامًا (summary.المرحلة_الدراسية
+    // فوق). لا تخلط بين الاثنين أبدًا عند الإجابة.
+    // 🆕 2026-08-26: مرحلة 1 (أبريل) مصدرها الشيت التاريخي
+    // "تقييمات_FCA_المراحل" فقط. أي مرحلة تانية (مايو فصاعدًا) مصدرها شيت
+    // "المدارس_والأنظمة" بالكامل (آخر زيارة نظام لكل مدرسة في كل شهر) —
+    // بنقرأ نفس البيانات المحسوبة فعليًا في التبويب (window._stageCompareRows/
+    // Stages) بدل إعادة حسابها من الصفر، عشان إجابة الـAI تطابق 100% اللي
+    // ظاهر في الشاشة، وعشان الاتجاه يبقى شهريًا فعليًا مش فاضي (السبب اللي
+    // كان بيخلي الـAI يقول إن مافيش بيانات شهرية: كان بيدوّر على عمود
+    // "السنة" في الشيت التاريخي وهو أصلاً مش موجود، فكانت النتيجة فاضية).
     // ════════════════════════════════════════════════════════════════
     try {
-      const fcaH = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
-      if (fcaH.length) {
-        const getMrhalah = (r) => r["المرحلة"] || r["stage"] || r["مرحلة"] || "";
-        const getScore   = (r) => { const v = r["الدرجة"] ?? r["درجة"] ?? r["fca"] ?? r["score"]; const n = parseFloat(v); return isFinite(n) ? n : null; };
-        const getYear    = (r) => r["السنة"] || r["year"] || r["عام"] || "";
-        const getCity    = (r) => r["المدينة"] || r["city"] || r["مدينة"] || "";
+      if (typeof renderStageCompareTab === "function") {
+        try { renderStageCompareTab(); } catch (_) {} // نضمن إن window._stageCompare* محدّثة
+      }
+      const stageRows   = Array.isArray(window._stageCompareRows) ? window._stageCompareRows : [];
+      const stages      = Array.isArray(window._stageCompareStages) ? window._stageCompareStages : [];
+      const stageLabel_ = typeof window._stageCompareLabel === "function" ? window._stageCompareLabel : (s) => s;
 
-        const يقيمات_حسب_المرحلة = {};
-        fcaH.forEach(r => {
-          const m = getMrhalah(r);
-          const s = getScore(r);
-          if (m && s != null) {
-            if (!يقيمات_حسب_المرحلة[m]) يقيمات_حسب_المرحلة[m] = [];
-            يقيمات_حسب_المرحلة[m].push(s);
-          }
+      if (stages.length) {
+        const متوسط_حسب_مرحلة_FCA = stages.map((s) => {
+          const withData = stageRows.filter(r => r.stageData[s]?.count > 0);
+          const avgs = withData.map(r => r.stageData[s].avg).filter(v => v != null);
+          return {
+            رقم_المرحلة: s,
+            الشهر: stageLabel_(s),
+            عدد_المدارس_المقيّمة: withData.length,
+            متوسط_FCA: avgs.length ? +(avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(2) : null,
+            المصدر: s === "1" ? "الشيت التاريخي (تقييمات_FCA_المراحل)" : "شيت المدارس_والأنظمة (آخر زيارة في الشهر)",
+          };
         });
-        const متوسط_حسب_المرحلة = Object.entries(يقيمات_حسب_المرحلة).map(([k,v]) => ({
-          المرحلة: k,
-          متوسط_FCA: +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2),
-          عدد_التقييمات: v.length,
-        }));
 
-        const يقيمات_حسب_السنة = {};
-        fcaH.forEach(r => {
-          const y = String(getYear(r)).trim();
-          const s = getScore(r);
-          if (y && s != null) {
-            if (!يقيمات_حسب_السنة[y]) يقيمات_حسب_السنة[y] = [];
-            يقيمات_حسب_السنة[y].push(s);
-          }
-        });
-        const اتجاه_FCA_عبر_السنوات = Object.entries(يقيمات_حسب_السنة)
-          .sort((a,b) => a[0].localeCompare(b[0]))
-          .map(([k,v]) => ({
-            السنة: k,
-            متوسط_FCA: +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2),
-            عدد_التقييمات: v.length,
-          }));
-
-        summary.تاريخ_تقييمات_FCA = {
-          مصدر: "تبويب تحليل FCA — تاريخ التقييمات",
-          إجمالي_السجلات: fcaH.length,
-          متوسط_حسب_المرحلة,
-          اتجاه_FCA_عبر_السنوات,
+        summary.مقارنة_مراحل_FCA_الشهرية = {
+          مصدر: "تبويب مقارنة مراحل FCA (window._stageCompareRows) — نفس البيانات المعروضة فعليًا في الشاشة",
+          تنبيه_هام: '"المرحلة" هنا = مرحلة تقييم FCA الشهرية، وليست "المرحلة الدراسية" (ابتدائي/متوسط/ثانوي) — دي بيانات مختلفة تمامًا في summary.المرحلة_الدراسية',
+          إجمالي_المدارس_في_المقارنة: stageRows.length,
+          اتجاه_شهري: متوسط_حسب_مرحلة_FCA, // مرتب زمنيًا: أبريل ثم مايو ثم يونيو ثم أغسطس... إلخ
         };
       }
     } catch (e) {
-      summary.تاريخ_تقييمات_FCA = { تنبيه: "تعذّر تلخيص تاريخ تقييمات FCA: " + (e?.message || e) };
+      summary.مقارنة_مراحل_FCA_الشهرية = { تنبيه: "تعذّر تلخيص مقارنة مراحل FCA: " + (e?.message || e) };
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // 📋 تبويب "FCA المرجعي" — بيانات المراحل التاريخية الخام (بدون
+    // الترقيم/الدمج مع شيت الأنظمة)، محتفظ بيها هنا لأي سؤال عن الشيت
+    // الخام تحديدًا (نادر). لأي سؤال عن "مقارنة المراحل" استخدم
+    // summary.مقارنة_مراحل_FCA_الشهرية فوق بدل هذا القسم.
+    // ────────────────────────────────────────────────────────────────
+    try {
+      const fcaH = Array.isArray(window.RAW_FCA_HISTORY) ? window.RAW_FCA_HISTORY : [];
+      if (fcaH.length) {
+        summary.تاريخ_تقييمات_FCA_الخام = {
+          مصدر: "الشيت التاريخي الخام تقييمات_FCA_المراحل (قبل أي دمج مع شيت الأنظمة)",
+          إجمالي_السجلات: fcaH.length,
+        };
+      }
+    } catch (e) {}
 
     // ════════════════════════════════════════════════════════════════
     // 📋 تبويب البلاغات (window.RAW_BALAGH)
@@ -20541,11 +21151,11 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 ══════════════════════════════════════════════════════
 • نظرة عامة              → عدد_المباني_الإجمالي، توزيع_المدن، توزيع_المراحل
 • تحليل FCA              → تحليل_FCA: متوسط، حرجة، أسوأ/أفضل مدارس
-• مقارنة مراحل FCA       → تاريخ_تقييمات_FCA: متوسط حسب المرحلة، اتجاه عبر السنوات
-• FCA المرجعي            → تاريخ_تقييمات_FCA (بيانات المراحل التاريخية)
+• مقارنة مراحل FCA       → summary.مقارنة_مراحل_FCA_الشهرية: اتجاه شهري فعلي (1=أبريل، 2=مايو، 3=يونيو، 4=أغسطس، 5=سبتمبر...، تترقّم تلقائيًا كل شهر). ⚠️ "مرحلة" هنا = جولة تقييم FCA شهرية، مش "المرحلة الدراسية" (بند منفصل تحت). مرحلة 1 فقط من الشيت التاريخي، الباقي من شيت المدارس_والأنظمة. لو السؤال عن اتجاه/تطور FCA بمرور الوقت أو مقارنة شهور، استخدم القسم ده مش تاريخ_تقييمات_FCA_الخام
+• FCA المرجعي            → آخر تقييم FCA فعلي لكل مدرسة (بيانات RAW الرئيسي: fca/fcaDate/fcaSource) — الأحدث تاريخًا من أي مصدر يفوز دايمًا، مش مرتبط بمفهوم "المرحلة" إطلاقًا
 • البيئة المدرسية         → البيئة_المدرسية: متوسط، أسوأ/أفضل مدارس
 • الطلاب وعمر المبنى     → الطلاب_وعمر_المبنى_تفصيلي: أقدم مباني، أكبر مدارس، توزيع أعمار
-• المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب)
+• المرحلة الدراسية        → المرحلة_الدراسية: تحليل_حسب_المرحلة (FCA+بيئة+طلاب) — ⚠️ "المرحلة" هنا = ابتدائي/متوسط/ثانوي (نوع تعليمي)، مختلف تمامًا عن "مرحلة" في مقارنة مراحل FCA (جولة تقييم شهرية) فوق — لا تخلط بينهما أبدًا
 • عقود عدا المجال        → عقود_FM: إجمالي، حالة السداد (مكتمل/جاري/لم يبدأ)، مالي (أساسية/محدثة/مدفوع/متبقي)، توزيع حسب مقاول/منطقة/تصنيف
 • الأنظمة الرئيسية       → الأنظمة_الرئيسية_والتفصيلية: درجات، فئات، متوسطات حسب النظام
 • الأنظمة التفصيلية      → الأنظمة_الرئيسية_والتفصيلية (نفس المصدر، تفصيل أعمق)
@@ -32678,3 +33288,17 @@ setTimeout(function tellUserStillTrying() {
   setTimeout(initPortalWallScreen, 3500);
 })();
 /* ══ نهاية Portal Home Wall-Screen Enhancements ══ */
+
+/* ══ [مؤقت] تفعيل بانر/مودال توريد المكيفات — نفس نمط تشغيل التحسينات
+   الأخرى في هذا الملف (تشغيل فوري لو الصفحة جاهزة، وإلا الانتظار
+   لـ DOMContentLoaded، مع إعادة محاولة مؤجلة احتياطاً لو #portal-home
+   لسه مش جاهز وقت أول تشغيل). لإزالة القسم المؤقت بالكامل لاحقاً: احذف
+   هذا البلوك، والبلوك الكبير المعلَّم بـ"🌡️ [مؤقت]" فوق، وملف
+   mokayefat_tawreedat.gs من مشروع Apps Script. ══ */
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", mokInit);
+} else {
+  mokInit();
+}
+setTimeout(mokInit, 1200);
+/* ══ نهاية القسم المؤقت (توريد المكيفات) ══ */

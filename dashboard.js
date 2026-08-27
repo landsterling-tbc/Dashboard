@@ -2064,6 +2064,83 @@ function renderStageCompareTab() {
     date:    getDate(r),
   })).filter(r => (r.minId||r.schoolK) && r.score!=null && r.stage);
 
+  // ══════════════════════════════════════════════════════════════════════
+  // 🆕 2026-08-26 (تحديث بعد تأكيد صريح من المستخدم) — الشهر الوحيد اللي
+  // مصدره شيت "تقييمات_FCA_المراحل" التاريخي هو شهر المرحلة 1 (أبريل).
+  // أي شهر تاني (مايو=2، يونيو=3، أغسطس=4، سبتمبر=5...) مصدره شيت
+  // "المدارس_والأنظمة" بالكامل — حتى لو فيه سجل قديم بنفس الشهر في الشيت
+  // التاريخي (زي مرحلة 2/3 القديمة لمايو/يونيو)، بيتجاهل هنا تمامًا
+  // ويستبدله سجل شيت الأنظمة لنفس الشهر. لو مدرسة عندها أكتر من زيارة في
+  // نفس الشهر بشيت الأنظمة، بناخد آخر زيارة بس (الأحدث تاريخًا ضمن
+  // الشهر)، مش متوسطهم.
+  // ⚠️ منفصل تمامًا عن pickUnifiedFca (اللي بيحدد "آخر تقييم FCA" المعتمد
+  // في كل الداشبورد — ده أصلاً بيتعامل صح مع أي شهر لاحق تلقائيًا لأنه
+  // بيقارن التواريخ مباشرة، من غير ما يحتاج مفهوم "مرحلة" خالص) — هنا فقط
+  // بنبني أعمدة "مرحلة" لتبويب مقارنة المراحل (وتبعًا له تبويب FCA
+  // المرجعي)، من غير ما نلمس ملف تقييمات_FCA_المراحل الأصلي نفسه ولا
+  // منطق "آخر تقييم" العام.
+  // ══════════════════════════════════════════════════════════════════════
+  (function buildStagesFromHistoryAndSystems() {
+    // 1) بنحدّد "شهر المرحلة 1" بأقدم شهر فعلي موجود في الشيت التاريخي
+    //    نفسه (مش بمطابقة نصية على عمود "المرحلة" بالحرف زي "1" بالظبط —
+    //    ده كان بيتكسر لو العمود فيه أي تنسيق مختلف عن المتوقع: علامة
+    //    اتجاه مخفية (RLM/LRM) زي ما بيحصل كتير في شيتات عربية، صفر بادئ
+    //    "01"، مسافة زيادة... إلخ — فكانت مرحلة 1/أبريل بتختفي بالكامل من
+    //    غير أي سبب واضح في الواجهة). بعد تحديد شهر الأنكور، أي صف تاريخي
+    //    بنفس الشهر ده بنعتبره رسميًا "مرحلة 1" (حتى لو عمود "المرحلة"
+    //    مكتوب فيه حاجة مختلفة شكليًا)، وأي صف تاريخي لشهر تاني (زي مايو/
+    //    يونيو القديمة) بيتشال من allRows تمامًا، لأن شهوره بقى مصدرها
+    //    شيت الأنظمة بدل منه.
+    let anchorMonthKey = ""; // شهر المرحلة 1 (أقدم شهر في الشيت التاريخي) — فاضي = مفيش أي صف تاريخي بتاريخ خالص
+    allRows.forEach((r) => {
+      if (r.date) {
+        const mk = monthKey(r.date);
+        if (!anchorMonthKey || mk < anchorMonthKey) anchorMonthKey = mk;
+      }
+    });
+    const stage1Rows = allRows.filter((r) => r.date && monthKey(r.date) === anchorMonthKey);
+    stage1Rows.forEach((r) => { r.stage = "1"; }); // توحيد اسم المرحلة رسميًا بغض النظر عن شكل عمود "المرحلة" الأصلي
+    allRows.length = 0;
+    allRows.push(...stage1Rows);
+
+    // 2) كل زيارات شيت الأنظمة بعد شهر المرحلة 1 (مايو فصاعدًا) — مجمّعة
+    //    بـ(مدرسة+شهر)، آخر زيارة في الشهر بس — مرقّمة تسلسليًا بترتيبها
+    //    الزمني بدءًا من 2: أول شهر بعد الأنكور = مرحلة 2، اللي بعده = 3،
+    //    وهكذا تلقائيًا لأي شهر جديد يظهر مستقبلاً من غير أي تعديل كود.
+    const sysNorm = Array.isArray(window.RAW_SYSTEMS_NORM) ? window.RAW_SYSTEMS_NORM : [];
+    const bySchoolMonth = new Map(); // "schoolId::monthKey" → أحدث زيارة في هذا الشهر لهذه المدرسة
+    const newMonthKeys = new Set();
+    sysNorm.forEach((rec) => {
+      if (!rec || !rec.schoolId || rec.submissionScorePct == null) return;
+      const d = rec.completedAtObj;
+      if (!(d instanceof Date) || isNaN(d)) return;
+      const mk = monthKey(d);
+      if (anchorMonthKey && mk <= anchorMonthKey) return; // نفس شهر المرحلة 1 أو قبله — يتجاهل
+      newMonthKeys.add(mk);
+      const key = rec.schoolId + "::" + mk;
+      const existing = bySchoolMonth.get(key);
+      if (!existing || d > existing.completedAtObj) bySchoolMonth.set(key, rec);
+    });
+
+    const sortedNewMonths = [...newMonthKeys].sort();
+    const monthToStage = {};
+    sortedNewMonths.forEach((mk, i) => { monthToStage[mk] = String(2 + i); });
+
+    bySchoolMonth.forEach((rec, key) => {
+      const mk = key.slice(key.indexOf("::") + 2);
+      allRows.push({
+        school:  rec.schoolName || rec.schoolId,
+        schoolK: schoolKey(rec.schoolName || ""),
+        sector:  rec.sector || "",
+        city:    rec.city || "",
+        minId:   rec.schoolId,
+        stage:   monthToStage[mk],
+        score:   rec.submissionScorePct,
+        date:    rec.completedAtObj,
+      });
+    });
+  })();
+
   /* ── المراحل الفريدة — مرتبة بأول تاريخ ظهرت فيه (Apr→May→Jun→...) ── */
   const stageFirstDate = {};
   allRows.forEach(r => {
@@ -2296,6 +2373,24 @@ function renderStageCompareTab() {
   }
 
   /* ── Chart 4: تغطية البيانات — doughnut per stage ── */
+  // 🆕 2026-08-26 — تصحيح الإجمالي: قبل كده كان total=rows.length، وrows
+  // مبنية بس من مدارس عندها سجل مرحلة واحد ع الأقل (من أي مصدر) — يعني أي
+  // مدرسة معندهاش أي تقييم إطلاقًا كانت بتتشال من الإجمالي نفسه، مش بس من
+  // "المقيّمة"، فكان الإجمالي (مثلاً 3,530) أقل من العدد الحقيقي لكل مدارس
+  // شيت المباني (~3,600+). الحل (بموافقة المستخدم): نحسب الإجمالي من كل
+  // مدارس شيت المباني (window.RAW) نفسه — بنفس فلتر المدينة/البحث المطبّق
+  // على "rows" فعلاً (عشان الأرقام تفضل متسقة مع باقي الشاشة) لكن من غير
+  // فلتر المرحلة (لأن الهدف هنا إظهار تغطية كل مرحلة بمفردها). أي مدرسة
+  // مفيهاش أي تقييم لمرحلة معيّنة بتتحسب تلقائيًا ضمن "بدون تقييم".
+  const rawAllSchools = Array.isArray(window.RAW) ? window.RAW : [];
+  const totalSchoolKeys = new Set();
+  rawAllSchools.forEach(r=>{
+    const mid = getMinId(r), nm = getSchool(r), cty = getCity(r), sec = getSector(r);
+    if(cityFilter && cty!==cityFilter) return;
+    if(search && !(nm.toLowerCase().includes(search) || String(mid??"").toLowerCase().includes(search) || sec.toLowerCase().includes(search) || cty.toLowerCase().includes(search))) return;
+    totalSchoolKeys.add(mid ? "ID::"+mid : "NM::"+schoolKey(sec)+"::"+schoolKey(nm));
+  });
+  const totalSchoolsCount = totalSchoolKeys.size;
   const coverEl = document.getElementById("stageCoverCharts");
   if(coverEl){
     coverEl.innerHTML="";
@@ -2305,7 +2400,7 @@ function renderStageCompareTab() {
     allStages.forEach((s,i)=>{
       const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
       const cnt=rows.filter(r=>r.stageData[s]?.count>0).length;
-      const total=rows.length;
+      const total=Math.max(totalSchoolsCount, cnt); // أمان: لو (نادرًا) طلعت مدارس في rows مش متطابقة مع RAW
       const missing=total-cnt;
       const div=document.createElement("div");
       div.style.cssText=`width:${cellW}%;max-width:220px;min-width:120px;flex-shrink:0;text-align:center;padding:0 8px;box-sizing:border-box`;
@@ -2810,7 +2905,15 @@ window.normSchoolId = function (v) {
   if (v == null) return "";
   const digits = String(v).replace(/\uFEFF/g, "").replace(/[^0-9]/g, "");
   if (!digits) return "";
-  return digits.replace(/^0+(?=\d)/, ""); // شيل الأصفار البادئة بس، خلي رقم واحد "0" لوحده زي ما هو
+  let out = digits;
+  // 🆕 2026-08-26: تصحيح كود "39" الزائد الظاهر في بعض قيم "Ministry ID"
+  // بشيت "المدارس_والأنظمة" — مثال: "M3932985" بعد تجريد الحروف بيبقى
+  // "3932985" (7 أرقام)، لكن الرقم الوزاري الحقيقي هو "32985" (5 أرقام)
+  // بس، بعد شيل كود "39" الزيادة. نطبّقها هنا بس (المكان الموحّد الوحيد)
+  // عشان تتعمّم تلقائيًا على كل مكان في اللوحة بيربط بالرقم الوزاري. لازم
+  // تسبق شيل الأصفار البادئة تحت (فحص طول 7 على الرقم الخام قبل أي قصّ).
+  if (7 === out.length && out.startsWith("39")) out = out.slice(2);
+  return out.replace(/^0+(?=\d)/, ""); // شيل الأصفار البادئة بس، خلي رقم واحد "0" لوحده زي ما هو
 };
 
 let __loadDataInFlight = false;
@@ -3728,13 +3831,70 @@ let _map = null,
   // آخر مجموعة مدارس اتعرضت فعليًا على الخريطة (بعد كل الفلاتر: العامة +
   // المحلية + شرط وجود إحداثيات) — مصدر زر "تنزيل بيانات الخريطة" عشان
   // الملف المُصدَّر يطابق بالظبط اللي المستخدم شايفه على الخريطة لحظة الضغط.
-  _mapLastRows = [];
+  _mapLastRows = [],
+  // ── فلاتر عامة على الخريطة (2026-08-25) — محافظة/مدينة/مرحلة، تظهر دايمًا
+  // مهما كان وضع العرض، وتُبنى خياراتها ديناميكيًا من المدارس المتاحة حاليًا.
+  // محلية بالكامل لتبويب الخريطة (زي _mapTierFilter بالظبط) ──
+  _mapSectorFilter = "",
+  _mapCityFilter = "",
+  _mapStageFilter = "",
+  // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط) — بيعيد حساب عدد
+  // البلاغات الفعلي لكل مدرسة ضمن الفترة المحددة (من RAW_BALAGH مباشرة عبر
+  // "تاريخ الإنشاء")، بدل استخدام r.alerts الثابت (كل الوقت) ──
+  _mapDateFrom = "",
+  _mapDateTo = "",
+  // ── نمط طبقة الخريطة الأساسية: "street" (خرائط الشوارع الافتراضية) أو
+  // "satellite" (قمر صناعي + طبقة أسماء/حدود فوقها للوضوح) ──
+  _mapTileMode = "street",
+  _mapBaseLayer = null,
+  _mapLabelsLayer = null,
+  // ── وضع "تكبير الخريطة" (2026-08-25) — CSS فقط (كلاس على الغلاف)، بدون
+  // نقل عناصر DOM؛ الفلاتر بتتحول لشريط عائم فوق الخريطة عبر position:absolute ──
+  _mapExpanded = false;
 
 // ── ألوان/تسميات فئات البلاغات الأربع + فئة "لا بلاغات" (بنفس أسلوب
 // الألوان الثابتة المستخدم بالفعل في buildLegendHTML لباقي الأوضاع) —
 // الترتيب تصاعدي حسب الخطورة: index 0 = لا بلاغات … index 4 = الأعلى ──
 const BALAGH_TIER_COLORS = ["#94A3B8", "#059669", "#D97706", "#EA580C", "#DC2626"],
-  BALAGH_TIER_LABELS = ["لا بلاغات", "منخفض", "متوسط", "مرتفع", "الأعلى"];
+  BALAGH_TIER_LABELS = ["لا يوجد بلاغات", "منخفض", "متوسط", "مرتفع", "الأعلى"];
+
+// ── 🧭 حدود جغرافية تقريبية للسعودية (بهامش أمان) — تُستخدم لفحص إحداثيات
+// المدارس على الخريطة قبل عرضها (2026-08-25، بناءً على طلب صريح: بعض
+// المواقع كانت بتظهر غلط). خط العرض والطول في السعودية لا يتداخلان أبداً
+// (العرض 16–32.5 تقريبًا، الطول 34.5–55.7 تقريبًا) — ده بيسمح باكتشاف أكتر
+// خطأ شائع في هذا النوع من البيانات: عكس عمودَي خط الطول/العرض في المصدر ──
+const SAUDI_BOUNDS_ = { latMin: 14, latMax: 34, lngMin: 32, lngMax: 58 };
+function inSaudiBounds_(lat, lng) {
+  return lat >= SAUDI_BOUNDS_.latMin && lat <= SAUDI_BOUNDS_.latMax && lng >= SAUDI_BOUNDS_.lngMin && lng <= SAUDI_BOUNDS_.lngMax;
+}
+// ── فحص/تصحيح إحداثيات مجموعة مدارس قبل عرضها على الخريطة — بيرجّع نسخة
+// جديدة من المصفوفة (من غير أي تعديل على window.RAW الأصلي، فمفيش أي تأثير
+// على أي تبويب تاني أو تصدير تاني): المدرسة اللي إحداثياتها سليمة تفضل زي
+// ما هي، اللي معكوسة (lat/lng متبادلين) بتتصحح تلقائيًا (خطأ شائع جدًا في
+// ملفات الإكسل)، واللي برة السعودية تمامًا حتى بعد المحاولتين بتتستبعد من
+// الخريطة (مش من البيانات نفسها) عشان ما تخربش نطاق/تكبير الخريطة ──
+function sanitizeMapCoords_(rows) {
+  let swapped = 0, excluded = 0;
+  const excludedList = [], out = [];
+  rows.forEach((r) => {
+    if (inSaudiBounds_(r.lat, r.lng)) { out.push(r); return; }
+    if (inSaudiBounds_(r.lng, r.lat)) {
+      swapped++;
+      out.push(Object.assign({}, r, { lat: r.lng, lng: r.lat }));
+      return;
+    }
+    excluded++;
+    excludedList.push({ اسم: r.name, الرقم_الوزاري: r.minId, خط_العرض: r.lat, خط_الطول: r.lng });
+  });
+  if (swapped || excluded) {
+    console.warn(
+      `[Map] فحص إحداثيات الخريطة: ${swapped} مدرسة كان خط الطول/العرض عندها معكوس وتم تصحيحه تلقائيًا على الخريطة (البيانات الأصلية لم تتغيّر)، ${excluded} مدرسة إحداثياتها غير صالحة نهائيًا (خارج نطاق السعودية حتى بعد عكسها) واستُبعدت من الخريطة فقط:`,
+      excludedList,
+    );
+  }
+  window.__mapCoordIssues = { swapped, excluded, excludedList };
+  return out;
+}
 
 // تقسيم المدارس لأربع فئات حسب عدد البلاغات (الأكثر/الأقل) — بناءً على
 // طلب صريح. التقسيم نسبي (Quartiles) محسوب من المدارس اللي عندها بلاغات
@@ -3792,7 +3952,7 @@ function buildLegendHTML(mode) {
     return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#059669"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>جيد جداً · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>لا توجد بيانات</div>`;
   }
   if ("balagh" === mode) {
-    return `<div class="map-legend-title">📢 عدد البلاغات <span style="font-weight:600">(نسبي)</span></div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[4]}"></div>الأعلى · أكثر من ${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[3]}"></div>مرتفع · ${_mapBalaghQuartiles.q2 + 1}–${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[2]}"></div>متوسط · ${_mapBalaghQuartiles.q1 + 1}–${_mapBalaghQuartiles.q2}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[1]}"></div>منخفض · 1–${_mapBalaghQuartiles.q1}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[0]}"></div>لا بلاغات</div>`;
+    return `<div class="map-legend-title">📢 عدد البلاغات <span style="font-weight:600">(نسبي)</span></div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[4]}"></div>الأعلى · أكثر من ${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[3]}"></div>مرتفع · ${_mapBalaghQuartiles.q2 + 1}–${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[2]}"></div>متوسط · ${_mapBalaghQuartiles.q1 + 1}–${_mapBalaghQuartiles.q2}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[1]}"></div>منخفض · 1–${_mapBalaghQuartiles.q1}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[0]}"></div>${BALAGH_TIER_LABELS[0]}</div>`;
   }
   return "gender" === mode
     ? '<div class="map-legend-title">👦👧 الجنس</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>بنات</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>بنين</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
@@ -3808,15 +3968,22 @@ function updateMapFilterUI() {
   _mapFilterUIMode = _mapMode;
   _mapTierFilter = "";
   _mapTopN = 0;
+  _mapDateFrom = "";
+  _mapDateTo = "";
   const row = document.getElementById("map-filters-row"),
     tierSel = document.getElementById("mapTierFilter"),
     topnWrap = document.getElementById("map-fg-topn"),
     topnSel = document.getElementById("mapTopN"),
+    dateWrap = document.getElementById("map-fg-date"),
+    dateFromEl = document.getElementById("mapDateFrom"),
+    dateToEl = document.getElementById("mapDateTo"),
     statBarFca = document.getElementById("map-stat-bar"),
     statBarBal = document.getElementById("map-stat-bar-balagh"),
     statBarGender = document.getElementById("map-stat-bar-gender"),
     statBarOwner = document.getElementById("map-stat-bar-owner");
   if (topnSel) topnSel.value = "0";
+  if (dateFromEl) dateFromEl.value = "";
+  if (dateToEl) dateToEl.value = "";
   // ── إخفاء كل أشرطة إحصائيات الخريطة الأول، وبعدين إظهار اللي يخص الوضع
   // الحالي بس — أوضح وأضمن (خصوصًا مع زيادة عدد الأوضاع) من تكرار سطر
   // إخفاء/إظهار مقابل لكل شرط ──
@@ -3826,6 +3993,7 @@ function updateMapFilterUI() {
   if ("fca" === _mapMode || "env" === _mapMode) {
     row.style.display = "flex";
     if (topnWrap) topnWrap.style.display = "none";
+    if (dateWrap) dateWrap.style.display = "none";
     tierSel.innerHTML =
       '<option value="">الكل</option>' +
       ["critical", "fair", "good", "vgood"].map((k) => `<option value="${k}">${TIER[k].label}</option>`).join("");
@@ -3833,6 +4001,7 @@ function updateMapFilterUI() {
   } else if ("balagh" === _mapMode) {
     row.style.display = "flex";
     if (topnWrap) topnWrap.style.display = "";
+    if (dateWrap) dateWrap.style.display = "";
     tierSel.innerHTML =
       '<option value="">الكل</option>' +
       [4, 3, 2, 1, 0].map((t) => `<option value="${t}">${BALAGH_TIER_LABELS[t]}</option>`).join("");
@@ -3845,6 +4014,32 @@ function updateMapFilterUI() {
     if (statBarOwner) statBarOwner.style.display = "";
   } else {
     row.style.display = "none";
+  }
+}
+// ── بناء/تحديث خيارات فلاتر الخريطة العامة (محافظة/مدينة/مرحلة) — بتتنفّذ
+// كل رندر (رخيصة: قوائم قصيرة)، وبتحافظ على اختيار المستخدم الحالي لو لسه
+// موجود ضمن القيم المتاحة، وإلا بتصفّره تلقائيًا (زي أي فلتر تاني في اللوحة) ──
+function updateMapGeneralFilterOptions(rows) {
+  const sectorSel = document.getElementById("mapSectorFilter"),
+    citySel = document.getElementById("mapCityFilter"),
+    stageSel = document.getElementById("mapStageFilter");
+  if (sectorSel) {
+    const sectors = [...new Set(rows.map((r) => r.sector).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar"));
+    sectorSel.innerHTML = '<option value="">كل المحافظات</option>' + sectors.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    if (sectors.includes(_mapSectorFilter)) sectorSel.value = _mapSectorFilter;
+    else { _mapSectorFilter = ""; sectorSel.value = ""; }
+  }
+  if (citySel) {
+    const cities = [...new Set(rows.map((r) => r.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar"));
+    citySel.innerHTML = '<option value="">كل المدن</option>' + cities.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+    if (cities.includes(_mapCityFilter)) citySel.value = _mapCityFilter;
+    else { _mapCityFilter = ""; citySel.value = ""; }
+  }
+  if (stageSel) {
+    const stages = [...new Set(rows.map((r) => r.stage).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar"));
+    stageSel.innerHTML = '<option value="">كل المراحل</option>' + stages.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    if (stages.includes(_mapStageFilter)) stageSel.value = _mapStageFilter;
+    else { _mapStageFilter = ""; stageSel.value = ""; }
   }
 }
 // ── تظليل بطاقة الإحصائية اللي بتطابق فلتر الفئة المفعّل حاليًا (سواء
@@ -3869,20 +4064,136 @@ window.setMapTopN = function (val) {
 window.clearMapFilters = function () {
   _mapTierFilter = "";
   _mapTopN = 0;
+  _mapDateFrom = "";
+  _mapDateTo = "";
   const t = document.getElementById("mapTierFilter"),
-    n = document.getElementById("mapTopN");
+    n = document.getElementById("mapTopN"),
+    df = document.getElementById("mapDateFrom"),
+    dt = document.getElementById("mapDateTo");
   if (t) t.value = "";
   if (n) n.value = "0";
+  if (df) df.value = "";
+  if (dt) dt.value = "";
   renderMap();
 };
+// ── فلاتر الخريطة العامة (محافظة/مدينة/مرحلة) — مستقلة عن فلتر الوضع أعلاه،
+// تفضل شغالة مهما اتغيّر وضع العرض (زي ما هو موضح في تعليق الحالة فوق) ──
+window.setMapSectorFilter = function (val) {
+  _mapSectorFilter = val;
+  renderMap();
+};
+window.setMapCityFilter = function (val) {
+  _mapCityFilter = val;
+  renderMap();
+};
+window.setMapStageFilter = function (val) {
+  _mapStageFilter = val;
+  renderMap();
+};
+window.clearMapGeneralFilters = function () {
+  _mapSectorFilter = "";
+  _mapCityFilter = "";
+  _mapStageFilter = "";
+  const g = document.getElementById("mapSectorFilter"),
+    c = document.getElementById("mapCityFilter"),
+    s = document.getElementById("mapStageFilter");
+  if (g) g.value = "";
+  if (c) c.value = "";
+  if (s) s.value = "";
+  renderMap();
+};
+// ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط) — راجع computeAlertsInRange_ ──
+window.setMapDateFrom = function (val) {
+  _mapDateFrom = val || "";
+  renderMap();
+};
+window.setMapDateTo = function (val) {
+  _mapDateTo = val || "";
+  renderMap();
+};
+// ── تبديل نمط طبقة الخريطة الأساسية بين الشوارع والقمر الصناعي ──
+window.toggleMapSatellite = function () {
+  _mapTileMode = "satellite" === _mapTileMode ? "street" : "satellite";
+  applyMapTileLayer();
+  const btn = document.getElementById("map-satellite-toggle");
+  if (btn) btn.classList.toggle("active", "satellite" === _mapTileMode);
+};
+// ── تطبيق طبقة الخريطة الأساسية حسب _mapTileMode الحالي — بتستبدل الطبقة
+// من غير إعادة إنشاء الخريطة كلها (أسرع وأنعم من إعادة البناء الكامل) ──
+function applyMapTileLayer() {
+  if (!_map) return;
+  if (_mapBaseLayer) { _map.removeLayer(_mapBaseLayer); _mapBaseLayer = null; }
+  if (_mapLabelsLayer) { _map.removeLayer(_mapLabelsLayer); _mapLabelsLayer = null; }
+  if ("satellite" === _mapTileMode) {
+    // Esri World Imagery (قمر صناعي، بدون مفتاح API) + طبقة مرجعية شفافة
+    // فوقها فيها أسماء الأماكن والحدود الإدارية عشان المدارس ومحيطها يبانوا
+    // واضحين فوق الصورة الجوية، بنفس فكرة الوضع الهجين في خرائط جوجل.
+    // ⚠️ maxNativeZoom مضبوط أقل من maxZoom عمدًا: تغطية الصور عالية
+    // الدقة عند Esri مش متساوية في كل مكان، وتكبير الخريطة أكتر من الحد
+    // الفعلي المتاح كان بيرجّع بلاطات "Map data not yet available" فارغة
+    // بدل الصورة. بضبط maxNativeZoom، Leaflet بيكبّر آخر بلاطة متاحة فعليًا
+    // بدل ما يطلب بلاطة مش موجودة أصلاً — الصورة تفضل مستمرة (حتى لو أقل
+    // دقة عند التكبير الشديد) بدل ما "تتكسر" بمربعات فاضية.
+    _mapBaseLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, maxNativeZoom: 17, attribution: "Esri, Maxar, Earthstar Geographics" },
+    ).addTo(_map);
+    _mapLabelsLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, maxNativeZoom: 16, attribution: "" },
+    ).addTo(_map);
+  } else {
+    _mapBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap",
+    }).addTo(_map);
+  }
+}
+// ── تكبير/تصغير الخريطة (2026-08-25) — CSS فقط: كلاس على الغلاف بيخلي
+// الفلاتر تتحول لشريط عائم فوق الخريطة (راجع dashboard.css). لازم
+// invalidateSize بعد التبديل عشان Leaflet يعيد حساب أبعاد اللوحة الجديدة ──
+window.toggleMapExpand = function () {
+  _mapExpanded = !_mapExpanded;
+  const wrap = document.getElementById("map-fullscreen-wrap"),
+    btn = document.getElementById("map-expand-btn");
+  if (wrap) wrap.classList.toggle("map-expanded", _mapExpanded);
+  if (btn) btn.innerHTML = _mapExpanded ? "✕ تصغير الخريطة" : "⛶ تكبير الخريطة";
+  setTimeout(() => { _map && _map.invalidateSize(); }, 200);
+};
+// ── الخروج من وضع التكبير بمفتاح Escape — تحسين تجربة استخدام بسيط ──
+document.addEventListener("keydown", (e) => {
+  if ("Escape" === e.key && _mapExpanded) window.toggleMapExpand();
+});
+// ── حساب عدد بلاغات كل مدرسة ضمن فترة تاريخ محددة (وضع "البلاغات" + فلتر
+// تاريخ فعّال فقط) — من RAW_BALAGH مباشرة عبر عمود "تاريخ الإنشاء"،
+// بمعزل تام عن r.alerts الثابت (إجمالي كل الوقت). يرجّع خريطة {رقم مدرسة
+// مطبَّع: عدد} أو null لو الفلتر مش مفعّل أصلاً (يعني استخدم r.alerts العادي) ──
+function computeAlertsInRange_(fromStr, toStr) {
+  if (!fromStr && !toStr) return null;
+  if (typeof window.parseBalaghDate !== "function" || typeof window.normSchoolId !== "function") return null;
+  const rows = window.RAW_BALAGH;
+  if (!Array.isArray(rows) || !rows.length) return {};
+  const fromD = fromStr ? new Date(fromStr + "T00:00:00") : null,
+    toD = toStr ? new Date(toStr + "T23:59:59") : null,
+    map = {};
+  rows.forEach((row) => {
+    const sn = window.normSchoolId(row["رقم المدرسة"]);
+    if (!sn) return;
+    const d = window.parseBalaghDate(row["تاريخ الإنشاء"]);
+    if (!d) return;
+    if (fromD && d < fromD) return;
+    if (toD && d > toD) return;
+    map[sn] = (map[sn] || 0) + 1;
+  });
+  return map;
+}
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🗺️  JS تبويب: الخريطة
    ║  (tab-map) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
 function renderMap() {
   const D = FILTERED,
-    withCoordsAll = D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1),
-    noCoords = D.length - withCoordsAll.length,
+    withCoordsAll = sanitizeMapCoords_(D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1)),
     // ── حقل الدرجة اللي بتتحسب منه بطاقات الإحصائيات فوق الخريطة يتغيّر
     // حسب وضع العرض المختار: FCA أو البيئة المدرسية — قبل كده كانت
     // البطاقات دايمًا بتعرض توزيع r.fca حتى في وضع "البيئة المدرسية" وهو
@@ -3896,25 +4207,38 @@ function renderMap() {
   (setText("ms-crit", statCrit.toLocaleString()),
     setText("ms-fair", statFair.toLocaleString()),
     setText("ms-good", statGood.toLocaleString()),
-    setText("ms-vgood", statVgood.toLocaleString()),
-    setText("ms-nocoord", noCoords.toLocaleString()));
+    setText("ms-vgood", statVgood.toLocaleString()));
 
   // ── واجهة الفلتر المحلي (تُبنى/تتحدّث مرة واحدة بس عند تغيّر الـ mode) ──
   updateMapFilterUI();
+  // ── خيارات فلاتر المدينة/المرحلة العامة (كل رندر — قوائم قصيرة ورخيصة) ──
+  updateMapGeneralFilterOptions(withCoordsAll);
+
+  // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط): لو مفعّل، نستبدل
+  // r.alerts بعدد البلاغات الفعلي ضمن الفترة المحددة فقط، عبر نسخ ظاهري
+  // للصفوف (باقي الحقول زي ما هي) — كل الحسابات التالية (الفئات الأربع،
+  // نصف قطر العلامة، الـ popup، تصدير CSV) بتقرأ r.alerts عادي فمش محتاجة
+  // أي تعديل تاني، لأنها بتشتغل على effAll/withCoords مش withCoordsAll ──
+  const alertsRangeMap = "balagh" === _mapMode ? computeAlertsInRange_(_mapDateFrom, _mapDateTo) : null;
+  const effAll = alertsRangeMap
+    ? withCoordsAll.map((r) => {
+        const sn = window.normSchoolId ? window.normSchoolId(r.minId || r.schoolSeq) : null;
+        return Object.assign({}, r, { alerts: sn ? (alertsRangeMap[sn] || 0) : 0 });
+      })
+    : withCoordsAll;
 
   // ── فئات البلاغات الأربع (نسبية Quartiles) — تُحسب دايمًا من المدارس
-  // ذات الإحداثيات ضمن الفلاتر العامة الحالية (withCoordsAll)، بغض النظر
+  // ذات الإحداثيات ضمن الفلاتر العامة الحالية (effAll)، بغض النظر
   // عن الـ mode المختار، عشان شريط إحصائيات البلاغات يفضل صحيح حتى لو
   // المستخدم واقف على وضع عرض تاني ──
-  _mapBalaghQuartiles = computeBalaghQuartiles(withCoordsAll.map((r) => r.alerts || 0));
+  _mapBalaghQuartiles = computeBalaghQuartiles(effAll.map((r) => r.alerts || 0));
   const balTierCounts = [0, 0, 0, 0, 0];
-  withCoordsAll.forEach((r) => { balTierCounts[getBalaghTier(r.alerts || 0)]++; });
+  effAll.forEach((r) => { balTierCounts[getBalaghTier(r.alerts || 0)]++; });
   (setText("ms-bal-none", balTierCounts[0].toLocaleString()),
     setText("ms-bal-low", balTierCounts[1].toLocaleString()),
     setText("ms-bal-med", balTierCounts[2].toLocaleString()),
     setText("ms-bal-high", balTierCounts[3].toLocaleString()),
-    setText("ms-bal-top", balTierCounts[4].toLocaleString()),
-    setText("ms-bal-nocoord", noCoords.toLocaleString()));
+    setText("ms-bal-top", balTierCounts[4].toLocaleString()));
 
   // ── بطاقات إحصائيات "الجنس" و"الملكية" — بتتحدّث دايمًا (زي باقي
   // الأشرطة) بغض النظر عن الوضع الحالي، عشان تبقى جاهزة فورًا لحظة
@@ -3927,16 +4251,14 @@ function renderMap() {
   });
   (setText("ms-gen-boys", genderCounts.boys.toLocaleString()),
     setText("ms-gen-girls", genderCounts.girls.toLocaleString()),
-    setText("ms-gen-other", genderCounts.other.toLocaleString()),
-    setText("ms-gen-nocoord", noCoords.toLocaleString()));
+    setText("ms-gen-other", genderCounts.other.toLocaleString()));
   (setText("ms-own-gov", ownerCounts.gov.toLocaleString()),
     setText("ms-own-rent", ownerCounts.rent.toLocaleString()),
-    setText("ms-own-other", ownerCounts.other.toLocaleString()),
-    setText("ms-own-nocoord", noCoords.toLocaleString()));
+    setText("ms-own-other", ownerCounts.other.toLocaleString()));
 
-  // ── تطبيق فلتر الخريطة المحلي (فئة/أعلى N مدرسة) — تصفية إضافية فوق
-  // withCoordsAll، محلية بالكامل لتبويب الخريطة، لا تلمس FILTERED العام ──
-  let withCoords = withCoordsAll;
+  // ── تطبيق فلتر الخريطة المحلي (فئة/أعلى N مدرسة/فترة تاريخ) — تصفية
+  // إضافية فوق effAll، محلية بالكامل لتبويب الخريطة، لا تلمس FILTERED العام ──
+  let withCoords = effAll;
   if ("balagh" === _mapMode) {
     if ("" !== _mapTierFilter) {
       const wantTier = parseInt(_mapTierFilter, 10);
@@ -3951,6 +4273,11 @@ function renderMap() {
       return null != val && getTier(val) === _mapTierFilter;
     });
   }
+  // ── فلاتر عامة (مدينة/مرحلة) — تُطبَّق فوق أي فلتر خاص بالوضع، بغض
+  // النظر عن وضع العرض المختار ──
+  if (_mapSectorFilter) withCoords = withCoords.filter((r) => r.sector === _mapSectorFilter);
+  if (_mapCityFilter) withCoords = withCoords.filter((r) => r.city === _mapCityFilter);
+  if (_mapStageFilter) withCoords = withCoords.filter((r) => r.stage === _mapStageFilter);
   _mapLastRows = withCoords;
   const dlBtn = document.getElementById("map-download-csv");
   if (dlBtn) dlBtn.querySelector(".map-dl-count") && (dlBtn.querySelector(".map-dl-count").textContent = `(${withCoords.length.toLocaleString()})`);
@@ -3963,11 +4290,8 @@ function renderMap() {
       zoomControl: !0,
       attributionControl: !1,
     })),
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "© OpenStreetMap",
-      }).addTo(_map),
       L.control.attribution({ prefix: !1, position: "bottomleft" }).addTo(_map));
+    applyMapTileLayer();
     const legend = L.control({ position: "bottomright" });
     ((legend.onAdd = function () {
       const div = L.DomUtil.create("div", "map-legend");
@@ -8343,6 +8667,10 @@ function _sysDownloadFile(filename, content, mime) {
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
   }
+  // 🔗 تعريض للاستخدام من كود تبويب الخريطة (خارج هذا الـ IIFE) — لفلتر
+  // التاريخ على البلاغات في الخريطة، بنفس منطق تفسير التاريخ الموحّد هنا
+  // (2026-08-25) — لا يغيّر أي سلوك داخلي، مجرد تعريض للدالة الموجودة.
+  window.parseBalaghDate = parseBalaghDate;
 
   // ── تطبيع الرقم الوزاري (يشيل فراغات / BOM / صيغة "12345.0" من ملفات الإكسل) ──
   function normSchoolNo(v) {
@@ -18095,8 +18423,8 @@ function exportNashatExcel(rows) {
       الجنس: r.gender || null,
       المقاول: r.contractor || null,
       تاريخ_الإنشاء: r.creationDate || null,
-      وصف: (r.problemDescription || "").slice(0, 140),
-      وصف_الحل: (r.resolutionDesc || "").slice(0, 140),
+      وصف: (r.problemDescription || "").slice(0, 600),
+      وصف_الحل: (r.resolutionDesc || "").slice(0, 400),
     });
     const topCatKey = Object.keys(categories)[0] || null;
     // ── الأعمدة الجديدة: SLA الفعلي (بالأيام)، المرحلة، الجنس، المقاول ──
@@ -18146,10 +18474,10 @@ function exportNashatExcel(rows) {
       contractors,                       // توزيع البلاغات حسب المقاول المسؤول (بلاغ واحد ممكن يكون له أكتر من مقاول عبر الوقت)
       topContractor: Object.keys(contractors)[0] || null,
       latest10: sortedByDate.slice(0, 10).map(toDetail),
-      openDetails: rows.filter((r) => r.isOpen).slice(0, 60).map(toDetail),
-      urgentDetails: rows.filter((r) => isHighRiskFn(r.priority)).slice(0, 60).map(toDetail),
-      allDetails: rows.slice(0, 250).map(toDetail),
-      truncated: rows.length > 250,
+      openDetails: rows.filter((r) => r.isOpen).slice(0, 250).map(toDetail),
+      urgentDetails: rows.filter((r) => isHighRiskFn(r.priority)).slice(0, 250).map(toDetail),
+      allDetails: rows.slice(0, 800).map(toDetail),
+      truncated: rows.length > 800,
       source: "RAW_BALAGH",
       schoolMatchedBy: rows.length && rows[0].schoolKey === ("ID::" + school.minId) ? "schoolKey" : "name/minId-fallback",
       rowCount: rows.length,
@@ -18199,7 +18527,7 @@ function exportNashatExcel(rows) {
       const tb = b.creationDateObj ? b.creationDateObj.getTime() : -Infinity;
       return sortKey === "date_asc" ? ta - tb : tb - ta;
     });
-    const limit = Math.min(q.limit || 50, 250);
+    const limit = Math.min(q.limit || 50, 600);
     return {
       status: "ok",
       total: rows.length,
@@ -18208,7 +18536,7 @@ function exportNashatExcel(rows) {
         رقم: r.recordNo, مدرسة: r.linkedSchoolName || r.schoolName, مدينة: r.city || r.linkedCity || null, حالة: r.status,
         فئة: r.category, فئة_فرعية: r.subCategory, أولوية: r.priority, sla: r.slaStatus,
         SLA_أيام: r.slaDurationDays ?? null, المرحلة: r.stage || null, الجنس: r.gender || null, المقاول: r.contractor || null,
-        تاريخ: r.creationDate, وصف: (r.problemDescription || "").slice(0, 120),
+        تاريخ: r.creationDate, وصف: (r.problemDescription || "").slice(0, 450),
       })),
       appliedFilters: q,
       source: "RAW_BALAGH",
@@ -18415,18 +18743,28 @@ function exportNashatExcel(rows) {
       docsWithText++;
       const tokens = aiBalaghTokenize_(txt);
       const phrases = new Set([...aiBalaghBuildNgrams_(tokens, 2), ...aiBalaghBuildNgrams_(tokens, 3)]);
-      phrases.forEach((p) => { m[p] = (m[p] || 0) + 1; });
+      phrases.forEach((p) => {
+        if (!m[p]) m[p] = { count: 0, أمثلة: [] };
+        m[p].count++;
+        // 🎯 2026-08-25: نفس منطق أمثلة الأعطال — لغاية 3 أمثلة نصية حقيقية
+        // (وصف أصلي غير معدّل) لكل عبارة، عشان الـ AI يقدر يقتبس لغة حقيقية.
+        if (m[p].أمثلة.length < 3) {
+          const snippet = String(txt).trim().slice(0, 220);
+          if (snippet && !m[p].أمثلة.includes(snippet)) m[p].أمثلة.push(snippet);
+        }
+      });
     });
-    const entries = Object.entries(m).sort((a, b) => b[1] - a[1]);
+    const entries = Object.entries(m).sort((a, b) => b[1].count - a[1].count);
     const build = (topK) => ({
       العبارات: entries.slice(0, topK).map(([k, v]) => ({
         العبارة: k.replace(/_/g, " "),
-        عدد_البلاغات: v,
-        النسبة_المئوية: docsWithText ? +((v / docsWithText) * 100).toFixed(1) : null,
+        عدد_البلاغات: v.count,
+        أمثلة_حقيقية_من_وصف_البلاغات: v.أمثلة,
+        النسبة_المئوية: docsWithText ? +((v.count / docsWithText) * 100).toFixed(1) : null,
       })),
       عدد_العبارات_الفريدة_الكلي: entries.length,
       عدد_البلاغات_التي_لها_وصف_نصي: docsWithText,
-      ملاحظة: "عبارات من كلمتين أو ثلاث كلمات متتالية (بعد شيل كلمات الوقف)، محسوبة من كل البلاغات وليس عيّنة. العدد = عدد البلاغات المختلفة التي ظهرت فيها العبارة.",
+      ملاحظة: "عبارات من كلمتين أو ثلاث كلمات متتالية (بعد شيل كلمات الوقف)، محسوبة من كل البلاغات وليس عيّنة. العدد = عدد البلاغات المختلفة التي ظهرت فيها العبارة. أمثلة_حقيقية_من_وصف_البلاغات = لغاية 3 نصوص وصف حقيقية (كما كتبها المستخدم فعلياً، غير معدّلة) لبلاغات ظهرت فيها هذه العبارة — استخدمها للاقتباس المباشر بدل الاكتفاء بالرقم.",
     });
     __aiBalaghPhraseFreqCache = { srcRows: rowsArr, field, result: build };
     return build(n);
@@ -18502,19 +18840,31 @@ function exportNashatExcel(rows) {
         const matched = rule.patterns.some((p) => p.test(normed));
         if (!matched) return;
         const key = rule.system + "|" + rule.fault;
-        if (!m.has(key)) m.set(key, { النظام: rule.system, العطل: rule.fault, عدد_البلاغات: 0 });
-        m.get(key).عدد_البلاغات++;
+        if (!m.has(key)) m.set(key, { النظام: rule.system, العطل: rule.fault, عدد_البلاغات: 0, _أمثلة: [] });
+        const o = m.get(key);
+        o.عدد_البلاغات++;
+        // 🎯 2026-08-25: نلقّط لغاية 3 أمثلة نصية حقيقية (نص الوصف الأصلي
+        // كما كتبه المستخدم، غير معدّل) لكل عطل مصنّف — عشان الـ AI يقدر
+        // يقتبس لغة حقيقية من البلاغات، مش بس رقم إحصائي مجرد، حتى في
+        // الأسئلة العامة (مستوى كل الـ85,000+ بلاغ) اللي مفيهاش تفاصيل خام.
+        if (o._أمثلة.length < 3) {
+          const snippet = String(raw).trim().slice(0, 220);
+          if (snippet && !o._أمثلة.includes(snippet)) o._أمثلة.push(snippet);
+        }
       });
     });
     const entries = [...m.values()].sort((a, b) => b.عدد_البلاغات - a.عدد_البلاغات);
     const build = (topK) => ({
       الأعطال: entries.slice(0, topK).map((e) => ({
-        ...e,
+        النظام: e.النظام,
+        العطل: e.العطل,
+        عدد_البلاغات: e.عدد_البلاغات,
+        أمثلة_حقيقية_من_وصف_البلاغات: e._أمثلة,
         النسبة_المئوية: docsWithText ? +((e.عدد_البلاغات / docsWithText) * 100).toFixed(1) : null,
       })),
       عدد_تصنيفات_الأعطال_المكتشفة: entries.length,
       عدد_البلاغات_التي_لها_وصف_نصي: docsWithText,
-      ملاحظة: "تصنيف مبني على مطابقة نمطية (regex) لعبارات شائعة في نص الوصف، وليس عدّ كلمات مفردة — كل بلاغ يُحسب مرة واحدة لكل عطل مطابق (وقد يُحسب لأكثر من عطل لو وصفه ذكر أكثر من مشكلة). القاموس الحالي يغطي أشهر أنواع أعطال المنشآت المدرسية وقابل للتوسعة لاحقاً (أبواب/نوافذ/أرضيات/خزانات/مضخات/طفايات حريق/مصاعد). بلاغ لم يُطابق أي نمط معروف لا يظهر هنا — لتغطية أوسع راجع 'أكثر_الكلمات_تكراراً' أو 'أكثر_العبارات_تكراراً'.",
+      ملاحظة: "تصنيف مبني على مطابقة نمطية (regex) لعبارات شائعة في نص الوصف، وليس عدّ كلمات مفردة — كل بلاغ يُحسب مرة واحدة لكل عطل مطابق (وقد يُحسب لأكثر من عطل لو وصفه ذكر أكثر من مشكلة). القاموس الحالي يغطي أشهر أنواع أعطال المنشآت المدرسية وقابل للتوسعة لاحقاً (أبواب/نوافذ/أرضيات/خزانات/مضخات/طفايات حريق/مصاعد). بلاغ لم يُطابق أي نمط معروف لا يظهر هنا — لتغطية أوسع راجع 'أكثر_الكلمات_تكراراً' أو 'أكثر_العبارات_تكراراً'. أمثلة_حقيقية_من_وصف_البلاغات = لغاية 3 نصوص وصف حقيقية (كما كتبها المستخدم فعلياً، غير معدّلة) لبلاغات صُنّفت تحت هذا العطل — استخدمها للاقتباس المباشر بدل الاكتفاء بالرقم.",
     });
     __aiBalaghFaultCache = { srcRows: rowsArr, field, result: build };
     return build(n);
@@ -18588,7 +18938,7 @@ function exportNashatExcel(rows) {
         urgentOnly: urgentFilter,
         sla: slaOverdueFilter ? "تم اختراقه" : null,
       };
-      filtered = aiBalaghSearchReports_({ ...filterQ, limit: 80 });
+      filtered = aiBalaghSearchReports_({ ...filterQ, limit: 300 });
       // 🎯 2026-08-25: تجميع "أعلى/أقل مدارس بلاغات" من *كل* الصفوف المطابقة
       // للفلتر (مش عيّنة الـ80 المرتبة بالتاريخ فوق) — عشان أسئلة زي "أكتر
       // 10 مدارس بلاغات في جدة" تتجاوب برقم إجمالي حقيقي لكل مدرسة، مش
@@ -19711,8 +20061,9 @@ function exportNashatExcel(rows) {
    لأي سؤال عام حتى لو مش مطابق 100% لفلتر واضح. لو appliedFilters ليها
    قيمة (مدينة/حالة/عاجل/فئة اتكشفت تلقائياً من نص سؤال المستخدم)، هيبقى
    فيه كمان قسم نتيجة_مفلترة (نفس شكل بيانات aiBalaghSearchReports_: total/
-   returned/rows لحد 80 صف) — استخدمه لعرض أمثلة/بلاغات فردية، ولو total
-   فيه أكبر من returned وضّح إن دي عيّنة مش كل النتائج.
+   returned/rows لحد 300 صف، كل صف فيه نص الوصف كامل تقريباً — لحد 450
+   حرف، مش مقتطع بشدة) — استخدمه لعرض أمثلة/بلاغات فردية، ولو total فيه
+   أكبر من returned وضّح إن دي عيّنة مش كل النتائج.
    ⚠️ 3.1 أسئلة "أعلى/أكتر N مدرسة بلاغات" (زي "أكتر 10 مدارس بلاغات في
    جدة" أو "أعلى 20 مدرسة الأكثر بلاغات"، أو نفس الفكرة بفلتر حالة/فئة/
    عاجل/متأخر SLA بدل مدينة، أو أي تركيبة منهم مع بعض): ممنوع تستنتج
@@ -19746,7 +20097,7 @@ function exportNashatExcel(rows) {
    بس ضمن أي فلتر تاني مذكور مع بعض).
    ⚠️ 3.4 أسئلة عن "أكتر فئة/فئة فرعية تكراراً" على مستوى البلاغات (زي "أكتر
    الفئات الفرعية شيوعاً" أو "إيه أكتر نوع عطل بيتكرر"): ممنوع تستنتج من
-   عيّنة نتيجة_مفلترة (لحد 80 صف) — استخدم بدل منها:
+   عيّنة نتيجة_مفلترة (لحد 300 صف) — استخدم بدل منها:
      • لو فيه appliedFilters (مدينة/حالة/فئة/عاجل/متأخر_SLA): قسم
        "توزيع_الفئات_ضمن_الفلتر.فئة_رئيسية" أو ".فئة_فرعية" — محسوب من *كل*
        البلاغات المطابقة للفلتر، وفيه عدد كل قيمة ونسبتها المئوية الحقيقية.
@@ -19780,6 +20131,14 @@ function exportNashatExcel(rows) {
    محسوبة من كل النصوص فعلياً. لو القيمة null معناها السؤال ماتكشفش
    كـ"سؤال تحليل نصي" تلقائياً — وضّح إنك محتاج صياغة أوضح بدل الاعتذار
    عن نقص البيانات.
+   🆕 2026-08-25: كل عنصر جوه .أكثر_الأعطال_المصنّفة_تكراراً وجوه
+   .أكثر_العبارات_تكراراً فيه كمان حقل أمثلة_حقيقية_من_وصف_البلاغات —
+   مصفوفة لغاية 3 نصوص وصف حقيقية (كما كتبها المستخدم فعلياً في البلاغ،
+   غير معدّلة أو ملخّصة) لبلاغات وقعت تحت هذا العطل/هذه العبارة. استخدمها
+   لتقديم اقتباس مباشر حقيقي من لغة المستخدمين لما السؤال يطلب "أمثلة" أو
+   "إيه اللي بيكتبوه بالظبط" أو أي سؤال يحتاج نص حقيقي مش مجرد إحصائية —
+   هذا متاح حتى للأسئلة العامة على مستوى كل الـ85,000+ بلاغ، مش بس لمدرسة
+   بعينها، ولا يحتاج حقن كل نصوص الوصف في السياق دفعة واحدة.
 4. status = "not_ready": بيانات البلاغات لسه بتحمّل أو محصلش تحميلها.
    قل بوضوح إنها لسه مش جاهزة واقترح المحاولة تاني بعد لحظات — ممنوع
    تماماً اعتبار غياب البيانات = صفر بلاغات، وممنوع تقول "لا توجد بلاغات"
@@ -23083,11 +23442,58 @@ ${panelHTML}
       rowName.includes(targetName);
   }
 
+  // 🆕 2026-08-26 — يفهم أي شكل تاريخ شائع في شيتات الداشبورد: "24/6/2026"،
+  // "2026-08-15"، أو صيغة "Apr-26" المختصرة (شيت تقييمات_FCA_المراحل).
+  function _ixParseAnyDate(v){
+    if (v == null || v === "") return null;
+    if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+    const s = String(v).trim();
+    if (!s) return null;
+    const mAbbr = s.match(/^([A-Za-z]{3})[- ](\d{2})$/);
+    if (mAbbr) {
+      const monMap = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+      const mi = monMap[mAbbr[1].toLowerCase()];
+      if (mi !== undefined) return new Date(2000 + parseInt(mAbbr[2], 10), mi, 1);
+    }
+    if (typeof window.parseBalaghDate === "function") {
+      const d = window.parseBalaghDate(s);
+      if (d) return d;
+    }
+    const d2 = new Date(s);
+    return isNaN(d2.getTime()) ? null : d2;
+  }
+
+  // أحدث تاريخ نقدر نلاقيه في أي عمود اسمه فيه "تاريخ"/"date" داخل الصف —
+  // بيرجع null لو مفيش أي عمود تاريخ صالح.
+  function _ixRowDate(row){
+    if (!row || typeof row !== "object") return null;
+    let best = null;
+    for (const k of Object.keys(row)){
+      if (!/تاريخ|date/i.test(k)) continue;
+      const d = _ixParseAnyDate(row[k]);
+      if (d && (!best || d > best)) best = d;
+    }
+    return best;
+  }
+
   function _ixRowsFor(def, target){
     try{
       const rows = typeof def.rows === "function" ? def.rows() : [];
       if (!Array.isArray(rows)) return [];
-      return rows.filter(r => _ixRowMatches(r, target));
+      const matched = rows.filter(r => _ixRowMatches(r, target));
+      // 🆕 2026-08-26: نرتّب كل مصدر بالأحدث أولًا (بدل ترتيب الشيت الخام
+      // كما هو) — عشان أي قصّ/عرض جزئي (أول 35 سجل / أول 6 كروت ظاهرة في
+      // بانل المدرسة) يعرض دايمًا أحدث السجلات فعليًا، مش أقدمها. بموافقة
+      // صريحة من المستخدم، وينطبق على كل المصادر (بلاغات، زيارات أنظمة،
+      // تاريخ FCA، عقود...) اللي فيها عمود تاريخ يمكن اكتشافه.
+      const withDates = matched.map((r, idx) => ({ r, idx, d: _ixRowDate(r) }));
+      withDates.sort((a, b) => {
+        if (a.d && b.d) return b.d - a.d;
+        if (a.d && !b.d) return -1;
+        if (!a.d && b.d) return 1;
+        return a.idx - b.idx; // ثابت الترتيب لو مفيش تاريخ في أي منهم (زي ما كان)
+      });
+      return withDates.map(x => x.r);
     }catch(_){ return []; }
   }
 
@@ -29154,6 +29560,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const tier = card.dataset.tier;
     window.setMapTierFilter(_mapTierFilter === tier ? '' : tier);
   });
+  bind(208, 'change', function (event) { window.setMapCityFilter(this.value) });
+  bind(209, 'change', function (event) { window.setMapStageFilter(this.value) });
+  bind(210, 'click', function (event) { window.clearMapGeneralFilters() });
+  bind(211, 'change', function (event) { window.setMapDateFrom(this.value) });
+  bind(212, 'change', function (event) { window.setMapDateTo(this.value) });
+  bind(213, 'click', function (event) { window.toggleMapSatellite() });
+  bind(214, 'click', function (event) { window.toggleMapExpand() });
+  bind(215, 'change', function (event) { window.setMapSectorFilter(this.value) });
   bind(79, 'click', function (event) { showTab('NEW_ID',this) });
   bind(80, 'click', function (event) { showTab('NEW_ID',this) });
   bind(81, 'click', function (event) { showTab('NEW_ID',this) });

@@ -1384,6 +1384,73 @@ tbody tr:last-child td { border-bottom: none; }
   box-shadow: 0 3px 10px rgba(13,132,156,.22);
 }
 
+/* ── 🔲 وضع "تكبير الخريطة" (2026-08-25) — CSS فقط: كلاس map-expanded على
+   الغلاف بيحوّله لطبقة شبه ملء الشاشة، والفلاتر بتتحول لشريط عائم فوق
+   الخريطة نفسها (position:absolute) بدل ما تاخد مساحة رأسية منفصلة —
+   بدون أي نقل لعناصر DOM، رجوع الوضع الطبيعي بمجرد إزالة الكلاس ── */
+.map-fullscreen-wrap { position: relative; }
+
+.map-fullscreen-wrap.map-expanded {
+  position: fixed;
+  inset: 10px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-d8);
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* في وضع التكبير: نخفي شرائط الإحصائيات (تقليل الزحمة)، ونحوّل الغلاف
+   الواحد اللي فيه صفوف التحكم الثلاثة (#map-controls-floating) لشريط عائم
+   واحد فوق الخريطة — الصفوف الثلاثة تفضل تترتّب فوق بعض بتدفق طبيعي
+   (flex column) جوّه هذا الغلاف، فمحدش يركب فوق التاني مهما اختلف عدد
+   الأسطر (بعكس تثبيت كل صف بإحداثي top منفصل، اللي كان بيسبب تراكب) ونخلي
+   الخريطة تاخد كل المساحة المتبقية بدل ارتفاعها الثابت العادي */
+.map-expanded .map-stat-bar { display: none !important; }
+
+.map-expanded #map-controls-floating {
+  position: absolute;
+  inset-inline: 14px;
+  top: 14px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+}
+
+.map-expanded #map-controls-floating .map-controls,
+.map-expanded #map-controls-floating #map-filters-row-general,
+.map-expanded #map-controls-floating #map-filters-row {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 8px 12px;
+  margin-bottom: 0;
+  box-shadow: var(--sh-d4);
+  flex: 0 0 auto;
+}
+
+.map-expanded #map-container {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 300px;
+}
+
+@media (max-width: 720px) {
+  .map-expanded #map-controls-floating {
+    position: static;
+    max-height: none;
+    margin-bottom: 10px;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
    27. CHART TOOLTIP
    ══════════════════════════════════════════════════════════════ */

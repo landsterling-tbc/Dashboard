@@ -1247,6 +1247,11 @@
 -->
 </div><div class="panel" id="tab-map">
 
+  <!-- 🗺️ غلاف الخريطة الكامل — يتحول لوضع "تكبير" (ملء الشاشة تقريبًا)
+       بالضغط على زر "تكبير الخريطة"؛ في هذا الوضع تتجمّع الفلاتر في شريط
+       عائم أعلى الخريطة نفسها (CSS فقط، بدون نقل عناصر DOM) -->
+  <div id="map-fullscreen-wrap" class="map-fullscreen-wrap">
+
     <!-- بطاقات إحصائيات FCA/البيئة — قيمها بتتغيّر تلقائيًا حسب حقل الوضع
          المختار (FCA أو البيئة المدرسية)، والبطاقات الأربعة الملوّنة قابلة
          للضغط عليها كاختصار سريع لفلتر الفئة (نفس فلتر القائمة المنسدلة) -->
@@ -1279,15 +1284,14 @@
           <div class="map-stat-lbl">جيد جداً · 75–100%</div>
         </div>
       </div>
-      <div class="map-stat">
-        <div class="map-stat-dot" style="background:#94A3B8"></div>
-        <div>
-          <div class="map-stat-val" id="ms-nocoord" style="color:#94A3B8">—</div>
-          <div class="map-stat-lbl">بدون إحداثيات</div>
-        </div>
-      </div>
     </div>
 
+    <!-- 🧰 غلاف واحد لكل صفوف التحكم الثلاثة (وضع العرض + فلاتر عامة + فلاتر
+         الوضع) — في وضع "تكبير الخريطة" بيتحوّل الغلاف كله لشريط عائم واحد
+         فوق الخريطة (الصفوف بتترتب فوق بعض بتدفق طبيعي جواه، مش بإحداثيات
+         ثابتة لكل صف لوحده) عشان محدش يركب فوق التاني مهما اتغيّر عدد
+         الأسطر أو عرض الشاشة -->
+    <div id="map-controls-floating">
     <div class="map-controls">
       <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">عرض حسب:</span>
       <button class="map-ctrl-btn active" id="mctrl-fca"   data-evt="75">درجة FCA</button>
@@ -1295,13 +1299,40 @@
       <button class="map-ctrl-btn"        id="mctrl-gender" data-evt="77">الجنس</button>
       <button class="map-ctrl-btn"        id="mctrl-owner" data-evt="78">الملكية</button>
       <button class="map-ctrl-btn"        id="mctrl-balagh" data-evt="201">📢 البلاغات</button>
+      <button class="map-ctrl-btn" id="map-satellite-toggle" data-evt="213" title="تبديل نمط عرض الخريطة بين الشوارع والقمر الصناعي">🛰️ قمر صناعي</button>
+      <button class="map-ctrl-btn" id="map-expand-btn" data-evt="214" title="تكبير الخريطة لتظهر بوضوح أكبر">⛶ تكبير الخريطة</button>
       <button class="export-btn export-btn-csv" id="map-download-csv" style="margin-inline-start:auto" data-evt="205" title="تنزيل بيانات المدارس المعروضة حاليًا على الخريطة (بعد كل الفلاتر) كملف CSV">⬇ تنزيل بيانات الخريطة <span class="map-dl-count">(0)</span></button>
     </div>
 
-    <!-- فلاتر خاصة بتبويب الخريطة (تصفية محلية فوق الفلاتر العامة، لا تؤثر
-         على باقي التبويبات) — تتغيّر خياراتها حسب وضع العرض المختار فوق:
-         حرج/متوسط/جيد/جيد جداً لـ FCA والبيئة، وفئات البلاغات الخمس لوضع
-         البلاغات، ومربوط بيها فلتر "أعلى N مدرسة" خاص بالبلاغات فقط -->
+    <!-- فلاتر عامة على الخريطة (محافظة/مدينة/مرحلة) — تظهر دايمًا مهما كان
+         وضع العرض المختار، وتُطبَّق فوق الفلاتر العامة للوحة، محلية بالكامل
+         لتبويب الخريطة (لا تؤثر على باقي التبويبات) -->
+    <div class="map-controls" id="map-filters-row-general">
+      <div class="fg" id="map-fg-sector">
+        <div class="fg-lbl">المحافظة</div>
+        <select class="fsel" id="mapSectorFilter" data-evt="215" aria-label="تصفية حسب المحافظة">
+          <option value="">كل المحافظات</option>
+        </select>
+      </div>
+      <div class="fg" id="map-fg-city">
+        <div class="fg-lbl">المدينة</div>
+        <select class="fsel" id="mapCityFilter" data-evt="208" aria-label="تصفية حسب المدينة">
+          <option value="">كل المدن</option>
+        </select>
+      </div>
+      <div class="fg" id="map-fg-stage">
+        <div class="fg-lbl">المرحلة</div>
+        <select class="fsel" id="mapStageFilter" data-evt="209" aria-label="تصفية حسب المرحلة">
+          <option value="">كل المراحل</option>
+        </select>
+      </div>
+      <button class="f-clear" id="map-filters-clear-general" data-evt="210"><span>✕ مسح فلتر المحافظة/المدينة/المرحلة</span></button>
+    </div>
+
+    <!-- فلاتر خاصة بوضع العرض المختار فوق (تصفية محلية فوق الفلاتر العامة
+         + فلتر المدينة/المرحلة، لا تؤثر على باقي التبويبات) — تتغيّر خياراتها
+         حسب وضع العرض المختار: حرج/متوسط/جيد/جيد جداً لـ FCA والبيئة، وفئات
+         البلاغات الخمس + فترة زمنية + "أعلى N مدرسة" لوضع البلاغات فقط -->
     <div class="map-controls" id="map-filters-row" style="display:none">
       <div class="fg" id="map-fg-tier">
         <div class="fg-lbl">تصفية حسب الفئة</div>
@@ -1318,15 +1349,24 @@
           <option value="50">أعلى 50</option>
         </select>
       </div>
+      <div class="fg" id="map-fg-date" style="display:none">
+        <div class="fg-lbl">فترة البلاغات (تاريخ الإنشاء)</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="date" class="finp" id="mapDateFrom" data-evt="211" style="min-width:0;width:135px" aria-label="من تاريخ">
+          <span style="font-size:11px;color:var(--tx-muted)">→</span>
+          <input type="date" class="finp" id="mapDateTo" data-evt="212" style="min-width:0;width:135px" aria-label="إلى تاريخ">
+        </div>
+      </div>
       <button class="f-clear" id="map-filters-clear" data-evt="204"><span>✕ مسح فلتر الخريطة</span></button>
     </div>
+    </div><!-- /map-controls-floating -->
 
     <div class="map-stat-bar" id="map-stat-bar-balagh" style="display:none" data-evt="207">
       <div class="map-stat" data-tier="0">
         <div class="map-stat-dot" style="background:#94A3B8"></div>
         <div>
           <div class="map-stat-val" id="ms-bal-none" style="color:#94A3B8">—</div>
-          <div class="map-stat-lbl">لا بلاغات</div>
+          <div class="map-stat-lbl">لا يوجد بلاغات</div>
         </div>
       </div>
       <div class="map-stat" data-tier="1">
@@ -1357,13 +1397,6 @@
           <div class="map-stat-lbl">الأعلى</div>
         </div>
       </div>
-      <div class="map-stat">
-        <div class="map-stat-dot" style="background:#94A3B8"></div>
-        <div>
-          <div class="map-stat-val" id="ms-bal-nocoord" style="color:#94A3B8">—</div>
-          <div class="map-stat-lbl">بدون إحداثيات</div>
-        </div>
-      </div>
     </div>
 
     <!-- بطاقات إحصائيات وضع "الجنس" — نفس ألوان الماركرز/الليجند بالظبط -->
@@ -1387,13 +1420,6 @@
         <div>
           <div class="map-stat-val" id="ms-gen-other" style="color:#94A3B8">—</div>
           <div class="map-stat-lbl">غير محدد</div>
-        </div>
-      </div>
-      <div class="map-stat">
-        <div class="map-stat-dot" style="background:#94A3B8"></div>
-        <div>
-          <div class="map-stat-val" id="ms-gen-nocoord" style="color:#94A3B8">—</div>
-          <div class="map-stat-lbl">بدون إحداثيات</div>
         </div>
       </div>
     </div>
@@ -1421,16 +1447,11 @@
           <div class="map-stat-lbl">غير محدد</div>
         </div>
       </div>
-      <div class="map-stat">
-        <div class="map-stat-dot" style="background:#94A3B8"></div>
-        <div>
-          <div class="map-stat-val" id="ms-own-nocoord" style="color:#94A3B8">—</div>
-          <div class="map-stat-lbl">بدون إحداثيات</div>
-        </div>
-      </div>
     </div>
 
     <div id="map-container"></div>
+
+  </div><!-- /map-fullscreen-wrap -->
   </div>
 
 <!--

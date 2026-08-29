@@ -3711,6 +3711,18 @@ let __bgRevalidatedOnce = false;
         try { renderMap(); } catch (e) { console.warn("[map][balagh-refresh]", e); }
       }
     };
+    // 🔗 (2026-08-29) تبويبَي "ملخص الأمن والسلامة" و"بلاغات الأمن والسلامة"
+    // بيستخرجوا بياناتهم من window.RAW_BALAGH (نفس مصدر تبويب البلاغات
+    // العام) — فلازم يتحدّثوا برضه كل ما حالة تحميل البلاغات تتغيّر، مش
+    // بس تبويب البلاغات العام نفسه.
+    function _rerenderSecuritySafetyTabsIfActive() {
+      if (document.getElementById("tab-security-safety")?.classList.contains("active")) {
+        try { renderSecuritySafetyTab(); } catch (e) { console.warn("[SEC-SAFETY render]", e); }
+      }
+      if (document.getElementById("tab-security-safety-summary")?.classList.contains("active")) {
+        try { renderSecuritySafetySummaryTab(); } catch (e) { console.warn("[SEC-SAFETY-SUMMARY render]", e); }
+      }
+    }
     window.loadBalaghSeparate = async function(forceNetwork = false) {
       // 1) من الكاش أولاً (يشتغل حتى بعد F5) — عرض فوري بدون انتظار الشبكة
       const hadDataAlready = window.__BALAGH_LOAD_STATE__ === "loaded" &&
@@ -3725,6 +3737,7 @@ let __bgRevalidatedOnce = false;
             if (document.getElementById("tab-balagh")?.classList.contains("active")) {
               try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
             }
+            _rerenderSecuritySafetyTabsIfActive();
             // نجيب نسخة حديثة بصمت بالخلفية بعد العرض من الكاش
             setTimeout(() => { try { window.loadBalaghSeparate(true); } catch(_) {} }, 80);
             return;
@@ -3741,6 +3754,7 @@ let __bgRevalidatedOnce = false;
         if (document.getElementById("tab-balagh")?.classList.contains("active")) {
           try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
         }
+        _rerenderSecuritySafetyTabsIfActive();
       }
       try {
         if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
@@ -3772,6 +3786,7 @@ let __bgRevalidatedOnce = false;
       if (document.getElementById("tab-balagh")?.classList.contains("active")) {
         try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
       }
+      _rerenderSecuritySafetyTabsIfActive();
     };
     // تحميل تلقائي عند بدء اللوحة فقط — لا نُعيد تحميل البلاغات (ملف ضخم) في كل مرة
     // يُعاد فيها استدعاء loadData (تحديث الكاش بالخلفية، أو التحديث التلقائي كل 5 دقائق).
@@ -5275,341 +5290,454 @@ function renderConsultantKpiTab() {
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  🛡️  JS تبويب: الأمن والسلامة
-   ║  (tab-security-safety) — بلاغات الأمن والسلامة
-   ║  أعمدة الشيت: المنطقة، رقم البلاغ، نوع الحادث، وفيات، إصابات،
-   ║               التاريخ، الإدارة التعليمية، المدرسة، الارتباط،
-   ║               حرج، يجب التحقيق، اكتمل التحقيق، استجابة بإفادة،
-   ║               وصف البلاغ، مكرر محتمل
+   ║  🛡️  JS تبويب: بلاغات الأمن والسلامة (tab-security-safety)
+   ║  (2026-08-29) — تمّ استبدال المصدر بالكامل بطلب من المستخدم:
+   ║  التبويب ده كان بيعرض سجل حوادث منفصل تماماً (وفيات/إصابات/
+   ║  تحقيقات) من شيت "بلاغات_أمن_وسلامة" (RAW_SECURITY_SAFETY).
+   ║  دلوقتي بيعرض بدل منه بلاغات "الأمن والسلامة" المُستخرجة من
+   ║  شيت البلاغات العام نفسه (window.RAW_BALAGH) — عن طريق مطابقة
+   ║  عمود "الفئة الفرعية" بالتساوي التام مع 14 تصنيف
+   ║  حدّدهم المستخدم (ملف بلاغات الامن والسلامة.xlsx). المصدر
+   ║  الموحّد: window.getSecuritySafetyBalaghRows() (مُعرَّضة من IIFE
+   ║  تبويب البلاغات العام) — نفس صف normalizeRows بالظبط (نفس
+   ║  status/priority/dates/isOpen/isClosed/isOverdue...) عشان
+   ║  المسميات والمنطق يفضلوا متطابقين 100% مع تبويب "البلاغات" العام
+   ║  (اللي فضل زي ما هو من غير أي تغيير). ملحوظة: شيت
+   ║  "بلاغات_أمن_وسلامة" (RAW_SECURITY_SAFETY) لسه بيتحمّل زي ما هو
+   ║  (من غير حذف)، بس مبقاش معروض في أي تبويب حالياً.
    ╚════════════════════════════════════════════════════════════╝ */
-function renderSecuritySafetyTab(_fromDate, _toDate) {
+function renderSecuritySafetyTab() {
   const el = document.getElementById("security-safety-content");
   if (!el) return;
 
-  const allRows = window.RAW_SECURITY_SAFETY || [];
-  if (!allRows.length) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
-      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات أمن وسلامة</div>
-      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "بلاغات_أمن_وسلامة" وأن الـ Apps Script يقرأها</div>
+  const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const pct2 = (n, t) => (t ? ((n / t) * 100).toFixed(1) + "%" : "0.0%");
+  const fmt2 = (n) => (n || 0).toLocaleString("en-US");
+
+  // نفس نمط الحالة (idle/loading/loaded/error) المستخدم في تبويب البلاغات
+  // العام — بانر خفيف غير مانع، والهيكل كامل بيفضل ظاهر دايماً.
+  const balaghState = window.__BALAGH_LOAD_STATE__ || "idle";
+  const notLoaded = balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0;
+  let bannerHtml = "";
+  if (notLoaded) {
+    const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
+    const msg =
+      balaghState === "loading"
+        ? "يجري تحميل بيانات البلاغات في الخلفية، وستُحدَّث بيانات الأمن والسلامة تلقائيًا فور اكتمال التحميل."
+        : balaghState === "error"
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+      <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
+    </div>`;
+  }
+
+  if (typeof window.getSecuritySafetyBalaghRows !== "function") {
+    el.innerHTML = `${bannerHtml}<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">تعذّر تحميل وحدة البلاغات</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">يُرجى تحديث الصفحة والمحاولة مجددًا.</div>
     </div>`;
     return;
   }
 
-  // ── استخراج نطاق التواريخ المتاح ──
-  const allDates = allRows.map(r => String(r["التاريخ"]||"").slice(0,10)).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-  const minDate  = allDates[0] || "";
-  const maxDate  = allDates[allDates.length-1] || "";
+  const allSecRows = window.getSecuritySafetyBalaghRows();
 
-  // ── قراءة قيم الفلتر (من الـ inputs إن وُجدت، أو من المعاملات) ──
-  const fromEl = document.getElementById("sec-date-from");
-  const toEl   = document.getElementById("sec-date-to");
-  const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
-  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+  // 🩺 تشخيص مرئي (2026-08-29) — مُحدَّث ليطابق حقل "الفئة الفرعية" (وليس
+  // "الوصف")، بناءً على تصحيح المستخدم: إذا كانت البلاغات محمّلة فعليًا
+  // ولم يتطابق أي منها مع التصنيفات الأربعة عشر، تُعرض هنا أكثر القيم
+  // الفعلية تكرارًا في عمود "الفئة الفرعية" لمراجعتها ومقارنتها يدويًا.
+  // كل النصوص المعروضة للمستخدم بالفصحى بناءً على طلبه صراحةً.
+  let diagnosticHtml = "";
+  if (!notLoaded && allSecRows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
+    const diag = typeof window.debugSecuritySafetyMismatch === "function" ? window.debugSecuritySafetyMismatch() : null;
+    const topVals = diag ? diag.topUnmatched.slice(0, 12) : [];
+    diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:16px">
+      <div style="font-size:14px;font-weight:800;color:#991B1B;margin-bottom:6px">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن</div>
+      <div style="font-size:12px;color:#7F1D1D;line-height:1.9;margin-bottom:10px">
+        البيانات محمَّلة بالفعل (${fmt2(window.RAW_BALAGH.length)} بلاغًا)، إلا أنه لا توجد قيمة في عمود "الفئة الفرعية" تطابق أيًا من التصنيفات الأربعة عشر المحدَّدة. فيما يلي أكثر القيم تكرارًا في عمود "الفئة الفرعية" حاليًا؛ يُرجى مراجعتها ومقارنتها بالتصنيفات، وإخبارنا بالتصنيف الصحيح في حال وجود اختلاف:
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${topVals.length ? topVals.map(([v, n]) => `
+          <div style="display:flex;justify-content:space-between;gap:10px;background:#fff;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;font-size:12px">
+            <span style="color:var(--tx-main)">${esc(v)}</span><span style="color:#991B1B;font-weight:700;white-space:nowrap">${fmt2(n)}×</span>
+          </div>`).join("") : `<div style="font-size:12px;color:#7F1D1D">عمود "الفئة الفرعية" فارغ في جميع البلاغات.</div>`}
+      </div>
+    </div>`;
+  }
 
-  // ── تصفية الصفوف ──
-  const rows = allRows.filter(r => {
-    const d = String(r["التاريخ"]||"").slice(0,10);
-    if (!d) return true;
-    if (fromDate && d < fromDate) return false;
-    if (toDate   && d > toDate)   return false;
+  // ── حالة الفلاتر (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم) ──
+  const ST = (window.__SEC_BALAGH_STATE__ = window.__SEC_BALAGH_STATE__ || {
+    search: "", status: "", category: "", priority: "", dateFrom: "", dateTo: "",
+    sort: "date_desc", page: 0, size: 25,
+  });
+
+  function parseDateInputLocal_(v) {
+    const s = String(v || "").trim();
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // ── تطبيق الفلاتر ──
+  let rows = allSecRows.filter((r) => {
+    if (ST.status && r.status !== ST.status) return false;
+    if (ST.category && r.subCategory !== ST.category) return false;
+    if (ST.priority && r.priority !== ST.priority) return false;
+    if (ST.dateFrom) {
+      const from = parseDateInputLocal_(ST.dateFrom);
+      if (!r.creationDateObj || !from || r.creationDateObj < from) return false;
+    }
+    if (ST.dateTo) {
+      const to = parseDateInputLocal_(ST.dateTo);
+      if (to) to.setHours(23, 59, 59, 999);
+      if (!r.creationDateObj || !to || r.creationDateObj > to) return false;
+    }
+    if (ST.search) {
+      const s = ST.search.trim().toLowerCase();
+      const hay = [r.recordNo, r.schoolName, r.linkedSchoolName, r.location, r.subCategory, r.problemDescription, r.contractor]
+        .join(" ").toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
     return true;
   });
 
-  const n_    = (v) => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
-  const pct2  = (n, t) => t ? ((n / t) * 100).toFixed(1) + "%" : "0.0%";
-  const total      = rows.length;
-  const totalDeaths = rows.reduce((s,r) => s + n_(r["وفيات"]), 0);
-  const totalInj    = rows.reduce((s,r) => s + n_(r["إصابات"]), 0);
-  const critical    = rows.filter(r => r["حرج"] === "نعم").length;
-  const needInv     = rows.filter(r => r["يجب التحقيق"] === "نعم").length;
-  const doneInv     = rows.filter(r => r["اكتمل التحقيق"] === "نعم").length;
-  const duplicates  = rows.filter(r => r["مكرر محتمل"] === "نعم").length;
-  const withReply   = rows.filter(r => r["استجابة بإفادة"] === "نعم").length;
+  // ── الترتيب ──
+  const timeOf = (d) => (d instanceof Date && !isNaN(d.getTime()) ? d.getTime() : null);
+  rows = [...rows].sort((a, b) => {
+    switch (ST.sort) {
+      case "date_asc": return (timeOf(a.creationDateObj) ?? Infinity) - (timeOf(b.creationDateObj) ?? Infinity);
+      case "priority_desc": return (window.isHighRiskPriority(b.priority) ? 1 : 0) - (window.isHighRiskPriority(a.priority) ? 1 : 0);
+      case "school": return (a.schoolName || "").localeCompare(b.schoolName || "", "ar");
+      case "date_desc": default: return (timeOf(b.creationDateObj) ?? -Infinity) - (timeOf(a.creationDateObj) ?? -Infinity);
+    }
+  });
 
-  // توزيع حسب نوع الحادث
-  const byType = {};
-  rows.forEach(r => { const t = r["نوع الحادث"] || "غير محدد"; byType[t] = (byType[t]||0)+1; });
-  const typeEntries = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const total = allSecRows.length;
+  const filteredTotal = rows.length;
+  const openCount = rows.filter((r) => r.isOpen).length;
+  const closedCount = rows.filter((r) => r.isClosed).length;
+  const overdueCount = rows.filter((r) => r.isOverdue).length;
+  const slaBreachPct = filteredTotal > 0 ? ((overdueCount / filteredTotal) * 100).toFixed(1) : "0.0";
 
-  // توزيع حسب المنطقة
-  const byRegion = {};
-  rows.forEach(r => { const g = r["المنطقة"] || "غير محدد"; byRegion[g] = (byRegion[g]||0)+1; });
-  const regionEntries = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]);
+  // ── توزيع حسب التصنيف (الـ14 فئة بالترتيب، حتى اللي عددها صفر) ──
+  const catCounts = {};
+  rows.forEach((r) => { catCounts[r.subCategory] = (catCounts[r.subCategory] || 0) + 1; });
+  const catEntries = (window.SECURITY_SAFETY_CATEGORIES || [])
+    .map((c) => [c, catCounts[c] || 0])
+    .sort((a, b) => b[1] - a[1]);
 
-  // توزيع حسب الإدارة التعليمية
-  const byEdAdmin = {};
-  rows.forEach(r => { const a = r["الإدارة التعليمية"] || "غير محدد"; byEdAdmin[a] = (byEdAdmin[a]||0)+1; });
-  const edAdminEntries = Object.entries(byEdAdmin).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  // ── توزيع حسب الحالة ──
+  const statusCounts = {};
+  rows.forEach((r) => { const s = window.balaghStatusLabel(r.status); statusCounts[s] = (statusCounts[s] || 0) + 1; });
+  const statusEntries = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
 
-  // اتجاه شهري
-  const byMonth = {};
-  rows.forEach(r => { const d = r["التاريخ"]; if (!d) return; const m = String(d).slice(0,7); byMonth[m]=(byMonth[m]||0)+1; });
-  const monthKeys = Object.keys(byMonth).sort();
-  const monthVals = monthKeys.map(k=>byMonth[k]);
+  // ── خيارات الفلاتر (من كل بلاغات الأمن والسلامة، مش المفلترة) ──
+  const statusOptions = [...new Set(allSecRows.map((r) => r.status).filter(Boolean))].sort();
+  const priorityOptions = [...new Set(allSecRows.map((r) => r.priority).filter(Boolean))]
+    .sort((a, b) => (window.isHighRiskPriority(b) ? 1 : 0) - (window.isHighRiskPriority(a) ? 1 : 0));
 
-  // آخر 20 بلاغ
-  const recent = [...rows].reverse().slice(0,20);
+  const list = rows.slice(ST.page * ST.size, ST.page * ST.size + ST.size);
+  const pageCount = Math.max(1, Math.ceil(filteredTotal / ST.size));
 
   el.innerHTML = `
-  <div class="card mb14">
-    <div class="card-title">
-      <span>لوحة بلاغات الأمن والسلامة</span>
-      <span class="sub">${total.toLocaleString()} بلاغ</span>
-    </div>
-
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:16px">
-      <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">فلتر التاريخ</span>
-      <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
-        <label style="font-size:11px;color:var(--tx-muted)">من</label>
-        <input type="date" id="sec-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
-          style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-          onchange="renderSecuritySafetyTab(this.value, document.getElementById('sec-date-to').value)">
-        <label style="font-size:11px;color:var(--tx-muted)">إلى</label>
-        <input type="date" id="sec-date-to" value="${toDate}" min="${minDate}" max="${maxDate}"
-          style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
-          onchange="renderSecuritySafetyTab(document.getElementById('sec-date-from').value, this.value)">
-        <button onclick="renderSecuritySafetyTab('${minDate}','${maxDate}')"
-          style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+    ${bannerHtml}
+    ${diagnosticHtml}
+    <div class="card mb14">
+      <div class="card-title">
+        <span>لوحة بلاغات الأمن والسلامة</span>
+        <span class="sub">${fmt2(filteredTotal)} من ${fmt2(total)}</span>
       </div>
-      <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} بلاغ بعد الفلترة</span>
-    </div>
-
-    <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
-      <div class="kpi kc-amber">
-        <div class="kpi-val" style="color:#D97706">${total.toLocaleString()}</div>
-        <div class="kpi-lbl">إجمالي البلاغات</div>
-        <div class="kpi-sub">${duplicates} مكرر محتمل</div>
-      </div>
-      <div class="kpi kc-purple">
-        <div class="kpi-val" style="color:#6D28D9">${totalInj.toLocaleString()}</div>
-        <div class="kpi-lbl">إجمالي الإصابات</div>
-        <div class="kpi-sub">وفيات: ${totalDeaths}</div>
-      </div>
-      <div class="kpi kc-red">
-        <div class="kpi-val" style="color:#991b1b">${critical.toLocaleString()}</div>
-        <div class="kpi-lbl">حالات حرجة</div>
-        <div class="kpi-sub">${total ? ((critical/total)*100).toFixed(1) : 0}% من الإجمالي</div>
-      </div>
-      <div class="kpi kc-green">
-        <div class="kpi-val" style="color:#059669">${doneInv.toLocaleString()}</div>
-        <div class="kpi-lbl">التحقيقات المكتملة</div>
-        <div class="kpi-sub">من ${needInv} مطلوبة</div>
+      <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
+        <div class="kpi kc-amber">
+          <div class="kpi-val" style="color:#D97706">${fmt2(filteredTotal)}</div>
+          <div class="kpi-lbl">إجمالي بلاغات الأمن والسلامة</div>
+          <div class="kpi-sub">${total === filteredTotal ? "" : `من إجمالي ${fmt2(total)}`}</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val" style="color:#991b1b">${fmt2(openCount)}</div>
+          <div class="kpi-lbl">مفتوحة</div>
+          <div class="kpi-sub">${pct2(openCount, filteredTotal)} من المعروض</div>
+        </div>
+        <div class="kpi kc-green">
+          <div class="kpi-val" style="color:#059669">${fmt2(closedCount)}</div>
+          <div class="kpi-lbl">مغلقة</div>
+          <div class="kpi-sub">${pct2(closedCount, filteredTotal)} من المعروض</div>
+        </div>
+        <div class="kpi kc-blue">
+          <div class="kpi-val" style="color:#0891B2">${slaBreachPct}%</div>
+          <div class="kpi-lbl">نسبة اختراق SLA</div>
+          <div class="kpi-sub">${fmt2(overdueCount)} بلاغ متأخر</div>
+        </div>
       </div>
     </div>
 
-    <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:14px">
-      <div class="kpi kc-navy">
-        <div class="kpi-val" style="color:#083D4F">${needInv.toLocaleString()}</div>
-        <div class="kpi-lbl">تحتاج تحقيق</div>
-        <div class="kpi-sub">${pct2(needInv,total)} من الإجمالي</div>
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">التوزيع حسب الفئة</div>
+        <div class="chart-box" style="height:320px"><canvas id="ch-sec-category"></canvas></div>
       </div>
-      <div class="kpi kc-teal">
-        <div class="kpi-val" style="color:#0E7490">${withReply.toLocaleString()}</div>
-        <div class="kpi-lbl">استجابة بإفادة</div>
-        <div class="kpi-sub">${pct2(withReply,total)} من الإجمالي</div>
-      </div>
-      <div class="kpi kc-blue">
-        <div class="kpi-val" style="color:#0891B2">${duplicates.toLocaleString()}</div>
-        <div class="kpi-lbl">مكرر محتمل</div>
-        <div class="kpi-sub">${pct2(duplicates,total)} من الإجمالي</div>
-      </div>
-      <div class="kpi kc-red">
-        <div class="kpi-val" style="font-size:28px">${totalDeaths.toLocaleString()}</div>
-        <div class="kpi-lbl">إجمالي الوفيات</div>
-        <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
+      <div class="card">
+        <div class="card-title">التوزيع حسب الحالة</div>
+        <div class="chart-box" style="height:320px"><canvas id="ch-sec-status"></canvas></div>
       </div>
     </div>
-  </div>
 
-  <div class="g2 mb14">
+    <div class="card mb14">
+      <div class="card-title">فلاتر بلاغات الأمن والسلامة</div>
+      <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px 0">
+        <div class="fg" style="flex:1;min-width:220px">
+          <div class="fg-lbl">بحث</div>
+          <input class="finp" style="width:100%" placeholder="🔍 المدرسة أو رقم البلاغ أو المقاول..." value="${esc(ST.search)}"
+            oninput="window.__SEC_BALAGH_STATE__.search=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الفئة</div>
+          <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.category=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+            <option value="">كل الفئات</option>
+            ${catEntries.map(([c, n]) => `<option value="${esc(c)}" ${ST.category === c ? "selected" : ""}>${esc(c)} (${n})</option>`).join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الحالة</div>
+          <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.status=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+            <option value="">كل الحالات</option>
+            ${statusOptions.map((s) => `<option value="${esc(s)}" ${ST.status === s ? "selected" : ""}>${esc(window.balaghStatusLabel(s))}</option>`).join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الأولوية</div>
+          <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.priority=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+            <option value="">كل الأولويات</option>
+            ${priorityOptions.map((p) => `<option value="${esc(p)}" ${ST.priority === p ? "selected" : ""}>${esc(window.balaghPriorityLabel(p))}</option>`).join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">من تاريخ</div>
+          <input class="finp" type="date" value="${esc(ST.dateFrom)}"
+            onchange="window.__SEC_BALAGH_STATE__.dateFrom=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">إلى تاريخ</div>
+          <input class="finp" type="date" value="${esc(ST.dateTo)}"
+            onchange="window.__SEC_BALAGH_STATE__.dateTo=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الترتيب</div>
+          <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.sort=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+            <option value="date_desc" ${ST.sort === "date_desc" ? "selected" : ""}>الأحدث أولاً</option>
+            <option value="date_asc" ${ST.sort === "date_asc" ? "selected" : ""}>الأقدم أولاً</option>
+            <option value="priority_desc" ${ST.sort === "priority_desc" ? "selected" : ""}>الأولوية (الأعلى أولاً)</option>
+            <option value="school" ${ST.sort === "school" ? "selected" : ""}>اسم المدرسة (أبجدي)</option>
+          </select>
+        </div>
+        <button class="f-clear" onclick="window.__SEC_BALAGH_STATE__={search:'',status:'',category:'',priority:'',dateFrom:'',dateTo:'',sort:'date_desc',page:0,size:25};renderSecuritySafetyTab()">✕ مسح الفلاتر</button>
+      </div>
+    </div>
+
     <div class="card">
-      <div class="card-title">توزيع البلاغات حسب نوع الحادث</div>
-      <div class="chart-box" style="height:280px"><canvas id="ch-sec-type"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title">البلاغات حسب المنطقة</div>
-      <div class="chart-box" style="height:280px"><canvas id="ch-sec-region"></canvas></div>
-    </div>
-  </div>
-
-  <div class="g2 mb14">
-    <div class="card">
-      <div class="card-title">الاتجاه الشهري للبلاغات</div>
-      <div class="chart-box" style="height:200px"><canvas id="ch-sec-month"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title">البلاغات حسب الإدارة التعليمية</div>
-      <div class="chart-box" style="height:200px"><canvas id="ch-sec-edadmin"></canvas></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">آخر 20 بلاغ <span class="sub">من الأحدث للأقدم</span></div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead><tr style="background:var(--bg2)">
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">التاريخ</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">رقم البلاغ</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">المنطقة</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">الإدارة التعليمية</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">المدرسة</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">نوع الحادث</th>
-          <th style="padding:8px 10px;text-align:center;white-space:nowrap">وفيات</th>
-          <th style="padding:8px 10px;text-align:center;white-space:nowrap">إصابات</th>
-          <th style="padding:8px 10px;text-align:center;white-space:nowrap">حرج</th>
-          <th style="padding:8px 10px;text-align:center;white-space:nowrap">التحقيق</th>
-          <th style="padding:8px 10px;text-align:right;white-space:nowrap">الارتباط</th>
-        </tr></thead>
-        <tbody>
-          ${recent.map(r => {
-            const isCritical = r["حرج"] === "نعم";
-            const d = n_(r["وفيات"]), inj = n_(r["إصابات"]);
-            const invStatus = r["اكتمل التحقيق"]==="نعم"
-              ? `<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">مكتمل</span>`
-              : r["يجب التحقيق"]==="نعم"
-                ? `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">معلق</span>`
-                : `<span style="color:var(--tx-muted)">—</span>`;
-            return `<tr style="border-bottom:1px solid var(--brd);${isCritical?'background:#FEF2F2':''}">
-              <td style="padding:6px 10px;color:var(--tx-muted);white-space:nowrap">${esc(r["التاريخ"])||"—"}</td>
-              <td style="padding:6px 10px;font-family:monospace;font-size:11px;color:#0891B2">${esc(r["رقم البلاغ"])||"—"}</td>
-              <td style="padding:6px 10px;white-space:nowrap">${esc(r["المنطقة"])||"—"}</td>
-              <td style="padding:6px 10px;white-space:nowrap;font-size:11px">${esc(r["الإدارة التعليمية"])||"—"}</td>
-              <td style="padding:6px 10px;font-size:11px;max-width:150px">${esc(r["المدرسة"])||"—"}</td>
-              <td style="padding:6px 10px;max-width:140px;font-size:11px">${esc(r["نوع الحادث"])||"—"}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${d>0?'#DC2626':'var(--tx-muted)'}">${d||"—"}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${inj>0?'#7C3AED':'var(--tx-muted)'}">${inj||"—"}</td>
-              <td style="padding:6px 10px;text-align:center">${isCritical?'<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">حرج</span>':'<span style="color:var(--tx-muted)">—</span>'}</td>
-              <td style="padding:6px 10px;text-align:center">${invStatus}</td>
-              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted)">${esc(r["الارتباط"])||"—"}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
+      <div class="card-title">
+        <span>تفاصيل البلاغات</span>
+        <span class="sub">${fmt2(filteredTotal)} سجل</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم البلاغ</th><th>تاريخ الإنشاء</th><th>الفئة</th><th>المدرسة</th>
+              <th>المحافظة</th><th>الحالة</th><th>الأولوية</th><th>حالة SLA</th><th>المقاول</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.length ? list.map((r) => `
+              <tr>
+                <td style="font-family:monospace;font-size:11px">${esc(r.recordNo) || "—"}</td>
+                <td style="white-space:nowrap">${esc(r.creationDate) || "—"}</td>
+                <td style="max-width:220px">${esc(r.subCategory) || "—"}</td>
+                <td style="max-width:160px">${esc(r.isLinked ? r.linkedSchoolName : r.schoolName) || "—"}</td>
+                <td>${esc(r.location) || "—"}</td>
+                <td>${esc(window.balaghStatusLabel(r.status))}</td>
+                <td>${esc(window.balaghPriorityLabel(r.priority))}</td>
+                <td style="color:${r.isOverdue ? "#DC2626" : "var(--tx-muted)"};font-weight:${r.isOverdue ? "700" : "400"}">${r.isOverdue ? "متأخر" : (esc(r.slaStatus) || "—")}</td>
+                <td>${esc(r.contractor) || "—"}</td>
+              </tr>`).join("")
+              : `<tr><td colspan="9"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <div class="pag-bar">
+        <div class="pag-info">عرض ${filteredTotal ? ST.page * ST.size + 1 : 0} - ${Math.min(filteredTotal, (ST.page + 1) * ST.size)} من ${fmt2(filteredTotal)} سجل</div>
+        <div class="pag-btns">
+          <button class="pag-btn" ${ST.page <= 0 ? "disabled" : ""} onclick="window.__SEC_BALAGH_STATE__.page=Math.max(0,window.__SEC_BALAGH_STATE__.page-1);renderSecuritySafetyTab()">◀ السابق</button>
+          <button class="pag-btn active">${ST.page + 1} / ${pageCount}</button>
+          <button class="pag-btn" ${ST.page >= pageCount - 1 ? "disabled" : ""} onclick="window.__SEC_BALAGH_STATE__.page=Math.min(${pageCount - 1},window.__SEC_BALAGH_STATE__.page+1);renderSecuritySafetyTab()">التالي ▶</button>
+        </div>
+      </div>
+    </div>`;
 
   requestAnimationFrame(() => {
-    const PAL = CSS_TOKENS.palette(); // palette موحد من :root
+    if (typeof Chart === "undefined") return;
+    const PAL = CSS_TOKENS.palette();
 
-    // نوع الحادث — أفقي
-    const cType = document.getElementById("ch-sec-type");
-    if (cType && typeof Chart !== "undefined") {
-      killChart("ch-sec-type");
-      CHARTS["ch-sec-type"] = new Chart(cType, {
+    const cCat = document.getElementById("ch-sec-category");
+    if (cCat) {
+      killChart("ch-sec-category");
+      const nonZero = catEntries.filter((e) => e[1] > 0);
+      const dataEntries = nonZero.length ? nonZero : catEntries;
+      CHARTS["ch-sec-category"] = new Chart(cCat, {
         type: "bar",
-        data: { labels: typeEntries.map(e=>e[0]), datasets: [{ data: typeEntries.map(e=>e[1]), backgroundColor: PAL, borderRadius: 4 }] },
-        options: { indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}}, maintainAspectRatio:false }
+        data: { labels: dataEntries.map((e) => e[0]), datasets: [{ data: dataEntries.map((e) => e[1]), backgroundColor: PAL, borderRadius: 4 }] },
+        options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, maintainAspectRatio: false },
       });
     }
 
-    // المنطقة — دونات
-    const cRegion = document.getElementById("ch-sec-region");
-    if (cRegion && typeof Chart !== "undefined") {
-      killChart("ch-sec-region");
-      CHARTS["ch-sec-region"] = new Chart(cRegion, {
+    const cStatus = document.getElementById("ch-sec-status");
+    if (cStatus) {
+      killChart("ch-sec-status");
+      CHARTS["ch-sec-status"] = new Chart(cStatus, {
         type: "doughnut",
-        data: { labels: regionEntries.map(e=>e[0]), datasets: [{ data: regionEntries.map(e=>e[1]), backgroundColor: PAL, borderWidth:2 }] },
-        options: { plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}}, cutout:"55%", maintainAspectRatio:false }
-      });
-    }
-
-    // الاتجاه الشهري
-    const cMonth = document.getElementById("ch-sec-month");
-    if (cMonth && typeof Chart !== "undefined") {
-      killChart("ch-sec-month");
-      CHARTS["ch-sec-month"] = new Chart(cMonth, {
-        type: "line",
-        data: { labels: monthKeys, datasets: [{ data: monthVals, borderColor:CSS_TOKENS.danger(), backgroundColor:CSS_TOKENS.α(CSS_TOKENS.danger(), 0.08), borderWidth:2, fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:CSS_TOKENS.danger() }] },
-        options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}, maintainAspectRatio:false }
-      });
-    }
-
-    // الإدارة التعليمية
-    const cEd = document.getElementById("ch-sec-edadmin");
-    if (cEd && typeof Chart !== "undefined") {
-      killChart("ch-sec-edadmin");
-      CHARTS["ch-sec-edadmin"] = new Chart(cEd, {
-        type: "bar",
-        data: { labels: edAdminEntries.map(e=>e[0]), datasets: [{ data: edAdminEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.info(), borderRadius:4 }] },
-        options: { indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}}, maintainAspectRatio:false }
+        data: { labels: statusEntries.map((e) => e[0]), datasets: [{ data: statusEntries.map((e) => e[1]), backgroundColor: PAL, borderWidth: 2 }] },
+        options: { plugins: { legend: { position: "right", labels: { font: { size: 10 }, boxWidth: 10 } } }, cutout: "55%", maintainAspectRatio: false },
       });
     }
   });
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
-   ║  🛡️📊 JS تبويب: ملخص الأمن والسلامة
-   ║  (tab-security-safety-summary) — بيانات ثابتة مُدخلة يدوياً من
-   ║  تقرير خارجي (Looker Studio / Google Data Studio)، مفيش ملف
-   ║  مصدر مرتبط بها تلقائياً — عدّل الأرقام في SECURITY_SAFETY_SUMMARY_DATA
-   ║  تحت مباشرة كل ما يتحدّث التقرير الخارجي
+   ║  🛡️📊 JS تبويب: ملخص الأمن والسلامة (tab-security-safety-summary)
+   ║  (2026-08-29) — تمّ استبدال الأرقام الثابتة المُدخلة يدوياً (من
+   ║  تقرير Looker Studio خارجي) بأرقام حقيقية محسوبة فعلياً من نفس
+   ║  بلاغات "الأمن والسلامة" المُستخرجة من شيت البلاغات العام (بمطابقة
+   ║  تامة لعمود "الفئة الفرعية" مع 14 تصنيف حدّدهم المستخدم) — بنفس المصدر
+   ║  الموحّد المستخدم في تبويب "بلاغات الأمن والسلامة":
+   ║  window.getSecuritySafetyBalaghRows(). ملحوظة: بعض المفاهيم القديمة
+   ║  (التذاكر "المعاد فتحها"، "المقترحة") لا يوجد لها مقابل حقيقي في
+   ║  نموذج بيانات شيت البلاغات، فتم استبدالها بمقاييس حقيقية متاحة
+   ║  فعلياً (قيد التنفيذ، ملغاة، توزيع حسب الفئة) بدل اختلاق أرقام.
    ╚════════════════════════════════════════════════════════════╝ */
-var SECURITY_SAFETY_SUMMARY_DATA = {
-  // 🔧 عدّل الأرقام هنا فقط عند تحديث التقرير الخارجي
-  slaCompliant: 53.3,     // نسبة الملتزم باتفاقية مستوى الخدمة %
-  slaNonCompliant: 46.7,  // نسبة غير الملتزم باتفاقية مستوى الخدمة %
-  reopened: 60,           // التذاكر المعاد فتحها
-  cancelled: 89,          // التذاكر الملغاة
-  resolved: 4,            // التذاكر المحلولة
-  closed: 3366,           // التذاكر المغلقة
-  totalTickets: 3842,     // إجمالي التذاكر (تفاصيل حالة التذاكر المفتوحة)
-  suggestedTickets: 383,  // التذاكر المقترحة
-};
-
 function renderSecuritySafetySummaryTab() {
   const el = document.getElementById("security-safety-summary-content");
   if (!el) return;
-  const d = SECURITY_SAFETY_SUMMARY_DATA;
+
+  const fmt2 = (n) => (n || 0).toLocaleString("en-US");
+  const pct2 = (n, t) => (t ? ((n / t) * 100).toFixed(1) : "0.0");
+
+  const balaghState = window.__BALAGH_LOAD_STATE__ || "idle";
+  const notLoaded = balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0;
+  let bannerHtml = "";
+  if (notLoaded) {
+    const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
+    const msg =
+      balaghState === "loading"
+        ? "يجري تحميل بيانات البلاغات في الخلفية، وسيُحدَّث هذا الملخص تلقائيًا فور اكتمال التحميل."
+        : balaghState === "error"
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+      <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
+    </div>`;
+  }
+
+  if (typeof window.getSecuritySafetyBalaghRows !== "function") {
+    el.innerHTML = `${bannerHtml}<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">تعذّر تحميل وحدة البلاغات</div>
+    </div>`;
+    return;
+  }
+
+  const rows = window.getSecuritySafetyBalaghRows();
+
+  let diagnosticHtml = "";
+  if (!notLoaded && rows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
+    diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
+      <strong style="color:#991B1B">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن.</strong> يُرجى فتح تبويب "بلاغات الأمن والسلامة" لمعرفة السبب بالتفصيل، حيث تُعرض هناك أكثر القيم الفعلية تكرارًا في عمود "الفئة الفرعية" لمقارنتها بالتصنيفات.
+    </div>`;
+  }
+
+  const total = rows.length;
+  const openCount = rows.filter((r) => r.isOpen).length;
+  const closedLbl = (r) => window.balaghStatusLabel(r.status);
+  const closedCount = rows.filter((r) => closedLbl(r) === "مغلق").length;
+  const cancelledCount = rows.filter((r) => closedLbl(r) === "ملغى").length;
+  const resolvedCount = rows.filter((r) => closedLbl(r) === "تم حله").length;
+  const inProgressCount = rows.filter((r) => ["قيد التنفيذ", "موافقة الاستشاري قيد التنفيذ"].includes(closedLbl(r))).length;
+  const overdueCount = rows.filter((r) => r.isOverdue).length;
+  const slaCompliantPct = total ? pct2(total - overdueCount, total) : "0.0";
+  const slaNonCompliantPct = total ? pct2(overdueCount, total) : "0.0";
+
+  const catCounts = {};
+  rows.forEach((r) => { catCounts[r.subCategory] = (catCounts[r.subCategory] || 0) + 1; });
+  const catEntries = (window.SECURITY_SAFETY_CATEGORIES || [])
+    .map((c) => [c, catCounts[c] || 0])
+    .sort((a, b) => b[1] - a[1]);
+  const maxCat = Math.max(1, ...catEntries.map((e) => e[1]));
 
   el.innerHTML = `
+    ${bannerHtml}
+    ${diagnosticHtml}
     <div class="card mb14">
       <div class="card-title">🛡️ الالتزام باتفاقية مستوى الخدمة (SLA)</div>
       <div style="display:flex;gap:24px;justify-content:space-around;padding:18px 0 12px;flex-wrap:wrap">
         <div style="text-align:center">
           <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">ملتزم باتفاقية مستوى الخدمة</div>
-          <div style="font-size:40px;font-weight:800;color:#EA580C">${d.slaCompliant}<span style="font-size:22px">%</span></div>
+          <div style="font-size:40px;font-weight:800;color:#059669">${slaCompliantPct}<span style="font-size:22px">%</span></div>
         </div>
         <div style="text-align:center">
           <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">غير ملتزم باتفاقية مستوى الخدمة</div>
-          <div style="font-size:40px;font-weight:800;color:#EA580C">${d.slaNonCompliant}<span style="font-size:22px">%</span></div>
+          <div style="font-size:40px;font-weight:800;color:#DC2626">${slaNonCompliantPct}<span style="font-size:22px">%</span></div>
         </div>
       </div>
       <div style="height:10px;border-radius:6px;overflow:hidden;display:flex;border:1px solid var(--bd-light)">
-        <div style="width:${d.slaCompliant}%;background:#059669" title="ملتزم ${d.slaCompliant}%"></div>
-        <div style="width:${d.slaNonCompliant}%;background:#DC2626" title="غير ملتزم ${d.slaNonCompliant}%"></div>
+        <div style="width:${slaCompliantPct}%;background:#059669" title="ملتزم ${slaCompliantPct}%"></div>
+        <div style="width:${slaNonCompliantPct}%;background:#DC2626" title="غير ملتزم ${slaNonCompliantPct}%"></div>
       </div>
     </div>
 
     <div class="kpi-grid mb14">
       <div class="kpi kc-red">
-        <div class="kpi-val">${d.reopened.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">التذاكر المعاد فتحها</div>
+        <div class="kpi-val">${fmt2(openCount)}</div>
+        <div class="kpi-lbl">بلاغات مفتوحة</div>
+      </div>
+      <div class="kpi kc-blue">
+        <div class="kpi-val">${fmt2(inProgressCount)}</div>
+        <div class="kpi-lbl">قيد التنفيذ</div>
       </div>
       <div class="kpi kc-green">
-        <div class="kpi-val">${d.cancelled.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">التذاكر الملغاة</div>
+        <div class="kpi-val">${fmt2(resolvedCount + closedCount)}</div>
+        <div class="kpi-lbl">تم حلها / مغلقة</div>
       </div>
-      <div class="kpi kc-green">
-        <div class="kpi-val">${d.resolved.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">التذاكر المحلولة</div>
+      <div class="kpi kc-navy">
+        <div class="kpi-val">${fmt2(cancelledCount)}</div>
+        <div class="kpi-lbl">ملغاة</div>
       </div>
-      <div class="kpi kc-green">
-        <div class="kpi-val">${d.closed.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">التذاكر المغلقة</div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">تفاصيل عامة</div>
+      <div class="kpi-grid" style="margin-top:12px">
+        <div class="kpi kc-green">
+          <div class="kpi-val">${fmt2(total)}</div>
+          <div class="kpi-lbl">إجمالي بلاغات الأمن والسلامة</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val">${fmt2(overdueCount)}</div>
+          <div class="kpi-lbl">متأخرة SLA</div>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">تفاصيل حالة التذاكر المفتوحة</div>
-      <div class="kpi-grid" style="margin-top:12px">
-        <div class="kpi kc-green">
-          <div class="kpi-val">${d.totalTickets.toLocaleString("en-US")}</div>
-          <div class="kpi-lbl">إجمالي التذاكر</div>
-        </div>
-        <div class="kpi kc-green">
-          <div class="kpi-val">${d.suggestedTickets.toLocaleString("en-US")}</div>
-          <div class="kpi-lbl">التذاكر المقترحة</div>
-        </div>
+      <div class="card-title">التوزيع حسب الفئة <span class="sub">${fmt2(total)} بلاغ</span></div>
+      <div style="padding:8px 0">
+        ${catEntries.map(([c, n]) => `
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--tx-main);margin-bottom:4px">
+              <span>${c}</span><span style="color:var(--tx-muted)">${fmt2(n)}</span>
+            </div>
+            <div style="height:8px;background:var(--bg-2);border-radius:5px;overflow:hidden">
+              <div style="height:100%;width:${(n / maxCat) * 100}%;background:#0891B2;border-radius:5px"></div>
+            </div>
+          </div>`).join("")}
       </div>
     </div>
   `;
@@ -8474,6 +8602,25 @@ function _sysDownloadFile(filename, content, mime) {
   // التاريخ على البلاغات في الخريطة، بنفس منطق تفسير التاريخ الموحّد هنا
   // (2026-08-25) — لا يغيّر أي سلوك داخلي، مجرد تعريض للدالة الموجودة.
   window.parseBalaghDate = parseBalaghDate;
+  // 🔗 تعريض دوال تسمية الحالة/الأولوية (2026-08-29) — عشان تبويبَي "ملخص
+  // الأمن والسلامة" و"بلاغات الأمن والسلامة" (خارج هذا الـ IIFE) يعرضوا
+  // نفس مسميات الحالة/الأولوية المستخدمة في تبويب "البلاغات" العام بالظبط،
+  // من غير ما نكرر خرائط التسمية دي في مكان تاني (نفس مصدر وحيد للحقيقة).
+  window.balaghStatusLabel = balaghStatusLabel;
+  window.balaghPriorityLabel = balaghPriorityLabel;
+  window.isHighRiskPriority = isHighRiskPriority;
+
+  // ── تفسير قيمة input[type=date] ("YYYY-MM-DD") كتاريخ محلي 100% (نفس
+  // طريقة parseBalaghDate بالضبط: new Date(y, m-1, d))، بدل new Date(str)
+  // العادي اللي بيتفسّر كـ UTC ويسبب فرق ساعات عن أي تاريخ محلي — وده اللي
+  // كان سبب مشكلة "اختيار تاريخ 27 بيرجع نتايج من 28" (2026-08-29). ──
+  function parseBalaghDateInputLocal_(v) {
+    const s = norm(v);
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
 
   // ── تطبيع الرقم الوزاري (يشيل فراغات / BOM / صيغة "12345.0" من ملفات الإكسل) ──
   function normSchoolNo(v) {
@@ -8639,6 +8786,98 @@ function _sysDownloadFile(filename, content, mime) {
     return result;
   }
 
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║  🛡️ بلاغات "الأمن والسلامة" — مُستخرجة من شيت البلاغات العام  ║
+  // ║  (2026-08-29) — بناءً على تصحيح المستخدم: التصنيفات الأربعة     ║
+  // ║  عشر تُطابَق مع عمود "الفئة الفرعية" (وليس "الوصف" كما افتُرض   ║
+  // ║  ابتدائيًا) — بمطابقة قوية (تتجاهل التشكيل واختلاف رسم الحروف    ║
+  // ║  اللي حددها المستخدم في ملف "بلاغات الامن والسلامة.xlsx" عشان   ║
+  // ║  نعرف أي بلاغات من شيت البلاغات العام هي فعلياً بلاغات أمن      ║
+  // ║  وسلامة. تُستخدم من تبويبَي "ملخص الأمن والسلامة" و"بلاغات      ║
+  // ║  الأمن والسلامة" (خارج هذا الـ IIFE) عبر الدالتين المعرّضتين     ║
+  // ║  تحت. ⚠️ تبويب "البلاغات" العام (renderBalaghTab) نفسه فضل      ║
+  // ║  زي ما هو من غير أي تغيير — البلاغات دي بتفضل ظاهرة فيه كمان،   ║
+  // ║  إحنا بس بنستخرج نسخة إضافية منها للتبويبين التانيين.           ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  const SECURITY_SAFETY_CATEGORIES = [
+    "بلاغات صيانة مضخات الحريق",
+    "بلاغات تعبئة طفايات الحريق",
+    "بلاغات صيانة نظام الإنذار المبكر",
+    "بلاغات انقطاع كلي للكهرباء",
+    "بلاغات صيانة نظام مكافحة الحريق",
+    "بلاغات إنشاء مخرج للطوارئ",
+    "بلاغات صيانة لوحات الإنذار",
+    "بلاغات إعادة تأهيل الممرات والمنحدرات وفق متطلبات الوصول الشامل",
+    "بلاغات صيانة نظام تشغيل المصاعد الميكانيكي",
+    "بلاغات صيانة إنارة ومخارج الطوارئ",
+    "بلاغات صيانة كبائن المصاعد",
+    "بلاغات انحباس داخل المصاعد",
+    "بلاغات اعطال المصاعد",
+    "بلاغات اعطال أنظمة مكافحة الحريق",
+  ];
+  // ── تطبيع أقوى مخصوص للمطابقة (2026-08-29 — أُضيف بعد ما ظهرت أصفار في
+  // البيانات الفعلية، غالبًا بسبب اختلافات شائعة في النص العربي: تشكيل،
+  // تطويل، أشكال الألف/الياء/التاء المربوطة المختلفة، أو نص إضافي ملتصق
+  // بالوصف. المطابقة التامة (norm فقط) كانت بتفشل مع أبسط اختلاف زي ده.
+  // بنستخدم نفس دالة التطبيع العربي المشتركة (__portalSearchNormalize —
+  // مُعرّفة كدالة عامة top-level برة أي IIFE، فمتاحة هنا فورًا بفضل الـ
+  // hoisting رغم إنها متعرّفة لاحقًا في الملف) بدل ما نكرر نفس منطق
+  // التطبيع في مكان تاني، زائد إزالة علامات ترقيم شائعة. وكمان
+  // بنقبل احتواء (لو "الوصف" فيه نص زيادة حوالين اسم الفئة)
+  // بس في اتجاه واحد بس (الوصف يحتوي على الفئة كاملة) عشان
+  // نتجنب إيجابيات كاذبة من أوصاف قصيرة عامة. ──
+  function normArForMatch_(v) {
+    var s = String(v == null ? "" : v).replace(/[.,؛;:!؟?"'`]/g, "");
+    return typeof __portalSearchNormalize === "function" ? __portalSearchNormalize(s) : norm(s);
+  }
+  const SECURITY_SAFETY_CATEGORIES_NORM = SECURITY_SAFETY_CATEGORIES.map(normArForMatch_);
+
+  // صف مُطبَّع (من normalizeRows) → هل هو بلاغ أمن وسلامة؟ المطابقة على
+  // عمود "الفئة الفرعية" (subCategory) — حسب تأكيد المستخدم إن تصنيفات
+  // الأمن والسلامة الأربعة عشر هي قيم من هذا العمود تحديدًا، وليس عمود
+  // "الوصف" (Problem Description) كما افتُرض ابتدائيًا (2026-08-29).
+  // تطابق تام، أو احتواء إذا كانت "الفئة الفرعية" تتضمن نصًا إضافيًا حول
+  // اسم الفئة نفسه.
+  function isSecuritySafetyBalaghRow(r) {
+    const sub = normArForMatch_(r.subCategory);
+    if (!sub) return false;
+    return SECURITY_SAFETY_CATEGORIES_NORM.some((c) => sub === c || sub.includes(c));
+  }
+
+  // كل بلاغات "الأمن والسلامة" مُطبَّعة (نفس شكل صف normalizeRows بالظبط:
+  // status/isOpen/isClosed/isOverdue/creationDateObj/schoolKey/priority/...)،
+  // جاهزة للاستخدام المباشر من أي تبويب بره الـ IIFE ده.
+  function getSecuritySafetyBalaghRows() {
+    return normalizeRows().filter(isSecuritySafetyBalaghRow);
+  }
+
+  // 🩺 أداة تشخيص (2026-08-29): تطبع في الـ Console كل القيم الفعلية
+  // المختلفة الموجودة في عمود "الفئة الفرعية" بكل بلاغات شيت البلاغات (مع
+  // تكرارها)، مقسّمة إلى مطابقة/غير مطابقة، لمعرفة سبب فشل المطابقة إن
+  // وُجد (اختلاف نصي بسيط، تصنيف جديد غير مُدرج، إلخ) دون الحاجة للرجوع
+  // إلى الشيت الأصلي. تُستخدم من Console المتصفح: debugSecuritySafetyMismatch()
+  function debugSecuritySafetyMismatch() {
+    const all = normalizeRows();
+    const freq = {};
+    all.forEach((r) => {
+      const raw = norm(r.subCategory);
+      if (!raw) return;
+      freq[raw] = (freq[raw] || 0) + 1;
+    });
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    const matched = sorted.filter(([v]) => isSecuritySafetyBalaghRow({ subCategory: v }));
+    const unmatched = sorted.filter(([v]) => !isSecuritySafetyBalaghRow({ subCategory: v }));
+    console.log(`[الأمن والسلامة] إجمالي البلاغات: ${all.length} | عدد القيم المختلفة في "الفئة الفرعية": ${sorted.length}`);
+    console.log('[الأمن والسلامة] القيم المطابقة لفئات الأمن والسلامة:', matched);
+    console.log('[الأمن والسلامة] أعلى 40 قيمة غير مطابقة (للمقارنة اليدوية مع التصنيفات الأربعة عشر):', unmatched.slice(0, 40));
+    return { totalRows: all.length, distinctSubCategories: sorted.length, matched, topUnmatched: unmatched.slice(0, 40) };
+  }
+
+  window.SECURITY_SAFETY_CATEGORIES = SECURITY_SAFETY_CATEGORIES;
+  window.isSecuritySafetyBalaghRow = isSecuritySafetyBalaghRow;
+  window.getSecuritySafetyBalaghRows = getSecuritySafetyBalaghRows;
+  window.debugSecuritySafetyMismatch = debugSecuritySafetyMismatch;
+
   function filteredRows(all) {
     // نقرأ من STATE أولاً (دائماً محدّث)، ثم DOM كاحتياط
     const ST = window.__BALAGH_STATE__ || {};
@@ -8671,14 +8910,24 @@ function _sysDownloadFile(filename, content, mime) {
       if (month) {
         if (!r.creationDateObj || (r.creationDateObj.getMonth() + 1) !== +month) return false;
       }
+      // ⚠️ ملاحظة مهمة: تاريخ الإنشاء (creationDateObj) يُبنى دايماً بالتوقيت
+      // المحلي عبر new Date(year, month-1, day) (شوف parseBalaghDate فوق).
+      // لو فسّرنا قيمة input[type=date] (نص "YYYY-MM-DD") بـ new Date(str)
+      // العادي، الـ JS بيقرأها كمنتصف ليل UTC مش منتصف ليل محلي — ولأي
+      // متصفح بتوقيت أمامي (زي السعودية +3)، ده معناه إن "من تاريخ 27"
+      // بيتحول فعلياً لساعة 3 صباحاً بتوقيت 27 محلي، فأي بلاغ اتسجل الساعة
+      // 00:00 محلي يوم 27 (وكله كده لأن مفيش وقت مخزّن، بس تاريخ) بيبقى
+      // "أصغر" من الحد الأدنى ده ويتستبعد بالغلط — وده بالظبط اللي كان بيدّي
+      // إحساس إن اختيار 27 بيبدأ فعلياً من 28. الحل: نفسّر تاريخ input[date]
+      // بنفس طريقة parseBalaghDate (محلي 100%) عشان المقارنة تبقى متسقة. ──
       if (dateFrom) {
-        const from = new Date(dateFrom);
-        if (!r.creationDateObj || r.creationDateObj < from) return false;
+        const from = parseBalaghDateInputLocal_(dateFrom);
+        if (!r.creationDateObj || !from || r.creationDateObj < from) return false;
       }
       if (dateTo) {
-        const to = new Date(dateTo);
-        to.setHours(23, 59, 59, 999);
-        if (!r.creationDateObj || r.creationDateObj > to) return false;
+        const to = parseBalaghDateInputLocal_(dateTo);
+        if (to) to.setHours(23, 59, 59, 999);
+        if (!r.creationDateObj || !to || r.creationDateObj > to) return false;
       }
       if (!s) return true;
 
@@ -8998,32 +9247,36 @@ function _sysDownloadFile(filename, content, mime) {
     const el = document.getElementById("balagh-content");
     if (!el) return;
 
-    // ── حالة تحميل البلاغات ──
+    // ── حالة تحميل البلاغات: بانر خفيف غير مانع بدل استبدال الشاشة بالكامل ──
+    // (2026-08-29) — طلب صريح من المستخدم إنه يشوف الكروت والتشارتات وهيكل
+    // التبويب كامل حتى لو البيانات لسه بتحمل أو مفيش بيانات خالص، بدل شاشة
+    // فاضية/سبينر بيغطي كل حاجة. فبدل ما نعمل return مبكر ونمسح المحتوى
+    // بالكامل، بنكمل بناء نفس هيكل التبويب زي العادة (الكروت والنسب والتشارتات
+    // كلها أصلاً بتتعامل مع مصفوفة فاضية بأمان — محمية من القسمة على صفر)
+    // ونضيف بس شريط تنبيه صغير أعلى الصفحة يوضح حالة التحميل/الخطأ، وبيختفي
+    // لوحده أول ما البيانات تتحمل (لأن renderBalaghTab بتتنادى تاني وقتها).
     const balaghState = window.__BALAGH_LOAD_STATE__ || "idle"; // idle | loading | loaded | error
-    if (balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0) {
-      const icon   = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
-      const title  = balaghState === "loading" ? "جاري تحميل البلاغات…"
-                   : balaghState === "error"   ? "تعذّر تحميل البلاغات"
-                   : "البلاغات لم تُحمَّل بعد";
-      const sub    = balaghState === "loading"
-                   ? "يتم تحميل البيانات في الخلفية — الصفحة الرئيسية تعمل بشكل طبيعي"
-                   : balaghState === "error"
-                   ? `${window.__BALAGH_LOAD_ERR__ || "خطأ في الاتصال"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit">إعادة المحاولة</button>`
-                   : 'اضغط <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit">تحميل البلاغات</button> للبدء';
-      const spinner = balaghState === "loading"
-        ? `<div style="width:40px;height:40px;border:4px solid #E2E8F0;border-top-color:#0891B2;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
-           <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`
-        : "";
-      el.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;min-height:320px">
-          <div style="text-align:center;max-width:440px;padding:32px">
-            ${spinner}
-            <div style="font-size:48px;margin-bottom:12px">${balaghState === "loading" ? "" : icon}</div>
-            <div style="font-size:17px;font-weight:800;color:var(--tx-main);margin-bottom:10px">${title}</div>
-            <div style="font-size:13px;color:var(--tx-sec);line-height:1.8">${sub}</div>
-          </div>
+    const balaghNotLoaded =
+      balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0;
+    let balaghBannerHtml = "";
+    if (balaghNotLoaded) {
+      const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
+      const msg =
+        balaghState === "loading"
+          ? "جاري تحميل بيانات البلاغات في الخلفية — الأرقام والتشارتات هتتحدّث تلقائياً أول ما التحميل يخلص"
+          : balaghState === "error"
+          ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+          : `البلاغات لم تُحمَّل بعد — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">اضغط هنا للتحميل</button>`;
+      const spin =
+        balaghState === "loading"
+          ? `<span style="display:inline-block;width:14px;height:14px;border:2px solid #FDE68A;border-top-color:#92400E;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span><style>@keyframes balaghspin{to{transform:rotate(360deg)}}</style>`
+          : "";
+      balaghBannerHtml = `
+        <div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+          ${spin}
+          <span style="font-size:16px">${balaghState === "loading" ? "" : icon}</span>
+          <span style="flex:1">${msg}</span>
         </div>`;
-      return;
     }
 
     const all = normalizeRows();
@@ -9152,6 +9405,7 @@ function _sysDownloadFile(filename, content, mime) {
     const totalForBars = Math.max(1, filteredTotal);
 
     el.innerHTML = `
+      ${balaghBannerHtml}
       ${balaghSecHead(1, "📊", "نظرة عامة", "أهم الأرقام ضمن الفلاتر الحالية")}
       <div class="card mb14">
         <div class="card-title">
@@ -10993,7 +11247,72 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🛗  JS تبويب: المصاعد
    ║  (tab-elevators) — الدوال الخاصة بهذا التبويب تبدأ هنا
+   ║
+   ║  📝 2026-08-29: شيت المصاعد اتبدّل بملف أغنى بكتير (المستخدم رفع
+   ║     "المصاعد.xlsx" وبدّل بيه شيت جوجل شيتس نفسه). التغييرات الجوهرية:
+   ║     • "حالة المصعد" البسيطة (يعمل/لا يعمل/متعطل) بقت "الحالة الموحدة"
+   ║       بـ10 تصنيفات تفصيلية (حالات توريد/تركيب/صيانة مختلفة).
+   ║       باتفاق المستخدم: بنجمّعها في 4 فئات رئيسية عن طريق
+   ║       window.classifyElevatorStatus() (مطابقة بكلمات مفتاحية، مش
+   ║       نص حرفي كامل، عشان تفضل صامدة لأي تنسيق مختلف في الشيت —
+   ║       نفس درس "شهر 4" في مقارنة مراحل FCA).
+   ║     • "عمر المصعد" اتشال، بدالها "سنة التركيب بالهجري" — باتفاق
+   ║       المستخدم بنعرضها كما هي من غير حساب عمر تقريبي.
+   ║     • "المدينة" بقت مقسومة لمستويين: "المنطقة" (أوسع) و"المحافظة"
+   ║       (الأقرب لمفهوم "المدينة" القديم) — الفلتر الأساسي بقى
+   ║       بالمحافظة، ومضاف فلتر منطقة كمان.
+   ║     • أعمدة جديدة لمتابعة توريد/تركيب مصاعد قيد التنفيذ (حالة
+   ║       الإنجاز، تاريخ بدء التشغيل المتوقع، مدة أعمال التركيب،
+   ║       ملاحظات التشغيل) — باتفاق المستخدم عملنالها قسم منفصل تحت.
+   ║     الدوال العامة (classifyElevatorStatus وأخواتها) معرّفة على
+   ║     window عشان تُستخدم بنفس المنطق في كل مكان تاني بالداشبورد
+   ║     (ملخص الذكاء الاصطناعي، محرك القوائم...) — مفيش تكرار منطق.
    ╚════════════════════════════════════════════════════════════╝ */
+
+// 🔑 القيمة الخام لحالة المصعد — "الحالة الموحدة" أولاً، وفي حال غيابها
+// (بيانات قديمة مخزّنة محليًا مثلاً) نرجع لأسماء الأعمدة القديمة.
+window.getElevatorStatusRaw = function (r) {
+  if (!r) return "";
+  const v = r["الحالة الموحدة"] ?? r["حالة المصعد"] ?? r["الحالة الأصلية"];
+  return v == null ? "" : String(v).trim();
+};
+
+// 🔑 تصنيف نص الحالة الخام إلى واحدة من 4 فئات رئيسية، بمطابقة كلمات
+// مفتاحية (لا حساسية لصيغة النص الكاملة). ترتيب الفحص يهم: "صيانة/عطل"
+// أولاً (حتى لو الحالة "يعمل (بحاجة صيانة)")، بعدين كلمات التوريد/التركيب
+// (حتى لو بدأت بـ"لا يعمل (...)")، بعدين "لا يعمل" الصريحة، وأخيرًا "يعمل".
+window.classifyElevatorStatus = function (rawStatus) {
+  const s = String(rawStatus || "").trim();
+  if (!s) return "غير محدد";
+  if (/صيانة|عطل/.test(s)) return "بحاجة صيانة";
+  if (/توريد|تركيب|تشغيل|عرض|اعتماد|مراجعة|جديد|قيد|بانتظار/.test(s)) return "قيد التوريد أو التركيب";
+  if (/لا\s*يعمل/.test(s)) return "لا يعمل";
+  if (/يعمل/.test(s)) return "يعمل";
+  return "غير محدد";
+};
+window.getElevatorStatusBucket = function (r) {
+  return window.classifyElevatorStatus(window.getElevatorStatusRaw(r));
+};
+// "معطل" لأغراض التقارير/الذكاء الاصطناعي = فعليًا لا يعمل أو محتاج
+// صيانة فعلية — نستثني "قيد التوريد أو التركيب" لأنها حالة مستقبلية
+// (مصعد جديد لسه بيتركّب) مش عطل بالمعنى التشغيلي.
+window.isElevatorProblem = function (r) {
+  const b = window.getElevatorStatusBucket(r);
+  return b === "لا يعمل" || b === "بحاجة صيانة";
+};
+window.ELEVATOR_BUCKET_COLOR = function (bucket) {
+  return bucket === "يعمل"
+    ? CSS_TOKENS.positive()
+    : bucket === "لا يعمل"
+      ? CSS_TOKENS.danger()
+      : bucket === "بحاجة صيانة"
+        ? CSS_TOKENS.warning()
+        : bucket === "قيد التوريد أو التركيب"
+          ? CSS_TOKENS.info()
+          : CSS_TOKENS.txMuted();
+};
+window.ELEVATOR_BUCKETS_ORDER = ["يعمل", "لا يعمل", "بحاجة صيانة", "قيد التوريد أو التركيب"];
+
 window.renderElevatorsTab = function () {
   const el = document.getElementById("elevators-content");
   if (!el) return;
@@ -11014,10 +11333,11 @@ window.renderElevatorsTab = function () {
     return "—";
   };
 
-  const getCity = (r) => gv(r, ["المدينة_الرئيسية", "المدينة"]);
+  const getRegion = (r) => gv(r, ["المنطقة"]);
+  const getCity = (r) => gv(r, ["المحافظة", "المدينة_الرئيسية", "المدينة"]);
   const getName = (r) => gv(r, ["اسم_المدرسة", "اسم المدرسة"]);
   const getMinId = (r) => gv(r, ["رقم_وزاري", "الرقم الوزاري"]);
-  const getAge = (r) => gv(r, ["عمر المصعد"]);
+  const getInstallYear = (r) => gv(r, ["سنة التركيب بالهجري"]);
   const getCount = (r) => gv(r, ["عدد المصاعد بالمبنى"]);
   const getType = (r) => {
     for (const k of Object.keys(r)) {
@@ -11025,50 +11345,40 @@ window.renderElevatorsTab = function () {
     }
     return "—";
   };
-  const getStatus = (r) => gv(r, ["حالة المصعد"]);
+  const getStatusRaw = (r) => { const v = window.getElevatorStatusRaw(r); return v || "—"; };
+  const getStatusNote = (r) => gv(r, ["ملاحظات الحالة"]);
+  const getSupplyStatus = (r) => gv(r, ["حالة الإنجاز (تحديث التوريد)"]);
+  const getExpectedStart = (r) => gv(r, ["تاريخ بدء التشغيل المتوقع"]);
+  const getInstallDuration = (r) => gv(r, ["مدة أعمال التركيب"]);
+  const getOpsNote = (r) => gv(r, ["ملاحظات التشغيل (تحديث)"]);
   const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
   const norm = (v) => String(v == null ? "" : v).trim();
 
+  const regions = [...new Set(rows.map((r) => norm(getRegion(r))).filter((v) => v && v !== "—"))].sort(
+    (a, b) => a.localeCompare(b, "ar"),
+  );
   const cities = [...new Set(rows.map((r) => norm(getCity(r))).filter((v) => v && v !== "—"))].sort(
     (a, b) => a.localeCompare(b, "ar"),
   );
 
+  window._elevatorsRegionFilter = window._elevatorsRegionFilter || "";
   window._elevatorsCityFilter = window._elevatorsCityFilter || "";
+  const selectedRegion = window._elevatorsRegionFilter;
   const selectedCity = window._elevatorsCityFilter;
-  const filteredRows = selectedCity ? rows.filter((r) => norm(getCity(r)) === selectedCity) : rows;
+  const filteredRows = rows.filter((r) => {
+    if (selectedRegion && norm(getRegion(r)) !== selectedRegion) return false;
+    if (selectedCity && norm(getCity(r)) !== selectedCity) return false;
+    return true;
+  });
 
   const totalSchools = new Set(filteredRows.map((r) => getName(r)).filter((v) => v && v !== "—"))
     .size;
   const totalElevators = filteredRows.reduce((s, r) => s + (num(getCount(r)) || 0), 0);
-  const ages = filteredRows.map((r) => num(getAge(r))).filter((v) => Number.isFinite(v));
-  const avgAge = ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null;
-  const broken = filteredRows.filter((r) => {
-    const s = String(getStatus(r) || "").trim();
-    return s.length > 1 && (s.includes("متعطل") || s.includes("لا يعمل"));
-  }).length;
-  const working = filteredRows.filter((r) => {
-    const s = String(getStatus(r) || "").trim();
-    return s.length > 1 && s.includes("يعمل") && !s.includes("لا يعمل");
-  }).length;
-  const empty = filteredRows.filter((r) => {
-    const s = String(getStatus(r) || "").trim();
-    return s.length > 1 && s.includes("مخلى");
-  }).length;
 
-  const statusColor = (status) => {
-    const s = String(status || "").trim();
-    return s && s !== "—"
-      ? s.includes("متعطل") || s.includes("لا يعمل")
-        ? CSS_TOKENS.danger()
-        : s.includes("يعمل")
-          ? CSS_TOKENS.positive()
-          : s.includes("مخلى")
-            ? CSS_TOKENS.txMuted()
-            : s.includes("صيانة")
-              ? CSS_TOKENS.warning()
-              : CSS_TOKENS.info()
-      : CSS_TOKENS.txMuted();
-  };
+  // 🔑 توزيع الفئات الأربع (باتفاق المستخدم) — كل صف يُصنَّف مرة واحدة فقط
+  const bucketCounts = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, "غير محدد": 0 };
+  filteredRows.forEach((r) => { bucketCounts[window.getElevatorStatusBucket(r)]++; });
+  const classified = filteredRows.length - bucketCounts["غير محدد"];
 
   const cityOptions = ['<option value="">الكل</option>']
     .concat(
@@ -11078,11 +11388,33 @@ window.renderElevatorsTab = function () {
       ),
     )
     .join("");
+  const regionOptions = ['<option value="">الكل</option>']
+    .concat(
+      regions.map(
+        (rg) =>
+          `<option value="${esc(rg)}"${rg === selectedRegion ? " selected" : ""}>${esc(rg)}</option>`,
+      ),
+    )
+    .join("");
+
+  // ── قسم متابعة التوريد والتركيب: أي صف فيه بيانات في أعمدة المتابعة ──
+  const supplyRows = filteredRows.filter((r) => getSupplyStatus(r) !== "—");
+  const supplyStatusCounts = {};
+  supplyRows.forEach((r) => {
+    const s = norm(getSupplyStatus(r));
+    supplyStatusCounts[s] = (supplyStatusCounts[s] || 0) + 1;
+  });
 
   el.innerHTML = `
     <div class="filters-row" style="margin-bottom:16px">
-      <div class="fg" style="min-width:220px">
-        <div class="fg-lbl">المدينة</div>
+      <div class="fg" style="min-width:180px">
+        <div class="fg-lbl">المنطقة</div>
+        <select class="fsel" id="elev-region-filter" onchange="window._elevatorsRegionFilter=this.value;renderElevatorsTab()">
+          ${regionOptions}
+        </select>
+      </div>
+      <div class="fg" style="min-width:180px">
+        <div class="fg-lbl">المحافظة</div>
         <select class="fsel" id="elev-city-filter" onchange="window._elevatorsCityFilter=this.value;renderElevatorsTab()">
           ${cityOptions}
         </select>
@@ -11101,16 +11433,87 @@ window.renderElevatorsTab = function () {
         <div class="kpi-sub">مجموع عدد المصاعد بالمباني</div>
       </div>
       <div class="kpi kc-green">
-        <div class="kpi-val">${working.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">يعمل بشكل طبيعي</div>
-        <div class="kpi-sub">${avgAge == null ? "—" : avgAge.toFixed(1)} سنة متوسط العمر</div>
+        <div class="kpi-val">${bucketCounts["يعمل"].toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">يعمل</div>
+        <div class="kpi-sub">${classified ? Math.round((bucketCounts["يعمل"] / classified) * 100) + "%" : "—"}</div>
       </div>
       <div class="kpi kc-red">
-        <div class="kpi-val">${broken.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">متعطل / لا يعمل</div>
-        <div class="kpi-sub">${empty > 0 ? empty + " مبنى مخلى" : ""}</div>
+        <div class="kpi-val">${bucketCounts["لا يعمل"].toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">لا يعمل</div>
+        <div class="kpi-sub">${classified ? Math.round((bucketCounts["لا يعمل"] / classified) * 100) + "%" : "—"}</div>
+      </div>
+      <div class="kpi kc-amber">
+        <div class="kpi-val">${bucketCounts["بحاجة صيانة"].toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">بحاجة صيانة</div>
+        <div class="kpi-sub">${classified ? Math.round((bucketCounts["بحاجة صيانة"] / classified) * 100) + "%" : "—"}</div>
+      </div>
+      <div class="kpi kc-info">
+        <div class="kpi-val">${bucketCounts["قيد التوريد أو التركيب"].toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">قيد التوريد أو التركيب</div>
+        <div class="kpi-sub">${classified ? Math.round((bucketCounts["قيد التوريد أو التركيب"] / classified) * 100) + "%" : "—"}</div>
       </div>
     </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">توزيع حالة المصاعد (4 فئات رئيسية)</div>
+        <div class="chart-box" style="height:260px"><canvas id="ch-elev-status-donut"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">توزيع الحالة حسب المحافظة</div>
+        <div class="chart-box" style="height:260px"><canvas id="ch-elev-status-city"></canvas></div>
+      </div>
+    </div>
+
+    ${
+      supplyRows.length
+        ? `
+    <div class="card mb14">
+      <div class="card-title">
+        🚧 متابعة توريد وتركيب المصاعد
+        <span class="sub">${supplyRows.length.toLocaleString("en-US")} مصعد قيد المتابعة</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px">
+        ${Object.entries(supplyStatusCounts)
+          .map(
+            ([s, c]) => `<div class="kpi kc-info">
+              <div class="kpi-val">${c.toLocaleString("en-US")}</div>
+              <div class="kpi-lbl">${esc(s)}</div>
+            </div>`,
+          )
+          .join("")}
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>المدرسة</th>
+            <th>المحافظة</th>
+            <th>الحالة الموحدة</th>
+            <th>حالة الإنجاز (توريد)</th>
+            <th>تاريخ بدء التشغيل المتوقع</th>
+            <th>مدة أعمال التركيب</th>
+            <th>ملاحظات التشغيل</th>
+          </tr></thead>
+          <tbody>
+            ${supplyRows
+              .map(
+                (r) => `<tr>
+              <td style="text-align:right">${esc(getName(r))}</td>
+              <td>${esc(getCity(r))}</td>
+              <td>${esc(getStatusRaw(r))}</td>
+              <td style="font-weight:700">${esc(getSupplyStatus(r))}</td>
+              <td>${esc(getExpectedStart(r))}</td>
+              <td>${esc(getInstallDuration(r))}</td>
+              <td style="font-size:11px;color:var(--tx-muted)">${esc(getOpsNote(r))}</td>
+            </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`
+        : ""
+    }
 
     <div class="card">
       <div class="card-title">
@@ -11121,28 +11524,33 @@ window.renderElevatorsTab = function () {
         <table>
           <thead>
             <tr>
-              <th>المدينة</th>
+              <th>المنطقة</th>
+              <th>المحافظة</th>
               <th>اسم المدرسة</th>
               <th>الرقم الوزاري</th>
-              <th>عمر المصعد</th>
+              <th>سنة التركيب (هجري)</th>
               <th>عدد المصاعد بالمبنى</th>
               <th>نوع المصاعد (المُصنع)</th>
-              <th>حالة المصعد</th>
+              <th>الحالة</th>
+              <th>ملاحظات الحالة</th>
             </tr>
           </thead>
           <tbody>
             ${filteredRows
               .map((r) => {
-                const st = getStatus(r);
+                const st = getStatusRaw(r);
+                const bucketColor = window.ELEVATOR_BUCKET_COLOR(window.getElevatorStatusBucket(r));
                 return `
               <tr>
-                <td>${getCity(r)}</td>
-                <td style="text-align:right">${getName(r)}</td>
-                <td>${getMinId(r)}</td>
-                <td>${getAge(r)}</td>
-                <td>${getCount(r)}</td>
-                <td>${getType(r)}</td>
-                <td><span class="badge" style="background:${statusColor(st)}18;color:${statusColor(st)};border:1px solid ${statusColor(st)}33">${st || "—"}</span></td>
+                <td>${esc(getRegion(r))}</td>
+                <td>${esc(getCity(r))}</td>
+                <td style="text-align:right">${esc(getName(r))}</td>
+                <td>${esc(getMinId(r))}</td>
+                <td>${esc(getInstallYear(r))}</td>
+                <td>${esc(getCount(r))}</td>
+                <td>${esc(getType(r))}</td>
+                <td><span class="badge" style="background:${bucketColor}18;color:${bucketColor};border:1px solid ${bucketColor}33">${esc(st)}</span></td>
+                <td style="font-size:11px;color:var(--tx-muted)">${esc(getStatusNote(r))}</td>
               </tr>`;
               })
               .join("")}
@@ -11151,6 +11559,70 @@ window.renderElevatorsTab = function () {
       </div>
     </div>
   `;
+
+  requestAnimationFrame(() => {
+    killChart("ch-elev-status-donut");
+    const donutLabels = window.ELEVATOR_BUCKETS_ORDER.filter((b) => bucketCounts[b] > 0);
+    CHARTS["ch-elev-status-donut"] = new Chart(document.getElementById("ch-elev-status-donut"), {
+      type: "doughnut",
+      data: {
+        labels: donutLabels,
+        datasets: [
+          {
+            data: donutLabels.map((b) => bucketCounts[b]),
+            backgroundColor: donutLabels.map((b) => window.ELEVATOR_BUCKET_COLOR(b) + "DD"),
+            borderWidth: 2,
+            borderColor: "#fff",
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: !1,
+        cutout: "60%",
+        plugins: {
+          legend: { position: "bottom", labels: { font: { size: 10 }, boxWidth: 12, padding: 6 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${Math.round((ctx.raw / classified) * 100)}%)`,
+            },
+          },
+        },
+      },
+    });
+
+    const cityBuckets = {};
+    filteredRows.forEach((r) => {
+      const c = norm(getCity(r)) || "غير محدد";
+      if (!cityBuckets[c]) cityBuckets[c] = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0 };
+      const b = window.getElevatorStatusBucket(r);
+      if (cityBuckets[c][b] != null) cityBuckets[c][b]++;
+    });
+    const cityLabels = Object.keys(cityBuckets).sort(
+      (a, b) => Object.values(cityBuckets[b]).reduce((s, v) => s + v, 0) - Object.values(cityBuckets[a]).reduce((s, v) => s + v, 0),
+    );
+    killChart("ch-elev-status-city");
+    CHARTS["ch-elev-status-city"] = new Chart(document.getElementById("ch-elev-status-city"), {
+      type: "bar",
+      data: {
+        labels: cityLabels,
+        datasets: window.ELEVATOR_BUCKETS_ORDER.map((b) => ({
+          label: b,
+          data: cityLabels.map((c) => cityBuckets[c][b] || 0),
+          backgroundColor: window.ELEVATOR_BUCKET_COLOR(b) + "AA",
+          borderColor: window.ELEVATOR_BUCKET_COLOR(b),
+          borderWidth: 1,
+        })),
+      },
+      options: {
+        maintainAspectRatio: !1,
+        plugins: { legend: { position: "bottom", labels: { font: { size: 9 }, boxWidth: 10, padding: 5 } } },
+        scales: {
+          x: { stacked: !0, ticks: { font: { size: 9 } } },
+          y: { stacked: !0, beginAtZero: !0, ticks: { precision: 0 } },
+        },
+      },
+    });
+  });
 };
 
 
@@ -17286,6 +17758,10 @@ function exportNashatExcel(rows) {
 
     // ════════════════════════════════════════════════════════════════
     // 🛗 تبويب المصاعد (window.RAW_ELEVATORS)
+    // 📝 2026-08-29: بعد تحديث شيت المصاعد — الحالة بقت "الحالة الموحدة"
+    // بـ10 تصنيفات، بنجمّعها في 4 فئات عن طريق window.classifyElevatorStatus
+    // (نفس المنطق المستخدم في التبويب — مفيش تكرار). "عمر المصعد" اتشال
+    // من الشيت (بدالها سنة تركيب هجرية)، فمتوسط العمر مبقاش متاح.
     // ════════════════════════════════════════════════════════════════
     try {
       const elvRaw = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
@@ -17294,26 +17770,24 @@ function exportNashatExcel(rows) {
           for (const k of keys) { const v = r[k]; if (v != null && v !== "" && v !== "—") return v; }
           return null;
         };
-        const getCity = (r) => gv(r, ["المدينة_الرئيسية", "المدينة"]);
-        const getAge = (r) => fcbNum(gv(r, ["عمر المصعد"]));
+        const getCity = (r) => gv(r, ["المحافظة", "المدينة_الرئيسية", "المدينة"]);
         const getCount = (r) => fcbNum(gv(r, ["عدد المصاعد بالمبنى"]));
-        const getStatus = (r) => gv(r, ["حالة المصعد"]);
         const totalSchools = new Set(elvRaw.map((r) => gv(r, ["اسم_المدرسة", "اسم المدرسة"])).filter(Boolean)).size;
         const totalElevators = elvRaw.reduce((s, r) => s + (getCount(r) || 0), 0);
-        const ages = elvRaw.map(getAge).filter((v) => v != null);
-        const avgAge = ages.length ? +(ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : null;
-        const broken = elvRaw.filter((r) => { const s = String(getStatus(r) || ""); return s.includes("متعطل") || s.includes("لا يعمل"); }).length;
-        const working = elvRaw.filter((r) => { const s = String(getStatus(r) || ""); return s.includes("يعمل") && !s.includes("لا يعمل"); }).length;
+        const bucketCounts = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, "غير محدد": 0 };
+        elvRaw.forEach((r) => { bucketCounts[window.getElevatorStatusBucket(r)]++; });
         const cityCount = {};
         elvRaw.forEach((r) => { const c = getCity(r); if (c) cityCount[c] = (cityCount[c] || 0) + (getCount(r) || 0); });
         summary.المصاعد = {
           مصدر: "تبويب المصاعد",
           عدد_المدارس_التي_لديها_مصاعد: totalSchools,
           إجمالي_عدد_المصاعد: totalElevators,
-          متوسط_عمر_المصعد: avgAge,
-          عدد_المصاعد_المتعطلة: broken,
-          عدد_المصاعد_العاملة: working,
-          توزيع_عدد_المصاعد_حسب_المدينة: cityCount,
+          يعمل: bucketCounts["يعمل"],
+          لا_يعمل: bucketCounts["لا يعمل"],
+          بحاجة_صيانة: bucketCounts["بحاجة صيانة"],
+          قيد_التوريد_أو_التركيب: bucketCounts["قيد التوريد أو التركيب"],
+          توزيع_عدد_المصاعد_حسب_المحافظة: cityCount,
+          ملاحظة: "الحالة مجمّعة في 4 فئات رئيسية من عمود 'الحالة الموحدة' التفصيلي — راجع تبويب المصاعد للتفاصيل الكاملة لكل صف.",
         };
       }
     } catch (e) {
@@ -17787,38 +18261,48 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 🛡️ تبويب الأمن والسلامة (RAW_SECURITY_SAFETY)
+    // 🛡️ تبويبَي "بلاغات الأمن والسلامة" و"ملخص الأمن والسلامة"
+    // (2026-08-29) — التبويبان يعرضان بلاغات "أمن وسلامة" مُستخرجة من شيت
+    // البلاغات العام (window.RAW_BALAGH) عن طريق مطابقة عمود "الفئة
+    // الفرعية" مع أربعة عشر تصنيفًا محدَّدًا (صيانة مضخات/طفايات حريق،
+    // أنظمة إنذار ومكافحة حريق، مخارج طوارئ، انقطاع كهرباء كلي، أعطال/
+    // صيانة مصاعد...) — عبر window.getSecuritySafetyBalaghRows().
+    // ⚠️ ملحوظة مهمة: هذا مختلف تمامًا عن شيت "بلاغات_أمن_وسلامة"
+    // (RAW_SECURITY_SAFETY) القديم (سجل حوادث: وفيات/إصابات/تحقيقات) —
+    // الشيت القديم ما زال يُحمَّل لكنه لم يعد معروضًا في أي تبويب حاليًا،
+    // فلا داعي لتلخيصه هنا لتجنّب الخلط مع البيانات المعروضة فعليًا.
     // ════════════════════════════════════════════════════════════════
     try {
-      const ss = Array.isArray(window.RAW_SECURITY_SAFETY) ? window.RAW_SECURITY_SAFETY : [];
+      const ss = typeof window.getSecuritySafetyBalaghRows === "function" ? window.getSecuritySafetyBalaghRows() : [];
       if (ss.length) {
-        const total     = ss.length;
-        const deaths    = ss.reduce((s, r) => s + (parseFloat(r["وفيات"]) || 0), 0);
-        const injuries  = ss.reduce((s, r) => s + (parseFloat(r["إصابات"]) || 0), 0);
-        const critical  = ss.filter(r => r["حرج"] === "نعم").length;
-        const needInv   = ss.filter(r => r["يجب التحقيق"] === "نعم").length;
-        const doneInv   = ss.filter(r => r["اكتمل التحقيق"] === "نعم").length;
-        const byType    = {};
-        const byRegion  = {};
+        const total    = ss.length;
+        const open     = ss.filter(r => r.isOpen).length;
+        const closed   = ss.filter(r => r.isClosed).length;
+        const overdue  = ss.filter(r => r.isOverdue).length;
+        const cancelled = ss.filter(r => window.balaghStatusLabel(r.status) === "ملغى").length;
+        const slaCompliantPct = total ? (((total - overdue) / total) * 100).toFixed(1) : "0.0";
+        const byCategory = {};
+        const byRegion   = {};
         ss.forEach(r => {
-          const t = r["نوع الحادث"] || "غير محدد";
-          const rg = r["المنطقة"] || "غير محدد";
-          byType[t]   = (byType[t]   || 0) + 1;
+          byCategory[r.subCategory || "غير محدد"] = (byCategory[r.subCategory || "غير محدد"] || 0) + 1;
+          const rg = r.location || "غير محدد";
           byRegion[rg] = (byRegion[rg] || 0) + 1;
         });
-        const topType   = Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>k+": "+v);
-        const topRegion = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
+        const topCategory = Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
+        const topRegion   = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
         summary.بلاغات_الأمن_والسلامة = {
-          مصدر: "تبويب الأمن والسلامة — شيت بلاغات_أمن_وسلامة",
+          مصدر: "بلاغات مُستخرجة من تبويب البلاغات العام عبر عمود 'الفئة الفرعية' (أربعة عشر تصنيفًا للأمن والسلامة) — تُعرض في تبويبَي 'بلاغات الأمن والسلامة' و'ملخص الأمن والسلامة'",
           إجمالي_البلاغات: total,
-          إجمالي_الوفيات: deaths,
-          إجمالي_الإصابات: injuries,
-          الحالات_الحرجة: critical,
-          تحتاج_تحقيق: needInv,
-          اكتمل_التحقيق: doneInv,
-          أبرز_أنواع_الحوادث: topType,
-          البلاغات_حسب_المنطقة: topRegion,
+          مفتوحة: open,
+          مغلقة_أو_محلولة: closed,
+          ملغاة: cancelled,
+          متأخرة_SLA: overdue,
+          نسبة_الالتزام_بـSLA: slaCompliantPct + "%",
+          البلاغات_حسب_الفئة: topCategory,
+          البلاغات_حسب_المحافظة: topRegion,
         };
+      } else {
+        summary.بلاغات_الأمن_والسلامة = { تنبيه: "لا توجد بلاغات أمن وسلامة مطابقة حاليًا (أو أن بيانات البلاغات ما زالت قيد التحميل)." };
       }
     } catch (e) {
       summary.بلاغات_الأمن_والسلامة = { تنبيه: "تعذّر تلخيص بيانات الأمن والسلامة: " + (e?.message || e) };
@@ -20165,11 +20649,14 @@ function exportNashatExcel(rows) {
     }
 
     if (topics.مصاعد && Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
+      // 🔑 "متعطل" = لا يعمل أو بحاجة صيانة فعليًا (نفس تصنيف تبويب
+      // المصاعد) — بنستثني "قيد التوريد أو التركيب" لأنها مصاعد جديدة
+      // لسه بتتركّب، مش عطل تشغيلي.
       const broken = window.RAW_ELEVATORS
-        .filter(r => String(r["حالة المصعد"]||"").includes("متعطل"))
+        .filter(r => window.isElevatorProblem(r))
         .slice(0, 20)
-        .map(r => ({ مدرسة: r["اسم_المدرسة"]||r["اسم المدرسة"], مدينة: r["المدينة"]||"", عمر: r["عمر المصعد"] }));
-      extraContext += `\n\nمصاعد متعطلة:\n${JSON.stringify(broken)}`;
+        .map(r => ({ مدرسة: r["اسم_المدرسة"]||r["اسم المدرسة"], المحافظة: r["المحافظة"]||r["المدينة"]||"", الحالة: window.getElevatorStatusRaw(r), سنة_التركيب_الهجرية: r["سنة التركيب بالهجري"]||"" }));
+      extraContext += `\n\nمصاعد متعطلة (لا تعمل أو بحاجة صيانة):\n${JSON.stringify(broken)}`;
     }
 
     // ── قطع الغيار: بيانات صنف بعينه لو اتذكر اسمه في السؤال ──
@@ -20938,7 +21425,7 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 • البلاغات               → البلاغات: إجمالي، حالة، SLA (حالة نصية + مدة فعلية بالأيام)، فئات، أولويات، المرحلة، الجنس، المقاول المسؤول، أعلى مدارس، ترتيب المقاولين حسب سرعة الحل
 • خنادق الصرف            → خنادق_الصرف: بيانات ثابتة مُدخلة يدوياً (مكة/جدة/الطائف/المدينة…)، لا تأتي من ملف خارجي
 • تقييم عاين             → تقييم_عاين_تفصيلي: متوسط، تصنيفات، أسوأ مدارس، حسب المدينة
-• المصاعد                → المصاعد: إجمالي، متعطلة، عاملة، توزيع حسب المدينة
+• المصاعد                → المصاعد: إجمالي، توزيع حسب 4 فئات حالة (يعمل/لا يعمل/بحاجة صيانة/قيد التوريد أو التركيب)، توزيع حسب المحافظة — "متعطلة" = لا يعمل + بحاجة صيانة
 • التكلفة                → التكلفة: إجمالي، أعلى فئات، توزيع حسب المدينة
 • الخريطة                → الخريطة: مباني بإحداثيات، توزيع حسب المدينة
 • الجدول التفصيلي        → بيانات كل مبنى (من RAW الرئيسي — FCA + بيئة + طلاب + عمر المبنى + تقييم عاين)
@@ -20952,7 +21439,7 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 • التوريدات              → تجهيزات_الأثاث_المدرسية: من ملف الموقف_التنفيذي_للتجهيزات_المدرسية.xlsx (أثاث/مقاعد/رياض أطفال/صالات رياضية) — بيانات جزئية 4 موردين فقط من أصل 7، مستوى منطقة×مورد×صنف (مختلف عن تبويب "المخصص والاحتياج" لمواد التنظيف)
 • مبادرة النشاط البدني   → مبادرة_النشاط_البدني: من ملف الموقف_التنفيذي_للنشاط_البدني.xlsx — بيانات جزئية 5 شركات محددة فقط بالاسم، مستوى شركة×منطقة×صنف، بدون رقم أمر عمل
 • مؤشرات أداء الاستشاري  → مؤشرات_أداء_الاستشاري: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف) — نفس منطق مؤشرات أداء المقاول لكن للاستشاري
-• بلاغات الأمن والسلامة → بلاغات_الأمن_والسلامة: إحصائيات بلاغات الأمن والسلامة (مختلف عن تبويب "البلاغات" العام)
+• بلاغات الأمن والسلامة / ملخص الأمن والسلامة → بلاغات_الأمن_والسلامة: بلاغات مستخرجة من تبويب "البلاغات" العام نفسه (فلترة عمود "الفئة الفرعية" على أربعة عشر تصنيفًا للأمن والسلامة: صيانة مضخات/طفايات حريق، أنظمة إنذار ومكافحة حريق، مخارج طوارئ، انقطاع كهرباء كلي، أعطال/صيانة مصاعد...) — وليس شيتًا منفصلًا ولا بيانات ثابتة. تبويب "البلاغات" العام نفسه غير متأثر وما زال يعرض جميع البلاغات.
 • متابعة الفواتير        → متابعة_الفواتير: إجمالي السجلات، إجمالي القيمة، توزيع حسب الحالة
 
 ══════════════════════════════════════════════════════
@@ -25340,22 +25827,22 @@ window.addEventListener('load', function () {
     {
       id: 'security-safety', label: 'بلاغات الأمن والسلامة',
       keywords: [
-        'أمن وسلامة','أمن','سلامة','حوادث','حادثة','حادث','security','safety','security safety',
-        'بلاغات أمن','بلاغات سلامة','حوادث مدارس','إصابات','وفيات','حرج','تحقيق',
-        'حوادث مرورية','حريق','كهرباء حادث','بلاغ أمن','سلامة مدارس','إصابة طالب'
+        'أمن وسلامة','أمن','سلامة','security','safety','security safety',
+        'بلاغات أمن','بلاغات سلامة','مضخات حريق','طفايات حريق','إنذار مبكر','مكافحة حريق',
+        'مخرج طوارئ','انقطاع كهرباء','لوحات إنذار','ممرات ومنحدرات','انحباس مصعد','أعطال مصاعد',
+        'حريق','بلاغ أمن','سلامة مدارس'
       ],
-      charts: ['توزيع بلاغات الأمن والسلامة حسب نوع الحادث','البلاغات حسب المنطقة','اتجاه البلاغات الشهري'],
-      kpis: ['إجمالي البلاغات','إجمالي الإصابات','الحالات الحرجة','تحقيقات مكتملة']
+      charts: ['التوزيع حسب الفئة','التوزيع حسب الحالة'],
+      kpis: ['إجمالي بلاغات الأمن والسلامة','مفتوحة','مغلقة','نسبة اختراق SLA']
     },
     {
       id: 'security-safety-summary', label: 'ملخص الأمن والسلامة',
       keywords: [
-        'ملخص الأمن والسلامة','SLA','اتفاقية مستوى الخدمة','تذاكر','تذاكر معاد فتحها',
-        'تذاكر ملغاة','تذاكر محلولة','تذاكر مغلقة','تذاكر مقترحة','ملتزم','غير ملتزم',
-        'tickets','reopened','cancelled','resolved','closed tickets','service level agreement'
+        'ملخص الأمن والسلامة','SLA','اتفاقية مستوى الخدمة','ملتزم','غير ملتزم',
+        'قيد التنفيذ','ملغاة','مغلقة أو محلولة','service level agreement'
       ],
-      charts: [],
-      kpis: ['نسبة الالتزام بـSLA','التذاكر المعاد فتحها','التذاكر الملغاة','التذاكر المحلولة','التذاكر المغلقة','إجمالي التذاكر','التذاكر المقترحة']
+      charts: ['التوزيع حسب الفئة'],
+      kpis: ['نسبة الالتزام بـSLA','بلاغات مفتوحة','قيد التنفيذ','تم حلها / مغلقة','ملغاة','متأخرة SLA']
     },
   ];
 
@@ -25788,19 +26275,16 @@ ${dataCtx}
       }
     }
 
-    /* مصاعد متعطلة */
+    /* مصاعد متعطلة (لا تعمل أو بحاجة صيانة — نفس تصنيف تبويب المصاعد) */
     var elv = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
     if (elv.length) {
-      var broken = elv.filter(function (r) {
-        var s = String(r["حالة المصعد"] || "");
-        return s.includes("متعطل") || s.includes("لا يعمل");
-      });
+      var broken = elv.filter(function (r) { return window.isElevatorProblem(r); });
       if (broken.length) {
         risks.مصاعد_متعطلة = {
           العدد: broken.length,
           من_إجمالي: elv.length,
           أبرز_3: broken.slice(0, 3).map(function (r) {
-            return { المدرسة: r["اسم_المدرسة"] || r["اسم المدرسة"] || "", عمر: r["عمر المصعد"] || "" };
+            return { المدرسة: r["اسم_المدرسة"] || r["اسم المدرسة"] || "", الحالة: window.getElevatorStatusRaw(r) };
           }),
         };
       }
@@ -25915,7 +26399,7 @@ ${dataCtx}
     /* أولوية ٤: مصاعد متعطلة */
     var elv = Array.isArray(window.RAW_ELEVATORS) ? window.RAW_ELEVATORS : [];
     if (elv.length) {
-      var broken = elv.filter(function (r) { return String(r["حالة المصعد"] || "").includes("متعطل"); });
+      var broken = elv.filter(function (r) { return window.isElevatorProblem(r); });
       if (broken.length) {
         items.push({
           أولوية: 4,
@@ -31690,14 +32174,11 @@ setTimeout(function tellUserStillTrying() {
         }
       }
 
-      /* ── المصاعد المتعطلة ── */
-      if (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) {
+      /* ── المصاعد المتعطلة (نفس تصنيف تبويب المصاعد: 4 فئات) ── */
+      if (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length && typeof window.isElevatorProblem === "function") {
         var elev = window.RAW_ELEVATORS;
-        var elevStatKey = ["الحالة","Status","status"].find(function(k){return elev[0] && k in elev[0];});
-        if (elevStatKey) {
-          var broken = elev.filter(function(r){ var s = String(r[elevStatKey]||"").toLowerCase(); return s.includes("متعطل") || s.includes("out") || s.includes("broken"); });
-          ctx.المصاعد_الحية = { الإجمالي: elev.length, المتعطلة: broken.length, العاملة: elev.length - broken.length };
-        }
+        var broken = elev.filter(function(r){ return window.isElevatorProblem(r); });
+        ctx.المصاعد_الحية = { الإجمالي: elev.length, المتعطلة: broken.length, العاملة: elev.length - broken.length };
       }
 
       /* ── مؤشر الوقت ── */
@@ -32601,22 +33082,16 @@ setTimeout(function tellUserStillTrying() {
       }
     }
 
-    /* المصاعد */
+    /* المصاعد (نفس تصنيف تبويب المصاعد: 4 فئات) */
     var elev = sup.elevators;
-    if (Array.isArray(elev) && elev.length) {
-      var eStatKey = ["الحالة","Status","status"].find(function(k){return k in (elev[0]||{});});
-      if (eStatKey) {
-        var eBroken = elev.filter(function(r){
-          var s=String(r[eStatKey]||"").toLowerCase();
-          return s.includes("متعطل")||s.includes("broken")||s.includes("out");
-        });
-        sec.المصاعد = {
-          _source:    "Statistics→Elevators",
-          الإجمالي:  elev.length,
-          المتعطلة:  eBroken.length,
-          العاملة:   elev.length - eBroken.length,
-        };
-      }
+    if (Array.isArray(elev) && elev.length && typeof window.isElevatorProblem === "function") {
+      var eBroken = elev.filter(function(r){ return window.isElevatorProblem(r); });
+      sec.المصاعد = {
+        _source:    "Statistics→Elevators",
+        الإجمالي:  elev.length,
+        المتعطلة:  eBroken.length,
+        العاملة:   elev.length - eBroken.length,
+      };
     }
 
     /* حصر الأصول */

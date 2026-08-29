@@ -2611,6 +2611,7 @@ window.exportStageCompareExcel = function () {
       dateEl.innerHTML='<option value="">— كل —</option>'+dates.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join("");
 
     // فلترة — نستخدم نفس getTier الموجود في الداشبورد (critical/fair/good/vgood)
+    const uniqIdOf = (r) => window.normSchoolId(r.minId || r.schoolSeq);
     let rows = D.filter(r=>{
       if(search && !r.name.toLowerCase().includes(search) && !String(r.minId??"").toLowerCase().includes(search)) return false;
       if(cityF   && r.city!==cityF)   return false;
@@ -2622,6 +2623,24 @@ window.exportStageCompareExcel = function () {
       }
       return true;
     });
+
+    // 🔑 (2026-08-29) تفريد الصفوف بالمدرسة (رقم وزاري موحّد) — العنوان
+    // والفلاتر ("50 مدرسة"، شريط الترقيم) تفترض صفًا واحدًا لكل مدرسة، لكن
+    // بعض الأرقام الوزارية عندها صفّا مبنى في شيت "المباني" (نفس المدرسة)،
+    // فكان الجدول والتصدير (CSV) بيعرضوا صفّين لنفس المدرسة بنفس تقييم FCA.
+    // بما إن fca/fcaDate/fcaSource محسوبين أصلًا على مستوى الرقم الوزاري
+    // (مش المبنى)، فالإبقاء على أول صف فقط لكل رقم وزاري آمن ولا يفقد أي
+    // معلومة تخص FCA نفسه.
+    {
+      const seen = new Set();
+      rows = rows.filter((r) => {
+        const id = uniqIdOf(r);
+        if (!id) return true; // سجل بدون رقم وزاري صالح — نسيبه زي ما هو دفاعيًا
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+    }
 
     // ترتيب
     rows.sort((a,b)=>{
@@ -2641,8 +2660,11 @@ window.exportStageCompareExcel = function () {
     if(kpisEl){
       // 🔑 نحسب بالمدارس الفريدة (رقم وزاري موحّد) مش بعدد صفوف المباني —
       // بعض الأرقام الوزارية عندها صفّين مبنى (نفس المدرسة)، فكانت بتتحسب
-      // مرتين. خليناها متطابقة مع تبويب "مقارنة مراحل FCA".
-      const uniqIdOf = (r) => window.normSchoolId(r.minId || r.schoolSeq);
+      // مرتين. خليناها متطابقة مع تبويب "مقارنة مراحل FCA". ⚠️ (2026-08-29):
+      // rows نفسها بقت مُفرَّدة بالفعل (صف واحد فقط لكل رقم وزاري — راجع
+      // التصحيح فوق قبل الترتيب)، فكل الحسابات هنا (بما فيها avgFca و"FCA
+      // أقل من 50%" اللي كانا بيتضاعفوا قبل كده) بقت صحيحة تلقائيًا بدون
+      // احتياج لتفريد إضافي منفصل.
       const totalIds  = new Set(rows.map(uniqIdOf).filter(Boolean));
       const withFca = rows.filter(r=>r.fca!=null);
       const withFcaIds = new Set(withFca.map(uniqIdOf).filter(Boolean));

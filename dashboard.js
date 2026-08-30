@@ -5390,7 +5390,7 @@ function renderSecuritySafetyTab() {
 
   // ── حالة الفلاتر (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم) ──
   const ST = (window.__SEC_BALAGH_STATE__ = window.__SEC_BALAGH_STATE__ || {
-    search: "", status: "", category: "", priority: "", dateFrom: "", dateTo: "",
+    search: "", status: "", category: "", priority: "", region: "", dateFrom: "", dateTo: "",
     sort: "date_desc", page: 0, size: 25,
   });
 
@@ -5407,6 +5407,7 @@ function renderSecuritySafetyTab() {
     if (ST.status && r.status !== ST.status) return false;
     if (ST.category && r.subCategory !== ST.category) return false;
     if (ST.priority && r.priority !== ST.priority) return false;
+    if (ST.region && r.location !== ST.region) return false;
     if (ST.dateFrom) {
       const from = parseDateInputLocal_(ST.dateFrom);
       if (!r.creationDateObj || !from || r.creationDateObj < from) return false;
@@ -5455,10 +5456,19 @@ function renderSecuritySafetyTab() {
   rows.forEach((r) => { const s = window.balaghStatusLabel(r.status); statusCounts[s] = (statusCounts[s] || 0) + 1; });
   const statusEntries = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
 
+  // 🗺️ (2026-08-30) توزيع حسب المنطقة (المحافظة) — بناءً على طلب صريح
+  // بإضافة تحليل لتوزيع المناطق في تبويب "بلاغات الأمن والسلامة"، بنفس
+  // منطق حقل "المحافظة" (r.location) المستخدم أصلاً في عمود الجدول وفي
+  // فلاتر تبويب "البلاغات" العام.
+  const regionCounts = {};
+  rows.forEach((r) => { const rg = r.location || "غير محدد"; regionCounts[rg] = (regionCounts[rg] || 0) + 1; });
+  const regionEntries = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
+
   // ── خيارات الفلاتر (من كل بلاغات الأمن والسلامة، مش المفلترة) ──
   const statusOptions = [...new Set(allSecRows.map((r) => r.status).filter(Boolean))].sort();
   const priorityOptions = [...new Set(allSecRows.map((r) => r.priority).filter(Boolean))]
     .sort((a, b) => (window.isHighRiskPriority(b) ? 1 : 0) - (window.isHighRiskPriority(a) ? 1 : 0));
+  const regionOptions = [...new Set(allSecRows.map((r) => r.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar"));
 
   const list = rows.slice(ST.page * ST.size, ST.page * ST.size + ST.size);
   const pageCount = Math.max(1, Math.ceil(filteredTotal / ST.size));
@@ -5498,12 +5508,17 @@ function renderSecuritySafetyTab() {
     <div class="g2 mb14">
       <div class="card">
         <div class="card-title">التوزيع حسب الفئة</div>
-        <div class="chart-box" style="height:320px"><canvas id="ch-sec-category"></canvas></div>
+        <div class="chart-box" style="height:340px"><canvas id="ch-sec-category"></canvas></div>
       </div>
       <div class="card">
         <div class="card-title">التوزيع حسب الحالة</div>
-        <div class="chart-box" style="height:320px"><canvas id="ch-sec-status"></canvas></div>
+        <div class="chart-box" style="height:340px"><canvas id="ch-sec-status"></canvas></div>
       </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">التوزيع حسب المنطقة (المحافظة)</div>
+      <div class="chart-box" style="height:280px"><canvas id="ch-sec-region"></canvas></div>
     </div>
 
     <div class="card mb14">
@@ -5536,6 +5551,13 @@ function renderSecuritySafetyTab() {
           </select>
         </div>
         <div class="fg">
+          <div class="fg-lbl">المنطقة</div>
+          <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.region=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
+            <option value="">كل المناطق</option>
+            ${regionOptions.map((r) => `<option value="${esc(r)}" ${ST.region === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="fg">
           <div class="fg-lbl">من تاريخ</div>
           <input class="finp" type="date" value="${esc(ST.dateFrom)}"
             onchange="window.__SEC_BALAGH_STATE__.dateFrom=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
@@ -5554,7 +5576,7 @@ function renderSecuritySafetyTab() {
             <option value="school" ${ST.sort === "school" ? "selected" : ""}>اسم المدرسة (أبجدي)</option>
           </select>
         </div>
-        <button class="f-clear" onclick="window.__SEC_BALAGH_STATE__={search:'',status:'',category:'',priority:'',dateFrom:'',dateTo:'',sort:'date_desc',page:0,size:25};renderSecuritySafetyTab()">✕ مسح الفلاتر</button>
+        <button class="f-clear" onclick="window.__SEC_BALAGH_STATE__={search:'',status:'',category:'',priority:'',region:'',dateFrom:'',dateTo:'',sort:'date_desc',page:0,size:25};renderSecuritySafetyTab()">✕ مسح الفلاتر</button>
       </div>
     </div>
 
@@ -5598,30 +5620,52 @@ function renderSecuritySafetyTab() {
       </div>
     </div>`;
 
+  // 🎨 (2026-08-30) استخدام نفس مصانع الرسوم الموحّدة (makeHBar/makeDoughnut)
+  // المستخدمة في باقي تبويبات الداشبورد بدل إنشاء Chart.js يدوياً — بناءً
+  // على طلب صريح بتحسين شكل الشارتات والأرقام. الفرق العملي: أعمدة بحواف
+  // دائرية وألوان متناسقة مع باقي النظام، تلميحات (Tooltip) بأرقام مُنسَّقة
+  // (فواصل آلاف + نسبة مئوية للدونات)، وأهم حاجة: رقم الإجمالي يظهر بشكل
+  // دائم في منتصف شارت الدونات (مش بس عند الوقوف عليه بالماوس).
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;
     const PAL = CSS_TOKENS.palette();
 
-    const cCat = document.getElementById("ch-sec-category");
-    if (cCat) {
-      killChart("ch-sec-category");
+    // 🔢 (2026-08-30) هامش أمان فوق أعلى قيمة — لو أعلى فئة/منطقة بتلامس
+    // أقصى المحور بالظبط، الطبقة العامة اللي بترسم رقم كل عمود (tbcPremiumValueLabels)
+    // بتتجاهل رسم الرقم عشان ميخرجش برّه حدود الرسم. بنضيف مساحة فاضية
+    // إضافية بسيطة فوق أعلى قيمة عشان رقم أعلى عمود يفضل ظاهر برضه دايماً.
+    const addHeadroom = (id, values) => {
+      try {
+        const chart = window.CHARTS && window.CHARTS[id];
+        if (!chart || !chart.options || !chart.options.scales || !chart.options.scales.x) return;
+        const maxVal = Math.max(1, ...values);
+        chart.options.scales.x.max = Math.ceil(maxVal * 1.2);
+        chart.update();
+      } catch (err) {
+        // إعادة رسم غير حرجة — أي فشل هنا (شارت اتحذف/اتغيّر تبويبه في نفس
+        // اللحظة) لازم ميوقفش باقي التبويب
+        console.warn("[security-safety] addHeadroom:", err);
+      }
+    };
+
+    if (document.getElementById("ch-sec-category")) {
       const nonZero = catEntries.filter((e) => e[1] > 0);
       const dataEntries = nonZero.length ? nonZero : catEntries;
-      CHARTS["ch-sec-category"] = new Chart(cCat, {
-        type: "bar",
-        data: { labels: dataEntries.map((e) => e[0]), datasets: [{ data: dataEntries.map((e) => e[1]), backgroundColor: PAL, borderRadius: 4 }] },
-        options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, maintainAspectRatio: false },
-      });
+      const colors = dataEntries.map((_, i) => PAL[i % PAL.length] + "DD");
+      const values = dataEntries.map((e) => e[1]);
+      makeHBar("ch-sec-category", dataEntries.map((e) => e[0]), values, colors);
+      addHeadroom("ch-sec-category", values);
     }
 
-    const cStatus = document.getElementById("ch-sec-status");
-    if (cStatus) {
-      killChart("ch-sec-status");
-      CHARTS["ch-sec-status"] = new Chart(cStatus, {
-        type: "doughnut",
-        data: { labels: statusEntries.map((e) => e[0]), datasets: [{ data: statusEntries.map((e) => e[1]), backgroundColor: PAL, borderWidth: 2 }] },
-        options: { plugins: { legend: { position: "right", labels: { font: { size: 10 }, boxWidth: 10 } } }, cutout: "55%", maintainAspectRatio: false },
-      });
+    if (document.getElementById("ch-sec-region")) {
+      const colors = regionEntries.map((_, i) => PAL[i % PAL.length] + "DD");
+      const values = regionEntries.map((e) => e[1]);
+      makeHBar("ch-sec-region", regionEntries.map((e) => e[0]), values, colors);
+      addHeadroom("ch-sec-region", values);
+    }
+
+    if (document.getElementById("ch-sec-status")) {
+      makeDoughnut("ch-sec-status", statusCounts, {});
     }
   });
 }
@@ -5668,14 +5712,60 @@ function renderSecuritySafetySummaryTab() {
     return;
   }
 
-  const rows = window.getSecuritySafetyBalaghRows();
+  const allRows = window.getSecuritySafetyBalaghRows();
 
   let diagnosticHtml = "";
-  if (!notLoaded && rows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
+  if (!notLoaded && allRows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
     diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
       <strong style="color:#991B1B">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن.</strong> يُرجى فتح تبويب "بلاغات الأمن والسلامة" لمعرفة السبب بالتفصيل، حيث تُعرض هناك أكثر القيم الفعلية تكرارًا في عمود "الفئة الفرعية" لمقارنتها بالتصنيفات.
     </div>`;
   }
+
+  // ── حالة فلتر التاريخ (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم)
+  // — بنفس نمط window.__SEC_BALAGH_STATE__ المستخدم في تبويب "بلاغات الأمن
+  // والسلامة" الشقيق. ──
+  const ST = (window.__SEC_SUMMARY_STATE__ = window.__SEC_SUMMARY_STATE__ || {
+    dateFrom: "", dateTo: "",
+  });
+
+  function parseDateInputLocal_(v) {
+    const s = String(v || "").trim();
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  let rows = allRows;
+  if (ST.dateFrom) {
+    const from = parseDateInputLocal_(ST.dateFrom);
+    rows = rows.filter((r) => r.creationDateObj && from && r.creationDateObj >= from);
+  }
+  if (ST.dateTo) {
+    const to = parseDateInputLocal_(ST.dateTo);
+    if (to) to.setHours(23, 59, 59, 999);
+    rows = rows.filter((r) => r.creationDateObj && to && r.creationDateObj <= to);
+  }
+
+  const filterHtml = `<div class="card mb14">
+    <div class="card-title">
+      <span>فلترة حسب التاريخ</span>
+      <span class="sub">${fmt2(rows.length)} من ${fmt2(allRows.length)}</span>
+    </div>
+    <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px 0">
+      <div class="fg">
+        <div class="fg-lbl">من تاريخ</div>
+        <input class="finp" type="date" value="${ST.dateFrom}"
+          onchange="window.__SEC_SUMMARY_STATE__.dateFrom=this.value;renderSecuritySafetySummaryTab()">
+      </div>
+      <div class="fg">
+        <div class="fg-lbl">إلى تاريخ</div>
+        <input class="finp" type="date" value="${ST.dateTo}"
+          onchange="window.__SEC_SUMMARY_STATE__.dateTo=this.value;renderSecuritySafetySummaryTab()">
+      </div>
+      <button class="f-clear" onclick="window.__SEC_SUMMARY_STATE__={dateFrom:'',dateTo:''};renderSecuritySafetySummaryTab()">✕ مسح الفلتر</button>
+    </div>
+  </div>`;
 
   const total = rows.length;
   const openCount = rows.filter((r) => r.isOpen).length;
@@ -5698,6 +5788,7 @@ function renderSecuritySafetySummaryTab() {
   el.innerHTML = `
     ${bannerHtml}
     ${diagnosticHtml}
+    ${filterHtml}
     <div class="card mb14">
       <div class="card-title">🛡️ الالتزام باتفاقية مستوى الخدمة (SLA)</div>
       <div style="display:flex;gap:24px;justify-content:space-around;padding:18px 0 12px;flex-wrap:wrap">

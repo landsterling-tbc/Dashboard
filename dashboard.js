@@ -3043,8 +3043,9 @@ let __bgRevalidatedOnce = false;
 
     // ══════════════════════════════════════════════════════════════════════
     // بناء خريطة "آخر تقييم FCA" لكل مدرسة من ملف تقييمات_FCA_المراحل
-    // المنطق: أحدث تاريخ يحتوي قيمة فعلية (Jun > May > Apr)
-    //         لو Jun فارغ → نرجع May، لو May فارغ → نرجع Apr
+    // المنطق: أحدث تاريخ يحتوي قيمة فعلية — يشتغل مع أي شهر (يناير حتى
+    // ديسمبر، مش مقتصر على أبريل/مايو/يونيو اللي كانت عيّنة البيانات
+    // الأولى بس)، فلو الشهر الأحدث فاضي بيرجع للي قبله وهكذا
     // مفتاح الربط: رقم_وزاري (المفتاح الوحيد المعتمد الآن — راجع الشرح فوق
     // window.normSchoolId) — رقم_المدرسة_الوزاري اتشال من شيت "المباني" لأنه
     // كان بيرجّع قيم متلخبطة في 34 مبنى بيشتركوا بنفس الاسم بالضبط (نفس
@@ -3095,7 +3096,7 @@ let __bgRevalidatedOnce = false;
         if (!existing) {
           latestFcaMap[rawId] = { score, dateObj, dateRaw: String(row["التاريخ"] ?? "").trim() || null };
         } else {
-          // نحتفظ بالأحدث تاريخاً الذي يحتوي قيمة (Jun > May > Apr)
+          // نحتفظ بالأحدث تاريخاً الذي يحتوي قيمة (أي شهر — مش مقصور على Apr/May/Jun)
           const existDate = existing.dateObj;
           if (!existDate && dateObj) {
             latestFcaMap[rawId] = { score, dateObj, dateRaw: String(row["التاريخ"] ?? "").trim() || null };
@@ -25096,6 +25097,19 @@ ${panelHTML}
   /* ──────────────────────────────────────────────
      6. ربط بطاقات KPI
   ────────────────────────────────────────────── */
+  // 🔤 (2026-08-29) ترتيب افتراضي أبجدي بالاسم — بناءً على طلب صريح:
+  // البانلات اللي مالهاش ترتيب واضح بمقياس رقمي (زي FCA أو عدد البلاغات)
+  // كانت بتعرض المدارس بترتيب الشيت الخام كما هو (بدون أي ترتيب فعلي)،
+  // فكانت أحيانًا تظهر سجلات إدارية مش مدرسة عادية (زي "برنامج التوحد
+  // بنات" أو "مكتب التشخيص والنمو") في أول القائمة بالصدفة لمجرد إنها
+  // أول صفوف في شيت "المباني". الترتيب الأبجدي متوقَّع ومنطقي لأي قائمة
+  // "مدارس" من غير معيار ترتيب صريح تاني، ومبيحطش أي سجل في الأول
+  // تحكميًا. البانلات اللي أصلاً بترتّب برقم (FCA تصاعدي/تنازلي، عدد
+  // بلاغات) اتسابت زي ما هي لأن ترتيبها مقصود ومفيد.
+  function _ixSortByName(rows) {
+    return [...rows].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"));
+  }
+
   function hookKpiCards() {
     const defs = [
       {
@@ -25103,7 +25117,7 @@ ${panelHTML}
         container: ".kpi.kc-blue",
         attr: "total",
         title: "إجمالي المدارس",
-        filterFn: () => getFiltered(),
+        filterFn: () => _ixSortByName(getFiltered()),
         columns: [
           { key: "name", label: "اسم المدرسة" },
           { key: "sector", label: "المحافظة" },
@@ -25143,7 +25157,7 @@ ${panelHTML}
         container: ".kpi.kc-navy",
         attr: "govt",
         title: "المدارس الحكومية",
-        filterFn: () => (getFiltered()).filter(r => (r.ownership || "").includes("حكومي")),
+        filterFn: () => _ixSortByName((getFiltered()).filter(r => (r.ownership || "").includes("حكومي"))),
         columns: [
           { key: "name", label: "اسم المدرسة" },
           { key: "sector", label: "المحافظة" },
@@ -25596,7 +25610,7 @@ ${panelHTML}
           const byDistrict = raw.filter(r => r.district === label);
           const byStage = raw.filter(r => r.stage === label);
           const byCity = raw.filter(r => r.city === label);
-          const matched = byDistrict.length ? byDistrict : byStage.length ? byStage : byCity;
+          const matched = _ixSortByName(byDistrict.length ? byDistrict : byStage.length ? byStage : byCity);
 
           if (matched.length) {
             openKpiModal("مدارس: " + label, matched.length + " مدرسة", matched, [
@@ -25635,9 +25649,9 @@ ${panelHTML}
           if (!label) return;
 
           const raw = getFiltered();
-          const matched = raw.filter(r =>
+          const matched = _ixSortByName(raw.filter(r =>
             r.ownership === label || r.schoolSize === label || r.linkType === label || r.subscriptionStatus === label
-          );
+          ));
 
           if (matched.length) {
             openKpiModal("مدارس: " + label, matched.length + " مدرسة", matched, [

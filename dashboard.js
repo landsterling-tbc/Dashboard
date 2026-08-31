@@ -3882,6 +3882,9 @@ let _map = null,
   _mapSectorFilter = "",
   _mapCityFilter = "",
   _mapStageFilter = "",
+  // فلتر الجنس (بنين/بنات) — عام زي فلاتر المحافظة/المدينة/المرحلة، يظهر
+  // ويعمل في كل أوضاع عرض الخريطة (fca/env/gender/owner/balagh) بلا استثناء (2026-08-31)
+  _mapGenderFilter = "",
   // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط) — بيعيد حساب عدد
   // البلاغات الفعلي لكل مدرسة ضمن الفترة المحددة (من RAW_BALAGH مباشرة عبر
   // "تاريخ الإنشاء")، بدل استخدام r.alerts الثابت (كل الوقت) ──
@@ -4134,16 +4137,25 @@ window.setMapStageFilter = function (val) {
   _mapStageFilter = val;
   renderMap();
 };
+// فلتر الجنس (بنين/بنات) — عام زي المحافظة/المدينة/المرحلة، خياراته ثابتة
+// (مش مبنية ديناميكيًا من البيانات)، ويشتغل مهما كان وضع عرض الخريطة المختار (2026-08-31)
+window.setMapGenderFilter = function (val) {
+  _mapGenderFilter = val;
+  renderMap();
+};
 window.clearMapGeneralFilters = function () {
   _mapSectorFilter = "";
   _mapCityFilter = "";
   _mapStageFilter = "";
+  _mapGenderFilter = "";
   const g = document.getElementById("mapSectorFilter"),
     c = document.getElementById("mapCityFilter"),
-    s = document.getElementById("mapStageFilter");
+    s = document.getElementById("mapStageFilter"),
+    gd = document.getElementById("mapGenderFilter");
   if (g) g.value = "";
   if (c) c.value = "";
   if (s) s.value = "";
+  if (gd) gd.value = "";
   renderMap();
 };
 // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط) — راجع computeAlertsInRange_ ──
@@ -4237,17 +4249,33 @@ function computeAlertsInRange_(fromStr, toStr) {
    ╚════════════════════════════════════════════════════════════╝ */
 function renderMap() {
   const D = FILTERED,
-    withCoordsAll = sanitizeMapCoords_(D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1)),
-    // ── حقل الدرجة اللي بتتحسب منه بطاقات الإحصائيات فوق الخريطة يتغيّر
-    // حسب وضع العرض المختار: FCA أو البيئة المدرسية — قبل كده كانت
-    // البطاقات دايمًا بتعرض توزيع r.fca حتى في وضع "البيئة المدرسية" وهو
-    // خطأ لأنه بيوهم إن الأرقام بتاعة البيئة، دلوقتي بتتغيّر فعليًا حسب
-    // اللي مختارو المستخدم ──
-    scoreField = "env" === _mapMode ? "envScore" : "fca",
-    statCrit = D.filter((r) => null != r[scoreField] && r[scoreField] < 25).length,
-    statFair = D.filter((r) => null != r[scoreField] && r[scoreField] >= 25 && r[scoreField] < 50).length,
-    statGood = D.filter((r) => null != r[scoreField] && r[scoreField] >= 50 && r[scoreField] < 75).length,
-    statVgood = D.filter((r) => null != r[scoreField] && r[scoreField] >= 75).length;
+    withCoordsAll = sanitizeMapCoords_(D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1));
+
+  // ── الفلاتر العامة (محافظة/مدينة/مرحلة/الجنس) — بناءً على طلب صريح
+  // (2026-08-31): "الكروت وكل حاجة تتفاعل مع الفلتر"، يعني مش بس عدد
+  // المدارس المعروضة كنقاط على الخريطة، لازم كل بطاقة/شريط إحصائي فوق
+  // الخريطة (FCA، البيئة، البلاغات، الجنس، الملكية) يتحدّث هو كمان حسب
+  // الفلاتر دي، بغض النظر عن وضع العرض المختار — عشان كده بنطبّقها هنا
+  // على البيانات الأساسية *قبل* حساب أي بطاقة، بدل ما تتطبّق في الآخر
+  // بس على نقاط الخريطة نفسها كما كان الحال سابقًا ──
+  const generalFilter_ = (r) =>
+    (!_mapSectorFilter || r.sector === _mapSectorFilter) &&
+    (!_mapCityFilter || r.city === _mapCityFilter) &&
+    (!_mapStageFilter || r.stage === _mapStageFilter) &&
+    (!_mapGenderFilter || r.gender === _mapGenderFilter);
+  const Dg = D.filter(generalFilter_);
+  const withCoordsAllG = withCoordsAll.filter(generalFilter_);
+
+  // ── حقل الدرجة اللي بتتحسب منه بطاقات الإحصائيات فوق الخريطة يتغيّر
+  // حسب وضع العرض المختار: FCA أو البيئة المدرسية — قبل كده كانت
+  // البطاقات دايمًا بتعرض توزيع r.fca حتى في وضع "البيئة المدرسية" وهو
+  // خطأ لأنه بيوهم إن الأرقام بتاعة البيئة، دلوقتي بتتغيّر فعليًا حسب
+  // اللي مختارو المستخدم ──
+  const scoreField = "env" === _mapMode ? "envScore" : "fca",
+    statCrit = Dg.filter((r) => null != r[scoreField] && r[scoreField] < 25).length,
+    statFair = Dg.filter((r) => null != r[scoreField] && r[scoreField] >= 25 && r[scoreField] < 50).length,
+    statGood = Dg.filter((r) => null != r[scoreField] && r[scoreField] >= 50 && r[scoreField] < 75).length,
+    statVgood = Dg.filter((r) => null != r[scoreField] && r[scoreField] >= 75).length;
   (setText("ms-crit", statCrit.toLocaleString()),
     setText("ms-fair", statFair.toLocaleString()),
     setText("ms-good", statGood.toLocaleString()),
@@ -4255,29 +4283,34 @@ function renderMap() {
 
   // ── واجهة الفلتر المحلي (تُبنى/تتحدّث مرة واحدة بس عند تغيّر الـ mode) ──
   updateMapFilterUI();
-  // ── خيارات فلاتر المدينة/المرحلة العامة (كل رندر — قوائم قصيرة ورخيصة) ──
+  // ── خيارات فلاتر المحافظة/المدينة/المرحلة العامة (كل رندر — قوائم قصيرة
+  // ورخيصة) — بتُبنى دايمًا من كل المدارس (withCoordsAll غير المفلترة)
+  // عشان قوائم الاختيارات نفسها تفضل ثابتة ومتاحة بالكامل مهما كان
+  // الفلتر الحالي، ومنعرفش نرجع نلغي فلتر تاني بسهولة لو ضاقت خياراته ──
   updateMapGeneralFilterOptions(withCoordsAll);
 
   // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط): لو مفعّل، نستبدل
   // r.alerts بعدد البلاغات الفعلي ضمن الفترة المحددة فقط، عبر نسخ ظاهري
-  // للصفوف (باقي الحقول زي ما هي) — كل الحسابات التالية (الفئات الأربع،
-  // نصف قطر العلامة، الـ popup، تصدير CSV) بتقرأ r.alerts عادي فمش محتاجة
-  // أي تعديل تاني، لأنها بتشتغل على effAll/withCoords مش withCoordsAll ──
+  // للصفوف (باقي الحقول زي ما هي) ──
   const alertsRangeMap = "balagh" === _mapMode ? computeAlertsInRange_(_mapDateFrom, _mapDateTo) : null;
-  const effAll = alertsRangeMap
-    ? withCoordsAll.map((r) => {
-        const sn = window.normSchoolId ? window.normSchoolId(r.minId || r.schoolSeq) : null;
-        return Object.assign({}, r, { alerts: sn ? (alertsRangeMap[sn] || 0) : 0 });
-      })
-    : withCoordsAll;
+  const remapAlerts_ = (arr) =>
+    alertsRangeMap
+      ? arr.map((r) => {
+          const sn = window.normSchoolId ? window.normSchoolId(r.minId || r.schoolSeq) : null;
+          return Object.assign({}, r, { alerts: sn ? (alertsRangeMap[sn] || 0) : 0 });
+        })
+      : arr;
+  // effGeneral: المدارس ذات الإحداثيات، بعد تطبيق الفلاتر العامة الأربعة —
+  // هي المصدر الوحيد لكل ما بعدها (بطاقات البلاغات + نقاط الخريطة نفسها)
+  const effGeneral = remapAlerts_(withCoordsAllG);
 
-  // ── فئات البلاغات الأربع (نسبية Quartiles) — تُحسب دايمًا من المدارس
-  // ذات الإحداثيات ضمن الفلاتر العامة الحالية (effAll)، بغض النظر
+  // ── فئات البلاغات الأربع (نسبية Quartiles) — تُحسب من effGeneral، يعني
+  // متأثرة فعليًا بكل الفلاتر العامة (بما فيها الجنس الجديد)، بغض النظر
   // عن الـ mode المختار، عشان شريط إحصائيات البلاغات يفضل صحيح حتى لو
   // المستخدم واقف على وضع عرض تاني ──
-  _mapBalaghQuartiles = computeBalaghQuartiles(effAll.map((r) => r.alerts || 0));
+  _mapBalaghQuartiles = computeBalaghQuartiles(effGeneral.map((r) => r.alerts || 0));
   const balTierCounts = [0, 0, 0, 0, 0];
-  effAll.forEach((r) => { balTierCounts[getBalaghTier(r.alerts || 0)]++; });
+  effGeneral.forEach((r) => { balTierCounts[getBalaghTier(r.alerts || 0)]++; });
   (setText("ms-bal-none", balTierCounts[0].toLocaleString()),
     setText("ms-bal-low", balTierCounts[1].toLocaleString()),
     setText("ms-bal-med", balTierCounts[2].toLocaleString()),
@@ -4285,11 +4318,14 @@ function renderMap() {
     setText("ms-bal-top", balTierCounts[4].toLocaleString()));
 
   // ── بطاقات إحصائيات "الجنس" و"الملكية" — بتتحدّث دايمًا (زي باقي
-  // الأشرطة) بغض النظر عن الوضع الحالي، عشان تبقى جاهزة فورًا لحظة
-  // التبديل من غير أي وميض أو تأخير ──
+  // الأشرطة) بناءً على Dg (بعد الفلاتر العامة)، بغض النظر عن الوضع الحالي،
+  // عشان تبقى جاهزة فورًا لحظة التبديل من غير أي وميض أو تأخير. ملحوظة:
+  // لو فلتر الجنس نفسه مفعّل، بطاقة "الجنس" بتعكس ذلك فورًا (مثلاً فلتر
+  // "بنين" هيخلي عدّاد "بنات" يظهر صفر) — وده هو المطلوب بالظبط: كل بطاقة
+  // تتفاعل مع الفلتر المفعّل ──
   const genderCounts = { boys: 0, girls: 0, other: 0 },
     ownerCounts = { gov: 0, rent: 0, other: 0 };
-  D.forEach((r) => {
+  Dg.forEach((r) => {
     "بنين" === r.gender ? genderCounts.boys++ : "بنات" === r.gender ? genderCounts.girls++ : genderCounts.other++;
     "حكومي" === r.ownership ? ownerCounts.gov++ : "مستأجر" === r.ownership ? ownerCounts.rent++ : ownerCounts.other++;
   });
@@ -4301,8 +4337,9 @@ function renderMap() {
     setText("ms-own-other", ownerCounts.other.toLocaleString()));
 
   // ── تطبيق فلتر الخريطة المحلي (فئة/أعلى N مدرسة/فترة تاريخ) — تصفية
-  // إضافية فوق effAll، محلية بالكامل لتبويب الخريطة، لا تلمس FILTERED العام ──
-  let withCoords = effAll;
+  // إضافية فوق effGeneral (اللي أصلًا فيه الفلاتر العامة مطبّقة)، محلية
+  // بالكامل لتبويب الخريطة، لا تلمس FILTERED العام ──
+  let withCoords = effGeneral;
   if ("balagh" === _mapMode) {
     if ("" !== _mapTierFilter) {
       const wantTier = parseInt(_mapTierFilter, 10);
@@ -4317,11 +4354,6 @@ function renderMap() {
       return null != val && getTier(val) === _mapTierFilter;
     });
   }
-  // ── فلاتر عامة (مدينة/مرحلة) — تُطبَّق فوق أي فلتر خاص بالوضع، بغض
-  // النظر عن وضع العرض المختار ──
-  if (_mapSectorFilter) withCoords = withCoords.filter((r) => r.sector === _mapSectorFilter);
-  if (_mapCityFilter) withCoords = withCoords.filter((r) => r.city === _mapCityFilter);
-  if (_mapStageFilter) withCoords = withCoords.filter((r) => r.stage === _mapStageFilter);
   _mapLastRows = withCoords;
   const dlBtn = document.getElementById("map-download-csv");
   if (dlBtn) dlBtn.querySelector(".map-dl-count") && (dlBtn.querySelector(".map-dl-count").textContent = `(${withCoords.length.toLocaleString()})`);
@@ -23308,17 +23340,29 @@ function downloadCurrentTab() {
   // المتصفح نفسه يرسم النص العربي بشكل صحيح تمامًا بدون أي مكتبة وسيطة.
   // نحوّل كل chart canvas لصورة base64 أولًا عشان تظهر في النافذة الجديدة.
 
-  // 1. احتفظ بصور الـ charts
+  // ── (2026-08-31) بطاقات KPI العامة + شريط توزيع FCA (#globalOverviewKpis)
+  // مش جزء من .panel نفسه — دي عنصر شقيق منفصل يظهر فوق كل التبويبات جوه
+  // قسم "نظرة عامة" فقط (عبر كلاس على عنصر أب)، فكان بيتفلت تمامًا من
+  // التنزيل لأن الكود القديم كان بينسخ .panel.active بس. دلوقتي، لو
+  // التبويب الحالي هو "نظرة عامة"، بنضيف نسخة من هذه البطاقات فوق محتوى
+  // التبويب في الملف/الطباعة الناتجة ──
+  var isOverviewTab = "tab-overview" === panel.id;
+  var overviewKpisEl = isOverviewTab ? document.getElementById("globalOverviewKpis") : null;
+  var canvasSourceEls = overviewKpisEl ? [overviewKpisEl, panel] : [panel];
+
+  // 1. احتفظ بصور الـ charts (من بطاقات نظرة عامة العامة أولًا لو موجودة، ثم من التبويب نفسه)
   var chartImages = [];
-  panel.querySelectorAll("canvas").forEach(function (cv) {
-    try {
-      chartImages.push({
-        id:  cv.id || "",
-        src: (cv.width && cv.height) ? cv.toDataURL("image/png") : "",
-        w:   cv.offsetWidth,
-        h:   cv.offsetHeight,
-      });
-    } catch(e) { chartImages.push({ id: cv.id || "", src: "", w: cv.offsetWidth, h: cv.offsetHeight }); }
+  canvasSourceEls.forEach(function (srcEl) {
+    srcEl.querySelectorAll("canvas").forEach(function (cv) {
+      try {
+        chartImages.push({
+          id:  cv.id || "",
+          src: (cv.width && cv.height) ? cv.toDataURL("image/png") : "",
+          w:   cv.offsetWidth,
+          h:   cv.offsetHeight,
+        });
+      } catch(e) { chartImages.push({ id: cv.id || "", src: "", w: cv.offsetWidth, h: cv.offsetHeight }); }
+    });
   });
 
   // 2. استخرج كل ملفات الـ CSS من الصفحة الحالية
@@ -23327,15 +23371,27 @@ function downloadCurrentTab() {
   var cssStyles = Array.from(document.querySelectorAll("style"))
     .map(function(s){ return "<style>" + s.textContent + "</style>"; }).join("\n");
 
-  // 3. انسخ HTML الـ panel مع استبدال كل canvas بـ <img>
+  // 3. جهّز نسخة (clone) واحدة تجمع بطاقات "نظرة عامة" العامة (لو موجودة)
+  // فوق محتوى التبويب نفسه، ثم استبدل كل canvas بـ <img> بنفس الترتيب اللي
+  // اتجمعت بيه الصور فوق
+  var wrapper = document.createElement("div");
+  if (overviewKpisEl) {
+    var kpiClone = overviewKpisEl.cloneNode(true);
+    // إجباري الإظهار: أصلها متخفي افتراضيًا بـ CSS (display:none) وما
+    // بيظهرش إلا بكلاس على عنصر أب مش موجود في نافذة الطباعة المستقلة دي
+    kpiClone.style.cssText = "display:block!important;margin-bottom:14px;";
+    wrapper.appendChild(kpiClone);
+  }
   var clone = panel.cloneNode(true);
   clone.style.cssText = "display:block!important;position:static!important;max-height:none!important;overflow:visible!important;";
-  clone.querySelectorAll("*").forEach(function(el){
+  wrapper.appendChild(clone);
+
+  wrapper.querySelectorAll("*").forEach(function(el){
     el.style.maxHeight = "none";
     el.style.overflowY = "visible";
   });
 
-  var cloneCanvases = Array.from(clone.querySelectorAll("canvas"));
+  var cloneCanvases = Array.from(wrapper.querySelectorAll("canvas"));
   cloneCanvases.forEach(function(cc, i) {
     var info = chartImages[i];
     if (!info) return;
@@ -23348,7 +23404,7 @@ function downloadCurrentTab() {
     cc.parentNode.replaceChild(img, cc);
   });
 
-  var panelHTML = clone.outerHTML;
+  var panelHTML = wrapper.innerHTML;
   var googleFonts = '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">';
 
   // 4. افتح نافذة طباعة
@@ -30551,6 +30607,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(213, 'click', function (event) { window.toggleMapSatellite() });
   bind(214, 'click', function (event) { window.toggleMapExpand() });
   bind(215, 'change', function (event) { window.setMapSectorFilter(this.value) });
+  bind(216, 'change', function (event) { window.setMapGenderFilter(this.value) });
   bind(79, 'click', function (event) { showTab('NEW_ID',this) });
   bind(80, 'click', function (event) { showTab('NEW_ID',this) });
   bind(81, 'click', function (event) { showTab('NEW_ID',this) });

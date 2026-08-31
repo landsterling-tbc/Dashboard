@@ -1305,9 +1305,9 @@
       <button class="export-btn export-btn-csv" id="map-download-csv" style="margin-inline-start:auto" data-evt="205" title="تنزيل بيانات المدارس المعروضة حاليًا على الخريطة (بعد كل الفلاتر) كملف CSV">⬇ تنزيل بيانات الخريطة <span class="map-dl-count">(0)</span></button>
     </div>
 
-    <!-- فلاتر عامة على الخريطة (محافظة/مدينة/مرحلة) — تظهر دايمًا مهما كان
-         وضع العرض المختار، وتُطبَّق فوق الفلاتر العامة للوحة، محلية بالكامل
-         لتبويب الخريطة (لا تؤثر على باقي التبويبات) -->
+    <!-- فلاتر عامة على الخريطة (محافظة/مدينة/مرحلة/الجنس) — تظهر دايمًا مهما
+         كان وضع العرض المختار، وتُطبَّق فوق الفلاتر العامة للوحة، محلية
+         بالكامل لتبويب الخريطة (لا تؤثر على باقي التبويبات) -->
     <div class="map-controls" id="map-filters-row-general">
       <div class="fg" id="map-fg-sector">
         <div class="fg-lbl">المحافظة</div>
@@ -1327,7 +1327,15 @@
           <option value="">كل المراحل</option>
         </select>
       </div>
-      <button class="f-clear" id="map-filters-clear-general" data-evt="210"><span>✕ مسح فلتر المحافظة/المدينة/المرحلة</span></button>
+      <div class="fg" id="map-fg-gender">
+        <div class="fg-lbl">الجنس</div>
+        <select class="fsel" id="mapGenderFilter" data-evt="216" aria-label="تصفية حسب الجنس (بنين/بنات)">
+          <option value="">الكل (بنين وبنات)</option>
+          <option value="بنين">بنين</option>
+          <option value="بنات">بنات</option>
+        </select>
+      </div>
+      <button class="f-clear" id="map-filters-clear-general" data-evt="210"><span>✕ مسح فلتر المحافظة/المدينة/المرحلة/الجنس</span></button>
     </div>
 
     <!-- فلاتر خاصة بوضع العرض المختار فوق (تصفية محلية فوق الفلاتر العامة

@@ -31,6 +31,8 @@
 // ║     - Execute as: Me   |   Who has access: Anyone                     ║
 // ║  4) Deploy ▸ Authorize ▸ انسخ الرابط المنتهي بـ /exec.                 ║
 // ║  5) ابعت الرابط ده عشان يتحط بدل BALAGH_URL في dashboard.js.           ║
+// ║  6) من قائمة Run فوق، اختَر setupBalaghAllTriggers واضغط Run مرة واحدة  ║
+// ║     عشان تفعّل التحديث التلقائي السريع (راجع الشرح التفصيلي بالأسفل).  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
 // ── الأعمدة الخام المطلوب وجودها في صف العناوين عشان نعتبر الشيت "شيت بلاغات" ──
@@ -65,7 +67,10 @@ function balaghTranslateSlaStatus_(raw) {
   return orig || null;
 }
 
-const BALAGH_CACHE_SECONDS = 600;
+// (2026-08-30) رُفعت من 600 إلى 1800 ثانية (30 دقيقة) لإعطاء هامش أمان
+// إضافي مع نظام التحديث التلقائي في الأسفل — حتى لو تأخّرت دورة تحديث أو
+// اتنين لأي سبب، يفضل الكاش صالحاً وميضطرش أي مستخدم للانتظار.
+const BALAGH_CACHE_SECONDS = 1800;
 const BALAGH_CACHE_KEY_FULL = 'tbc_balagh_v1';
 const BALAGH_CACHE_CHUNK_MAX = 95 * 1024;
 
@@ -208,6 +213,22 @@ function balaghReadSheet_(sheet, headersNorm, lastRow, lastCol) {
   return result;
 }
 
+// ── فحص سريع: هل الشيت المُعدَّل ده شكله "شيت بلاغات" فعلاً (فيه Record No.
+//    و School Number)؟ بيُستخدم في onBalaghSheetEdit عشان ميعملش إعادة بناء
+//    كاملة للكاش (مكلفة مع 100 ألف صف) لو حد عدّل بالغلط في شيت تاني جوه
+//    نفس الملف مالوش علاقة بالبلاغات. ──
+function balaghSheetLooksLikeBalaghSheet_(sheet) {
+  try {
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return false;
+    const rawHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const headersNorm = rawHeaders.map((h, i) => balaghHeaderNorm_(h, i));
+    return BALAGH_REQUIRED_HEADERS_NORM.every((req) => headersNorm.indexOf(req) !== -1);
+  } catch (err) {
+    return true; // في حالة الشك، نكمل التحديث بدل ما نمنعه بالغلط
+  }
+}
+
 function balaghHeaderNorm_(header, index) {
   let h = String(header == null ? '' : header);
   if (index === 0) h = h.replace(/^﻿/, '');
@@ -296,4 +317,208 @@ function testBalagh() {
     Logger.log('   المفاتيح: ' + Object.keys(data[0]).join(' | '));
     Logger.log('   أول صف: ' + JSON.stringify(data[0]));
   }
+}
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║   (2026-08-31) تحديث فوري عند التعديل + شبكة أمان دورية — بناءً على     ║
+// ║   طلب صريح: "أول ما أحط الداتا في الشيت، تتحدث على طول أو خلال دقيقة   ║
+// ║   دقيقتين على الأكتر" (مع وصول البلاغات لحوالي 100 ألف صف).            ║
+// ║                                                                        ║
+// ║   ليه مش "فوري 100%"؟ الداشبورد بيقرأ من كاش (CacheService) مش من       ║
+// ║   الشيت مباشرة في كل طلب — لأن قراءة/تحويل 100 ألف صف في كل مرة يفتح    ║
+// ║   حد فيها الداشبورد هيبقى أبطأ بكتير من كده. الحل بقى مكوّن من طبقتين:  ║
+// ║                                                                        ║
+// ║   1) onBalaghSheetEdit — تريجر "عند التعديل" (installable onEdit):      ║
+// ║      بيشتغل تلقائياً بمجرد ما تضيف/تعدّل أي صف في شيت البلاغات (كتابة   ║
+// ║      يدوية أو لصق) — بيعيد بناء الكاش على طول في نفس اللحظة (ثوانٍ      ║
+// ║      معدودة عادةً)، فمفيش داعي تستنى دورة الجدولة الدورية أصلاً في      ║
+// ║      الحالة العادية (تعديل يدوي من واجهة جوجل شيتس).                   ║
+// ║      ⚠️ ملحوظة مهمة: onEdit ما بيشتغلش لو البيانات اتحطت عن طريق        ║
+// ║      أتمتة/سكريبت خارجي (مثلاً استيراد عبر Google Sheets API) بدل       ║
+// ║      الكتابة المباشرة في الشيت — في الحالة دي، الطبقة (2) تحت هي        ║
+// ║      اللي بتضمن التحديث.                                               ║
+// ║                                                                        ║
+// ║   2) refreshBalaghCache — شبكة أمان: Trigger زمني كل                    ║
+// ║      BALAGH_REFRESH_INTERVAL_MINUTES دقايق (5 دقايق حالياً) بيعيد بناء  ║
+// ║      الكاش على أي حال — تغطية للحالات اللي onEdit ميشتغلش فيها، وضمان   ║
+// ║      إن التأخير الأقصى (حتى لو onEdit اتعطّل لأي سبب) ميتعديش 5 دقايق.  ║
+// ║                                                                        ║
+// ║   طريقة التفعيل (خطوة واحدة بس):                                       ║
+// ║   1) من القائمة المنسدلة فوق (بجانب زر ▷ Run) اختَر                     ║
+// ║      setupBalaghAllTriggers ثم اضغط Run — بتركّب الطبقتين مرة واحدة.    ║
+// ║   2) أول مرة هيطلب صلاحيات (Authorize) — دي طبيعية لأنه محتاج صلاحية    ║
+// ║      "قراءة/تعديل الشيت" و"إدارة الجدولة (Triggers) بتاعتك"، وافق       ║
+// ║      عليها.                                                            ║
+// ║   3) تأكد إنها اشتغلت: من القائمة الجانبية اضغط أيقونة الساعة           ║
+// ║      (Triggers) وهتلاقي trigger باسم onBalaghSheetEdit (عند التعديل)    ║
+// ║      وتريجر تاني باسم refreshBalaghCache (كل 5 دقايق).                 ║
+// ║   4) (اختياري للمراجعة) من القائمة الجانبية اضغط Executions عشان تتابع  ║
+// ║      كل تشغيلة وتتأكد إنها بتنجح، وتشوف قد ايه بتاخد وقت فعلياً.        ║
+// ║                                                                        ║
+// ║   مبيحتاجش عمل Deploy جديد لتفعيل أي من الاتنين — بس احفظ (Ctrl/Cmd+S)   ║
+// ║   قبل ما تشغّل الدالة. لو حبيت توقف التحديث التلقائي بالكامل في أي وقت، ║
+// ║   شغّل removeBalaghAllTriggers مرة واحدة.                              ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+// كل قد ايه (بالدقايق) تتعمل إعادة بناء دورية للكاش كـ"شبكة أمان" احتياطية
+// (بالإضافة للتحديث الفوري عند التعديل في onBalaghSheetEdit تحت). لازم
+// يكون أقل بوضوح من مدة صلاحية الكاش (BALAGH_CACHE_SECONDS = 1800 ثانية =
+// 30 دقيقة). القيمة الحالية (5 دقايق) بتضمن إن أسوأ سيناريو (لو onEdit
+// معطّل أو البيانات بتتحط عن طريق أتمتة خارجية) هو تأخير 5 دقايق كحد أقصى،
+// وبرضه آمنة من ناحية حصة تشغيل الـ Triggers اليومية (288 تشغيلة/يوم كحد
+// أقصى). لو ظهرت رسالة عن تجاوز الحصة، كبّرها لـ 10.
+const BALAGH_REFRESH_INTERVAL_MINUTES = 5;
+
+// أقل مدة (بالثواني) بين تشغيلتين لـ onBalaghSheetEdit — عشان لو حد بيلصق/
+// يكتب كذا صف بسرعة (كذا عملية تعديل منفصلة خلال ثوانٍ)، منعملش إعادة بناء
+// كاملة (مكلفة مع 100 ألف صف) لكل تعديل على حدة. أي تعديل يتجاهَل بسبب
+// الـ debounce ده هيتغطى تلقائياً إما بالتعديل اللي بعده، أو بشبكة الأمان
+// الدورية (خلال 5 دقايق كحد أقصى) — فمفيش بيانات بتضيع، بس بنوفر تنفيذات
+// زيادة عن الحاجة.
+const BALAGH_EDIT_DEBOUNCE_SECONDS = 20;
+
+/**
+ * بتتنفذ تلقائياً كل BALAGH_REFRESH_INTERVAL_MINUTES دقيقة (بعد تشغيل
+ * setupBalaghAllTriggers مرة واحدة)، وكمان فورياً عند أي تعديل في الشيت
+ * (عبر onBalaghSheetEdit). بتنادي نفس doGet فوق وكأنها طلب فيه ?refresh=1
+ * — يعني بتجبره يقرأ الشيتات من جديد ويحدّث الكاش — لكن في الخلفية، من غير
+ * أي مستخدم مستني الرد.
+ */
+function refreshBalaghCache() {
+  const startedAt = new Date();
+  try {
+    const fakeRequest = { parameter: { refresh: '1' }, parameters: { refresh: ['1'] } };
+    doGet(fakeRequest);
+    const ms = new Date() - startedAt;
+    Logger.log('✅ تم تحديث كاش البلاغات بنجاح خلال ' + ms + ' مللي ثانية');
+  } catch (err) {
+    Logger.log('⚠️ فشل تحديث كاش البلاغات: ' + err);
+  }
+}
+
+/**
+ * شغّلها مرة واحدة بس عشان تركّب الجدولة التلقائية. لو شغّلتها تاني
+ * بالغلط، هي بتمسح أي نسخة قديمة من الـ Trigger قبل ما تعمل واحدة جديدة،
+ * فمفيش تكرار أبداً.
+ */
+function setupBalaghAutoRefreshTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'refreshBalaghCache') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger('refreshBalaghCache')
+    .timeBased()
+    .everyMinutes(BALAGH_REFRESH_INTERVAL_MINUTES)
+    .create();
+
+  // تشغيلة أولى فورية عشان الكاش يبقى دافئاً من أول لحظة، من غير ما نستنى
+  // أول دورة تلقائية من الـ Trigger
+  refreshBalaghCache();
+
+  Logger.log(
+    '✅ تم تفعيل التحديث التلقائي لكاش البلاغات كل ' +
+      BALAGH_REFRESH_INTERVAL_MINUTES +
+      ' دقايق'
+  );
+}
+
+/**
+ * لو حبيت توقف شبكة الأمان الدورية بس (وتسيب التحديث الفوري عند التعديل
+ * شغّال)، شغّل الدالة دي مرة واحدة. للإيقاف الكامل استخدم
+ * removeBalaghAllTriggers تحت.
+ */
+function removeBalaghAutoRefreshTrigger() {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'refreshBalaghCache') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+  Logger.log('تم حذف ' + removed + ' جدولة/جدولات تلقائية لكاش البلاغات');
+}
+
+/**
+ * (2026-08-31) بتتنفذ تلقائياً بمجرد ما حد يعدّل أي خلية في ملف الشيت —
+ * بعد تركيب onBalaghSheetEdit كـ Trigger "عند التعديل" عبر
+ * setupBalaghOnEditTrigger (أو setupBalaghAllTriggers). لو التعديل حصل في
+ * شيت شكله فعلاً "شيت بلاغات" (فيه Record No. + School Number)، بتعيد بناء
+ * الكاش على طول — عشان أي بلاغ جديد يظهر في الداشبورد خلال ثوانٍ من إضافته،
+ * بدل ما ننتظر شبكة الأمان الدورية.
+ */
+function onBalaghSheetEdit(e) {
+  try {
+    const sheet = e && e.range ? e.range.getSheet() : null;
+    if (sheet && !balaghSheetLooksLikeBalaghSheet_(sheet)) return; // تعديل في شيت تاني غير متعلق بالبلاغات
+
+    // Debounce بسيط: لو حصلت إعادة بناء قبل أقل من BALAGH_EDIT_DEBOUNCE_SECONDS،
+    // نتجاهل التعديل ده (هيتغطى بالتعديل اللي بعده أو بشبكة الأمان الدورية)
+    const cache = CacheService.getScriptCache();
+    const debounceKey = 'tbc_balagh_last_edit_refresh';
+    const last = cache.get(debounceKey);
+    const now = Date.now();
+    if (last && (now - parseInt(last, 10)) < BALAGH_EDIT_DEBOUNCE_SECONDS * 1000) return;
+    cache.put(debounceKey, String(now), 120);
+
+    refreshBalaghCache();
+  } catch (err) {
+    Logger.log('⚠️ [onBalaghSheetEdit] خطأ: ' + err);
+  }
+}
+
+/**
+ * شغّلها مرة واحدة بس عشان تركّب التحديث الفوري عند التعديل. لو شغّلتها
+ * تاني بالغلط، هي بتمسح أي نسخة قديمة من الـ Trigger قبل ما تعمل واحدة
+ * جديدة، فمفيش تكرار أبداً. (الأسهل: استخدم setupBalaghAllTriggers تحت
+ * عشان تركّب التحديث الفوري + شبكة الأمان الدورية مع بعض بضغطة واحدة.)
+ */
+function setupBalaghOnEditTrigger() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onBalaghSheetEdit') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('onBalaghSheetEdit')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+  Logger.log('✅ تم تفعيل التحديث الفوري لكاش البلاغات عند أي تعديل يدوي في الشيت');
+}
+
+/**
+ * لو حبيت توقف التحديث الفوري عند التعديل بس (وتسيب شبكة الأمان الدورية
+ * شغّالة)، شغّل الدالة دي مرة واحدة.
+ */
+function removeBalaghOnEditTrigger() {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onBalaghSheetEdit') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
+    }
+  });
+  Logger.log('تم حذف ' + removed + ' جدولة/جدولات للتحديث الفوري عند التعديل');
+}
+
+/**
+ * ✅ الطريقة الموصى بها للتفعيل: شغّل الدالة دي مرة واحدة بس من قائمة Run —
+ * بتركّب الطبقتين مع بعض (التحديث الفوري عند التعديل + شبكة الأمان الدورية
+ * كل BALAGH_REFRESH_INTERVAL_MINUTES دقايق) بضغطة واحدة.
+ */
+function setupBalaghAllTriggers() {
+  setupBalaghOnEditTrigger();
+  setupBalaghAutoRefreshTrigger();
+  Logger.log('✅ تم تفعيل كل أنظمة تحديث كاش البلاغات (فوري عند التعديل + شبكة أمان دورية)');
+}
+
+/**
+ * لإيقاف كل أنظمة التحديث التلقائي دفعة واحدة (فوري + دوري).
+ */
+function removeBalaghAllTriggers() {
+  removeBalaghOnEditTrigger();
+  removeBalaghAutoRefreshTrigger();
+  Logger.log('تم إيقاف كل أنظمة تحديث كاش البلاغات التلقائية');
 }

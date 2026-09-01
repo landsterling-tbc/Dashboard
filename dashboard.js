@@ -3811,6 +3811,71 @@ let __bgRevalidatedOnce = false;
       }
       _rerenderSecuritySafetyTabsIfActive();
     };
+    // ── (2026-08-31) زر "تحديث البلاغات الآن من الشيت" — بناءً على طلب صريح:
+    // زر خاص بتبويب البلاغات فقط، لما المستخدم يضغطه يروح يسحب الداتا من
+    // Google Sheets مباشرة (تجاوزًا لأي كاش، سواء كاش المتصفح المحلي أو كاش
+    // GAS نفسه)، ويجبر GAS يعيد بناء الكاش من الشيت فورًا، ثم يحمّل النتيجة
+    // الطازجة على طول في اللوحة. الفرق عن loadBalaghSeparate العادي: العادي
+    // بيقرأ من كاش GAS (سريع لكن ممكن يكون قديم شوية لحد 30 دقيقة/تحديث
+    // الفهرس التلقائي)، أما ده فبيضيف ?refresh=1 لرابط GAS اللي بيخلي
+    // doGet في balagh_reports.gs يقرأ الشيت مباشرة ويحدّث الكاش قبل ما يرجّع
+    // الرد — بطيء شوية (حسب حجم الشيت) لكن مضمون إنه أحدث نسخة فعليًا.
+    // ── ملحوظة: التوست العام (showToast) بيتكتب في #toast-area، وهو عنصر
+    // متخفٍ عمدًا (display:none) جوه #legacyDashboardArea (طلب صريح سابق
+    // لإخفاء التوست القديم العائم) — فمش هيبان للمستخدم هنا. عشان كده
+    // التغذية الراجعة الحقيقية بتتم عن طريق حالة مخزّنة (frState/frMsg)
+    // بتتحدّث مع كل إعادة رسم لتبويب البلاغات (راجع renderBalaghTab فوق)
+    // بدل الاعتماد على توست مخفي.
+    function _rerenderBalaghAndSecurityTabsNow() {
+      if (document.getElementById("tab-balagh")?.classList.contains("active")) {
+        try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
+      }
+      _rerenderSecuritySafetyTabsIfActive();
+    }
+    window.balaghForceRefreshFromSheet = async function () {
+      if (window.__BALAGH_FORCE_REFRESH_INFLIGHT__) return; // منع الضغط المتكرر أثناء التحديث
+      window.__BALAGH_FORCE_REFRESH_INFLIGHT__ = true;
+      window.__BALAGH_FORCE_REFRESH_STATE__ = "loading";
+      window.__BALAGH_FORCE_REFRESH_MSG__ = "";
+      _rerenderBalaghAndSecurityTabsNow();
+
+      try {
+        if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
+          throw new Error("لسه محطوطش رابط ملف Apps Script بتاع البلاغات (BALAGH_URL) في dashboard.js");
+        }
+        const sep = BALAGH_URL.indexOf("?") === -1 ? "?" : "&";
+        const bResp = await fetch(BALAGH_URL + sep + "refresh=1", { cache: "no-store" });
+        if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
+        const bJson = await bResp.json();
+        if (bJson.status === "ok" && Array.isArray(bJson.data)) {
+          window.RAW_BALAGH = bJson.data;
+          window.__BALAGH_LOAD_STATE__ = "loaded";
+          window.__BALAGH_LOAD_ERR__ = null;
+          _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
+          _linkBalaghToBuildings();
+          console.log(`[BALAGH] تحديث فوري من الشيت: تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
+          window.__BALAGH_FORCE_REFRESH_STATE__ = "ok";
+          window.__BALAGH_FORCE_REFRESH_MSG__ = `✅ تم السحب من الشيت — الإجمالي الآن ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`;
+        } else {
+          throw new Error(bJson.message || "بيانات غير صحيحة");
+        }
+      } catch (e) {
+        console.warn("[BALAGH] فشل التحديث الفوري من الشيت:", e);
+        window.__BALAGH_FORCE_REFRESH_STATE__ = "err";
+        window.__BALAGH_FORCE_REFRESH_MSG__ = `❌ تعذّر السحب من الشيت: ${e.message || e}`;
+      } finally {
+        window.__BALAGH_FORCE_REFRESH_INFLIGHT__ = false;
+        _rerenderBalaghAndSecurityTabsNow();
+        // نمسح رسالة النتيجة (نجاح/فشل) تلقائيًا بعد ٨ ثوانٍ ونرجّع الزر لحالته
+        // العادية، من غير ما نلمس أي بيانات فعلية — عرض بصري بحت
+        setTimeout(() => {
+          if (window.__BALAGH_FORCE_REFRESH_STATE__ === "loading") return; // تحديث تاني بدأ لوحده
+          window.__BALAGH_FORCE_REFRESH_STATE__ = null;
+          window.__BALAGH_FORCE_REFRESH_MSG__ = "";
+          _rerenderBalaghAndSecurityTabsNow();
+        }, 8000);
+      }
+    };
     // تحميل تلقائي عند بدء اللوحة فقط — لا نُعيد تحميل البلاغات (ملف ضخم) في كل مرة
     // يُعاد فيها استدعاء loadData (تحديث الكاش بالخلفية، أو التحديث التلقائي كل 5 دقائق).
     // لو المستخدم يحتاج بيانات بلاغات أحدث، فيه زر "إعادة المحاولة/تحميل البلاغات" داخل التبويب نفسه.
@@ -4158,6 +4223,147 @@ window.clearMapGeneralFilters = function () {
   if (gd) gd.value = "";
   renderMap();
 };
+
+// ══════════════════════════════════════════════════════════════════
+// 🔍 (2026-09-01) البحث المباشر عن مدرسة على الخريطة — بناءً على طلب
+// صريح: "عاوز حط بحث عشان ألاقي المدرسة مباشرة على طول". البحث بيشتغل
+// على window.__MAP_SEARCH_POOL__ (كل مدرسة بإحداثيات صالحة ضمن فلاتر
+// اللوحة العامة، بغض النظر عن فلاتر الخريطة المحلية — راجع renderMap
+// فوق)، وبيقفز فورًا لموقع المدرسة ويفتح الـ popup بتاعها. لو المدرسة
+// مستبعدة حاليًا بفلتر محلي (محافظة/مدينة/مرحلة/الجنس/فلتر الوضع)،
+// بيمسح الفلاتر دي أولاً عشان يضمن ظهورها فعليًا على الخريطة قبل ما
+// يفتح الـ popup — الهدف "يلاقيها على طول" مهما كانت الفلاتر مفعّلة.
+// ══════════════════════════════════════════════════════════════════
+let _mapSearchActiveIndex = -1;
+function _mapSearchNorm_(s) {
+  return String(s ?? "").trim().toLowerCase();
+}
+window.onMapSchoolSearchInput = function (query) {
+  const box = document.getElementById("mapSchoolSearchResults");
+  if (!box) return;
+  const q = _mapSearchNorm_(query);
+  _mapSearchActiveIndex = -1;
+  if (!q) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  const pool = window.__MAP_SEARCH_POOL__ || [];
+  const matches = pool
+    .filter((r) => _mapSearchNorm_(r.name).includes(q) || _mapSearchNorm_(r.minId).includes(q))
+    .slice(0, 8);
+  if (!matches.length) {
+    box.innerHTML = '<div class="map-search-empty">لا توجد مدرسة مطابقة</div>';
+    box.style.display = "block";
+    return;
+  }
+  box.innerHTML = matches
+    .map((r) => {
+      const sid = window.normSchoolId(r.minId || r.schoolSeq) || "";
+      const metaParts = [r.minId || "—"];
+      if (r.city) metaParts.push(r.city);
+      if (r.sector) metaParts.push(r.sector);
+      return `<div class="map-search-item" data-sid="${esc(sid)}" onclick="window.mapSearchSelectSchool('${esc(sid)}')">
+        <span class="map-search-item-name">${esc(r.name || "—")}</span>
+        <span class="map-search-item-meta">${esc(metaParts.join(" · "))}</span>
+      </div>`;
+    })
+    .join("");
+  box.style.display = "block";
+};
+window.onMapSchoolSearchKeydown = function (event) {
+  const box = document.getElementById("mapSchoolSearchResults");
+  if (!box || "none" === box.style.display) return;
+  const items = Array.from(box.querySelectorAll(".map-search-item"));
+  if (!items.length) return;
+  if ("ArrowDown" === event.key) {
+    event.preventDefault();
+    _mapSearchActiveIndex = Math.min(_mapSearchActiveIndex + 1, items.length - 1);
+  } else if ("ArrowUp" === event.key) {
+    event.preventDefault();
+    _mapSearchActiveIndex = Math.max(_mapSearchActiveIndex - 1, 0);
+  } else if ("Enter" === event.key) {
+    event.preventDefault();
+    const idx = _mapSearchActiveIndex >= 0 ? _mapSearchActiveIndex : 0;
+    const sid = items[idx] && items[idx].dataset.sid;
+    if (sid) window.mapSearchSelectSchool(sid);
+    return;
+  } else if ("Escape" === event.key) {
+    box.style.display = "none";
+    event.target.blur();
+    return;
+  } else {
+    return;
+  }
+  items.forEach((it, i) => it.classList.toggle("active", i === _mapSearchActiveIndex));
+};
+window.mapSearchSelectSchool = function (sid) {
+  const pool = window.__MAP_SEARCH_POOL__ || [];
+  const row = pool.find((r) => window.normSchoolId(r.minId || r.schoolSeq) === sid);
+  const box = document.getElementById("mapSchoolSearchResults");
+  const input = document.getElementById("mapSchoolSearch");
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+  if (!row) {
+    if (typeof showToast === "function") showToast("تعذّر إيجاد المدرسة على الخريطة", "warn");
+    return;
+  }
+  if (input) input.value = row.name || "";
+
+  // نمسح فلاتر الخريطة المحلية كلها (عامة + خاصة بالوضع الحالي) عشان
+  // نضمن إن المدرسة مش مستبعدة بفلتر مفعّل حاليًا، ثم نعيد الرسم قبل
+  // ما نقفز لموقعها فعليًا.
+  const hadLocalFilter =
+    _mapSectorFilter || _mapCityFilter || _mapStageFilter || _mapGenderFilter ||
+    _mapTierFilter || _mapTopN || _mapDateFrom || _mapDateTo;
+  if (hadLocalFilter) {
+    _mapSectorFilter = "";
+    _mapCityFilter = "";
+    _mapStageFilter = "";
+    _mapGenderFilter = "";
+    _mapTierFilter = "";
+    _mapTopN = 0;
+    _mapDateFrom = "";
+    _mapDateTo = "";
+    const g = document.getElementById("mapSectorFilter"),
+      c = document.getElementById("mapCityFilter"),
+      s = document.getElementById("mapStageFilter"),
+      gd = document.getElementById("mapGenderFilter"),
+      t = document.getElementById("mapTierFilter"),
+      n = document.getElementById("mapTopN"),
+      df = document.getElementById("mapDateFrom"),
+      dt = document.getElementById("mapDateTo");
+    if (g) g.value = "";
+    if (c) c.value = "";
+    if (s) s.value = "";
+    if (gd) gd.value = "";
+    if (t) t.value = "";
+    if (n) n.value = "0";
+    if (df) df.value = "";
+    if (dt) dt.value = "";
+    renderMap();
+  }
+
+  if (!_map) return;
+  _map.flyTo([row.lat, row.lng], Math.max(_map.getZoom(), 15), { duration: 0.8 });
+  const openPopupFor = () => {
+    const marker = window.__MAP_MARKERS_BY_ID__ && window.__MAP_MARKERS_BY_ID__[sid];
+    if (marker) marker.openPopup();
+  };
+  // نستنى شوية لحد ما إعادة الرسم الناتجة عن مسح الفلاتر (لو حصلت) تخلّص
+  // وتبني الماركرات من جديد، وكمان لحد ما حركة flyTo تقرب كفاية
+  setTimeout(openPopupFor, hadLocalFilter ? 350 : 300);
+};
+// إغلاق قائمة نتائج البحث عند الضغط بره مربّع البحث نفسه
+document.addEventListener("click", function (e) {
+  const wrap = document.getElementById("map-fg-search");
+  const box = document.getElementById("mapSchoolSearchResults");
+  if (!wrap || !box || "none" === box.style.display) return;
+  if (!wrap.contains(e.target)) box.style.display = "none";
+});
+
 // ── فلتر فترة تاريخ البلاغات (وضع "البلاغات" فقط) — راجع computeAlertsInRange_ ──
 window.setMapDateFrom = function (val) {
   _mapDateFrom = val || "";
@@ -4250,6 +4456,12 @@ function computeAlertsInRange_(fromStr, toStr) {
 function renderMap() {
   const D = FILTERED,
     withCoordsAll = sanitizeMapCoords_(D.filter((r) => r.lat && r.lng && Math.abs(r.lat) > 0.1 && Math.abs(r.lng) > 0.1));
+
+  // ── (2026-09-01) مخزن بحث الخريطة — كل مدرسة عندها إحداثيات صالحة ضمن
+  // فلاتر اللوحة العامة، بغض النظر عن فلاتر الخريطة المحلية (محافظة/مدينة/
+  // مرحلة/الجنس/الوضع) — عشان مربّع البحث "ابحث عن مدرسة" يقدر يلاقي أي
+  // مدرسة ويقفز لها حتى لو مستبعدة حاليًا بفلتر محلي (بنمسحه وقت الاختيار) ──
+  window.__MAP_SEARCH_POOL__ = withCoordsAll;
 
   // ── الفلاتر العامة (محافظة/مدينة/مرحلة/الجنس) — بناءً على طلب صريح
   // (2026-08-31): "الكروت وكل حاجة تتفاعل مع الفلتر"، يعني مش بس عدد
@@ -4376,6 +4588,11 @@ function renderMap() {
       legend.addTo(_map));
   }
   const legendEl = document.getElementById("map-legend-content");
+  // ── (2026-09-01) سجل الماركرات الحالية مفهرَس برقم المدرسة — يُصفَّر
+  // مع كل رندر (الماركرات القديمة بتتشال فوق مع _mapLayer) ويتبنى من
+  // جديد تحت، عشان مربّع البحث "ابحث عن مدرسة" يقدر يفتح popup أي
+  // مدرسة فورًا من غير ما يدوّر على الـ layer نفسه ──
+  window.__MAP_MARKERS_BY_ID__ = {};
   if (
     (legendEl && (legendEl.innerHTML = buildLegendHTML(_mapMode)),
     _mapLayer && (_map.removeLayer(_mapLayer), (_mapLayer = null)),
@@ -4431,6 +4648,8 @@ function renderMap() {
       { maxWidth: 260, className: "map-popup-custom" },
     ),
       markers.push(circle));
+    const _searchSid = window.normSchoolId(r.minId || r.schoolSeq);
+    if (_searchSid) window.__MAP_MARKERS_BY_ID__[_searchSid] = circle;
   }),
     (_mapLayer = L.layerGroup(markers).addTo(_map)));
   try {
@@ -9550,14 +9769,34 @@ function _sysDownloadFile(filename, content, mime) {
     const list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
     const totalForBars = Math.max(1, filteredTotal);
 
+    // ── (2026-08-31) زر "تحديث فوري من الشيت" — راجع window.balaghForceRefreshFromSheet
+    // فوق. الحالة (loading/ok/err) بتتخزن في متغيرات عامة (بتتحدّث برة الدالة دي)
+    // عشان تفضل ظاهرة بعد إعادة الرسم اللي بتحصل في كل مرحلة (بداية/نجاح/فشل)،
+    // وبتُمسح تلقائيًا بعد ثوانٍ عبر setTimeout جوه الدالة نفسها ──
+    const frState = window.__BALAGH_FORCE_REFRESH_STATE__ || null; // null | 'loading' | 'ok' | 'err'
+    const frMsg = window.__BALAGH_FORCE_REFRESH_MSG__ || "";
+    const frBtnLabel =
+      frState === "loading"
+        ? '<span style="display:inline-block;width:11px;height:11px;border:2px solid #FDE68A;border-top-color:#fff;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span> جاري السحب من الشيت...'
+        : "🔄 تحديث فوري من الشيت";
+    const frBtnHtml = `<button type="button" id="balagh-force-refresh-btn" onclick="window.balaghForceRefreshFromSheet()" ${frState === "loading" ? "disabled" : ""}
+        title="يسحب أحدث بيانات البلاغات مباشرة من Google Sheets الآن (بدون انتظار التحديث التلقائي) ويحدّث الكاش فورًا"
+        style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:${frState === "loading" ? "default" : "pointer"};white-space:nowrap;border:1px solid #0891B2;background:${frState === "loading" ? "#0891B2" : "#ECFEFF"};color:${frState === "loading" ? "#fff" : "#0891B2"};margin-right:8px"
+      >${frBtnLabel}</button><style>@keyframes balaghspin{to{transform:rotate(360deg)}}</style>`;
+    const frStatusHtml = frMsg
+      ? `<span id="balagh-force-refresh-status" style="font-size:11px;font-weight:700;color:${frState === "err" ? "#DC2626" : "#059669"}">${frMsg}</span>`
+      : `<span id="balagh-force-refresh-status"></span>`;
+
     el.innerHTML = `
       ${balaghBannerHtml}
       ${balaghSecHead(1, "📊", "نظرة عامة", "أهم الأرقام ضمن الفلاتر الحالية")}
       <div class="card mb14">
-        <div class="card-title">
+        <div class="card-title" style="flex-wrap:wrap">
           <span class="card-title-icon" style="background:#FFF7ED;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></span>
           <span>لوحة البلاغات — ملف CSV</span>
           <span class="sub">${fmt(filteredTotal)} من ${fmt(total)}</span>
+          ${frBtnHtml}
+          ${frStatusHtml}
         </div>
 
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">

@@ -1293,6 +1293,20 @@
          ثابتة لكل صف لوحده) عشان محدش يركب فوق التاني مهما اتغيّر عدد
          الأسطر أو عرض الشاشة -->
     <div id="map-controls-floating">
+    <!-- 🔍 البحث المباشر عن مدرسة على الخريطة (2026-09-01) — بناءً على طلب
+         صريح: يقفز فورًا لموقع المدرسة على الخريطة بالاسم أو الرقم الوزاري،
+         بغض النظر عن أي فلتر مفعّل حاليًا (بيمسح فلاتر الخريطة تلقائيًا
+         لو المدرسة مستبعدة بيها، عشان يضمن ظهورها فعليًا) -->
+    <div class="map-controls" id="map-search-row">
+      <div class="fg" id="map-fg-search">
+        <div class="fg-lbl">🔍 ابحث عن مدرسة (بالاسم أو الرقم الوزاري)</div>
+        <input class="finp" id="mapSchoolSearch" type="text" autocomplete="off" placeholder="اكتب اسم المدرسة أو رقمها الوزاري..."
+          oninput="window.onMapSchoolSearchInput(this.value)"
+          onfocus="window.onMapSchoolSearchInput(this.value)"
+          onkeydown="window.onMapSchoolSearchKeydown(event)">
+        <div id="mapSchoolSearchResults" class="map-search-results" style="display:none"></div>
+      </div>
+    </div>
     <div class="map-controls">
       <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">عرض حسب:</span>
       <button class="map-ctrl-btn active" id="mctrl-fca"   data-evt="75">درجة FCA</button>

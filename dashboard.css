@@ -1384,6 +1384,73 @@ tbody tr:last-child td { border-bottom: none; }
   box-shadow: 0 3px 10px rgba(13,132,156,.22);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   🔍 مربّع البحث عن مدرسة على الخريطة (2026-09-01) — بناءً على طلب
+   صريح: يلاقي المدرسة مباشرة بالاسم أو الرقم الوزاري، بيقفز لها على
+   الخريطة، ويفتح الـ popup بتاعها، حتى لو كانت مستبعدة حاليًا بفلاتر
+   الخريطة (بيمسحها تلقائيًا عشان يضمن ظهورها).
+   ══════════════════════════════════════════════════════════════ */
+#map-fg-search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+#mapSchoolSearch {
+  width: 100%;
+  min-width: 0;
+}
+
+.map-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 1200; /* فوق طبقات Leaflet (tiles/markers/legend) وأي عنصر تاني على الخريطة */
+  background: #fff;
+  border: 1px solid var(--bd-mid);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--sh-d16, 0 8px 24px rgba(8,45,60,.18));
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.map-search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--bd-light);
+  text-align: right;
+}
+
+.map-search-item:last-child { border-bottom: none; }
+
+.map-search-item:hover,
+.map-search-item.active {
+  background: var(--bg-info, #eef8fb);
+}
+
+.map-search-item-name {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--tx-main);
+}
+
+.map-search-item-meta {
+  font-size: 10.5px;
+  color: var(--tx-muted);
+}
+
+.map-search-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--tx-muted);
+  text-align: center;
+}
+
 /* ── 🔲 وضع "تكبير الخريطة" (2026-08-25) — CSS فقط: كلاس map-expanded على
    الغلاف بيحوّله لطبقة شبه ملء الشاشة، والفلاتر بتتحول لشريط عائم فوق
    الخريطة نفسها (position:absolute) بدل ما تاخد مساحة رأسية منفصلة —

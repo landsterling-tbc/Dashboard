@@ -26,11 +26,12 @@ const SHEET_NAMES = {
   training          : 'برامج_التدريب',
   employeeKpi       : 'تقييم_الموظفين',
   safetyTeamKpi     : 'مؤشرات_أداء_فريق_السلامة',
+  schoolsSupervisors: 'المدارس_والمشرفين',
 };
 
 // ── إعدادات الكاش ───────────────────────────────────────────────
 const CACHE_SECONDS  = 600;
-const CACHE_KEY_FULL = 'tbc_sheet_v8';   // ★ رُفِّع الإصدار بسبب فصل البلاغات (balaghReports) لملف Apps Script مستقل
+const CACHE_KEY_FULL = 'tbc_sheet_v9';   // ★ رُفِّع الإصدار بسبب إضافة شيت المدارس_والمشرفين
 const CACHE_CHUNK_MAX = 95 * 1024;
 
 // ══════════════════════════════════════════════════════════════════
@@ -195,7 +196,8 @@ function clearCache_(cache) {
       'tbc_sheet_v4', 'tbc_sheet_v4_chunks',
       'tbc_sheet_v5', 'tbc_sheet_v5_chunks',
       'tbc_sheet_v6', 'tbc_sheet_v6_chunks',
-      'tbc_sheet_v7', 'tbc_sheet_v7_chunks'
+      'tbc_sheet_v7', 'tbc_sheet_v7_chunks',
+      'tbc_sheet_v8', 'tbc_sheet_v8_chunks'
     );
     cache.removeAll(keys);
   } catch (err) {}

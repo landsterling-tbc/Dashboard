@@ -983,6 +983,8 @@ function applyFilters() {
     if (activeId === "tab-tajheez") safeRun(renderTajheezInventoryTab, "tajheez");
     if (activeId === "tab-gatekeepers" && typeof renderGatekeepersTab === "function")
       safeRun(renderGatekeepersTab, "gatekeepers");
+    if (activeId === "tab-supervisors" && typeof renderSupervisorsTab === "function")
+      safeRun(renderSupervisorsTab, "supervisors");
     if (activeId === "tab-khanadeq") safeRun(renderKhanadeqTab, "khanadeq");
     if (activeId === "tab-map") safeRun(renderMap, "map");
     if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
@@ -1192,6 +1194,7 @@ function showTab(name, el) {
     "tajheez-contracts" === name && renderTajheezContractsTab(),
     "nashat-badani" === name && renderNashatBadaniTab(),
     "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
+    "supervisors" === name && "function" === typeof renderSupervisorsTab && renderSupervisorsTab(),
     "recruitment" === name && "function" === typeof renderRecruitmentTab && renderRecruitmentTab(),
 
     "khanadeq" === name && renderKhanadeqTab(),
@@ -3011,7 +3014,9 @@ let __bgRevalidatedOnce = false;
       (window.RAW_TRAINING         = sa(d.training)),
       (window.RAW_EMP_KPI          = sa(d.employeeKpi)),
       (window.RAW_SAFETY_KPI       = sa(d.safetyTeamKpi)),
+      (window.RAW_SUPERVISORS      = sa(d.schoolsSupervisors)),
       setProgress(60));
+    window.__SUPERVISORS_MAP__ = null; // إعادة بناء الفهرس عند كل تحميل بيانات
     if (typeof fcaHistory === "string") {
       const fcaPath = fcaHistory.trim();
       if (fcaPath) {
@@ -3882,6 +3887,17 @@ let __bgRevalidatedOnce = false;
     if (!window.__BALAGH_LOAD_STATE__ || window.__BALAGH_LOAD_STATE__ === "error") {
       window.loadBalaghSeparate();
     }
+    // تحديث دوري صامت للبلاغات — يطابق دورة تحديث كاش balagh_reports.gs (5
+    // دقائق)، بدون ?refresh=1 (لا يفرض قراءة الشيت الضخم من جديد، يكتفي
+    // بكاش GAS المُحدَّث أصلاً بالتريجر الزمني). يُنشأ مرة واحدة فقط.
+    if (!window.__BALAGH_AUTO_TIMER_STARTED__) {
+      window.__BALAGH_AUTO_TIMER_STARTED__ = true;
+      setInterval(() => {
+        if (document.hidden) return;
+        if (window.__BALAGH_LOAD_STATE__ === "loading" || window.__BALAGH_FORCE_REFRESH_INFLIGHT__) return;
+        window.loadBalaghSeparate(true);
+      }, CFG.AUTO_INTERVAL_MS);
+    }
     // تحميل صامت لبيانات حصر الأصول مرة واحدة عند بدء اللوحة — عشان بطاقات
     // "إجمالي الأصول" و"أصول متهالكة" في نظرة عامة تظهر بأرقام حقيقية من
     // غير ما ننتظر المستخدم يفتح تبويب "حصر الأصول" بنفسه.
@@ -4414,12 +4430,31 @@ function applyMapTileLayer() {
 // ── تكبير/تصغير الخريطة (2026-08-25) — CSS فقط: كلاس على الغلاف بيخلي
 // الفلاتر تتحول لشريط عائم فوق الخريطة (راجع dashboard.css). لازم
 // invalidateSize بعد التبديل عشان Leaflet يعيد حساب أبعاد اللوحة الجديدة ──
+const MAP_COLLAPSIBLE_ROW_IDS = ["map-search-row", "map-mode-row", "map-filters-row-general", "map-filters-row"];
 window.toggleMapExpand = function () {
   _mapExpanded = !_mapExpanded;
   const wrap = document.getElementById("map-fullscreen-wrap"),
     btn = document.getElementById("map-expand-btn");
-  if (wrap) wrap.classList.toggle("map-expanded", _mapExpanded);
+  if (wrap) {
+    wrap.classList.toggle("map-expanded", _mapExpanded);
+    // الوضع الافتراضي عند فتح التكبير: كل الأشرطة مقفولة (بس الأيقونة
+    // ظاهرة)، والمستخدم يفتح اللي محتاجه بنفسه — وترجع كل الأشرطة لوضعها
+    // الطبيعي (مفتوحة) تلقائيًا عند الخروج من وضع التكبير
+    MAP_COLLAPSIBLE_ROW_IDS.forEach((id) => {
+      const row = document.getElementById(id);
+      if (!row) return;
+      row.classList.toggle("row-collapsed", _mapExpanded);
+    });
+  }
   if (btn) btn.innerHTML = _mapExpanded ? "✕ تصغير الخريطة" : "⛶ تكبير الخريطة";
+  setTimeout(() => { _map && _map.invalidateSize(); }, 200);
+};
+// ── طيّ/إظهار شريط تحكّم واحد بذاته في وضع التكبير فقط — كل شريط له زر
+// خاص بيه (راجع dashboard.css)، عشان المستخدم يطوي اللي مش محتاجه بس ──
+window.toggleMapRow = function (rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  row.classList.toggle("row-collapsed");
   setTimeout(() => { _map && _map.invalidateSize(); }, 200);
 };
 // ── الخروج من وضع التكبير بمفتاح Escape — تحسين تجربة استخدام بسيط ──
@@ -4642,9 +4677,14 @@ function renderMap() {
       sectorLine =
         r.sector
           ? `<div class="map-popup-row"><span class="map-popup-lbl">المحافظة</span><span class="map-popup-val">${esc(r.sector)}</span></div>`
+          : "",
+      supRec = (typeof window.getSupervisorForSchool === "function") ? window.getSupervisorForSchool(r.minId || r.schoolSeq) : null,
+      supLine =
+        supRec && supRec.fieldName
+          ? `<div class="map-popup-row"><span class="map-popup-lbl">المشرف الميداني</span><span class="map-popup-val">${esc(supRec.fieldName)}${supRec.fieldPhone ? " · " + esc(supRec.fieldPhone) : ""}</span></div>`
           : "";
     (circle.bindPopup(
-      `\n      <div style="min-width:190px;direction:rtl;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif">\n        <div class="map-popup-name">${esc(r.name)}</div>\n        <div style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};border:1px solid ${color}44;margin-bottom:8px">${label}</div>\n        ${fcaLine}${envLine}\n        ${minIdLine}${cityLine}${sectorLine}\n        <div class="map-popup-row"><span class="map-popup-lbl">الحي</span><span class="map-popup-val">${esc(r.district) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">المرحلة</span><span class="map-popup-val">${esc(r.stage) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الجنس</span><span class="map-popup-val">${esc(r.gender) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الملكية</span><span class="map-popup-val">${esc(r.ownership) || "—"}</span></div>\n        ${alertsLine}\n      </div>\n    `,
+      `\n      <div style="min-width:190px;direction:rtl;font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif">\n        <div class="map-popup-name">${esc(r.name)}</div>\n        <div style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};border:1px solid ${color}44;margin-bottom:8px">${label}</div>\n        ${fcaLine}${envLine}\n        ${minIdLine}${cityLine}${sectorLine}\n        <div class="map-popup-row"><span class="map-popup-lbl">الحي</span><span class="map-popup-val">${esc(r.district) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">المرحلة</span><span class="map-popup-val">${esc(r.stage) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الجنس</span><span class="map-popup-val">${esc(r.gender) || "—"}</span></div>\n        <div class="map-popup-row"><span class="map-popup-lbl">الملكية</span><span class="map-popup-val">${esc(r.ownership) || "—"}</span></div>\n        ${alertsLine}${supLine}\n      </div>\n    `,
       { maxWidth: 260, className: "map-popup-custom" },
     ),
       markers.push(circle));
@@ -8801,6 +8841,7 @@ function _sysDownloadFile(filename, content, mime) {
     category: "",
     priority: "",
     location: "",
+    region: "",
     contractor: "",
     stage: "",
     gender: "",
@@ -8810,6 +8851,23 @@ function _sysDownloadFile(filename, content, mime) {
     sort: "date_desc",
     topSchoolN: 10,
   });
+
+  // المنطقة الرئيسية لكل محافظة — حسب التجميع الفعلي في شيت المباني
+  // (عمود المدينة_الرئيسية)، محافظة غير موجودة هنا تُعتبر منطقتها نفسها
+  const BALAGH_SECTOR_TO_REGION = {
+    "مكة المكرمة": "مكة المكرمة",
+    "القنفذة": "مكة المكرمة",
+    "الليث": "مكة المكرمة",
+    "المدينة المنورة": "المدينة المنورة",
+    "ينبع": "المدينة المنورة",
+    "العلا": "المدينة المنورة",
+    "المهد": "المدينة المنورة",
+    "جدة": "جدة",
+    "الطائف": "الطائف",
+  };
+  function balaghRegionFromSector_(sector) {
+    return sector ? (BALAGH_SECTOR_TO_REGION[sector] || sector) : "";
+  }
 
   const STATUS_ORDER = {
     "In Progress": 1,
@@ -9132,6 +9190,7 @@ function _sysDownloadFile(filename, content, mime) {
           linkedCity:        linkedSchool ? linkedSchool.city        : "",
           isLinked:          !!linkedSchool,
           location:          norm(r["المحافظة التابع لها المدرسة"]),
+          region:            balaghRegionFromSector_(norm(r["المحافظة التابع لها المدرسة"])),
           city:              norm(r["TBC مدينة"]),
           category:          norm(r["الفئة الرئيسية"]),
           subCategory:       norm(r["الفئة الفرعية"]),
@@ -9253,6 +9312,7 @@ function _sysDownloadFile(filename, content, mime) {
     const category = ST.category || document.getElementById("balagh-category")?.value || "";
     const priority = ST.priority || document.getElementById("balagh-priority")?.value || "";
     const location = ST.location || document.getElementById("balagh-location")?.value || "";
+    const region = ST.region || document.getElementById("balagh-region")?.value || "";
     const dateFrom = ST.dateFrom || document.getElementById("balagh-date-from")?.value || "";
     const dateTo = ST.dateTo || document.getElementById("balagh-date-to")?.value || "";
     const month = ST.month || document.getElementById("balagh-month")?.value || "";
@@ -9269,6 +9329,7 @@ function _sysDownloadFile(filename, content, mime) {
       if (category && r.category !== category) return false;
       if (priority && r.priority !== priority) return false;
       if (location && r.location !== location) return false;
+      if (region && r.region !== region) return false;
       if (contractor && r.contractor !== contractor) return false;
       if (stage && r.stage !== stage) return false;
       if (gender && r.gender !== gender) return false;
@@ -9893,7 +9954,20 @@ function _sysDownloadFile(filename, content, mime) {
           </select>
         </div>
         <div class="fg">
-          <div class="fg-lbl">المنطقة</div>
+          <div class="fg-lbl">المنطقة الرئيسية</div>
+          <select class="fsel" id="balagh-region" onchange="window.__BALAGH_STATE__.region=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
+            <option value="">الكل</option>
+            ${[...new Set(all.map((r) => r.region).filter(Boolean))]
+              .sort()
+              .map(
+                (v) =>
+                  `<option value="${escText(v)}"${STATE.region === v ? " selected" : ""}>${escText(v)}</option>`,
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المحافظة</div>
           <select class="fsel" id="balagh-location" onchange="window.__BALAGH_STATE__.location=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
             <option value="">الكل</option>
             ${[...new Set(all.map((r) => r.location).filter(Boolean))]
@@ -9963,7 +10037,7 @@ function _sysDownloadFile(filename, content, mime) {
           <input class="finp" type="date" id="balagh-date-to" value="${escText(STATE.dateTo)}"
             onchange="window.__BALAGH_STATE__.dateTo=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
         </div>
-        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
+        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',region:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
         <button class="export-btn export-btn-csv" onclick="window.balaghExportCSV()">⬇ تصدير CSV</button>
         <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolCountsCSV()">⬇ عدد البلاغات لكل مدرسة (Excel)</button>
       </div>
@@ -11001,7 +11075,7 @@ function _sysDownloadFile(filename, content, mime) {
           <div style="font-size:40px;margin-bottom:10px">⚠️</div>
           <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">حصل خطأ أثناء عرض بيانات البلاغات</div>
           <div style="font-size:12px;color:var(--tx-muted);margin-bottom:14px">جرّب مسح الفلاتر أو تحديث الصفحة. إن استمرت المشكلة أبلغ الدعم الفني.</div>
-          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
+          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',region:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
         </div>`;
     }
   }
@@ -18485,6 +18559,46 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
+    // 🧑‍💼 تبويب المشرفين (window.RAW_SUPERVISORS)
+    // أعمدة: المنطقة، الرقم الوزاري، اسم المدرسة، المشرف الميداني (اسم/جوال/
+    // إيميل)، المهندس (اسم/جوال/إيميل)، مسؤول تطوير (اسم/جوال)
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const supRaw = Array.isArray(window.RAW_SUPERVISORS) ? window.RAW_SUPERVISORS : [];
+      if (supRaw.length) {
+        const norm = (v) => String(v == null ? "" : v).replace(/﻿/g, "").trim();
+        const sup = supRaw.map(r => ({
+          region:     norm(r["المنطقة"]),
+          schoolName: norm(r["اسم المدرسة"]),
+          minId:      norm(r["الرقم الوزاري"]),
+          fieldName:  norm(r["المشرف الميداني - الاسم"]),
+          fieldPhone: norm(r["المشرف الميداني - جوال"]),
+          engName:    norm(r["المهندس - الاسم"]),
+          engPhone:   norm(r["المهندس - جوال"]),
+          devName:    norm(r["مسؤول تطوير - الاسم"]),
+          devPhone:   norm(r["مسؤول تطوير - جوال"]),
+        }));
+
+        const byRegion = {};
+        sup.forEach(r => { if (r.region) byRegion[r.region] = (byRegion[r.region] || 0) + 1; });
+
+        // ⚠️ لا تُحفظ هنا — تُحقن في الـ context بشكل منفصل عند الطلب فقط
+        window.__SUP_FULL__ = sup;
+        summary.المشرفون = {
+          مصدر: "تبويب المشرفين — المدارس_والمشرفين",
+          إجمالي_السجلات: sup.length,
+          عدد_المدارس_المغطاة: new Set(sup.map(r => r.minId || r.schoolName).filter(Boolean)).size,
+          عدد_المشرفين_الميدانيين: new Set(sup.map(r => r.fieldName).filter(Boolean)).size,
+          عدد_المهندسين: new Set(sup.map(r => r.engName).filter(Boolean)).size,
+          عدد_مسؤولي_التطوير: new Set(sup.map(r => r.devName).filter(Boolean)).size,
+          توزيع_حسب_المنطقة: Object.entries(byRegion).sort((a,b) => b[1]-a[1]).map(([k,v]) => ({ المنطقة: k, عدد_المدارس: v })),
+        };
+      }
+    } catch (e) {
+      summary.المشرفون = { تنبيه: "تعذّر تلخيص بيانات المشرفين: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // 📈 تبويب "مقارنة مراحل FCA" — ⚠️ "مرحلة" هنا تعني مرحلة/جولة تقييم
     // FCA شهرية (1=أبريل، 2=مايو، 3=يونيو، 4=أغسطس، 5=سبتمبر...، تترقّم
     // تلقائيًا شهر بشهر) — تختلف كليًا عن "المرحلة الدراسية" (ابتدائي/
@@ -19166,7 +19280,7 @@ function exportNashatExcel(rows) {
   ════════════════════════════════════════════════════════════════ */
   const FCB_RULES = [
     { test: /هذه اللوحة|عن اللوحة|اللوحة دي|what is this dashboard|من انت|انت مين|مين انت/i, reply: "أنا مساعد إدارة المرافق الذكي 🏫 — أساعدك في تحليل الحالة الفنية FCA، إدارة العقود والأصول، التجهيزات المدرسية، والبوابين وأنظمة المباني. اسألني عن أي قسم في اللوحة 📊" },
-    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• عقود عدا المجال — عقود FM\n• المدفوعات — قيمة العقود والمدفوع والمتبقي (عقود المجال)\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
+    { test: /تبويب|تبويبات|اقسام|أقسام|tabs|قائمة|أين أجد|وين الاقي|where/i, reply: "التبويبات الرئيسية في الشريط العلوي:\n• نظرة عامة — أهم المؤشرات KPIs\n• تحليل FCA — الحالة الفنية للمباني\n• البيئة المدرسية — جودة بيئة التعلم\n• عقود عدا المجال — عقود FM\n• المدفوعات — قيمة العقود والمدفوع والمتبقي (عقود المجال)\n• البلاغات — الأعطال والاستجابة\n• التجهيزات — الأصول ودورة حياتها\n• الأنظمة الرئيسية — التكييف والكهرباء والسباكة\n• البوابين — قائمة البوابين وبيانات التواصل\n• المشرفون والمهندسون — بيانات التواصل مع المشرف الميداني والمهندس ومسؤول التطوير لكل مدرسة\n• الخريطة — توزيع المواقع جغرافياً 🗂️" },
     { test: /fca|الحالة الفنية|تقييم المبان|حالة المبان|بنية تحتية/i, reply: "تقييم الحالة الفنية FCA (Facility Condition Assessment) 🏗️\n\nيقيس حالة المبنى من 0-100 ويُصنَّف:\n• 75-100: جيد جداً 🟢 — مراقبة روتينية\n• 50-74: جيد 🟡 — صيانة وقائية دورية\n• 25-49: متوسط 🟠 — صيانة تصحيحية عاجلة\n• 0-24: حرج 🔴 — تدخّل فوري خلال 30 يوماً\n\nقاعدة الاستبدال: إذا تجاوزت تكاليف الإصلاح 60% من قيمة الاستبدال، الاستبدال أجدى اقتصادياً." },
     { test: /بيئة|نظاف|ترتيب|جودة البيئة|environment/i, reply: "البيئة المدرسية 🌿 — مؤشر مباشر على جودة الخدمة وسلامة المستخدمين.\n\nتشمل: النظافة، السلامة، الراحة الحرارية، والإضاءة. تبويب البيئة يعرض أفضل 10 وأسوأ 10 مدارس — ركّز جهود التحسين على الأدنى أداءً أولاً." },
     { test: /عقد|عقود|تعاقد|مورد|contract|انتهاء|تجديد/i, reply: "إدارة العقود 📁\n\n• تتبّع تواريخ الانتهاء وتجديدها قبل 60-90 يوماً لضمان استمرارية الخدمة.\n• قياس أداء المقاول وربطه بجودة الصيانة الفعلية (SLA).\n• توثيق كل أعمال الصيانة المنجزة.\n\nتبويب عقود عدا المجال يعرض عقود FM (مقاولون خارج نطاق المجال)، وتبويب المدفوعات يعرض عقود المجال بقيمتها والمدفوع والمتبقي." },
@@ -19175,6 +19289,7 @@ function exportNashatExcel(rows) {
     { test: /تجهيز|أصول|اصول|معدات|asset|equipment|جرد|استبدال/i, reply: "إدارة الأصول والتجهيزات 🪑\n\n• توثيق الأصول وتصنيفها وتتبع حالتها.\n• تخطيط الاستبدال بناءً على العمر التشغيلي وتكاليف الصيانة.\n\nتبويب التجهيزات يحصر الأصول مع الفرق بين المخصص والاحتياج الفعلي — الفرق السالب يعني عجزاً يحتاج ميزانية." },
     { test: /تكييف|كهرباء|سباكة|أنظمة|hvac|electrical|plumbing/i, reply: "أنظمة المباني ⚙️ — التكييف والكهرباء والسباكة\n\n• التكييف: العمر الافتراضي 10-15 سنة — يحتاج صيانة وقائية دورية.\n• الكهرباء: فحص دوري سنوي كحد أدنى.\n• السباكة: مراقبة الصرف وضغط المياه بشكل منتظم.\n\nتبويب الأنظمة الرئيسية والتفصيلية يعرض تقييم كل نظام حسب المدرسة." },
     { test: /بواب|بوابين|حارس|gatekeeper/i, reply: "تبويب البوابين 🧍 — يعرض قائمة كاملة بجميع البوابين مع اسم المدرسة ورقم الجوال ورقم الهوية والمدينة. اسألني مباشرة عن بواب مدرسة معينة وسأخبرك." },
+    { test: /مشرف|مشرفين|مهندس|مسؤول تطوير|supervisor|engineer/i, reply: "تبويب المشرفون والمهندسون 🧑‍💼 — يعرض المشرف الميداني والمهندس ومسؤول التطوير المسؤولين عن كل مدرسة مع أرقام التواصل. اسألني مباشرة عن مشرف مدرسة معينة وسأخبرك." },
     { test: /خريط|موقع|مواقع|جغراف|map|توزيع/i, reply: "تبويب الخريطة 🗺️ يعرض توزيع المدارس جغرافياً مع مؤشرات حالتها (FCA والبيئة)، لتحديد التجمعات الجغرافية ذات الأولوية وتخطيط جولات الفحص الميداني بكفاءة." },
     { test: /مؤشر|kpi|إحصائ|احصائ|أرقام|ملخص|نظرة عامة|overview/i, reply: "مؤشرات الأداء KPIs 📈 — أبرزها:\n• متوسط زمن الاستجابة للبلاغات.\n• نسبة إغلاق البلاغات خلال المدة المحددة.\n• متوسط FCA للمحفظة.\n• معدل إنجاز العقود.\n\nتبويب نظرة عامة يجمع أهم KPIs في بطاقات سريعة." },
     { test: /تحديث|بيانات|مصدر|refresh|محدّث|متى/i, reply: "تقدر تحدّث البيانات من زر «↻ تحديث» في الشريط العلوي، أو تفعّل «◷ تلقائي» للتحديث الدوري. يظهر وقت آخر تحديث بجانب الأزرار ⏱️" },
@@ -19746,9 +19861,28 @@ function exportNashatExcel(rows) {
      من غير ترتيب ولا قصّ — عشان تُستخدم برضو في تجميع "أعلى مدارس بلاغات"
      (aiBalaghSchoolAgg_) اللي محتاجة تحسب من *كل* الصفوف المطابقة للفلتر،
      مش بس أول 80/250 صف بعد الترتيب بالتاريخ زي اللي بيترجع هنا. ── */
+  // 📅 2026-09-03: هل تاريخ إنشاء البلاغ هو "اليوم" (بتوقيت جهاز المستخدم)؟
+  // تُستخدم لفلتر "بلاغات اليوم" — بيشتغل على أي بلاغ (أمن وسلامة أو غيره).
+  function aiBalaghIsToday_(d) {
+    if (!(d instanceof Date) || isNaN(d.getTime())) return false;
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  }
   function aiBalaghApplyFilters_(rows, q) {
     q = q || {};
     if (q.status) rows = rows.filter((r) => String(r.status || "").includes(q.status));
+    // 🛡️ 2026-09-03: فلتر "أمن وسلامة فقط" — نفس المطابقة المستخدمة في
+    // تبويبَي "بلاغات الأمن والسلامة"/"ملخص الأمن والسلامة" (14 تصنيفًا
+    // على عمود الفئة الفرعية)، عشان الشات بوت يقدر يرجّع قائمة/تجميع فعلي
+    // لبلاغات الأمن والسلامة بس مش مجرد أرقام إجمالية جاهزة.
+    if (q.securityOnly) {
+      const fn = window.isSecuritySafetyBalaghRow;
+      if (typeof fn === "function") rows = rows.filter(fn);
+    }
+    // 📅 2026-09-03: فلتر "اليوم فقط" — يشتغل بصرف النظر عن نوع البلاغ
+    // (أمن وسلامة أو غيره)، ويُطبَّق مع فلتر الأمن والسلامة أعلاه لو الاتنين
+    // مطلوبين معاً ("بلاغات أمن وسلامة اليوم").
+    if (q.todayOnly) rows = rows.filter((r) => aiBalaghIsToday_(r.creationDateObj));
     // 🏙️ فلتر المدينة — أُضيف 2026-08-23 عشان أسئلة عامة زي "بلاغات جدة"
     // من غير اسم مدرسة. بنفحص city (TBC مدينة) و linkedCity (مدينة المدرسة
     // المرتبطة من ملف المباني) معاً لأن أحياناً واحد منهم فاضي والتاني لأ.
@@ -20150,6 +20284,16 @@ function exportNashatExcel(rows) {
     // (slaStatus === "تم اختراقه") المستخدمة في باقي المحرك.
     const slaOverdueFilter = /متأخر[ةه]?\s*sla|sla\s*متأخر[ةه]?|تجاوز.*sla|اخترق.*sla|overdue/i.test(t);
 
+    // 🛡️ 2026-09-03: اكتشاف سؤال عن بلاغات "الأمن والسلامة" تحديداً — نفس
+    // تصنيفات SECURITY_SAFETY_CATEGORIES (14 تصنيفًا على الفئة الفرعية)،
+    // مش قيمة "الفئة الرئيسية" العادية (categoryMatch تحت بيبقى null لها
+    // لأنها مش قيمة حرفية موجودة في عمود الفئة الرئيسية).
+    const securityFilter = /أمن\s*(?:و\s*)?(?:ال)?سلامة|حريق|طفاي[ةه]|مضخات الحريق|إنذار مبكر|مخرج.*طوارئ|إخلاء/i.test(t);
+    // 📅 2026-09-03: اكتشاف سؤال عن بلاغات "اليوم" — يشتغل بصرف النظر عن
+    // النوع (أمن وسلامة أو غيره)، ولو اتذكر مع securityFilter الاتنين
+    // بيتطبّقوا معاً ("بلاغات أمن وسلامة اليوم").
+    const todayFilter = /اليوم|النهارده|النهاردة|today/i.test(t);
+
     // 🏷️ اكتشاف فئة رئيسية مذكورة — من قيم الفئات الحقيقية الموجودة فعلياً
     // في البيانات (مش قائمة ثابتة مكتوبة يدوياً) عشان تفضل صحيحة مهما اتغيّرت
     // فئات الشيت. بنرتب الأطول أولاً لتفادي تطابق جزئي مضلل.
@@ -20166,7 +20310,7 @@ function exportNashatExcel(rows) {
     // استنتاج من عيّنة أحدث 80 بلاغ.
     const wordFreqRequested = /أعطال|كلم[ةه]|كلمات|أكثر\s*تكرار|الأكثر\s*تكرار|متكرر[ةه]?|شيوع|أكثر\s*شيوعاً|مشاكل\s*متكرر/i.test(t);
 
-    const hasFilter = !!(cityMatch || statusFilter || urgentFilter || categoryMatch || slaOverdueFilter);
+    const hasFilter = !!(cityMatch || statusFilter || urgentFilter || categoryMatch || slaOverdueFilter || securityFilter || todayFilter);
     // العدد المطلوب من المدارس في الترتيب (لو مذكور صراحة في السؤال — مثلاً
     // "أكتر 10 مدارس" أو "أعلى 20") — 2026-08-25
     const topNSchools = fcbParseRequestedTopN(t, 10);
@@ -20189,6 +20333,8 @@ function exportNashatExcel(rows) {
         closedOnly: statusFilter === "closed",
         urgentOnly: urgentFilter,
         sla: slaOverdueFilter ? "تم اختراقه" : null,
+        securityOnly: securityFilter,
+        todayOnly: todayFilter,
       };
       filtered = aiBalaghSearchReports_({ ...filterQ, limit: 300 });
       // 🎯 2026-08-25: تجميع "أعلى/أقل مدارس بلاغات" من *كل* الصفوف المطابقة
@@ -20231,6 +20377,14 @@ function exportNashatExcel(rows) {
     });
     const monthlyTrend = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([k, v]) => ({ الشهر: k, العدد: v }));
 
+    // 🛡️📅 2026-09-03: أرقام "اليوم" و"أمن وسلامة" دايماً متاحة بصرف النظر
+    // عن وجود فلتر — عشان أي سؤال عام يلاقي إجابة مباشرة من غير الحاجة
+    // لصياغة السؤال بكلمة فلترة معينة.
+    const isSecFn = typeof window.isSecuritySafetyBalaghRow === "function" ? window.isSecuritySafetyBalaghRow : () => false;
+    const todayRowsAll = rows.filter((r) => aiBalaghIsToday_(r.creationDateObj));
+    const securityRowsAll = rows.filter(isSecFn);
+    const todaySecurityRowsAll = todayRowsAll.filter(isSecFn);
+
     const baseNote = leastFilter
       ? "السؤال عن *أقل* مدارس بلاغات — استخدم قسم 'أعلى_مدارس_ضمن_الفلتر' (بيحتوي مفتاح 'أقل_مدارس' مش 'أعلى_مدارس' في وضع الترتيب التصاعدي ده). القائمة هنا بتشمل فعلياً المدارس اللي عندها صفر بلاغات ضمن نفس النطاق (كل اللوحة أو مدينة appliedFilters.مدينة لو موجودة) — دي أفضل المدارس أداءً فعلاً، مش بس أقل مدرسة من ضمن اللي اشتكى منها حد."
       : hasFilter
@@ -20246,11 +20400,18 @@ function exportNashatExcel(rows) {
           ? " ولأي سؤال عن أكتر الأعطال/الكلمات/العبارات تكراراً في نص وصف البلاغ نفسه: استخدم "
             + (hasFilter ? "توزيع_الفئات_ضمن_الفلتر.تحليل_نص_وصف_البلاغات" : "الإحصائيات_الإجمالية.تحليل_نص_وصف_البلاغات")
             + " — فيه 3 مستويات: .أكثر_الأعطال_المصنّفة_تكراراً (الأدق — أعطال حقيقية زي 'تسرب مياه'، فضّله للسؤال عن 'أعطال')، .أكثر_العبارات_تكراراً (عبارات كلمتين-تلاتة)، .أكثر_الكلمات_تكراراً (كلمات مفردة). كل ده تحليل فعلي لكل نصوص الوصف (مش عيّنة، ومش تخمين)، فأجب مباشرة من غير أي اعتذار عن نقص بيانات."
-          : "");
+          : "")
+      // 🛡️📅 2026-09-03: توضيح صريح لأسئلة "بلاغات اليوم" و"بلاغات الأمن
+      // والسلامة" — عشان الموديل يستخدم نتيجة_مفلترة (لو securityFilter/
+      // todayFilter اتفعّلوا) أو أرقام الإحصائيات_الإجمالية.بلاغات_اليوم /
+      // بلاغات_الأمن_والسلامة الجاهزة دايماً، مش يقول "البيانات غير متاحة".
+      + (securityFilter || todayFilter
+          ? " ⚠️ السؤال يخص " + (securityFilter && todayFilter ? "بلاغات الأمن والسلامة اليوم تحديداً" : securityFilter ? "بلاغات الأمن والسلامة" : "بلاغات اليوم") + " — استخدم 'نتيجة_مفلترة' (القائمة الفعلية المطابقة) و'أعلى_مدارس_ضمن_الفلتر' و'توزيع_الفئات_ضمن_الفلتر' مباشرة؛ إجمالي_البلاغات_ضمن_الفلتر هو العدد الحقيقي الكامل (مش عيّنة). بلاغات 'الأمن والسلامة' هنا هي البلاغات المستخرجة من شيت البلاغات العام نفسه عبر عمود الفئة الفرعية (14 تصنيفًا)، وليست شيتًا منفصلًا."
+          : " ولأي سؤال عن بلاغات اليوم أو بلاغات الأمن والسلامة (حتى لو ماذكرش صراحة في نص السؤال الحالي): استخدم الإحصائيات_الإجمالية.بلاغات_اليوم / بلاغات_الأمن_والسلامة_اليوم / بلاغات_الأمن_والسلامة_الإجمالي — أرقام حقيقية جاهزة دايماً محسوبة من كل البلاغات.");
     return {
       status: "ok",
       note: baseNote + catNote,
-      appliedFilters: (hasFilter || leastFilter) ? { مدينة: cityMatch, حالة: statusFilter, عاجل: urgentFilter || null, فئة: categoryMatch, متأخر_SLA: slaOverdueFilter || null, الترتيب: leastFilter ? "الأقل أولاً" : "الأكثر أولاً" } : null,
+      appliedFilters: (hasFilter || leastFilter) ? { مدينة: cityMatch, حالة: statusFilter, عاجل: urgentFilter || null, فئة: categoryMatch, متأخر_SLA: slaOverdueFilter || null, أمن_وسلامة_فقط: securityFilter || null, اليوم_فقط: todayFilter || null, الترتيب: leastFilter ? "الأقل أولاً" : "الأكثر أولاً" } : null,
       نتيجة_مفلترة: filtered,
       أعلى_مدارس_ضمن_الفلتر: topSchoolsFiltered,
       // 🎯 2026-08-25: توزيع الفئة/الفئة الفرعية ضمن نطاق appliedFilters نفسه
@@ -20262,6 +20423,13 @@ function exportNashatExcel(rows) {
         مفتوحة: open,
         مغلقة: closed,
         متأخرة_SLA: overdue,
+        // 🛡️📅 2026-09-03: أرقام جاهزة دايماً (بصرف النظر عن أي فلتر مكتشف)
+        // لأي سؤال عن "بلاغات اليوم" أو "بلاغات الأمن والسلامة" — بلاغات
+        // الأمن والسلامة هنا مستخرجة من نفس شيت البلاغات العام (14 تصنيفًا
+        // على الفئة الفرعية)، وليست شيتًا منفصلًا.
+        بلاغات_اليوم: todayRowsAll.length,
+        بلاغات_الأمن_والسلامة_الإجمالي: securityRowsAll.length,
+        بلاغات_الأمن_والسلامة_اليوم: todaySecurityRowsAll.length,
         // 🎯 2026-08-25: كل توزيعات القيم دي محسوبة من الـ 85,895+ بلاغ
         // بالكامل (مش عيّنة أحدث 80) — يصح الاستشهاد بها مباشرة بثقة كاملة
         // لأي سؤال عن "الأكثر تكراراً" على مستوى الفئة/الفئة الفرعية/إلخ.
@@ -20556,8 +20724,9 @@ function exportNashatExcel(rows) {
     const tajheezMatch = fcbMatchTajheezName(t);
     return {
       بوابين:    /بواب|بوابين|حارس|gatekeeper/i.test(t),
+      مشرفين:    /مشرف|مشرفين|مهندس|مهندسين|مسؤول تطوير|supervisor|engineer/i.test(t),
       عقود:      /عقد|عقود|مستحق|مقاول|contract|مدة|انتهاء|تجديد|fm|صروف/i.test(t),
-      بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق|أسرع مقاول|أبطأ مقاول|ترتيب المقاول|تصنيف المقاول|أداء المقاول/i.test(t),
+      بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق|أسرع مقاول|أبطأ مقاول|ترتيب المقاول|تصنيف المقاول|أداء المقاول|أمن\s*(?:و\s*)?(?:ال)?سلامة|حريق|طفاي[ةه]|مضخات الحريق|إنذار مبكر|مخرج.*طوارئ|إخلاء/i.test(t),
       fca:       /fca|حالة فنية|تقييم|حرج|متوسط.*مبنى|أسوأ مدرسة/i.test(t),
       أنظمة:     /نظام|تكييف|كهرباء|سباكة|hvac|درجة.*نظام/i.test(t),
       تجهيزات:   /تجهيز|أصول|مخزون|احتياج|مخصص|عجز/i.test(t) || !!tajheezMatch,
@@ -20938,6 +21107,17 @@ function exportNashatExcel(rows) {
         // نضغط الأعمدة عشان نوفر tokens
         const compressed = subset.map(r => `${r.schoolName}|${r.minId}|${r.city}|${r.gateName}|${r.phone}|${r.nationalId}`);
         extraContext += `\n\nقائمة البوابين (اسم المدرسة|الرقم الوزاري|المدينة|اسم البواب|الجوال|الهوية):\n${compressed.join("\n")}`;
+      }
+    }
+
+    if (topics.مشرفين) {
+      const supFull = window.__SUP_FULL__ || [];
+      if (supFull.length) {
+        const schoolMatch = userText.match(/مدرسة\s+([\u0600-\u06FF\s]+)/)?.[1]?.trim();
+        let subset = supFull;
+        if (schoolMatch) subset = supFull.filter(r => r.schoolName.includes(schoolMatch) || r.minId.includes(schoolMatch));
+        const compressed = subset.map(r => `${r.schoolName}|${r.minId}|${r.region}|${r.fieldName}|${r.fieldPhone}|${r.engName}|${r.engPhone}|${r.devName}|${r.devPhone}`);
+        extraContext += `\n\nقائمة المشرفين (اسم المدرسة|الرقم الوزاري|المنطقة|المشرف الميداني|جواله|المهندس|جواله|مسؤول التطوير|جواله):\n${compressed.join("\n")}`;
       }
     }
 
@@ -22166,6 +22346,9 @@ ${(() => {
   window.fcbDetectTopics  = window.fcbDetectTopics  || fcbDetectTopics;
   window.fcbBuildPriorityActions = window.fcbBuildPriorityActions || fcbBuildPriorityActions;
   window.fcbParseRequestedTopN = window.fcbParseRequestedTopN || fcbParseRequestedTopN;
+  // 🔧 2026-09-03: تعريض قراءة فقط لمحرك استعلامات البلاغات العام — عشان
+  // فلترة "بلاغات اليوم"/"أمن وسلامة" تبقى قابلة للاختبار المباشر.
+  window.aiBalaghGeneralOverview_ = window.aiBalaghGeneralOverview_ || aiBalaghGeneralOverview_;
 
   /* ════════════════════════════════════════════════════════════════
      📨 إرسال الرسالة — يجرّب OpenAI أولاً، ولو فشل أو ما فيه مفتاح
@@ -22506,6 +22689,305 @@ ${(() => {
     "[gatekeepers] تم تحميل الملف بنجاح. typeof renderGatekeepersTab =",
     typeof window.renderGatekeepersTab,
   );
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+   تبويب المشرفين
+   المصدر: window.RAW_SUPERVISORS (key: schoolsSupervisors في GAS)
+   أعمدة الملف: المنطقة، الرقم الوزاري، اسم المدرسة، المشرف الميداني (اسم/
+                جوال/إيميل)، المهندس (اسم/جوال/إيميل)، مسؤول تطوير (اسم/جوال)
+══════════════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var fmt_ = typeof fmt === "function" ? fmt : function (v) { return v == null ? "—" : Number(v).toLocaleString("en-US"); };
+  var esc_ = typeof esc === "function" ? esc : function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+    });
+  };
+
+  var STATE = (window.__SUP_STATE__ = window.__SUP_STATE__ || {
+    page: 0,
+    size: 25,
+    search: "",
+    region: "",
+    sort: "region",
+  });
+
+  function norm(v) {
+    return String(v == null ? "" : v).replace(/﻿/g, "").trim();
+  }
+
+  function getRaw() {
+    return Array.isArray(window.RAW_SUPERVISORS) ? window.RAW_SUPERVISORS : [];
+  }
+
+  function normalizeRows() {
+    return getRaw().map(function (r) {
+      return {
+        minId: norm(r["الرقم الوزاري"]),
+        schoolName: norm(r["اسم المدرسة"]),
+        region: norm(r["المنطقة"]),
+        fieldName: norm(r["المشرف الميداني - الاسم"]),
+        fieldPhone: norm(r["المشرف الميداني - جوال"]),
+        fieldEmail: norm(r["المشرف الميداني - إيميل"]),
+        engName: norm(r["المهندس - الاسم"]),
+        engPhone: norm(r["المهندس - جوال"]),
+        engEmail: norm(r["المهندس - إيميل"]),
+        devName: norm(r["مسؤول تطوير - الاسم"]),
+        devPhone: norm(r["مسؤول تطوير - جوال"]),
+      };
+    });
+  }
+
+  // فهرس موحّد حسب الرقم الوزاري (normSchoolId) — يُستخدم من الخريطة وبانل
+  // المدرسة الشامل. عند تكرار الرقم الوزاري لأكثر من مدرسة، يُعتمد آخر سجل.
+  window.getSupervisorForSchool = function (minId) {
+    if (!window.__SUPERVISORS_MAP__) {
+      var map = {};
+      normalizeRows().forEach(function (r) {
+        var id = window.normSchoolId ? window.normSchoolId(r.minId) : r.minId;
+        if (id) map[id] = r;
+      });
+      window.__SUPERVISORS_MAP__ = map;
+    }
+    var key = window.normSchoolId ? window.normSchoolId(minId) : minId;
+    return key ? window.__SUPERVISORS_MAP__[key] || null : null;
+  };
+
+  function filteredRows(all) {
+    var q = STATE.search.trim().toLowerCase();
+    return all.filter(function (r) {
+      if (STATE.region && r.region !== STATE.region) return false;
+      if (!q) return true;
+      return (
+        r.schoolName.toLowerCase().indexOf(q) !== -1 ||
+        r.minId.toLowerCase().indexOf(q) !== -1 ||
+        r.fieldName.toLowerCase().indexOf(q) !== -1 ||
+        r.engName.toLowerCase().indexOf(q) !== -1 ||
+        r.devName.toLowerCase().indexOf(q) !== -1 ||
+        r.region.toLowerCase().indexOf(q) !== -1
+      );
+    });
+  }
+
+  var SORTERS = {
+    region: function (a, b) {
+      return a.region.localeCompare(b.region, "ar") || a.schoolName.localeCompare(b.schoolName, "ar");
+    },
+    school: function (a, b) { return a.schoolName.localeCompare(b.schoolName, "ar"); },
+    field: function (a, b) { return a.fieldName.localeCompare(b.fieldName, "ar"); },
+    minId: function (a, b) { return (parseInt(a.minId, 10) || 0) - (parseInt(b.minId, 10) || 0); },
+  };
+
+  function sortRows(rows, sort) {
+    return rows.slice().sort(SORTERS[sort] || SORTERS.region);
+  }
+
+  function pctOf(n, total) {
+    if (!total) return "0%";
+    return ((n / total) * 100).toFixed(1) + "%";
+  }
+
+  function renderBarList(items, total, color) {
+    if (!items.length) return '<div class="empty-msg" style="padding:18px">لا توجد بيانات</div>';
+    return items
+      .map(function (it) {
+        var w = total ? Math.max(6, (it.v / total) * 100) : 0;
+        return (
+          '<div class="school-row" style="align-items:flex-start">' +
+          '<div style="min-width:140px;flex:0 0 140px;font-size:12px;font-weight:700;color:var(--tx-main)">' +
+          esc_(it.k) + "</div>" +
+          '<div style="flex:1"><div class="mini-track"><div class="mini-fill" style="width:' + w +
+          "%;background:" + color + '"></div></div></div>' +
+          '<div style="min-width:56px;text-align:left;font-weight:800;color:' + color +
+          ';font-variant-numeric:tabular-nums">' + fmt_(it.v) + "</div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function renderPager(total) {
+    var pages = Math.max(1, Math.ceil(total / STATE.size));
+    var current = Math.min(STATE.page, pages - 1);
+    STATE.page = current;
+    var start = current * STATE.size;
+    var end = Math.min(start + STATE.size, total);
+    return (
+      '<div class="pag-bar">' +
+      '<div class="pag-info">عرض ' + fmt_(start + 1) + " - " + fmt_(end) + " من " + fmt_(total) + " سجل</div>" +
+      '<div class="pag-btns">' +
+      '<button class="pag-btn" ' + (current <= 0 ? "disabled" : "") +
+      ' onclick="window.__SUP_STATE__.page=Math.max(0,window.__SUP_STATE__.page-1);renderSupervisorsTab()">◀ السابق</button>' +
+      '<button class="pag-btn active">' + fmt_(current + 1) + " / " + fmt_(pages) + "</button>" +
+      '<button class="pag-btn" ' + (current >= pages - 1 ? "disabled" : "") +
+      ' onclick="window.__SUP_STATE__.page=Math.min(' + (pages - 1) + ',window.__SUP_STATE__.page+1);renderSupervisorsTab()">التالي ▶</button>' +
+      "</div></div>"
+    );
+  }
+
+  function exportSupCSV(rows) {
+    var headers = ["المنطقة", "اسم المدرسة", "الرقم الوزاري", "المشرف الميداني", "جوال المشرف", "المهندس", "جوال المهندس", "مسؤول التطوير", "جوال مسؤول التطوير"];
+    var csv = [headers.map(function (h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(",")];
+    rows.forEach(function (r) {
+      var vals = [r.region, r.schoolName, r.minId, r.fieldName, r.fieldPhone, r.engName, r.engPhone, r.devName, r.devPhone].map(function (v) {
+        return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+      });
+      csv.push(vals.join(","));
+    });
+    var blob = new Blob(["﻿" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "المشرفون_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 150);
+  }
+
+  function phoneCell(phone) {
+    return phone ? '<a href="tel:' + esc_(phone) + '" style="color:#0891B2;text-decoration:none">' + esc_(phone) + "</a>" : "—";
+  }
+
+  function personCell(name, phone) {
+    if (!name) return "—";
+    return '<div style="font-weight:700">' + esc_(name) + "</div>" +
+      '<div style="font-size:11px;color:var(--tx-muted)">' + phoneCell(phone) + "</div>";
+  }
+
+  function showErrorState(el, message) {
+    el.innerHTML =
+      '<div class="card empty-state">' +
+      '<div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>' +
+      '<div class="empty-state-title">تعذّر عرض بيانات المشرفين</div>' +
+      '<div class="empty-state-sub">' + esc_(message) + "</div></div>";
+  }
+
+  window.renderSupervisorsTab = function renderSupervisorsTab() {
+    var el = document.getElementById("supervisors-content");
+    if (!el) return;
+
+    try {
+      var all = normalizeRows();
+
+      if (!all.length) {
+        el.innerHTML =
+          '<div class="card empty-state">' +
+          '<div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>' +
+          '<div class="empty-state-title">لم يتم التحميل</div>' +
+          "</div></div>";
+        return;
+      }
+
+      var rows = sortRows(filteredRows(all), STATE.sort);
+      var total = all.length;
+      var filteredTotal = rows.length;
+
+      var regionsSet = {};
+      all.forEach(function (r) { if (r.region) regionsSet[r.region] = true; });
+      var regionsList = Object.keys(regionsSet);
+
+      var schoolsSet = {};
+      rows.forEach(function (r) { var k = r.minId || r.schoolName; if (k) schoolsSet[k] = true; });
+      var schoolsCount = Object.keys(schoolsSet).length;
+
+      var fieldSet = {}, engSet = {}, devSet = {};
+      rows.forEach(function (r) {
+        if (r.fieldName) fieldSet[r.fieldName] = true;
+        if (r.engName) engSet[r.engName] = true;
+        if (r.devName) devSet[r.devName] = true;
+      });
+
+      var regionCounts = regionsList
+        .map(function (c) { return { k: c, v: rows.filter(function (r) { return r.region === c; }).length }; })
+        .sort(function (a, b) { return b.v - a.v; });
+
+      var list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
+      var totalForBars = Math.max(1, filteredTotal);
+
+      var regionOptions = regionsList
+        .slice()
+        .sort(function (a, b) { return a.localeCompare(b, "ar"); })
+        .map(function (v) {
+          return '<option value="' + esc_(v) + '"' + (STATE.region === v ? " selected" : "") + ">" + esc_(v) + "</option>";
+        })
+        .join("");
+
+      var rowsHtml = list.length
+        ? list
+            .map(function (r) {
+              return (
+                "<tr>" +
+                '<td style="text-align:right;font-weight:700">' + esc_(r.schoolName || "—") + "</td>" +
+                '<td style="font-weight:800">' + esc_(r.minId || "—") + "</td>" +
+                "<td>" + esc_(r.region || "—") + "</td>" +
+                "<td>" + personCell(r.fieldName, r.fieldPhone) + "</td>" +
+                "<td>" + personCell(r.engName, r.engPhone) + "</td>" +
+                "<td>" + personCell(r.devName, r.devPhone) + "</td>" +
+                "</tr>"
+              );
+            })
+            .join("")
+        : '<tr><td colspan="6"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>';
+
+      el.innerHTML =
+        '<div class="card mb14">' +
+        '<div class="card-title">' +
+        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>' +
+        "<span>المشرفون والمهندسون</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
+        "</div>" +
+        '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
+        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
+        '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(Object.keys(fieldSet).length) + '</div><div class="kpi-lbl">مشرفون ميدانيون</div><div class="kpi-sub">عدد فريد</div></div>' +
+        '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(Object.keys(engSet).length) + '</div><div class="kpi-lbl">المهندسون</div><div class="kpi-sub">عدد فريد</div></div>' +
+        '<div class="kpi kc-amber"><div class="kpi-val" style="color:#92400e">' + fmt_(Object.keys(devSet).length) + '</div><div class="kpi-lbl">مسؤولو التطوير</div><div class="kpi-sub">عدد فريد</div></div>' +
+        "</div></div>" +
+        '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
+        '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
+        '<input class="finp" id="sup-search" placeholder="🔍 اسم المدرسة أو الرقم الوزاري أو اسم المشرف..." value="' + esc_(STATE.search) + '" style="width:100%" ' +
+        'oninput="window.__SUP_STATE__.search=this.value;window.__SUP_STATE__.page=0;smartSearchRerender(this, renderSupervisorsTab)"></div>' +
+        '<div class="fg"><div class="fg-lbl">المنطقة</div>' +
+        '<select class="fsel" id="sup-region" onchange="window.__SUP_STATE__.region=this.value;window.__SUP_STATE__.page=0;renderSupervisorsTab()">' +
+        '<option value="">الكل</option>' + regionOptions + "</select></div>" +
+        '<div class="fg"><div class="fg-lbl">الترتيب</div>' +
+        '<select class="fsel" id="sup-sort" onchange="window.__SUP_STATE__.sort=this.value;window.__SUP_STATE__.page=0;renderSupervisorsTab()">' +
+        '<option value="region"' + (STATE.sort === "region" ? " selected" : "") + ">المنطقة ثم المدرسة</option>" +
+        '<option value="school"' + (STATE.sort === "school" ? " selected" : "") + ">اسم المدرسة (أبجدي)</option>" +
+        '<option value="field"' + (STATE.sort === "field" ? " selected" : "") + ">المشرف الميداني (أبجدي)</option>" +
+        '<option value="minId"' + (STATE.sort === "minId" ? " selected" : "") + ">الرقم الوزاري</option>" +
+        "</select></div>" +
+        '<button class="f-clear" onclick="Object.assign(window.__SUP_STATE__,{page:0,size:25,search:\'\',region:\'\',sort:\'region\'});renderSupervisorsTab()">✕ مسح الفلاتر</button>' +
+        '<button class="export-btn export-btn-csv" onclick="window.exportSupCSV_dispatch && window.exportSupCSV_dispatch()">⬇ تصدير CSV</button>' +
+        "</div>" +
+        '<div class="card"><div class="card-title">' +
+        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>' +
+        "<span>عدد المدارس حسب المنطقة</span></div>" +
+        renderBarList(regionCounts, totalForBars, CSS_TOKENS.info()) +
+        "</div>" +
+        '<div class="card"><div class="card-title">' +
+        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
+        "<span>تفاصيل الإشراف</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
+        '<div class="tbl-wrap"><table><thead><tr>' +
+        '<th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>' +
+        '<th style="min-width:90px">الرقم الوزاري</th>' +
+        '<th style="min-width:100px">المنطقة</th>' +
+        '<th style="text-align:right;min-width:170px">المشرف الميداني</th>' +
+        '<th style="text-align:right;min-width:170px">المهندس</th>' +
+        '<th style="text-align:right;min-width:170px">مسؤول التطوير</th>' +
+        "</tr></thead><tbody>" + rowsHtml + "</tbody></table></div>" +
+        renderPager(filteredTotal) +
+        "</div>";
+
+      window.exportSupCSV_dispatch = function () { exportSupCSV(rows); };
+    } catch (err) {
+      console.error("[supervisors] خطأ أثناء رسم التبويب:", err);
+      showErrorState(el, "حدث خطأ غير متوقع: " + (err && err.message ? err.message : String(err)));
+    }
+  };
 })();
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -24627,6 +25109,7 @@ ${panelHTML}
     { key:"RAW_VEHICLES", label:"المركبات", singular:"مركبة", icon:"🚐", rows:()=>window.RAW_VEHICLES },
     { key:"RAW_TRAINING", label:"التدريب", singular:"برنامج تدريبي", icon:"🎓", rows:()=>window.RAW_TRAINING },
     { key:"RAW_GATEKEEPERS", label:"البوابون", singular:"بوّاب", icon:"👮", rows:()=>window.RAW_GATEKEEPERS },
+    { key:"RAW_SUPERVISORS", label:"المشرفون والمهندسون", singular:"سجل إشراف", icon:"🧑‍💼", rows:()=>window.RAW_SUPERVISORS },
     { key:"RAW_RECRUITMENT", label:"التوظيف", singular:"طلب توظيف", icon:"👥", rows:()=>window.RAW_RECRUITMENT },
     { key:"RAW_MAG_KPI", label:"مؤشرات أداء المقاول", singular:"مؤشر", icon:"📊", rows:()=>window.RAW_MAG_KPI },
     { key:"RAW_CONSULTANT_KPI", label:"مؤشرات الاستشاري", singular:"مؤشر", icon:"🧭", rows:()=>window.RAW_CONSULTANT_KPI },
@@ -26203,6 +26686,12 @@ window.addEventListener('load', function () {
       keywords: ['بوابين','gatekeepers','بواب','gatekeeper','حراس','guards','أمن مدارس','school security','حارس','security guard','حراسة'],
       charts: ['توزيع البوابين حسب المدرسة','تغطية البوابين'],
       kpis: ['إجمالي البوابين','مدارس بدون بواب']
+    },
+    {
+      id: 'supervisors', label: 'المشرفون والمهندسون',
+      keywords: ['مشرفين','مشرف','supervisor','supervisors','مشرف ميداني','field supervisor','مهندس','engineer','مسؤول تطوير','development officer','جهة الاتصال','contact'],
+      charts: ['عدد المدارس حسب المنطقة'],
+      kpis: ['عدد المدارس المغطاة','مشرفون ميدانيون','المهندسون','مسؤولو التطوير']
     },
     {
       id: 'all-contracts', label: 'عقود عدا المجال',
@@ -30779,6 +31268,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(34, 'click', function (event) { showTab('tajheez',this) });
   bind(35, 'click', function (event) { showTab('spare',this) });
   bind(36, 'click', function (event) { showTab('gatekeepers',this) });
+  bind(217, 'click', function (event) { showTab('supervisors',this) });
   bind(38, 'click', function (event) { showTab('all-contracts',this) });
   bind(39, 'click', function (event) { showTab('payments',this);paymentsInitTab() });
   bind(40, 'click', function (event) { showTab('cost',this) });
@@ -31186,7 +31676,8 @@ var PORTAL_CATEGORIES = {
       { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
       { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
       { name: "training",        label: "برامج التدريب" },
-      { name: "gatekeepers",     label: "البوابين" }
+      { name: "gatekeepers",     label: "البوابين" },
+      { name: "supervisors",     label: "المشرفون والمهندسون" }
     ]
   },
   safety: {

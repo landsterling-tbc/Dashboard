@@ -234,7 +234,7 @@
       <div class="portal-card" id="portal-card-operations" data-category="operations" data-wm="⚙️">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></div>
         <div class="portal-card-title">التشغيل</div>
-        <div class="portal-card-desc">مؤشرات الأداء، التدريب، البوابين</div>
+        <div class="portal-card-desc">مؤشرات الأداء، التدريب، البوابين، المشرفون والمهندسون</div>
       </div>
 
       <div class="portal-card" id="portal-card-safety" data-category="safety" data-wm="📢">
@@ -508,6 +508,7 @@
     <div class="tab" data-evt="52">عقود التجهيزات</div>
     <div class="tab" data-evt="35">قطع الغيار</div>
     <div class="tab" data-evt="36">البوابين</div>
+    <div class="tab" data-evt="217">المشرفون والمهندسون</div>
     <div class="tab" data-evt="38">عقود عدا المجال</div>
     <div class="tab" data-evt="39">المدفوعات للمجال</div>
     <div class="tab tab-premium" data-evt="40">التكلفة</div>
@@ -1092,6 +1093,24 @@
 
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
+║  🧑‍💼  تبويب: المشرفون والمهندسون
+║  ID: tab-supervisors
+╠════════════════════════════════════════════════════════════════════╣
+║  المصدر: window.RAW_SUPERVISORS (key: schoolsSupervisors في GAS)
+║  الرندر: renderSupervisorsTab() في dashboard.js
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-supervisors">
+    <div id="supervisors-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-icon">🧑‍💼</div>
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
 ║  👥  تبويب: التوظيف
 ║  ID: tab-recruitment
 ╠════════════════════════════════════════════════════════════════════╣
@@ -1298,6 +1317,9 @@
          بغض النظر عن أي فلتر مفعّل حاليًا (بيمسح فلاتر الخريطة تلقائيًا
          لو المدرسة مستبعدة بيها، عشان يضمن ظهورها فعليًا) -->
     <div class="map-controls" id="map-search-row">
+      <button type="button" class="map-row-toggle" onclick="window.toggleMapRow('map-search-row')" title="طيّ/إظهار هذا الشريط">
+        <span class="map-row-toggle-lbl">🔍 بحث</span><span class="map-row-toggle-chevron">⌄</span>
+      </button>
       <div class="fg" id="map-fg-search">
         <div class="fg-lbl">🔍 ابحث عن مدرسة (بالاسم أو الرقم الوزاري)</div>
         <input class="finp" id="mapSchoolSearch" type="text" autocomplete="off" placeholder="اكتب اسم المدرسة أو رقمها الوزاري..."
@@ -1307,7 +1329,10 @@
         <div id="mapSchoolSearchResults" class="map-search-results" style="display:none"></div>
       </div>
     </div>
-    <div class="map-controls">
+    <div class="map-controls" id="map-mode-row">
+      <button type="button" class="map-row-toggle" onclick="window.toggleMapRow('map-mode-row')" title="طيّ/إظهار هذا الشريط">
+        <span class="map-row-toggle-lbl">🗺️ العرض</span><span class="map-row-toggle-chevron">⌄</span>
+      </button>
       <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">عرض حسب:</span>
       <button class="map-ctrl-btn active" id="mctrl-fca"   data-evt="75">درجة FCA</button>
       <button class="map-ctrl-btn"        id="mctrl-env"   data-evt="76">البيئة المدرسية</button>
@@ -1323,6 +1348,9 @@
          كان وضع العرض المختار، وتُطبَّق فوق الفلاتر العامة للوحة، محلية
          بالكامل لتبويب الخريطة (لا تؤثر على باقي التبويبات) -->
     <div class="map-controls" id="map-filters-row-general">
+      <button type="button" class="map-row-toggle" onclick="window.toggleMapRow('map-filters-row-general')" title="طيّ/إظهار هذا الشريط">
+        <span class="map-row-toggle-lbl">🧭 فلاتر عامة</span><span class="map-row-toggle-chevron">⌄</span>
+      </button>
       <div class="fg" id="map-fg-sector">
         <div class="fg-lbl">المحافظة</div>
         <select class="fsel" id="mapSectorFilter" data-evt="215" aria-label="تصفية حسب المحافظة">
@@ -1357,6 +1385,9 @@
          حسب وضع العرض المختار: حرج/متوسط/جيد/جيد جداً لـ FCA والبيئة، وفئات
          البلاغات الخمس + فترة زمنية + "أعلى N مدرسة" لوضع البلاغات فقط -->
     <div class="map-controls" id="map-filters-row" style="display:none">
+      <button type="button" class="map-row-toggle" onclick="window.toggleMapRow('map-filters-row')" title="طيّ/إظهار هذا الشريط">
+        <span class="map-row-toggle-lbl">🎯 فلاتر الوضع</span><span class="map-row-toggle-chevron">⌄</span>
+      </button>
       <div class="fg" id="map-fg-tier">
         <div class="fg-lbl">تصفية حسب الفئة</div>
         <select class="fsel" id="mapTierFilter" data-evt="202" aria-label="تصفية حسب الفئة">
@@ -1376,7 +1407,6 @@
         <div class="fg-lbl">فترة البلاغات (تاريخ الإنشاء)</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input type="date" class="finp" id="mapDateFrom" data-evt="211" style="min-width:0;width:135px" aria-label="من تاريخ">
-          <span style="font-size:11px;color:var(--tx-muted)">→</span>
           <input type="date" class="finp" id="mapDateTo" data-evt="212" style="min-width:0;width:135px" aria-label="إلى تاريخ">
         </div>
       </div>

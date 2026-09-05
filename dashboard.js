@@ -1189,6 +1189,12 @@ function showTab(name, el) {
     "sys-main" === name && renderSysMain(),
     "sys-detail" === name && renderSysDetail(),
     "balagh" === name && renderBalaghTab(),
+    // ⚡ 2026-09-03: عند فتح أي تبويب بلاغات (عام/أمن وسلامة) — تحقق فوري
+    // (بدون انتظار Tick التايمر الدوري) هل البيانات المعروضة "قديمة" (أقدم
+    // من BALAGH_AUTO_INTERVAL_MS)، ولو كذلك اسحب نسخة أحدث من كاش GAS بصمت.
+    (("balagh" === name || "security-safety" === name || "security-safety-summary" === name) &&
+      "function" === typeof window.__balaghMaybeRefreshOnView &&
+      window.__balaghMaybeRefreshOnView()),
     "tajheez" === name && renderTajheezInventoryTab(),
     "tajheez-supplies" === name && renderTajheezSuppliesTab(),
     "tajheez-contracts" === name && renderTajheezContractsTab(),
@@ -3706,6 +3712,21 @@ let __bgRevalidatedOnce = false;
     const BALAGH_URL =
       "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec";
     const BALAGH_CACHE_KEY = "tbc_balagh_cache_v1";
+    // ⚡ 2026-09-03: تحديث "شبه فوري" للبلاغات فقط — بناءً على طلب صريح.
+    // الباك إند (balagh_reports.gs) عنده تريجر "عند التعديل" (onBalaghSheetEdit)
+    // بيعيد بناء كاش GAS خلال ثوانٍ من أي إضافة/تعديل في شيت البلاغات (بشرط
+    // تشغيل setupBalaghAllTriggers مرة واحدة من محرر Apps Script).
+    // ⚠️ 2026-09-03 (تعديل بعد ملاحظة مستخدم مهمة جداً): مع تجاوز البلاغات
+    // 100 ألف صف، الحمولة الكاملة (JSON كامل بكل الأعمدة) ممكن تتجاوز 100
+    // ميجابايت! أول نسخة من هذا التحديث السريع كانت بتطلب هذه الحمولة
+    // الكاملة كل 20 ثانية بصرف النظر عن وجود تغيير فعلي — ده كان هيسبب
+    // استهلاك بيانات ضخم مع أكتر من مستخدم، وضغط حقيقي على تخزين كاش GAS.
+    // الحل: "فحص خفيف" — نسأل GAS كل 20 ثانية عن توقيع صغير جداً (عدد
+    // الصفوف + وقت آخر تحديث فعلي، بضع بايتات فقط)، ولا نطلب الحمولة
+    // الكاملة إلا لو التوقيع اختلف فعلاً عن آخر نسخة عندنا. راجع
+    // balaghReadFromCache_/balaghWriteMeta_ في balagh_reports.gs.
+    const BALAGH_META_URL = BALAGH_URL + (BALAGH_URL.indexOf("?") === -1 ? "?" : "&") + "meta=1";
+    const BALAGH_AUTO_INTERVAL_MS = 2e4; // 20 ثانية — فاصل "الفحص الخفيف"، مش تحميل الحمولة الكاملة
     // 🔑 استخدام الدالة الموحّدة الوحيدة لتطبيع رقم المدرسة (window.normSchoolId)
     // بدل أي نسخة محلية — راجع تعريفها فوق لشرح القاعدة والسبب بالتفصيل.
     const normId_ = window.normSchoolId;
@@ -3773,6 +3794,12 @@ let __bgRevalidatedOnce = false;
         } catch (_) {}
       }
 
+      // ⚡ 2026-09-03: حارس عدم تداخل — مع حمولة قد تتجاوز 100 ميجابايت
+      // (أكتر من 100 ألف صف)، لو طلب سابق لسه شغّال (شبكة بطيئة مثلاً)
+      // وجه طلب تاني (تحقق دوري/فتح تبويب) قبل ما يخلص، ميبدأش تحميل تاني
+      // متوازي فوقه — يتجاهل بهدوء ويسيب الطلب الشغّال يكمل لوحده.
+      if (window.__BALAGH_BG_FETCH_INFLIGHT__) return;
+      window.__BALAGH_BG_FETCH_INFLIGHT__ = true;
       // لو عندنا بيانات معروضة بالفعل (من كاش أو تحميل سابق)، التحديث ده صامت تمامًا:
       // لا نغيّر الحالة لـ"loading" ولا نلمس الشاشة إلا بعد وصول البيانات الجديدة فعليًا،
       // عشان ما نعمل "وميض" يخفي البيانات الموجودة وهي شغالة صح.
@@ -3794,6 +3821,11 @@ let __bgRevalidatedOnce = false;
         if (bJson.status === "ok" && Array.isArray(bJson.data)) {
           window.RAW_BALAGH = bJson.data;
           window.__BALAGH_LOAD_STATE__ = "loaded";
+          window.__BALAGH_LAST_FETCH_TS__ = Date.now();
+          // ⚡ توقيع النسخة الحالية (نفس القيمة اللي بيرجّعها فحص meta=1
+          // الخفيف) — يُستخدم لمقارنة سريعة بدل تحميل الحمولة الكاملة تاني
+          // لو مفيش تغيير فعلي.
+          window.__BALAGH_DATA_TIMESTAMP__ = bJson.timestamp || null;
           _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
           // ربط البلاغات بالمباني بعد التحميل
           _linkBalaghToBuildings();
@@ -3809,6 +3841,8 @@ let __bgRevalidatedOnce = false;
           window.__BALAGH_LOAD_ERR__ = e.message;
         }
         console.warn("[BALAGH] فشل تحميل البلاغات:", e);
+      } finally {
+        window.__BALAGH_BG_FETCH_INFLIGHT__ = false;
       }
       // تحديث التبويب بعد التحميل أو الخطأ
       if (document.getElementById("tab-balagh")?.classList.contains("active")) {
@@ -3856,6 +3890,8 @@ let __bgRevalidatedOnce = false;
           window.RAW_BALAGH = bJson.data;
           window.__BALAGH_LOAD_STATE__ = "loaded";
           window.__BALAGH_LOAD_ERR__ = null;
+          window.__BALAGH_LAST_FETCH_TS__ = Date.now();
+          window.__BALAGH_DATA_TIMESTAMP__ = bJson.timestamp || null;
           _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
           _linkBalaghToBuildings();
           console.log(`[BALAGH] تحديث فوري من الشيت: تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
@@ -3887,16 +3923,48 @@ let __bgRevalidatedOnce = false;
     if (!window.__BALAGH_LOAD_STATE__ || window.__BALAGH_LOAD_STATE__ === "error") {
       window.loadBalaghSeparate();
     }
-    // تحديث دوري صامت للبلاغات — يطابق دورة تحديث كاش balagh_reports.gs (5
-    // دقائق)، بدون ?refresh=1 (لا يفرض قراءة الشيت الضخم من جديد، يكتفي
-    // بكاش GAS المُحدَّث أصلاً بالتريجر الزمني). يُنشأ مرة واحدة فقط.
+    // ⚡ 2026-09-03: "فحص خفيف" دوري — فاصل زمني مستقل وسريع
+    // (BALAGH_AUTO_INTERVAL_MS، 20 ثانية) خاص بالبلاغات فقط، مش مرتبط
+    // بفاصل تحديث بقية اللوحة (CFG.AUTO_INTERVAL_MS). الفحص نفسه بيسأل
+    // BALAGH_META_URL بس (توقيع صغير: عدد صفوف + وقت آخر تحديث — بضع
+    // بايتات)، ولا نطلب الحمولة الكاملة (ممكن تتجاوز 100 ميجابايت مع أكتر
+    // من 100 ألف صف) إلا لو التوقيع اختلف فعلاً عن آخر نسخة محمّلة عندنا.
+    let _balaghMetaCheckInflight = false;
+    const _balaghMetaCheckAndMaybeRefresh = async () => {
+      if (document.hidden) return;
+      if (window.__BALAGH_LOAD_STATE__ === "loading" || window.__BALAGH_FORCE_REFRESH_INFLIGHT__) return;
+      if (window.__BALAGH_BG_FETCH_INFLIGHT__ || _balaghMetaCheckInflight) return;
+      // أول تحميل للبيانات لسه ما حصلش (أو فشل) — سيب المسار الأساسي
+      // (window.loadBalaghSeparate) هو اللي يتكفّل بيه، الفحص الخفيف مالوش
+      // معنى قبل ما يكون عندنا نسخة أساسية أصلاً.
+      if (window.__BALAGH_LOAD_STATE__ !== "loaded") return;
+      _balaghMetaCheckInflight = true;
+      try {
+        const mResp = await fetch(BALAGH_META_URL, { cache: "no-store" });
+        if (!mResp.ok) return;
+        const mJson = await mResp.json();
+        if (mJson.status !== "ok") return;
+        // لسه نفس النسخة (مفيش تعديل حقيقي حصل في الشيت) → مفيش داعي نطلب
+        // الحمولة الكاملة الضخمة تاني.
+        if (mJson.timestamp && mJson.timestamp === window.__BALAGH_DATA_TIMESTAMP__) return;
+        window.loadBalaghSeparate(true); // فيه تغيير فعلي — نسحب النسخة الكاملة دلوقتي
+      } catch (_) {
+        // فشل الفحص الخفيف نفسه (شبكة مثلاً) — نتجاهل بصمت، هيتعاد المحاولة في الدورة الجاية
+      } finally {
+        _balaghMetaCheckInflight = false;
+      }
+    };
+    // 🔗 تعريض عام — عشان showTab يقدر يطلب تحقق فوري لحظة فتح أي تبويب من
+    // تبويبات البلاغات (عام/أمن وسلامة)، من غير ما ينتظر أول Tick للتايمر.
+    window.__balaghMaybeRefreshOnView = _balaghMetaCheckAndMaybeRefresh;
     if (!window.__BALAGH_AUTO_TIMER_STARTED__) {
       window.__BALAGH_AUTO_TIMER_STARTED__ = true;
-      setInterval(() => {
-        if (document.hidden) return;
-        if (window.__BALAGH_LOAD_STATE__ === "loading" || window.__BALAGH_FORCE_REFRESH_INFLIGHT__) return;
-        window.loadBalaghSeparate(true);
-      }, CFG.AUTO_INTERVAL_MS);
+      setInterval(_balaghMetaCheckAndMaybeRefresh, BALAGH_AUTO_INTERVAL_MS);
+      // تحديث فوري إضافي لحظة رجوع المستخدم لتبويب المتصفح (بعد ما كان في
+      // تبويب/نافذة تانية) — بدل ما ننتظر لحد أقرب Tick للتايمر الدوري.
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) _balaghMetaCheckAndMaybeRefresh();
+      });
     }
     // تحميل صامت لبيانات حصر الأصول مرة واحدة عند بدء اللوحة — عشان بطاقات
     // "إجمالي الأصول" و"أصول متهالكة" في نظرة عامة تظهر بأرقام حقيقية من

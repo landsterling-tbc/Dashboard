@@ -1020,12 +1020,29 @@ function clearFilters() {
     applyFilters());
 }
 function renderKPIs() {
-  const D = FILTERED,
-    total = D.length,
-    govt = D.filter((r) => (r.ownership || "").includes("حكومي")).length,
-    rented = D.filter((r) => (r.ownership || "").includes("مستأجر")).length,
-    fcaArr = D.filter((r) => null != r.fca).map((r) => r.fca),
-    envArr = D.filter((r) => null != r.envScore).map((r) => r.envScore),
+  const D = FILTERED;
+  // 🔑 (2026-09-05) تفريد بالمدرسة (رقم وزاري موحّد window.normSchoolId) —
+  // نفس منطق تبويبَي "FCA المرجعي" و"مقارنة مراحل FCA"، عشان "إجمالي
+  // المدارس"/"لها درجة FCA" هنا تتفق مع باقي التبويبات المرتبطة، بدل ما
+  // تُحسب على مستوى صفوف المباني (مدرسة لها أكثر من مبنى في شيت "المباني"
+  // كانت بتتكرر وتُحسب أكتر من مرة). الإحصاءات اللي فعلاً على مستوى المبنى
+  // (الفصول، التكييف، عمر المبنى) لسه بتتحسب على D الكاملة زي ما هي.
+  const uniqIdOf = (r) => window.normSchoolId(r.minId || r.schoolSeq);
+  const DS = (() => {
+    const seen = new Set();
+    return D.filter((r) => {
+      const id = uniqIdOf(r);
+      if (!id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  })();
+  const total = DS.length,
+    govt = DS.filter((r) => (r.ownership || "").includes("حكومي")).length,
+    rented = DS.filter((r) => (r.ownership || "").includes("مستأجر")).length,
+    fcaArr = DS.filter((r) => null != r.fca).map((r) => r.fca),
+    envArr = DS.filter((r) => null != r.envScore).map((r) => r.envScore),
     lowFca = fcaArr.filter((v) => v < CFG.LOW_FCA_THRESHOLD).length,
     dists = new Set(D.map((r) => r.district).filter((d) => d)).size,
     sectors = new Set(D.map((r) => r.sector).filter((s) => s)).size,
@@ -1034,7 +1051,7 @@ function renderKPIs() {
     acTotal = D.reduce((s, r) => s + (r.acUnits || 0), 0);
 
   // حساب آخر تاريخ تقييم FCA ظهر في البيانات (لعرضه كمرجع)
-  const fcaWithDate = D.filter((r) => null != r.fca && r.fcaDateObj);
+  const fcaWithDate = DS.filter((r) => null != r.fca && r.fcaDateObj);
   const latestDateObj = fcaWithDate.length
     ? fcaWithDate.reduce((mx, r) => (r.fcaDateObj > mx.fcaDateObj ? r : mx), fcaWithDate[0]).fcaDateObj
     : null;
@@ -1072,7 +1089,7 @@ function renderKPIs() {
     setText("k-alerts-total", alertsTotal.toLocaleString()),
     setText("k-ac-total", acTotal.toLocaleString()));
   if (typeof renderOverviewAssetKpis === "function") renderOverviewAssetKpis();
-  const studArr = D.filter((r) => null != r.students && r.students > 0),
+  const studArr = DS.filter((r) => null != r.students && r.students > 0),
     studTotal = studArr.reduce((s, r) => s + r.students, 0),
     studAvg = studArr.length ? studTotal / studArr.length : null,
     studMax = studArr.length

@@ -74,10 +74,51 @@ const BALAGH_CACHE_SECONDS = 1800;
 const BALAGH_CACHE_KEY_FULL = 'tbc_balagh_v1';
 const BALAGH_CACHE_CHUNK_MAX = 95 * 1024;
 
+// ⚡ 2026-09-03: "توقيع" خفيف جداً لبيانات البلاغات (عدد الصفوف + نفس قيمة
+// timestamp اللي بترجع مع الحمولة الكاملة) — الغرض منه إن الواجهة تقدر
+// تسأل بسرعة عالية جداً (كل 20 ثانية) "هل فيه تغيير فعلي؟" من غير ما تحمّل
+// الحمولة الكاملة (ممكن تتجاوز 100 ميجابايت مع أكتر من 100 ألف صف بلاغ).
+// بنخزّنه في PropertiesService مش CacheService عشان يفضل موجود دايماً
+// وميتأثرش بانتهاء صلاحية الكاش (BALAGH_CACHE_SECONDS) ولا بأي مشكلة
+// تخزين مع الحمولة الضخمة نفسها (البيانات الكبيرة والتوقيع الصغير معزولين
+// تماماً عن بعض).
+const BALAGH_META_PROP_KEY = 'tbc_balagh_meta_v1';
+
+function balaghWriteMeta_(rowCount, isoTimestamp) {
+  try {
+    PropertiesService.getScriptProperties().setProperty(
+      BALAGH_META_PROP_KEY,
+      JSON.stringify({ rows: rowCount, timestamp: isoTimestamp })
+    );
+  } catch (err) {
+    Logger.log('⚠️ [balagh] فشل حفظ توقيع البيانات الخفيف (meta): ' + err.message);
+  }
+}
+
 function doGet(e) {
   try {
     const params = (e && e.parameter) ? e.parameter : {};
     const cache = CacheService.getScriptCache();
+
+    // ⚡ فحص خفيف جداً — يرجّع توقيع صغير (عدد الصفوف + وقت آخر تحديث فعلي
+    // للكاش) بدون أي قراءة/معالجة للبيانات الضخمة نفسها. تُستخدم من
+    // التحديث الدوري السريع في الواجهة (كل 20 ثانية) عشان تعرف هل فعلاً
+    // فيه تغيير قبل ما تطلب الحمولة الكاملة.
+    if (String(params.meta || '') === '1') {
+      let meta = null;
+      try {
+        const raw = PropertiesService.getScriptProperties().getProperty(BALAGH_META_PROP_KEY);
+        if (raw) meta = JSON.parse(raw);
+      } catch (err) {}
+      // نادر جداً (أول تشغيلة على الإطلاق قبل أي بناء كاش) — لسه ما فيش
+      // توقيع محفوظ، فنرجّع "غير معروف" ونسيب الواجهة تحمّل الحمولة
+      // الكاملة عادي (هي أصلاً بتعمل كده في أول تحميل بصرف النظر عن الفحص
+      // الخفيف ده) — بدل أي حساب إضافي هنا.
+      if (!meta) meta = { rows: null, timestamp: null };
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'ok', rows: meta.rows, timestamp: meta.timestamp,
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (String(params.refresh || '') === '1') {
       balaghClearCache_(cache);
@@ -90,16 +131,18 @@ function doGet(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const data = balaghReadAllSheets_(ss);
+    const nowIso = new Date().toISOString();
 
     const payload = {
       status: 'ok',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso,
       rows: data.length,
       data: data,
     };
 
     const jsonText = JSON.stringify(payload);
     balaghWriteToCache_(cache, jsonText);
+    balaghWriteMeta_(data.length, nowIso); // ⚡ حدّث التوقيع الخفيف كل مرة يُعاد فيها بناء الكاش فعلياً
 
     return ContentService.createTextOutput(jsonText).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {

@@ -6745,3 +6745,87 @@ button.ix-profile-source:hover{
 #portal-card-digital .portal-card-tabs-grid {
   grid-template-columns: 1fr 1fr; /* ↑ كان: 1fr (عمود واحد) — رجعت جنب بعض */
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   19) تحسينات الموبايل — طيّ شريط الفلاتر + تباعد أقرب في وضع الفتح +
+   تلميح تمرير أفقي للجداول. قسم جديد بالكامل — إضافة فقط، كل القواعد
+   هنا محصورة داخل @media (max-width) فمفيش أي تأثير على الديسكتوب.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* زر طيّ/فتح الفلاتر — مخفي تمامًا على الديسكتوب */
+.filters-toggle-btn {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .filters-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 10px 14px;
+    min-height: 42px;
+    background: #fff;
+    border: 1px solid rgba(13,47,64,.12);
+    border-radius: var(--r-lg, 12px);
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0d2f40;
+    cursor: pointer;
+  }
+  .filters-toggle-chevron {
+    transition: transform .15s ease;
+  }
+  .filters-toggle-btn.active .filters-toggle-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* الحالة المطويّة: شريط الفلاتر بالكامل مخفي عشان محتوى الصفحة
+     (المؤشرات والرسوم) يظهر فورًا من غير نزول طويل تحت الفلاتر أولاً.
+     !important ضرورية هنا عشان تتغلّب على display:flex اللي الجافاسكريبت
+     بيحطّه inline على العنصر بعد اكتمال تحميل البيانات؛ والتحديد بمسار
+     #legacyDashboardArea #filtersRow.filters-row.filters-collapsed
+     (لا #filtersRow.filters-collapsed لوحدها) ضروري عشان يتغلّب تحديدًا
+     على قاعدة قديمة أعلى تخصيصًا شوية: "#legacyDashboardArea.viewing-overview
+     #filtersRow{display:flex!important}" (بتفرض ظهور الفلاتر مع مؤشرات
+     تبويب "نظرة عامة") — من غير ما نلمس أو نعدّل القاعدة القديمة نفسها. */
+  #legacyDashboardArea #filtersRow.filters-row.filters-collapsed {
+    display: none !important;
+  }
+
+  /* الحالة المفتوحة على الموبايل: عمودين بدل عمود واحد تحت بعض، عشان
+     صف الفلاتر الطويل ياخد نص المساحة الرأسية تقريبًا. */
+  #legacyDashboardArea #filtersRow.filters-row:not(.filters-collapsed) {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+  }
+  #filtersRow:not(.filters-collapsed) .fg {
+    width: 100%;
+    margin: 0;
+  }
+  /* حقل البحث وزر المسح ياخدوا العرض الكامل (عمودين) لأنهم مختلفين
+     شكلاً عن باقي القوائم المنسدلة القصيرة */
+  #filtersRow:not(.filters-collapsed) .fg:has(#fSearch),
+  #filtersRow:not(.filters-collapsed) .f-clear {
+    grid-column: 1 / -1;
+  }
+}
+
+/* تلميح بصري إن الجدول قابل للتمرير الأفقي على الشاشات الضيقة (بدل ما
+   يظهر عمود مقصوص من غير أي إشارة إن فيه المزيد يمين/يسار) */
+@media (max-width: 640px) {
+  .tbl-wrap {
+    position: relative;
+    background-image:
+      linear-gradient(to left, rgba(255,255,255,.95), rgba(255,255,255,0) 18px),
+      linear-gradient(to right, rgba(255,255,255,.95), rgba(255,255,255,0) 18px);
+    background-position: left center, right center;
+    background-repeat: no-repeat;
+    background-size: 18px 100%, 18px 100%;
+    background-attachment: local, local;
+  }
+}

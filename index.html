@@ -292,6 +292,15 @@
 
   <div id="toast-area"></div>
 
+  <!-- 📱 زر طيّ/فتح الفلاتر — يظهر على الموبايل فقط (نفس نمط زر طيّ
+       القائمة الجانبية toggleCategorySidebar)، عشان محتوى الصفحة يظهر
+       أول ما المستخدم يفتح الصفحة بدل ما يستنى نزول طويل تحت الفلاتر. -->
+  <button type="button" id="filtersToggleBtn" class="filters-toggle-btn" onclick="toggleFiltersRow()">
+    <span class="filters-toggle-icon">🔍</span>
+    <span class="filters-toggle-label">الفلاتر</span>
+    <span class="filters-toggle-chevron">˅</span>
+  </button>
+
   <div class="filters-row" id="filtersRow" style="display:none">
 
     <div class="fg" id="fg-city">

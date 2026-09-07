@@ -3709,6 +3709,7 @@ let __bgRevalidatedOnce = false;
         setTimeout(clearToast, 5e3)),
       setProgress(100),
       (document.getElementById("filtersRow").style.display = "flex"),
+      (typeof __applyFiltersRowCollapsedState === "function" && __applyFiltersRowCollapsedState()),
       applyFilters());
 
     // ── لو عرضنا من الكاش، اجلب نسخة حديثة بصمت بالخلفية وحدّث الشاشة تلقائيًا (مرة واحدة فقط لكل جلسة) ──
@@ -32749,6 +32750,31 @@ function toggleCategorySidebar() {
   var collapsed = !__isSidebarCollapsed();
   localStorage.setItem("fm_sidebar_collapsed", String(collapsed));
   __applySidebarCollapsedState();
+}
+
+/* 📱 طيّ/فتح شريط الفلاتر — نفس فكرة طيّ القائمة الجانبية بالظبط، لكن
+   لصف الفلاتر (filtersRow). الحالة الافتراضية مطويّة (خصوصًا على الموبايل)
+   عشان المستخدم يوصل لمحتوى الصفحة فورًا بدل ما ينزل تحت صف طويل من
+   الفلاتر أول ما يفتح أي صفحة. زر الطيّ نفسه مُخفى على الديسكتوب بالكامل
+   (CSS)، فمفيش أي تأثير على شكل الفلاتر هناك إطلاقًا. */
+function __isFiltersRowCollapsed() {
+  var v = localStorage.getItem("fm_filters_collapsed");
+  return v === null ? true : v === "true";
+}
+
+function __applyFiltersRowCollapsedState() {
+  var row = document.getElementById("filtersRow");
+  if (!row) return;
+  var collapsed = __isFiltersRowCollapsed();
+  row.classList.toggle("filters-collapsed", collapsed);
+  var btn = document.getElementById("filtersToggleBtn");
+  if (btn) btn.classList.toggle("active", !collapsed);
+}
+
+function toggleFiltersRow() {
+  var collapsed = !__isFiltersRowCollapsed();
+  localStorage.setItem("fm_filters_collapsed", String(collapsed));
+  __applyFiltersRowCollapsedState();
 }
 
 function highlightSidebarActive(name) {

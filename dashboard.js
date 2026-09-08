@@ -4062,18 +4062,18 @@ async function _mainMetaCheckAndMaybeRefresh() {
 
 // ══════════════════════════════════════════════════════════════════
 // 💾 زر النسخة الاحتياطية الكاملة (مخفي في الفوتر) — إضافة مستقلة تمامًا،
-// لا تمسّ أي منطق تحميل أو عرض موجود مسبقًا. تجلب كل مصادر بيانات
-// الداشبورد الثمانية (الرئيسي بشيتاته الـ21 + البلاغات + توريدات
-// التجهيزات + عقود التجهيزات + النشاط البدني + المكيّفات + الحصر +
-// التكلفة) بالتوازي، وتُنزِّل كل مصدر في ملف إكسل مستقل بذاته — لا يُدمج
-// أي مصدر مع مصدر آخر في ملف واحد — وكل شيت داخل ملفه يحمل اسم الشيت
-// الأصلي على جوجل شيتس قدر الإمكان (راجع الملاحظة أدناه عن مصدرين لا
-// تتوفر لدينا أسماء شيتاتهما الدقيقة). لا تعتمد على أي بيانات محمَّلة
-// مسبقًا في ذاكرة المتصفح (window.RAW*) حتى تعمل بشكل صحيح ولو كان
-// المستخدم لا يزال في الصفحة الرئيسية فقط.
+// لا تمسّ أي منطق تحميل أو عرض موجود مسبقًا. تجلب خمسة من مصادر بيانات
+// الداشبورد (الرئيسي بشيتاته الـ21 + توريدات التجهيزات + عقود التجهيزات
+// + النشاط البدني + المكيّفات) بالتوازي، وتُنزِّل كل مصدر في ملف إكسل
+// مستقل بذاته — لا يُدمج أي مصدر مع مصدر آخر في ملف واحد — وكل شيت داخل
+// ملفه يحمل اسم الشيت الأصلي على جوجل شيتس. لا تعتمد على أي بيانات
+// محمَّلة مسبقًا في ذاكرة المتصفح (window.RAW*) حتى تعمل بشكل صحيح ولو
+// كان المستخدم لا يزال في الصفحة الرئيسية فقط.
+// 📌 استُبعدت البلاغات والحصر والتكلفة من هذه النسخة الاحتياطية عمدًا
+// (بطلب صريح — بياناتها محفوظة بأمان في مكان آخر)، ولتسريع العملية.
 // ══════════════════════════════════════════════════════════════════
 // 🔑 مبنية كدالة (مش const ثابت) عشان الروابط زي TAJHEEZ_SUPPLIES_URL/
-// HASR_SCRIPT_URL/... متعرَّفة (const) في مواضع تانية أسفل هذا الملف —
+// MOKAYEFAT_URL/... متعرَّفة (const) في مواضع تانية أسفل هذا الملف —
 // استدعاء الدالة دي بيحصل بس عند الضغط على الزر (بعد تنفيذ الملف بالكامل)،
 // فمفيش أي مشكلة توقيت، لكن لازم تفضل دالة (مش مصفوفة جاهزة من الأول).
 function __buildBackupSources_() {
@@ -4105,17 +4105,6 @@ function __buildBackupSources_() {
         safetyTeamKpi: "مؤشرات_أداء_فريق_السلامة",
         schoolsSupervisors: "المدارس_والمشرفين",
       },
-    },
-    // 🔑 رابط البلاغات مطابق تمامًا لـ BALAGH_URL المُعرَّف داخل دالة تحميل
-    // البلاغات المنفصلة أسفل الملف — لازم يتحدّثوا مع بعض لو تغيّر أي منهم.
-    // شيت البلاغات بيتعرّف تلقائيًا على أي تبويب فيه أعمدة بلاغات (ممكن
-    // يكون أكتر من تبويب/منطقة)، فمفيش اسم شيت واحد دقيق نرجّعه هنا —
-    // استخدمنا تسمية "البلاغات" كتسمية معقولة للصفحة الناتجة.
-    {
-      url: "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec",
-      kind: "flat",
-      label: "البلاغات",
-      fileLabel: "البلاغات",
     },
     {
       url: TAJHEEZ_SUPPLIES_URL,
@@ -4155,18 +4144,6 @@ function __buildBackupSources_() {
         basic: "توريدات المكيفيات شركة الاساسية",
         zamil: "توريدات المكيفيات شركة الزامل",
       },
-    },
-    // ⚠️ الحصر والتكلفة: لا يتوفر لدينا كود الـ Apps Script الخاص بهما، لذا
-    // لا نعرف أسماء الشيتات الداخلية بالضبط إن كان المصدر متعدد الشيتات —
-    // النوع "auto" يكتشف الشكل تلقائيًا (مصفوفة واحدة أو أكثر) ويسمّي كل
-    // صفحة بأفضل تخمين متاح. للحصول على أسماء دقيقة تمامًا، يُرجى إرسال
-    // كود الـ.gs الخاص بهما.
-    { url: HASR_SCRIPT_URL, kind: "auto", label: "حصر", fileLabel: "الحصر" },
-    {
-      url: "https://script.google.com/macros/s/AKfycbweVcD1cOAqFa6nkt9555c1kOyATcU6t_UWHGmySeOENb4y8XfmVbl9juXgRtqp2uEdeA/exec",
-      kind: "auto",
-      label: "التكلفة",
-      fileLabel: "التكلفة",
     },
   ];
 }
@@ -4223,12 +4200,82 @@ function __backupBuildWorkbookForSource_(src, apiResponse) {
   return wb;
 }
 
+// جلب مصدر بيانات واحد مع حدّ أقصى للانتظار وإعادة محاولة تلقائية. بعض
+// مصادر Google Apps Script (وعلى رأسها المصدر الرئيسي بشيتاته الـ21)
+// قد تستغرق وقتًا أطول من المعتاد أحيانًا (إعادة بناء الكاش أو تباطؤ
+// عابر في الخادم)، فبدل اعتبارها فاشلة من أول محاولة، تُعاد المحاولة
+// تلقائيًا حتى ثلاث مرات قبل الاستسلام فعليًا. كل مصدر مستقل تمامًا عن
+// باقي المصادر، فتعثُّر واحد أو إعادة محاولته لا يؤخِّر الباقي.
+const __BACKUP_FETCH_TIMEOUT_MS = 25000;
+const __BACKUP_FETCH_TIMEOUT_MAIN_MS = 45000; // المصدر الرئيسي أثقل من غيره
+const __BACKUP_FETCH_MAX_ATTEMPTS = 3;
+const __BACKUP_FETCH_RETRY_DELAY_MS = 2000;
+
+function __backupFetchOnce_(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { cache: "no-store", signal: controller.signal })
+    .then((r) => {
+      if (!r.ok) {
+        throw Object.assign(new Error("خطأ HTTP " + r.status), { __backupReason: "http" });
+      }
+      return r.json();
+    })
+    .then((json) => {
+      // رد خادم صريح بالفشل (status:"error") يُعامَل كفشل قابل لإعادة
+      // المحاولة أيضًا — فقد يكون تعثُّرًا عابرًا (ازدحام أو قفل مؤقّت
+      // على الشيت) يزول عند المحاولة التالية.
+      if (!json || json.status === "error") {
+        throw Object.assign(new Error((json && json.message) || "رد غير صالح من الخادم"), {
+          __backupReason: "server",
+        });
+      }
+      return json;
+    })
+    .catch((err) => {
+      if (err && err.name === "AbortError") {
+        throw Object.assign(new Error("انتهت مهلة الانتظار"), { __backupReason: "timeout" });
+      }
+      if (err && !err.__backupReason) err.__backupReason = "network";
+      throw err;
+    })
+    .finally(() => clearTimeout(timer));
+}
+
+async function __backupFetchWithTimeout_(url, timeoutMs, onRetry) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= __BACKUP_FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await __backupFetchOnce_(url, timeoutMs);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < __BACKUP_FETCH_MAX_ATTEMPTS) {
+        if (typeof onRetry === "function") onRetry(attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, __BACKUP_FETCH_RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// يترجم سبب فشل الجلب إلى نص عربي مختصر يُعرَض بجانب "تعذّر الجلب" في
+// نافذة التقدُّم، حتى يكون واضحًا هل المشكلة انتهاء مهلة أو خطأ خادم.
+function __backupReasonText_(err) {
+  const reason = err && err.__backupReason;
+  if (reason === "timeout") return "انتهت المهلة رغم إعادة المحاولة";
+  if (reason === "http") return err.message;
+  if (reason === "server") return "رد غير متوقَّع من الخادم";
+  if (reason === "empty") return "لا توجد بيانات في الرد";
+  return "تعذّر الاتصال بالخادم";
+}
+
 // ── نافذة تقدُّم واضحة للنسخ الاحتياطي (إضافة مستقلة تمامًا) ────────
 // نافذة مرئية تمامًا (بخلاف الزر نفسه) تظهر بمجرد بدء التنزيل، وتبقى
 // ظاهرة طوال العملية: تعرض حالة كل مصدر على حدة (قيد الانتظار/جارٍ
 // التنزيل/تم/فشل)، الوقت المنقضي منذ البدء، وعدد الملفات التي تم
 // تنزيلها من إجمالي المصادر — حتى يكون واضحًا تمامًا أن التنزيل يعمل
-// فعليًا، ولا يُغلَق تلقائيًا قبل اكتمال العملية.
+// فعليًا، ولا يُغلَق تلقائيًا قبل اكتمال العملية. يمكن سحبها لأي مكان
+// على الشاشة (مثلًا لأسفل) من مقبض العنوان في الأعلى.
 function __backupCreateProgressUI_(sourceLabels, auto) {
   // إزالة أي نافذة تقدُّم سابقة لم يُغلقها المستخدم بعد، حتى لا تتراكم
   // أكثر من نافذة على الشاشة في آن واحد.
@@ -4248,9 +4295,13 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
     "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;overflow:hidden";
 
   modal.innerHTML =
-    '<div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between">' +
+    '<div id="__backupProgHeader" style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1);' +
+    'display:flex;align-items:center;justify-content:space-between;cursor:move;touch-action:none;user-select:none">' +
+    '<div style="display:flex;align-items:center;gap:8px">' +
+    '<span style="opacity:.4;font-size:13px;letter-spacing:1px">⠿</span>' +
     '<div id="__backupProgTitle" style="font-size:13px;font-weight:700">' +
     (auto ? "جارٍ تنفيذ النسخ الاحتياطي التلقائي" : "جارٍ تنفيذ النسخ الاحتياطي") +
+    "</div>" +
     "</div>" +
     '<div id="__backupProgTimer" style="font-size:11px;opacity:.65;font-variant-numeric:tabular-nums">00:00</div>' +
     "</div>" +
@@ -4269,11 +4320,35 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
   const titleEl = modal.querySelector("#__backupProgTitle");
   const summaryEl = modal.querySelector("#__backupProgSummary");
   const closeBtn = modal.querySelector("#__backupProgCloseBtn");
+  const headerEl = modal.querySelector("#__backupProgHeader");
 
-  const STATUS_ICON = { pending: "⏳", downloading: "🔽", done: "✅", failed: "❌" };
+  // إمكانية سحب النافذة لأي مكان على الشاشة (مثلًا لأسفل) من مقبض العنوان.
+  let dragOffset = null;
+  headerEl.addEventListener("pointerdown", (e) => {
+    const rect = modal.getBoundingClientRect();
+    modal.style.position = "fixed";
+    modal.style.left = rect.left + "px";
+    modal.style.top = rect.top + "px";
+    modal.style.margin = "0";
+    dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    headerEl.setPointerCapture(e.pointerId);
+  });
+  headerEl.addEventListener("pointermove", (e) => {
+    if (!dragOffset) return;
+    const maxLeft = window.innerWidth - modal.offsetWidth;
+    const maxTop = window.innerHeight - modal.offsetHeight;
+    modal.style.left = Math.max(0, Math.min(maxLeft, e.clientX - dragOffset.x)) + "px";
+    modal.style.top = Math.max(0, Math.min(maxTop, e.clientY - dragOffset.y)) + "px";
+  });
+  headerEl.addEventListener("pointerup", () => {
+    dragOffset = null;
+  });
+
+  const STATUS_ICON = { pending: "⏳", downloading: "🔽", retrying: "🔁", done: "✅", failed: "❌" };
   const STATUS_TEXT = {
     pending: "قيد الانتظار",
     downloading: "جارٍ التنزيل...",
+    retrying: "إعادة المحاولة",
     done: "تم التنزيل",
     failed: "تعذّر الجلب",
   };
@@ -4308,9 +4383,13 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
   closeBtn.onclick = closeNow;
 
   return {
-    setStatus(idx, status) {
+    setStatus(idx, status, detail) {
       if (!rows[idx]) return;
-      rows[idx].textContent = `${STATUS_ICON[status]} ${STATUS_TEXT[status]}`;
+      let text = `${STATUS_ICON[status]} ${STATUS_TEXT[status]}`;
+      if (status === "retrying" && detail) text += ` (المحاولة ${detail}/${__BACKUP_FETCH_MAX_ATTEMPTS})`;
+      if (status === "failed" && detail) text += ` — ${detail}`;
+      rows[idx].textContent = text;
+      rows[idx].title = text;
     },
     setSummary(text) {
       summaryEl.textContent = text;
@@ -4339,6 +4418,12 @@ let __fullBackupInflight = false;
 // النافذة المرئية (__backupCreateProgressUI_) تعرض تقدُّم كل مصدر لحظيًا
 // حتى يكون واضحًا تمامًا أن التنزيل يعمل فعليًا، دون الاعتماد على أي
 // إشعار عابر قد يُفوَّت.
+// 🔑 كل مصدر يُجلَب ويُعاد جلبه (عند الفشل) بشكل مستقل تمامًا عن باقي
+// المصادر (Promise لكل مصدر على حدة)، فلو مصدر واحد (عادة الرئيسي، لأنه
+// الأثقل) احتاج وقتًا أطول أو إعادة محاولة، هذا لا يؤخِّر تنزيل بقية
+// الملفات الجاهزة فعلًا. الكتابة الفعلية للملفات (XLSX.writeFile) تمرّ
+// عبر طابور واحد بترتيب أول مصدر يجهز (وليس بترتيب المصادر الأصلي)
+// وبفاصل زمني بسيط بينها، حتى لا تنزل كل الملفات في نفس اللحظة.
 window.__downloadFullDataBackup = async function (opts) {
   if (__fullBackupInflight) return;
   __fullBackupInflight = true;
@@ -4349,48 +4434,53 @@ window.__downloadFullDataBackup = async function (opts) {
     auto,
   );
 
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const failedSources = [];
+  let successCount = 0;
+  let writeChain = Promise.resolve();
+
   try {
-    const results = await Promise.allSettled(
-      backupSources.map((src) => fetch(src.url, { cache: "no-store" }).then((r) => r.json())),
-    );
-
-    progress.setSummary("جارٍ تنزيل الملفات، مصدرًا تلو الآخر...");
-
-    const dateTag = new Date().toISOString().slice(0, 10);
-    const failedSources = [];
-    let successCount = 0;
-
-    for (let idx = 0; idx < backupSources.length; idx++) {
-      const src = backupSources[idx];
-      const res = results[idx];
+    const tasks = backupSources.map((src, idx) => {
       const displayName = src.fileLabel || src.label || src.url;
-
-      if (res.status !== "fulfilled" || !res.value || res.value.status === "error") {
-        failedSources.push(displayName);
-        progress.setStatus(idx, "failed");
-        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
-        continue;
-      }
-
+      const timeoutMs = src.url === CFG.GAS_URL ? __BACKUP_FETCH_TIMEOUT_MAIN_MS : __BACKUP_FETCH_TIMEOUT_MS;
       progress.setStatus(idx, "downloading");
-      const wb = __backupBuildWorkbookForSource_(src, res.value);
-      if (!wb.SheetNames.length) {
-        failedSources.push(displayName);
-        progress.setStatus(idx, "failed");
-        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
-        continue;
-      }
 
-      // فاصل بسيط بين كل تنزيل والذي يليه حتى يتعامل المتصفح مع كل ملف
-      // على حدة بدلًا من اعتبارها كلها طلبًا واحدًا مشبوهًا.
-      if (successCount > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 450));
-      }
-      XLSX.writeFile(wb, `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`);
-      successCount++;
-      progress.setStatus(idx, "done");
-      progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
-    }
+      return __backupFetchWithTimeout_(src.url, timeoutMs, (attempt) => {
+        progress.setStatus(idx, "retrying", attempt);
+      })
+        .then((apiResponse) => {
+          // ملحوظة: فشل الاتصال أو رد الخادم بـ status:"error" تمت معالجته
+          // ومحاولاته مرارًا بالفعل داخل __backupFetchWithTimeout_ — لو
+          // وصلنا هنا فالرد سليم فعلًا.
+          const wb = __backupBuildWorkbookForSource_(src, apiResponse);
+          if (!wb.SheetNames.length) {
+            throw Object.assign(new Error("لا توجد بيانات"), { __backupReason: "empty" });
+          }
+          // الانضمام لطابور الكتابة — يُنفَّذ بترتيب أول مصدر يجهز فعليًا.
+          writeChain = writeChain.then(() => {
+            const runWrite = () => {
+              XLSX.writeFile(wb, `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`);
+              successCount++;
+              progress.setStatus(idx, "done");
+              progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+            };
+            // فاصل بسيط بين كل تنزيل والذي يليه حتى يتعامل المتصفح مع كل
+            // ملف على حدة بدلًا من اعتبارها كلها طلبًا واحدًا مشبوهًا.
+            return successCount > 0
+              ? new Promise((resolve) => setTimeout(resolve, 450)).then(runWrite)
+              : runWrite();
+          });
+          return writeChain;
+        })
+        .catch((err) => {
+          console.error("[__downloadFullDataBackup] فشل مصدر:", displayName, err);
+          failedSources.push(displayName);
+          progress.setStatus(idx, "failed", __backupReasonText_(err));
+          progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+        });
+    });
+
+    await Promise.all(tasks);
 
     if (!successCount) {
       throw new Error("تعذّر جلب أي مصدر بيانات");

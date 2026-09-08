@@ -1,3 +1,11 @@
+/* ════════════════════════════════════════════════════════════════
+   📝 قاعدة ثابتة للغة: كل نص يظهر للمستخدم في هذا الداشبورد — عناوين،
+   أزرار، رسائل تنبيه (toast)، تلميحات، نصوص قوائم، رسائل خطأ، أي محتوى
+   جديد يُضاف مستقبلاً — يجب أن يكون بالعربية الفصحى حصراً، بلا ألفاظ
+   عامية أو مصرية (مثل: "بس"، "لسه"، "كدا"، "عايز"، "خد بالك"...). عند
+   إضافة أي ميزة جديدة أو نص جديد، راجع صياغته وتأكد أنه فصيح قبل حفظه.
+   ════════════════════════════════════════════════════════════════ */
+
 /* ════════════════════════════════════════════════════════════
    القسم 1: الإعدادات والحالة وخدمة البيانات والفلاتر والـ KPIs
    ════════════════════════════════════════════════════════════ */
@@ -3012,6 +3020,7 @@ let __bgRevalidatedOnce = false;
       _idb.set(DATA_CACHE_KEY, json); // بدون await — ما نأخّر عرض البيانات لحفظ الكاش
     }
     if ("error" === json.status) throw new Error(json.message || "Apps Script error");
+    window.__MAIN_DATA_TIMESTAMP__ = json.timestamp || null;
     const d = json.data || {};
     // ── تأمين كل القيم — لو جاء undefined يتحول لـ [] ──
     const sa = (v) => (Array.isArray(v) ? v : []);
@@ -4018,13 +4027,510 @@ let __bgRevalidatedOnce = false;
         (autoTimer = null),
         (btn.innerHTML = `◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">${"en" === LANG ? "Auto" : "تلقائي"}</span>`),
         btn.classList.remove("on"))
-      : ((autoTimer = setInterval(() => loadData(!0, !0), CFG.AUTO_INTERVAL_MS)),
+      : ((autoTimer = setInterval(_mainMetaCheckAndMaybeRefresh, CFG.AUTO_INTERVAL_MS)),
         (btn.textContent =
           "en" === LANG
             ? `◷ Every ${CFG.AUTO_INTERVAL_MS / 6e4} min`
             : `◷ كل ${CFG.AUTO_INTERVAL_MS / 6e4} دقائق`),
         btn.classList.add("on"));
   }));
+
+// ⚡ فحص خفيف قبل إعادة تحميل البيانات الرئيسية بالكامل عند تفعيل زر
+// "تلقائي": بدل ما نسحب الحمولة الكاملة (كل الشيتات الـ21) كل
+// CFG.AUTO_INTERVAL_MS من غير داعي، نسأل أولاً نقطة خفيفة جدًا (?meta=1)
+// عن توقيع آخر تحديث فعلي، ولو نفس التوقيع المحمّل حاليًا ما بنعملش أي
+// طلب زيادة. نفس فكرة الفحص الخفيف المطبّقة على تحديث البلاغات.
+const MAIN_META_URL =
+  CFG.GAS_URL + (CFG.GAS_URL.indexOf("?") === -1 ? "?" : "&") + "meta=1";
+let _mainMetaCheckInflight = false;
+async function _mainMetaCheckAndMaybeRefresh() {
+  if (document.hidden) return;
+  if (__loadDataInFlight || _mainMetaCheckInflight) return;
+  _mainMetaCheckInflight = true;
+  try {
+    const resp = await fetch(MAIN_META_URL, { cache: "no-store" });
+    if (!resp.ok) return;
+    const json = await resp.json();
+    if (json.status !== "ok") return;
+    if (json.timestamp && json.timestamp === window.__MAIN_DATA_TIMESTAMP__) return;
+    loadData(true, true);
+  } catch (_) {
+  } finally {
+    _mainMetaCheckInflight = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 💾 زر النسخة الاحتياطية الكاملة (مخفي في الفوتر) — إضافة مستقلة تمامًا،
+// لا تمسّ أي منطق تحميل أو عرض موجود مسبقًا. تجلب كل مصادر بيانات
+// الداشبورد الثمانية (الرئيسي بشيتاته الـ21 + البلاغات + توريدات
+// التجهيزات + عقود التجهيزات + النشاط البدني + المكيّفات + الحصر +
+// التكلفة) بالتوازي، وتُنزِّل كل مصدر في ملف إكسل مستقل بذاته — لا يُدمج
+// أي مصدر مع مصدر آخر في ملف واحد — وكل شيت داخل ملفه يحمل اسم الشيت
+// الأصلي على جوجل شيتس قدر الإمكان (راجع الملاحظة أدناه عن مصدرين لا
+// تتوفر لدينا أسماء شيتاتهما الدقيقة). لا تعتمد على أي بيانات محمَّلة
+// مسبقًا في ذاكرة المتصفح (window.RAW*) حتى تعمل بشكل صحيح ولو كان
+// المستخدم لا يزال في الصفحة الرئيسية فقط.
+// ══════════════════════════════════════════════════════════════════
+// 🔑 مبنية كدالة (مش const ثابت) عشان الروابط زي TAJHEEZ_SUPPLIES_URL/
+// HASR_SCRIPT_URL/... متعرَّفة (const) في مواضع تانية أسفل هذا الملف —
+// استدعاء الدالة دي بيحصل بس عند الضغط على الزر (بعد تنفيذ الملف بالكامل)،
+// فمفيش أي مشكلة توقيت، لكن لازم تفضل دالة (مش مصفوفة جاهزة من الأول).
+function __buildBackupSources_() {
+  return [
+    {
+      url: CFG.GAS_URL,
+      kind: "multi",
+      fileLabel: "البيانات_الرئيسية",
+      names: {
+        buildings: "المباني",
+        fcaHistory: "تقييمات_FCA_المراحل",
+        spareParts: "قطع_الغيار",
+        fmContracts: "عقود_عدا_المجال",
+        allSystems: "المدارس_والأنظمة",
+        elevators: "المصاعد",
+        elevatorStatus: "حالة_المصاعد",
+        tajheezInventory: "التجهيزات_منظف",
+        gatekeepers: "قائمة_البوابين_منظفة",
+        kpiContractor: "مؤشرات_الأداء_للمقاول",
+        consultantKpi: "مؤشرات_اداء_الاستشاري",
+        payments: "المدفوعات",
+        recruitment: "التوظيف",
+        securitySafety: "بلاغات_أمن_وسلامة",
+        correctionsEscalations: "تصحيحات_وتصعيدات_الأمن_والسلامة",
+        fuelConsumption: "استهلاك_الوقود",
+        vehicles: "السيارات",
+        training: "برامج_التدريب",
+        employeeKpi: "تقييم_الموظفين",
+        safetyTeamKpi: "مؤشرات_أداء_فريق_السلامة",
+        schoolsSupervisors: "المدارس_والمشرفين",
+      },
+    },
+    // 🔑 رابط البلاغات مطابق تمامًا لـ BALAGH_URL المُعرَّف داخل دالة تحميل
+    // البلاغات المنفصلة أسفل الملف — لازم يتحدّثوا مع بعض لو تغيّر أي منهم.
+    // شيت البلاغات بيتعرّف تلقائيًا على أي تبويب فيه أعمدة بلاغات (ممكن
+    // يكون أكتر من تبويب/منطقة)، فمفيش اسم شيت واحد دقيق نرجّعه هنا —
+    // استخدمنا تسمية "البلاغات" كتسمية معقولة للصفحة الناتجة.
+    {
+      url: "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec",
+      kind: "flat",
+      label: "البلاغات",
+      fileLabel: "البلاغات",
+    },
+    {
+      url: TAJHEEZ_SUPPLIES_URL,
+      kind: "multi",
+      fileLabel: "تجهيزات_التوريدات",
+      names: {
+        distribution: "التوزيع_حسب_المنطقة_والصنف",
+        pendingItems: "بنود_قيد_اعتماد_امر_العمل",
+        itemsGuide: "دليل_الأصناف (تجهيزات)",
+        supplierKpi: "مؤشرات_الموردين",
+        byRegion: "ملخص_حسب_المنطقة (تجهيزات)",
+        bySupplier: "ملخص_حسب_المورد (تجهيزات)",
+      },
+    },
+    {
+      url: TAJHEEZ_CONTRACTS_URL,
+      kind: "multi",
+      fileLabel: "تجهيزات_العقود",
+      names: { contracts: "العقود", summary: "ملخص_العقود", bySupplier: "حسب_المورد (عقود)" },
+    },
+    {
+      url: NASHAT_BADANI_URL,
+      kind: "multi",
+      fileLabel: "النشاط_البدني",
+      names: {
+        distribution: "التوزيع_التفصيلي (نشاط بدني)",
+        itemsGuide: "دليل_الأصناف (نشاط بدني)",
+        byCompany: "ملخص_حسب_الشركة",
+        byRegion: "ملخص_حسب_المنطقة (نشاط بدني)",
+      },
+    },
+    {
+      url: MOKAYEFAT_URL,
+      kind: "multi",
+      fileLabel: "توريد_وتركيب_المكيفات",
+      names: {
+        basic: "توريدات المكيفيات شركة الاساسية",
+        zamil: "توريدات المكيفيات شركة الزامل",
+      },
+    },
+    // ⚠️ الحصر والتكلفة: لا يتوفر لدينا كود الـ Apps Script الخاص بهما، لذا
+    // لا نعرف أسماء الشيتات الداخلية بالضبط إن كان المصدر متعدد الشيتات —
+    // النوع "auto" يكتشف الشكل تلقائيًا (مصفوفة واحدة أو أكثر) ويسمّي كل
+    // صفحة بأفضل تخمين متاح. للحصول على أسماء دقيقة تمامًا، يُرجى إرسال
+    // كود الـ.gs الخاص بهما.
+    { url: HASR_SCRIPT_URL, kind: "auto", label: "حصر", fileLabel: "الحصر" },
+    {
+      url: "https://script.google.com/macros/s/AKfycbweVcD1cOAqFa6nkt9555c1kOyATcU6t_UWHGmySeOENb4y8XfmVbl9juXgRtqp2uEdeA/exec",
+      kind: "auto",
+      label: "التكلفة",
+      fileLabel: "التكلفة",
+    },
+  ];
+}
+
+// برنامج إكسل يرفض أسماء صفحات أطول من 31 حرفًا أو تحتوي على الرموز
+// : \ / ? * [ ] كما يرفض تكرار الاسم نفسه مرتين داخل الملف الواحد. هذه
+// الدالة تنظّف الاسم وتضمن تفرّده داخل الملف (كل ملف الآن له مجموعة
+// أسماء مستقلة بما أن كل مصدر بيانات يُنزَّل في ملفه الخاص).
+function __backupSafeSheetName_(rawName, usedNames) {
+  let name = String(rawName || "sheet").replace(/[:\\/?*[\]]/g, "_").trim() || "sheet";
+  if (name.length > 31) name = name.slice(0, 31);
+  let finalName = name;
+  let n = 2;
+  while (usedNames.has(finalName)) {
+    const suffix = " (" + n + ")";
+    finalName = name.slice(0, 31 - suffix.length) + suffix;
+    n++;
+  }
+  usedNames.add(finalName);
+  return finalName;
+}
+
+function __backupAddSheet_(wb, usedNames, label, rows) {
+  const ws = XLSX.utils.json_to_sheet(Array.isArray(rows) ? rows : []);
+  XLSX.utils.book_append_sheet(wb, ws, __backupSafeSheetName_(label, usedNames));
+}
+
+// تُنشئ من استجابة مصدر واحد دفتر عمل (workbook) مستقل خاص بهذا المصدر
+// وحده، بنفس منطق تسمية الشيتات المتّبع سابقًا (kind: multi/flat/auto)،
+// وتُعيد الدفتر مع عدد الشيتات التي أُضيفت فعليًا إليه.
+function __backupBuildWorkbookForSource_(src, apiResponse) {
+  const wb = XLSX.utils.book_new();
+  const usedNames = new Set();
+  const data = apiResponse && apiResponse.data;
+
+  if (src.kind === "flat") {
+    __backupAddSheet_(wb, usedNames, src.label, Array.isArray(data) ? data : []);
+  } else if (data && typeof data === "object") {
+    if (src.kind === "multi") {
+      Object.keys(src.names).forEach((key) => {
+        __backupAddSheet_(wb, usedNames, src.names[key], data[key]);
+      });
+    } else {
+      // kind === "auto" — نكتشف الشكل من الاستجابة نفسها
+      if (Array.isArray(data)) {
+        __backupAddSheet_(wb, usedNames, src.label, data);
+      } else {
+        Object.keys(data).forEach((key) => {
+          __backupAddSheet_(wb, usedNames, src.label + "_" + key, data[key]);
+        });
+      }
+    }
+  }
+  return wb;
+}
+
+// ── نافذة تقدُّم واضحة للنسخ الاحتياطي (إضافة مستقلة تمامًا) ────────
+// نافذة مرئية تمامًا (بخلاف الزر نفسه) تظهر بمجرد بدء التنزيل، وتبقى
+// ظاهرة طوال العملية: تعرض حالة كل مصدر على حدة (قيد الانتظار/جارٍ
+// التنزيل/تم/فشل)، الوقت المنقضي منذ البدء، وعدد الملفات التي تم
+// تنزيلها من إجمالي المصادر — حتى يكون واضحًا تمامًا أن التنزيل يعمل
+// فعليًا، ولا يُغلَق تلقائيًا قبل اكتمال العملية.
+function __backupCreateProgressUI_(sourceLabels, auto) {
+  // إزالة أي نافذة تقدُّم سابقة لم يُغلقها المستخدم بعد، حتى لا تتراكم
+  // أكثر من نافذة على الشاشة في آن واحد.
+  document.querySelectorAll("#__backupProgressOverlay").forEach((el) => el.remove());
+
+  const overlay = document.createElement("div");
+  overlay.id = "__backupProgressOverlay";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:100000;background:rgba(6,20,28,.6);" +
+    "display:flex;align-items:center;justify-content:center;padding:16px";
+
+  const modal = document.createElement("div");
+  modal.style.cssText =
+    "background:#0B2733;border:1px solid rgba(255,255,255,.14);border-radius:14px;" +
+    "width:min(340px,100%);max-height:80vh;display:flex;flex-direction:column;" +
+    "box-shadow:0 20px 50px rgba(0,0,0,.5);direction:rtl;color:#fff;" +
+    "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;overflow:hidden";
+
+  modal.innerHTML =
+    '<div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between">' +
+    '<div id="__backupProgTitle" style="font-size:13px;font-weight:700">' +
+    (auto ? "جارٍ تنفيذ النسخ الاحتياطي التلقائي" : "جارٍ تنفيذ النسخ الاحتياطي") +
+    "</div>" +
+    '<div id="__backupProgTimer" style="font-size:11px;opacity:.65;font-variant-numeric:tabular-nums">00:00</div>' +
+    "</div>" +
+    '<div id="__backupProgList" style="padding:10px 16px;overflow-y:auto;flex:1"></div>' +
+    '<div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.1)">' +
+    '<div id="__backupProgSummary" style="font-size:11.5px;opacity:.85;margin-bottom:10px">جارٍ جلب البيانات من كل مصدر...</div>' +
+    '<button type="button" id="__backupProgCloseBtn" disabled style="width:100%;padding:8px;border:none;border-radius:8px;' +
+    'background:rgba(255,255,255,.1);color:rgba(255,255,255,.4);font-size:12px;cursor:not-allowed">إغلاق</button>' +
+    "</div>";
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const listEl = modal.querySelector("#__backupProgList");
+  const timerEl = modal.querySelector("#__backupProgTimer");
+  const titleEl = modal.querySelector("#__backupProgTitle");
+  const summaryEl = modal.querySelector("#__backupProgSummary");
+  const closeBtn = modal.querySelector("#__backupProgCloseBtn");
+
+  const STATUS_ICON = { pending: "⏳", downloading: "🔽", done: "✅", failed: "❌" };
+  const STATUS_TEXT = {
+    pending: "قيد الانتظار",
+    downloading: "جارٍ التنزيل...",
+    done: "تم التنزيل",
+    failed: "تعذّر الجلب",
+  };
+
+  const rows = sourceLabels.map((label, idx) => {
+    const row = document.createElement("div");
+    row.style.cssText =
+      "display:flex;align-items:center;justify-content:space-between;gap:8px;" +
+      "padding:6px 0;font-size:11.5px;border-bottom:1px solid rgba(255,255,255,.05)";
+    row.innerHTML =
+      '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + label + "</span>" +
+      '<span data-role="status" style="flex-shrink:0;opacity:.75">⏳ قيد الانتظار</span>';
+    listEl.appendChild(row);
+    return row.querySelector('[data-role="status"]');
+  });
+
+  const startedAt = Date.now();
+  const timerHandle = setInterval(() => {
+    const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
+    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const ss = String(elapsedSec % 60).padStart(2, "0");
+    timerEl.textContent = `${mm}:${ss}`;
+  }, 1000);
+
+  let closed = false;
+  function closeNow() {
+    if (closed) return;
+    closed = true;
+    clearInterval(timerHandle);
+    overlay.remove();
+  }
+  closeBtn.onclick = closeNow;
+
+  return {
+    setStatus(idx, status) {
+      if (!rows[idx]) return;
+      rows[idx].textContent = `${STATUS_ICON[status]} ${STATUS_TEXT[status]}`;
+    },
+    setSummary(text) {
+      summaryEl.textContent = text;
+    },
+    finish(summaryText) {
+      clearInterval(timerHandle);
+      titleEl.textContent = auto ? "اكتمل النسخ الاحتياطي التلقائي" : "اكتمل النسخ الاحتياطي";
+      summaryEl.textContent = summaryText;
+      closeBtn.disabled = false;
+      closeBtn.style.cssText =
+        "width:100%;padding:8px;border:none;border-radius:8px;background:#2FB7C8;" +
+        "color:#04202b;font-weight:700;font-size:12px;cursor:pointer";
+      overlay.onclick = (e) => {
+        if (e.target === overlay) closeNow();
+      };
+    },
+    close: closeNow,
+  };
+}
+
+let __fullBackupInflight = false;
+// كل مصدر بيانات يُنزَّل في ملف إكسل مستقل بذاته (وليس في ملف واحد مشترك)،
+// بنفس اسم الملف الذي يعكس محتواه ونفس أسماء الشيتات الأصلية بداخله. عند
+// تنزيل عدة ملفات من نفس الضغطة، قد يعرض المتصفح مرة واحدة إذنًا للسماح
+// بتنزيل عدة ملفات معًا — الموافقة عليه تسمح بإتمام تنزيل بقية الملفات.
+// النافذة المرئية (__backupCreateProgressUI_) تعرض تقدُّم كل مصدر لحظيًا
+// حتى يكون واضحًا تمامًا أن التنزيل يعمل فعليًا، دون الاعتماد على أي
+// إشعار عابر قد يُفوَّت.
+window.__downloadFullDataBackup = async function (opts) {
+  if (__fullBackupInflight) return;
+  __fullBackupInflight = true;
+  const auto = !!(opts && opts.auto);
+  const backupSources = __buildBackupSources_();
+  const progress = __backupCreateProgressUI_(
+    backupSources.map((s) => s.fileLabel || s.label || s.url),
+    auto,
+  );
+
+  try {
+    const results = await Promise.allSettled(
+      backupSources.map((src) => fetch(src.url, { cache: "no-store" }).then((r) => r.json())),
+    );
+
+    progress.setSummary("جارٍ تنزيل الملفات، مصدرًا تلو الآخر...");
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    const failedSources = [];
+    let successCount = 0;
+
+    for (let idx = 0; idx < backupSources.length; idx++) {
+      const src = backupSources[idx];
+      const res = results[idx];
+      const displayName = src.fileLabel || src.label || src.url;
+
+      if (res.status !== "fulfilled" || !res.value || res.value.status === "error") {
+        failedSources.push(displayName);
+        progress.setStatus(idx, "failed");
+        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+        continue;
+      }
+
+      progress.setStatus(idx, "downloading");
+      const wb = __backupBuildWorkbookForSource_(src, res.value);
+      if (!wb.SheetNames.length) {
+        failedSources.push(displayName);
+        progress.setStatus(idx, "failed");
+        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+        continue;
+      }
+
+      // فاصل بسيط بين كل تنزيل والذي يليه حتى يتعامل المتصفح مع كل ملف
+      // على حدة بدلًا من اعتبارها كلها طلبًا واحدًا مشبوهًا.
+      if (successCount > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      }
+      XLSX.writeFile(wb, `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`);
+      successCount++;
+      progress.setStatus(idx, "done");
+      progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+    }
+
+    if (!successCount) {
+      throw new Error("تعذّر جلب أي مصدر بيانات");
+    }
+
+    __markBackupRanToday_();
+
+    progress.finish(
+      failedSources.length
+        ? `تم تنزيل ${successCount} من ${backupSources.length} ملفات، وتعذّر جلب البيانات من: ${failedSources.join("، ")}`
+        : `تم تنزيل جميع الملفات الاحتياطية بنجاح (${successCount} ملفات)`,
+    );
+  } catch (err) {
+    console.error("[__downloadFullDataBackup]", err);
+    progress.finish("فشل تجهيز الملفات الاحتياطية: " + err.message);
+  } finally {
+    __fullBackupInflight = false;
+  }
+};
+
+// ── جدولة تحميل تلقائي يومي (إضافة مستقلة تمامًا) ──────────────────
+// الداشبورد صفحة ويب عادية وليس تطبيق خلفية، لذا تعمل هذه الجدولة فقط
+// عندما يكون المتصفح مفتوحًا فعليًا على الداشبورد. كل نصف دقيقة يُتحقَّق
+// هل حان الموعد المحدَّد ولم يُنزَّل أي نسخة اليوم بعد (يدويًا أو تلقائيًا)
+// — وإن كان الأمر كذلك، تُستدعى دالة التحميل نفسها بالضبط
+// (window.__downloadFullDataBackup) فلا يوجد أي منطق مكرَّر.
+const __BACKUP_SCHEDULE_KEY = "fm_backup_schedule_v1";
+const __BACKUP_LAST_RUN_KEY = "fm_backup_last_run_date_v1";
+
+function __getBackupSchedule_() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(__BACKUP_SCHEDULE_KEY) || "null");
+    if (raw && typeof raw.hhmm === "string") return { enabled: !!raw.enabled, hhmm: raw.hhmm };
+  } catch (_) {}
+  return { enabled: false, hhmm: "10:00" };
+}
+function __setBackupSchedule_(enabled, hhmm) {
+  try {
+    localStorage.setItem(
+      __BACKUP_SCHEDULE_KEY,
+      JSON.stringify({ enabled: !!enabled, hhmm: hhmm || "10:00" }),
+    );
+  } catch (_) {}
+}
+function __todayStr_() {
+  const d = new Date();
+  return (
+    d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
+  );
+}
+function __markBackupRanToday_() {
+  try {
+    localStorage.setItem(__BACKUP_LAST_RUN_KEY, __todayStr_());
+  } catch (_) {}
+}
+function __lastBackupRunDate_() {
+  try {
+    return localStorage.getItem(__BACKUP_LAST_RUN_KEY) || "";
+  } catch (_) {
+    return "";
+  }
+}
+function __backupSchedulerTick_() {
+  const sched = __getBackupSchedule_();
+  if (!sched.enabled || __fullBackupInflight) return;
+  if (__lastBackupRunDate_() === __todayStr_()) return;
+  const parts = String(sched.hhmm).split(":");
+  const targetMinutes = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  if (nowMinutes >= targetMinutes) window.__downloadFullDataBackup({ auto: true });
+}
+let __backupSchedulerTimer = null;
+if (!__backupSchedulerTimer) {
+  __backupSchedulerTick_();
+  __backupSchedulerTimer = setInterval(__backupSchedulerTick_, 3e4);
+}
+
+// ── القائمة المخفية التي تُفتح عند الضغط على الزر الشفاف ──────────
+window.__openBackupMenu = function (ev) {
+  if (ev) ev.stopPropagation();
+  if (document.getElementById("__backupMenuOverlay")) return;
+
+  const sched = __getBackupSchedule_();
+  const lastRun = __lastBackupRunDate_();
+
+  const overlay = document.createElement("div");
+  overlay.id = "__backupMenuOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;z-index:99998;background:transparent";
+  overlay.onclick = () => overlay.remove();
+
+  const panel = document.createElement("div");
+  panel.style.cssText =
+    "position:fixed;left:16px;bottom:52px;z-index:99999;background:#0B2733;" +
+    "border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:14px;" +
+    "width:230px;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
+    "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;color:#fff;font-size:12px";
+  panel.onclick = (e) => e.stopPropagation();
+
+  panel.innerHTML =
+    '<div style="font-size:12px;font-weight:700;margin-bottom:10px;opacity:.9">النسخ الاحتياطي الكامل</div>' +
+    '<button type="button" id="__backupNowBtn" style="width:100%;padding:8px;border:none;border-radius:8px;' +
+    'background:#2FB7C8;color:#04202b;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:12px">' +
+    "تنزيل الآن</button>" +
+    '<label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;font-size:11px">' +
+    '<input type="checkbox" id="__backupAutoEnabled"' +
+    (sched.enabled ? " checked" : "") +
+    ">تفعيل التنزيل التلقائي اليومي</label>" +
+    '<input type="time" id="__backupAutoTime" value="' +
+    sched.hhmm +
+    '" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.2);' +
+    'background:#08202b;color:#fff;font-size:12px;margin-bottom:10px">' +
+    '<div style="font-size:10px;opacity:.55;margin-bottom:10px;line-height:1.6">' +
+    "يعمل هذا الخيار فقط عندما يكون الداشبورد مفتوحًا في المتصفح وقت الموعد المحدَّد، وينزِّل كل مصدر بيانات في ملف مستقل.<br>" +
+    (lastRun ? "آخر نسخة احتياطية: " + lastRun : "لم يُنزَّل أي نسخة من هنا بعد") +
+    "</div>" +
+    '<button type="button" id="__backupSaveBtn" style="width:100%;padding:7px;border:none;border-radius:8px;' +
+    'background:rgba(255,255,255,.12);color:#fff;font-size:11px;cursor:pointer">حفظ الإعداد</button>';
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  document.getElementById("__backupNowBtn").onclick = () => {
+    overlay.remove();
+    window.__downloadFullDataBackup();
+  };
+  document.getElementById("__backupSaveBtn").onclick = () => {
+    const enabled = document.getElementById("__backupAutoEnabled").checked;
+    const hhmm = document.getElementById("__backupAutoTime").value || "10:00";
+    __setBackupSchedule_(enabled, hhmm);
+    overlay.remove();
+    if (typeof showToast === "function") {
+      showToast(
+        enabled ? `تم تفعيل التنزيل التلقائي يوميًا الساعة ${hhmm}` : "تم إيقاف التنزيل التلقائي",
+        "ok",
+      );
+      if (typeof clearToast === "function") setTimeout(clearToast, 4e3);
+    }
+  };
+};
 
 /* ════════════════════════════════════════════════════════════
    القسم 3: الخريطة والطلاب ومؤشرات KPI والأمن والسلامة

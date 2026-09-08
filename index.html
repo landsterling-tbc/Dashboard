@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <!--
 ╔════════════════════════════════════════════════════════════════════╗
+║ 📝 قاعدة ثابتة للغة: كل نص يظهر للمستخدم في هذا الداشبورد (عناوين،
+║ أزرار، تلميحات، رسائل تنبيه، أي محتوى جديد يُضاف مستقبلاً) يجب أن
+║ يكون بالعربية الفصحى حصراً، بلا ألفاظ عامية أو مصرية. راجع صياغة أي
+║ نص جديد قبل حفظه.
+╠════════════════════════════════════════════════════════════════════╣
 ║         فهرس التبويبات — Dashboard Tabs Index
 ╠════════════════════════════════════════════════════════════════════╣
 ║   1. 📊  نظرة عامة                      (tab-overview)
@@ -2100,8 +2105,21 @@
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC"
          style="height:36px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="102">
   </div>
-  <div style="font-size:10px;color:rgba(255,255,255,.25);text-align:center;letter-spacing:.04em">
-    FACILITIES MANAGEMENT DASHBOARD
+  <div style="display:flex;align-items:center;gap:10px">
+    <!-- زر نسخة احتياطية كاملة — مقصود إخفاؤه بالكامل (شفافية صفر، بدون
+         عنوان/تلميح، بدون أي أثر عند مرور الماوس). الضغط عليه يفتح قائمة
+         صغيرة فيها "تحميل الآن" أو جدولة تحميل تلقائي يومي في وقت مُحدَّد.
+         ملحوظة: الزر متعمّد وضعه قبل الجملة (بعيدًا عن حافة الشاشة) عشان
+         لا يقع تحت أيقونة مساعد الذكاء الاصطناعي العائمة. -->
+    <button type="button" id="fullBackupBtn" onclick="window.__openBackupMenu(event)"
+      style="width:14px;height:14px;padding:0;border:none;background:transparent;
+        opacity:0;cursor:pointer;display:flex;align-items:center;justify-content:center">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <div style="font-size:10px;color:rgba(255,255,255,.25);text-align:center;letter-spacing:.04em">
+      FACILITIES MANAGEMENT DASHBOARD
+    </div>
   </div>
 </footer>
 

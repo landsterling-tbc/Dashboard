@@ -24344,6 +24344,27 @@ ${(() => {
     return ((n / total) * 100).toFixed(1) + "%";
   }
 
+  // بناء سلسلة شهرية (مستلم/مصروف) من كل صفوف العهدة — تُستخدم في الرسم
+  // البياني الخطي لمقارنة "باخد كام وباصرف كام" في كل شهر تقريبًا.
+  var MM_AR_PC = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  function buildMonthlySeries(rows) {
+    var byMonth = {};
+    rows.forEach(function (r) {
+      var dt = parseDateVal(r.date);
+      if (!dt) return;
+      var key = dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0");
+      if (!byMonth[key]) byMonth[key] = { received: 0, spent: 0, y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1 };
+      byMonth[key].received += r.received;
+      byMonth[key].spent += r.spent;
+    });
+    var keys = Object.keys(byMonth).sort();
+    return {
+      labels: keys.map(function (k) { return MM_AR_PC[byMonth[k].m - 1] + " " + byMonth[k].y; }),
+      received: keys.map(function (k) { return byMonth[k].received; }),
+      spent: keys.map(function (k) { return byMonth[k].spent; }),
+    };
+  }
+
   function renderPager(total) {
     var pages = Math.max(1, Math.ceil(total / STATE.size));
     var current = Math.min(STATE.page, pages - 1);
@@ -24423,6 +24444,8 @@ ${(() => {
       var totalSpent = all.reduce(function (s, r) { return s + r.spent; }, 0);
       var totalRemaining = totalReceived - totalSpent;
 
+      var monthly = buildMonthlySeries(all);
+
       var byPerson = people.map(function (p) {
         var prows = all.filter(function (r) { return r.sheet === p; });
         var received = prows.reduce(function (s, r) { return s + r.received; }, 0);
@@ -24487,6 +24510,15 @@ ${(() => {
         '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(people.length) + '</div><div class="kpi-lbl">عدد المسؤولين</div><div class="kpi-sub">' + escText(byPerson.map(function (p) { return p.name; }).join("، ")) + "</div></div>" +
         "</div></div>" +
         '<div class="card mb14"><div class="card-title">' +
+        '<span class="card-title-icon" style="background:#FFF7ED;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>' +
+        "<span>مقارنة شهرية: المستلم مقابل المصروف</span>" +
+        '<span class="sub">تقريبي — لمتابعة اتجاه الاستلام والصرف شهرًا بشهر</span>' +
+        "</div>" +
+        (monthly.labels.length
+          ? '<div class="chart-box" style="height:280px"><canvas id="pc-monthly-chart"></canvas></div>'
+          : '<div class="empty-msg">لا توجد تواريخ كافية لبناء مقارنة شهرية</div>') +
+        "</div>" +
+        '<div class="card mb14"><div class="card-title">' +
         '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
         "<span>حسب المسؤول</span></div>" +
         breakdownHtml +
@@ -24522,6 +24554,56 @@ ${(() => {
         "</div>";
 
       window.exportPettyCashCSV_dispatch = function () { exportPettyCashCSV(rows); };
+
+      // رسم الشارت الشهري (بعد ما الـ canvas يتضاف فعليًا للـ DOM)
+      if (monthly.labels.length && typeof window.Chart === "function" && typeof killChart === "function") {
+        requestAnimationFrame(function () {
+          killChart("pc-monthly-chart");
+          var canvas = document.getElementById("pc-monthly-chart");
+          if (!canvas) return;
+          window.CHARTS = window.CHARTS || {};
+          window.CHARTS["pc-monthly-chart"] = new Chart(canvas, {
+            type: "line",
+            data: {
+              labels: monthly.labels,
+              datasets: [
+                {
+                  label: "المستلم",
+                  data: monthly.received,
+                  borderColor: "#059669",
+                  backgroundColor: "#05966922",
+                  borderWidth: 2.5,
+                  tension: 0.3,
+                  fill: true,
+                  pointRadius: 4,
+                  pointHoverRadius: 6,
+                  pointBackgroundColor: "#059669",
+                },
+                {
+                  label: "المصروف",
+                  data: monthly.spent,
+                  borderColor: "#B91C1C",
+                  backgroundColor: "#B91C1C22",
+                  borderWidth: 2.5,
+                  tension: 0.3,
+                  fill: true,
+                  pointRadius: 4,
+                  pointHoverRadius: 6,
+                  pointBackgroundColor: "#B91C1C",
+                },
+              ],
+            },
+            options: {
+              maintainAspectRatio: false,
+              interaction: { mode: "index", intersect: false },
+              plugins: { legend: { position: "bottom", rtl: true, labels: { usePointStyle: true } } },
+              scales: {
+                y: { beginAtZero: true, ticks: { callback: function (v) { return fmt_(v); } } },
+              },
+            },
+          });
+        });
+      }
     } catch (err) {
       console.error("[petty-cash] خطأ أثناء رسم تبويب العهدة:", err);
       showErrorState(el, "حدث خطأ غير متوقع: " + (err && err.message ? err.message : String(err)) + " — افتح Console (F12) للتفاصيل.");
@@ -30469,6 +30551,10 @@ function _orgBuildGroupedChart(rows) {
   return `<ul class="org-chart-root-list">${html}</ul>`;
 }
 
+// ⚠️ تذكير: أي نص يظهر هنا للمستخدم (ملاحظات، عناوين، رسائل) يجب أن يكون
+// بالعربية الفصحى فقط — بلا ألفاظ عامية (راجع القاعدة الثابتة أعلى الملف).
+// حُذفت ملاحظة "لسه مش متعبّى" سابقاً من هذه الدالة لمخالفتها هذه القاعدة
+// ولطلب صريح من المستخدم بإزالتها بالكامل من واجهة تبويب الهيكل الوظيفي.
 function _orgBuildChartPanel(rows) {
   const mgrCount = rows.filter((r) => _orgManager(r)).length;
   if (mgrCount > 0) {
@@ -30480,10 +30566,7 @@ function _orgBuildChartPanel(rows) {
       );
     }
   }
-  return (
-    `<div class="org-chart-note">📌 عمود "المدير المباشر" لسه مش متعبّى في الملف — العرض الحالي مبني على نوع الفريق/المنطقة/المسمى الوظيفي. بمجرد تعبئة "المدير المباشر" هيتحول العرض هنا تلقائيًا لهيكل تنظيمي فعلي بالأسماء من غير أي تعديل تاني.</div>` +
-    `<div class="org-chart-wrap">${_orgBuildGroupedChart(rows)}</div>`
-  );
+  return `<div class="org-chart-wrap">${_orgBuildGroupedChart(rows)}</div>`;
 }
 
 function _orgSwitchView(view) {
@@ -30986,7 +31069,6 @@ function _ctpSectionKpisHtml(rows) {
     <div class="kpi kc-teal">
       <div class="kpi-val">${rows.length.toLocaleString("ar")}</div>
       <div class="kpi-lbl">عدد المشاريع/النطاقات</div>
-      <div class="kpi-sub">صف لكل مشروع فرعي تحت العقد</div>
     </div>
     <div class="kpi kc-purple">
       <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>

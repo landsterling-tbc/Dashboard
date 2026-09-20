@@ -2201,6 +2201,9 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
   .filters-row { padding: 12px; border-radius: var(--r-lg); gap: 8px; }
   .finp, .fsel, .f-clear { width: 100%; min-width: 0; }
   .fg { width: 100%; margin: 0; }
+  .msel-wrap { width: 100%; }
+  .msel-btn { width: 100%; max-width: none; min-width: 0; }
+  .msel-panel { max-width: none; left: 0; right: 0; width: 100%; }
 
   /* map */
   .map-stat { min-width: calc(50% - 6px); }
@@ -3937,6 +3940,93 @@ tbody td {
   box-shadow: 0 2px 8px rgba(184,66,90,.10);
 }
 
+/* ── 6-H: فلاتر بقيم متعددة (Multi-Select) ─────────────────────
+   طبقة عرض (زر + قائمة تشيك بوكس) فوق <select multiple> الأصلي
+   (مخفي بصرياً عبر .msel-native وهو مصدر الحقيقة الوحيد لكل أكواد
+   الفلترة القديمة). المقاسات والألوان هنا مطابقة لأحدث نسخة من
+   .fsel/.finp أعلاه (Phase 6) عشان يبقى شكلها متسق. راجع دالة
+   mselInit في dashboard.js.
+   ──────────────────────────────────────────────────────────────── */
+.msel-wrap { position: relative; display: inline-block; }
+.msel-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  border: 0 !important;
+}
+.msel-btn {
+  font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif;
+  font-size: 13px;
+  min-height: 36px;
+  min-width: 110px;
+  padding: 5px 10px 5px 26px;
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--tx-main);
+  direction: rtl;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 2px rgba(8,45,60,.04);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+html[dir="ltr"] .msel-btn { direction: ltr; }
+.msel-btn .msel-btn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msel-btn .msel-chev { font-size: 9px; color: #5f7d95; flex-shrink: 0; }
+.msel-btn:hover { background-color: #fafcfe; border-color: rgba(13,132,156,.40); }
+.msel-btn.msel-open {
+  outline: none;
+  background-color: #fff;
+  border-color: var(--teal);
+  box-shadow: inset 0 1px 2px rgba(8,45,60,.04), 0 0 0 3px rgba(13,132,156,.16);
+}
+/* ⚠️ .msel-panel بيتلحق بـ document.body مباشرة (مش جوه .msel-wrap) ويتحدد
+   موضعه (top/left) بالـ JS (mselPositionPanel) وقت الفتح — عشان كده
+   position: fixed هنا، من غير top/right ثابتين. السبب: .filters-row
+   عنده backdrop-filter، وده بينشئ "stacking context" جديد بيحبس أي
+   z-index جوّاه (زي اللوحة دي) فيمنعها تظهر فوق أقسام تانية بعدها في
+   الصفحة (زي كروت "نظرة عامة") حتى لو z-index عالي. الحل الصحيح
+   ليها إنها تتلحق بالـ body مباشرة بدل ما تفضل جوه .filters-row. */
+.msel-panel {
+  position: fixed;
+  z-index: 5000;
+  background: #fff;
+  border: 1px solid var(--bd-light);
+  border-radius: var(--r-sm);
+  box-shadow: var(--sh-card);
+  min-width: 190px;
+  max-width: 300px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  display: none;
+}
+.msel-panel.msel-panel-open { display: block; }
+.msel-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.msel-opt:hover { background: rgba(13,132,156,.08); }
+.msel-opt input { cursor: pointer; margin: 0; accent-color: var(--teal); flex-shrink: 0; }
+.msel-opt-all { font-weight: 800; border-bottom: 1px solid var(--bd-light); margin-bottom: 4px; padding-bottom: 8px; }
+
 /* نهاية Phase 6 — Filters */
 
 /* ══════════════════════════════════════════════════════════════
@@ -5302,6 +5392,12 @@ tbody tr:last-child td:last-child {
 [data-category="fca"]:hover               { border-color: rgba(13,132,156,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(13,132,156,.16), inset 0 1px 0 #fff; }
 [data-category="otherAssessments"]:hover  { border-color: rgba(91,107,140,.3);  box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(91,107,140,.18), inset 0 1px 0 #fff; }
 
+/* ★ 2026-09-17: أقسام إعادة التوزيع الجديدة (نظرة عامة/المدارس والطلاب/
+   الأنظمة والصيانة الفنية/مؤشرات الأداء) — إضافة فقط */
+[data-category="overview"]:hover           { border-color: rgba(22,61,82,.3);   box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(22,61,82,.16), inset 0 1px 0 #fff; }
+[data-category="systemsMaintenance"]:hover { border-color: rgba(61,82,102,.3);  box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(61,82,102,.18), inset 0 1px 0 #fff; }
+[data-category="kpi"]:hover                { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
+
 [data-category="assets"]:hover               { border-color: rgba(11,107,126,.28); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(11,107,126,.16), inset 0 1px 0 #fff; }
 
 [data-category="contracts"]:hover               { border-color: rgba(176,138,78,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(176,138,78,.18), inset 0 1px 0 #fff; }
@@ -5611,6 +5707,10 @@ tbody tr:last-child td:last-child {
 [data-category="fca"]              { background: linear-gradient(160deg, #ffffff 0%, rgba(13,132,156,.055) 100%);  border-color: rgba(13,132,156,.24); }
 [data-category="otherAssessments"] { background: linear-gradient(160deg, #ffffff 0%, rgba(91,107,140,.06) 100%);   border-color: rgba(91,107,140,.26); }
 [data-category="assets"]     { background: linear-gradient(160deg, #ffffff 0%, rgba(11,107,126,.055) 100%);  border-color: rgba(11,107,126,.24); }
+/* ★ 2026-09-17: أقسام إعادة التوزيع الجديدة — إضافة فقط */
+[data-category="overview"]           { background: linear-gradient(160deg, #ffffff 0%, rgba(22,61,82,.05) 100%);    border-color: rgba(22,61,82,.22); }
+[data-category="systemsMaintenance"] { background: linear-gradient(160deg, #ffffff 0%, rgba(61,82,102,.055) 100%);  border-color: rgba(61,82,102,.26); }
+[data-category="kpi"]                { background: linear-gradient(160deg, #ffffff 0%, rgba(11,107,126,.055) 100%); border-color: rgba(11,107,126,.24); }
 [data-category="contracts"]  { background: linear-gradient(160deg, #ffffff 0%, rgba(176,138,78,.07) 100%);   border-color: rgba(176,138,78,.3); }
 [data-category="operations"] { background: linear-gradient(160deg, #ffffff 0%, rgba(22,61,82,.05) 100%);     border-color: rgba(22,61,82,.22); }
 [data-category="safety"]     { background: linear-gradient(160deg, #ffffff 0%, rgba(125,31,44,.05) 100%);    border-color: rgba(125,31,44,.22); }
@@ -6344,6 +6444,10 @@ tbody tr:last-child td:last-child {
 #portal-card-explore    { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);    --cat-bd:rgba(22,61,82,.28);    }
 #portal-card-digital    { --cat-accent:#4f46e5; --cat-soft:rgba(79,70,229,.13);   --cat-bd:rgba(79,70,229,.3);    }
 #portal-card-raci       { --cat-accent:#8a6a37; --cat-soft:rgba(138,106,55,.14);  --cat-bd:rgba(138,106,55,.3);   }
+/* ★ 2026-09-17: أقسام إعادة التوزيع الجديدة — إضافة فقط */
+#portal-card-overview           { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);   --cat-bd:rgba(22,61,82,.28);   }
+#portal-card-systemsMaintenance { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);  }
+#portal-card-kpi                { --cat-accent:#0b6b7e; --cat-soft:rgba(11,107,126,.13);  --cat-bd:rgba(11,107,126,.28); }
 
 .portal-favorites-card { border-radius: var(--r-2xl); }
 
@@ -6411,17 +6515,28 @@ tbody tr:last-child td:last-child {
    "الأنظمة الرقمية" اتشالت من الشبكة التلاتة أعمدة وبقت مثبّتة تحت
    كارت "المفضلة" في نفس العمود الضيق (الشمال)، فمكانها الفاضي جوه
    شبكة الـ3×3 اتسدّ بنقل كارت RACI لمكانه بدل ما يفضل لوحده في صف رابع.
-   (ترتيب العرض بس — ترتيب الـHTML نفسه ما اتغيرش) */
-#portal-card-fca              { order: 1; }
-#portal-card-otherAssessments { order: 2; }
-#portal-card-safety     { order: 3; }
-#portal-card-assets     { order: 4; }
-#portal-card-equipment  { order: 5; }
-#portal-card-contracts  { order: 6; }
-#portal-card-operations { order: 7; }
-#portal-card-geo        { order: 8; }
-#portal-card-explore    { order: 9; }
-#portal-card-raci       { order: 10; }
+   (ترتيب العرض بس — ترتيب الـHTML نفسه ما اتغيرش)
+
+   ★ 2026-09-20: بناءً على طلب صريح، بقى ترتيب العرض الكامل مضبوط
+   صراحةً لكل كارت (بدل الاعتماد على order الافتراضي=0 لبعض الكروت
+   الجديدة اللي كانت بتخليها تظهر أول حاجة بترتيب DOM بدل ترتيب منطقي).
+   "نظرة عامة" بقت أول كارت، يتبعها "تقييم حالة المرافق FCA"، يتبعها
+   "التقييمات الأخرى" — الثلاثة دول بالترتيب المطلوب بالظبط وعلى التوالي.
+   باقي الكروت سابتها بنفس ترتيبها النسبي القديم. أزلنا كمان قواعد
+   order الخاصة بـ"assets"/"explore" القديمة — دول أسماء كروت مبقتش
+   موجودة خالص في index.html الحالي (لا فايدة من قاعدة CSS مالهاش عنصر
+   تنطبق عليه). */
+#portal-card-overview          { order: 1; }
+#portal-card-fca               { order: 2; }
+#portal-card-otherAssessments  { order: 3; }
+#portal-card-systemsMaintenance{ order: 4; }
+#portal-card-kpi               { order: 5; }
+#portal-card-safety            { order: 6; }
+#portal-card-equipment         { order: 7; }
+#portal-card-contracts         { order: 8; }
+#portal-card-operations        { order: 9; }
+#portal-card-geo               { order: 10; }
+#portal-card-raci              { order: 11; }
 
 /* "الأنظمة الرقمية" تحت المفضلة في نفس العمود (عمود 4)، وبقت بنفس
    عرض وارتفاع الكارت اللي جمبها في صف 2 (تجهيزات/عقود/تشغيل) —

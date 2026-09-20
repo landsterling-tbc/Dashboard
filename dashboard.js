@@ -788,26 +788,27 @@ function smartSearchRerender(inputEl, renderFn, delay = 250) {
 window.smartSearchRerender = smartSearchRerender;
 
 function updateDistrictBySector() {
-  const city = document.getElementById("fCity").value;
-  const sector = document.getElementById("fSector").value;
+  // 🆕 فلاتر بقيم متعددة: مصفوفة بدل قيمة واحدة (فاضية = "الكل")
+  const cityArr = getMultiVal("fCity");
+  const sectorArr = getMultiVal("fSector");
   const el = document.getElementById("fDistrict");
   if (!el) return;
-  const prevDistrict = el.value;
+  const prevDistrictArr = getMultiVal("fDistrict");
   const allLabel = "en" === LANG ? "All" : "الكل";
-  // Filter source: if sector selected → districts of that sector; else if city selected → districts of that city; else all
+  // Filter source: if sector(s) selected → districts of those sectors; else if city/cities selected → districts of those cities; else all
   let filtered;
-  if (sector) {
+  if (sectorArr.length) {
     filtered = [
       ...new Set(
-        RAW.filter((r) => r.sector === sector)
+        RAW.filter((r) => sectorArr.includes(r.sector))
           .map((r) => r.district)
           .filter((d) => d && "—" !== d && "#N/A" !== d),
       ),
     ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-  } else if (city) {
+  } else if (cityArr.length) {
     filtered = [
       ...new Set(
-        RAW.filter((r) => r.city === city)
+        RAW.filter((r) => cityArr.includes(r.city))
           .map((r) => r.district)
           .filter((d) => d && "—" !== d && "#N/A" !== d),
       ),
@@ -820,62 +821,57 @@ function updateDistrictBySector() {
   el.innerHTML =
     `<option value="">${allLabel}</option>` +
     filtered.map((v) => `<option value="${v}">${v}</option>`).join("");
-  // Restore previous value if still valid
-  if (prevDistrict && [...el.options].some((o) => o.value === prevDistrict)) {
-    el.value = prevDistrict;
-  } else {
-    el.value = "";
-  }
+  // Restore previously-selected districts that are still valid
+  setMultiVal("fDistrict", prevDistrictArr.filter((v) => filtered.includes(v)));
+  if ("function" === typeof mselBuildPanel) mselBuildPanel("fDistrict");
 }
 function updateSectorByCity() {
-  const city = document.getElementById("fCity").value;
+  // 🆕 فلاتر بقيم متعددة: مصفوفة بدل قيمة واحدة (فاضية = "الكل")
+  const cityArr = getMultiVal("fCity");
   const el = document.getElementById("fSector");
   if (!el) return;
-  const prevSector = el.value;
-  // Build filtered sector list based on selected city
+  const prevSectorArr = getMultiVal("fSector");
+  // Build filtered sector list based on selected city/cities
   const allLabel = "en" === LANG ? "All" : "الكل";
-  if (!city) {
+  let filtered;
+  if (!cityArr.length) {
     // No city selected: show all sectors
-    const allSectors = [
+    filtered = [
       ...new Set(RAW.map((r) => r.sector).filter((s) => s && "—" !== s && "#N/A" !== s)),
     ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-    el.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      allSectors.map((v) => `<option value="${v}">${v}</option>`).join("");
   } else {
-    // Filter sectors to only those belonging to the selected city
-    const filtered = [
+    // Filter sectors to only those belonging to the selected city/cities
+    filtered = [
       ...new Set(
-        RAW.filter((r) => r.city === city)
+        RAW.filter((r) => cityArr.includes(r.city))
           .map((r) => r.sector)
           .filter((s) => s && "—" !== s && "#N/A" !== s),
       ),
     ].sort((a, b) => a.localeCompare(b, "en" === LANG ? "en" : "ar"));
-    el.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      filtered.map((v) => `<option value="${v}">${v}</option>`).join("");
   }
-  // Restore previous sector if still valid, otherwise reset
-  if (prevSector && [...el.options].some((o) => o.value === prevSector)) {
-    el.value = prevSector;
-  } else {
-    el.value = "";
-  }
+  el.innerHTML =
+    `<option value="">${allLabel}</option>` +
+    filtered.map((v) => `<option value="${v}">${v}</option>`).join("");
+  // Restore previously-selected sectors that are still valid
+  setMultiVal("fSector", prevSectorArr.filter((v) => filtered.includes(v)));
+  if ("function" === typeof mselBuildPanel) mselBuildPanel("fSector");
 }
 function buildDynamicFilters() {
   function fillSelect(id, values) {
     const el = document.getElementById(id);
     if (!el) return;
     if (!Array.isArray(values)) return;
-    const prev = el.value,
+    // 🆕 فلاتر بقيم متعددة: نحفظ كل القيم المختارة سابقاً (مش قيمة واحدة بس)
+    const prevArr = getMultiVal(id),
       sorted = [...new Set(values.filter((v) => v && "—" !== v && "#N/A" !== v))].sort((a, b) =>
         a.localeCompare(b, "en" === LANG ? "en" : "ar"),
       ),
       allLabel = "en" === LANG ? "All" : "الكل";
-    ((el.innerHTML =
+    el.innerHTML =
       `<option value="">${allLabel}</option>` +
-      sorted.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")),
-      prev && sorted.includes(prev) && (el.value = prev));
+      sorted.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    setMultiVal(id, prevArr.filter((v) => sorted.includes(v)));
+    if ("function" === typeof mselBuildPanel) mselBuildPanel(id);
   }
   (fillSelect(
     "fCity",
@@ -924,15 +920,16 @@ function buildDynamicFilters() {
 }
 function applyFilters() {
   try {
-    const city = document.getElementById("fCity").value,
-      sector = document.getElementById("fSector").value,
-      stage = document.getElementById("fStage").value,
-      gender = document.getElementById("fGender").value,
-      size = document.getElementById("fSize").value,
-      owner = document.getElementById("fOwner").value,
+    // 🆕 فلاتر بقيم متعددة: كل فلتر بقى مصفوفة (فاضية = "الكل"، زي "" قديماً)
+    const cityArr = getMultiVal("fCity"),
+      sectorArr = getMultiVal("fSector"),
+      stageArr = getMultiVal("fStage"),
+      genderArr = getMultiVal("fGender").map((g) => g.replace(/\s+$/, "")),
+      sizeArr = getMultiVal("fSize"),
+      ownerArr = getMultiVal("fOwner"),
       fcaMin = parseFloat(document.getElementById("fFcaMin").value) || 0,
-      district = document.getElementById("fDistrict").value,
-      subStatus = document.getElementById("fSubStatus")?.value || "",
+      districtArr = getMultiVal("fDistrict"),
+      subStatusArr = getMultiVal("fSubStatus"),
       search = document.getElementById("fSearch").value.trim().toLowerCase(),
       linkChecked = [...document.querySelectorAll("#fLinkType input:checked")].map(
         (cb) => cb.value,
@@ -940,14 +937,14 @@ function applyFilters() {
 
     FILTERED = RAW.filter(
       (r) =>
-        (!city || r.city === city) &&
-        (!sector || r.sector === sector) &&
-        (!stage || r.stage === stage) &&
-        (!gender || r.gender.replace(/\s+$/, "") === gender.replace(/\s+$/, "")) &&
-        (!size || r.schoolSize === size) &&
-        (!owner || r.ownership === owner) &&
-        (!district || r.district === district) &&
-        (!subStatus || r.subscriptionStatus === subStatus) &&
+        (!cityArr.length || cityArr.includes(r.city)) &&
+        (!sectorArr.length || sectorArr.includes(r.sector)) &&
+        (!stageArr.length || stageArr.includes(r.stage)) &&
+        (!genderArr.length || genderArr.includes(r.gender.replace(/\s+$/, ""))) &&
+        (!sizeArr.length || sizeArr.includes(r.schoolSize)) &&
+        (!ownerArr.length || ownerArr.includes(r.ownership)) &&
+        (!districtArr.length || districtArr.includes(r.district)) &&
+        (!subStatusArr.length || subStatusArr.includes(r.subscriptionStatus)) &&
         (!linkChecked.length || linkChecked.includes(r.linkType)) &&
         (!fcaMin || !(null == r.fca || r.fca < fcaMin)) &&
         !(
@@ -1009,6 +1006,12 @@ function applyFilters() {
     if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
     if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
     if (activeId === "tab-training") safeRun(renderTrainingTab, "training");
+    if (activeId === "tab-correspondence") safeRun(renderCorrespondenceTab, "correspondence");
+    if (activeId === "tab-org-structure") safeRun(renderOrgStructureTab, "org-structure");
+    if (activeId === "tab-ls-payments") safeRun(renderLsPaymentsTab, "ls-payments");
+    if (activeId === "tab-contractor-payments") safeRun(renderContractorPaymentsTab, "contractor-payments");
+    if (activeId === "tab-ppm-maximo") safeRun(renderPpmMaximoTab, "ppm-maximo");
+    if (activeId === "tab-visits") safeRun(renderVisitsTab, "visits");
   } catch (err) {
     console.error("[applyFilters]", err);
     if (typeof showToast === "function") showToast("خطأ أثناء تحديث العرض: " + err.message, "err");
@@ -1019,7 +1022,10 @@ function clearFilters() {
   (["fCity", "fSector", "fStage", "fGender", "fSize", "fOwner", "fDistrict", "fSubStatus"].forEach(
     (id) => {
       const el = document.getElementById(id);
-      el && (el.value = "");
+      if (!el) return;
+      // 🆕 فلاتر بقيم متعددة: إلغاء تحديد كل الخيارات (= "الكل") بدل .value=""
+      [...el.options].forEach((o) => { o.selected = false; });
+      if (typeof mselBuildPanel === "function") mselBuildPanel(id);
     },
   ),
     (document.getElementById("fFcaMin").value = "0"),
@@ -1027,6 +1033,322 @@ function clearFilters() {
     document.querySelectorAll("#fLinkType input").forEach((cb) => (cb.checked = !1)),
     applyFilters());
 }
+
+/* ══════════════════════════════════════════════════════════════
+   فلاتر بقيم متعددة (Multi-Select Filters)
+   ──────────────────────────────────────────────────────────────
+   الفكرة: كل <select> فلتر رئيسي (fCity/fSector/fStage/fGender/
+   fSize/fOwner/fDistrict/fSubStatus) بيصير multiple فعلياً وهو
+   نفسه يفضل "مصدر الحقيقة" — بس بيتحوّل بصرياً (عبر .msel-native)
+   لعنصر مخفي، وفوقه واجهة زر + قائمة تشيك بوكس (mselInit) بتشتغل
+   عليه مباشرة. أي تغيير في القائمة بيطلق change عادي على الـ
+   select الأصلي، فكل أكواد bind()/applyFilters() القديمة تشتغل
+   بالظبط زي ما كانت من غير أي تعديل في آلية الربط.
+   getMultiVal/getMultiValStr هما نقطة القراءة الموحّدة لأي كود
+   عاوز يعرف القيم المختارة (مصفوفة فاضية = "الكل" بالظبط زي ""
+   القديمة).
+   ══════════════════════════════════════════════════════════════ */
+function getMultiVal(id) {
+  const el = document.getElementById(id);
+  if (!el) return [];
+  if (el.multiple) return [...el.selectedOptions].map((o) => o.value).filter((v) => v !== "");
+  return el.value ? [el.value] : [];
+}
+function getMultiValStr(id) {
+  return getMultiVal(id).join("، ");
+}
+function setMultiVal(id, values) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const set = new Set(values || []);
+  [...el.options].forEach((o) => { o.selected = set.has(o.value); });
+}
+window.getMultiVal = getMultiVal;
+window.getMultiValStr = getMultiValStr;
+window.setMultiVal = setMultiVal;
+
+const MSEL_REGISTRY = {};
+
+function mselOptionLabel(optEl) {
+  return (optEl.textContent || optEl.value || "").trim();
+}
+
+function mselBuildPanel(id) {
+  const reg = MSEL_REGISTRY[id];
+  const el = document.getElementById(id);
+  if (!reg || !el) return;
+  const selected = new Set(getMultiVal(id));
+  const opts = [...el.options].filter((o) => o.value !== "");
+  const isEn = ("undefined" !== typeof LANG ? LANG : "ar") === "en";
+  const allLabel = isEn ? "All" : "الكل";
+  let html =
+    `<label class="msel-opt msel-opt-all"><input type="checkbox" data-msel-all="1"${selected.size === 0 ? " checked" : ""}> ${allLabel}</label>`;
+  html += opts
+    .map((o) => {
+      const v = (o.value + "").replace(/"/g, "&quot;");
+      return `<label class="msel-opt"><input type="checkbox" value="${v}"${selected.has(o.value) ? " checked" : ""}> ${esc(mselOptionLabel(o))}</label>`;
+    })
+    .join("");
+  reg.panel.innerHTML = html;
+  mselUpdateButtonLabel(id);
+}
+
+function mselUpdateButtonLabel(id) {
+  const reg = MSEL_REGISTRY[id];
+  const el = document.getElementById(id);
+  if (!reg || !el) return;
+  const vals = getMultiVal(id);
+  const isEn = ("undefined" !== typeof LANG ? LANG : "ar") === "en";
+  if (!vals.length) {
+    reg.labelEl.textContent = isEn ? "All" : "الكل";
+  } else if (1 === vals.length) {
+    const opt = [...el.options].find((o) => o.value === vals[0]);
+    reg.labelEl.textContent = opt ? mselOptionLabel(opt) : vals[0];
+  } else {
+    reg.labelEl.textContent = isEn ? vals.length + " selected" : vals.length + " محدّدة";
+  }
+}
+
+function mselToggleOption(id, checkbox) {
+  // ⚠️ عمداً بنعدّل الـ checkboxes الموجودة في مكانها من غير إعادة بناء
+  // اللوحة كلها (mselBuildPanel) — إعادة البناء بتستبدل عناصر الـ DOM
+  // فبيبوّظ أي تفاعل مستمر (زي تحديد أكتر من خيار بسرعة) وبيفقد موضع
+  // السكرول في القوائم الطويلة. اللوحة الكاملة بتتبني بس لما القيم
+  // نفسها تتغيّر من الخارج (تحميل بيانات جديد، تصفية متتالية...).
+  const el = document.getElementById(id);
+  if (!el) return;
+  const reg = MSEL_REGISTRY[id];
+  const panel = reg?.panel;
+  if (checkbox.dataset.mselAll) {
+    [...el.options].forEach((o) => { o.selected = false; });
+    if (panel) {
+      panel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.checked = !!cb.dataset.mselAll;
+      });
+    }
+  } else {
+    const opt = [...el.options].find((o) => o.value === checkbox.value);
+    if (opt) opt.selected = checkbox.checked;
+    if (panel) {
+      const allCb = panel.querySelector('input[data-msel-all]');
+      if (allCb) allCb.checked = 0 === getMultiVal(id).length;
+    }
+  }
+  mselUpdateButtonLabel(id);
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function mselCloseAllPanels() {
+  document.querySelectorAll(".msel-panel.msel-panel-open").forEach((p) => p.classList.remove("msel-panel-open"));
+  document.querySelectorAll(".msel-btn.msel-open").forEach((b) => b.classList.remove("msel-open"));
+}
+
+/* ⚠️ بتحسب موضع اللوحة (top/left) بالـ JS وقت الفتح كل مرة، لأن اللوحة
+   بقت ملحقة بـ document.body مباشرة (راجع mselInit) — مش جوه العنصر
+   الأب. من غير كده اللوحة كانت بتتحبس جوه stacking context بتاع
+   .filters-row (بسبب backdrop-filter) فتظهر تحت أقسام تانية بعدها في
+   الصفحة (زي كروت "نظرة عامة") حتى مع z-index عالي. */
+function mselPositionPanel(id) {
+  const reg = MSEL_REGISTRY[id];
+  if (!reg) return;
+  const rect = reg.btn.getBoundingClientRect();
+  const panel = reg.panel;
+  const isLtr = "ltr" === (document.documentElement.getAttribute("dir") || "").toLowerCase();
+  panel.style.top = rect.bottom + 4 + "px";
+  if (isLtr) {
+    panel.style.left = rect.left + "px";
+    panel.style.right = "auto";
+  } else {
+    panel.style.right = window.innerWidth - rect.right + "px";
+    panel.style.left = "auto";
+  }
+  // نتأكد بعد ما اللوحة اتقاست فعلياً إنها ما تطلعش برّه حدود الشاشة
+  requestAnimationFrame(() => {
+    const pRect = panel.getBoundingClientRect();
+    if (pRect.right > window.innerWidth - 4) {
+      panel.style.right = "4px";
+      panel.style.left = "auto";
+    }
+    if (pRect.left < 4) {
+      panel.style.left = "4px";
+      panel.style.right = "auto";
+    }
+    if (pRect.bottom > window.innerHeight - 4) {
+      panel.style.top = Math.max(4, rect.top - pRect.height - 4) + "px";
+    }
+  });
+}
+
+function mselInit(id) {
+  const el = document.getElementById(id);
+  if (!el || MSEL_REGISTRY[id]) return;
+  el.classList.add("msel-native");
+
+  const wrap = document.createElement("div");
+  wrap.className = "msel-wrap";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "msel-btn";
+  const labelEl = document.createElement("span");
+  labelEl.className = "msel-btn-label";
+  const chev = document.createElement("span");
+  chev.className = "msel-chev";
+  chev.textContent = "˅";
+  btn.appendChild(labelEl);
+  btn.appendChild(chev);
+  const panel = document.createElement("div");
+  panel.className = "msel-panel";
+
+  el.parentNode.insertBefore(wrap, el.nextSibling);
+  wrap.appendChild(el);
+  wrap.appendChild(btn);
+  // 🆕 اللوحة تتلحق بـ document.body مباشرة (مش جوه .msel-wrap) عشان
+  // تفلت من أي stacking context بيحبسها جوه أب زي .filters-row.
+  document.body.appendChild(panel);
+
+  MSEL_REGISTRY[id] = { wrap, btn, panel, labelEl };
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = !panel.classList.contains("msel-panel-open");
+    mselCloseAllPanels();
+    if (willOpen) {
+      mselPositionPanel(id);
+      panel.classList.add("msel-panel-open");
+      btn.classList.add("msel-open");
+    }
+  });
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  panel.addEventListener("change", (e) => {
+    const cb = e.target;
+    if (cb && "checkbox" === cb.type) mselToggleOption(id, cb);
+  });
+
+  let observerBusy = false;
+  const obs = new MutationObserver(() => {
+    if (observerBusy) return;
+    observerBusy = true;
+    mselBuildPanel(id);
+    setTimeout(() => { observerBusy = false; }, 0);
+  });
+  obs.observe(el, { childList: true });
+
+  mselBuildPanel(id);
+}
+
+function initMultiSelectFilters() {
+  ["fCity", "fSector", "fStage", "fGender", "fSize", "fOwner", "fDistrict", "fSubStatus"].forEach(mselInit);
+  document.addEventListener("click", mselCloseAllPanels);
+  // إقفال اللوحة المفتوحة لو المستخدم عمل scroll أو غيّر مقاس الشاشة —
+  // عشان موضعها (المحسوب وقت الفتح) ميفضلش غلط بعد الحركة.
+  window.addEventListener("scroll", mselCloseAllPanels, true);
+  window.addEventListener("resize", mselCloseAllPanels);
+}
+window.initMultiSelectFilters = initMultiSelectFilters;
+
+/* ══════════════════════════════════════════════════════════════
+   لوحة اختيار متعدد مشتركة (Shared Multi-Select Popover)
+   ──────────────────────────────────────────────────────────────
+   للتبويبات اللي بتعيد بناء الـ HTML بالكامل مع كل تغيير فلتر (زي
+   البلاغات وغيرها) — بدل ما نلف كل select برّه (زي mselInit فوق،
+   ومش مناسب هنا لأن العنصر بيتبنى من جديد في كل رندر)، بنستخدم
+   عنصر واحد مشترك متلحق بالـ body مرة واحدة بس ويتحرك بين أي زرار
+   فلتر بيفتحه. بيرجع مفتوح ومتزامن مع الحالة حتى لو التبويب اللي
+   تحته اتبنى من جديد بالكامل، لأنه مش جزء من الـ HTML بتاعه أصلاً.
+   ══════════════════════════════════════════════════════════════ */
+let __mselShared = null;
+function mselSharedEnsure() {
+  if (__mselShared) return __mselShared;
+  const panel = document.createElement("div");
+  panel.className = "msel-panel";
+  panel.id = "mselSharedPanel";
+  document.body.appendChild(panel);
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => mselSharedClose());
+  window.addEventListener("scroll", () => mselSharedClose(), true);
+  window.addEventListener("resize", () => mselSharedClose());
+  __mselShared = { panel, anchorBtn: null, onToggle: null, options: null, getSelected: null };
+  return __mselShared;
+}
+function mselSharedClose() {
+  if (!__mselShared) return;
+  __mselShared.panel.classList.remove("msel-panel-open");
+  if (__mselShared.anchorBtn) __mselShared.anchorBtn.classList.remove("msel-open");
+  __mselShared.anchorBtn = null;
+}
+function mselSharedRenderOptions() {
+  const s = __mselShared;
+  if (!s || !s.anchorBtn) return;
+  const selected = new Set(s.getSelected());
+  const allLabel = "en" === ("undefined" !== typeof LANG ? LANG : "ar") ? "All" : "الكل";
+  let html = `<label class="msel-opt msel-opt-all"><input type="checkbox" data-msel-all="1"${0 === selected.size ? " checked" : ""}> ${allLabel}</label>`;
+  html += s.options
+    .map((o) => {
+      const v = (o.value + "").replace(/"/g, "&quot;");
+      return `<label class="msel-opt"><input type="checkbox" value="${v}"${selected.has(o.value) ? " checked" : ""}> ${esc(o.label)}</label>`;
+    })
+    .join("");
+  s.panel.innerHTML = html;
+  s.panel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+    cb.addEventListener("change", () => {
+      s.onToggle(cb.dataset.mselAll ? null : cb.value, cb.checked);
+      // بعض onToggle بتعيد بناء التبويب بالكامل (renderBalaghTab وغيرها)،
+      // فبنعيد رسم محتوى اللوحة بعدها مباشرة عشان تفضل متزامنة مع
+      // الحالة الجديدة من غير ما تتقفل.
+      mselSharedRenderOptions();
+    });
+  });
+}
+function mselSharedOpen(anchorBtn, options, getSelected, onToggle) {
+  const s = mselSharedEnsure();
+  const wasOpenOnSameAnchor = s.anchorBtn === anchorBtn && s.panel.classList.contains("msel-panel-open");
+  mselSharedClose();
+  if (wasOpenOnSameAnchor) return; // toggle: كانت مفتوحة على نفس الزرار → اتقفلت وخلاص
+  s.anchorBtn = anchorBtn;
+  s.options = options;
+  s.getSelected = getSelected;
+  s.onToggle = onToggle;
+  mselSharedRenderOptions();
+  const rect = anchorBtn.getBoundingClientRect();
+  const isLtr = "ltr" === (document.documentElement.getAttribute("dir") || "").toLowerCase();
+  s.panel.style.top = rect.bottom + 4 + "px";
+  if (isLtr) {
+    s.panel.style.left = rect.left + "px";
+    s.panel.style.right = "auto";
+  } else {
+    s.panel.style.right = window.innerWidth - rect.right + "px";
+    s.panel.style.left = "auto";
+  }
+  s.panel.classList.add("msel-panel-open");
+  anchorBtn.classList.add("msel-open");
+  requestAnimationFrame(() => {
+    if (!s.panel.classList.contains("msel-panel-open")) return;
+    const pRect = s.panel.getBoundingClientRect();
+    if (pRect.right > window.innerWidth - 4) {
+      s.panel.style.right = "4px";
+      s.panel.style.left = "auto";
+    }
+    if (pRect.left < 4) {
+      s.panel.style.left = "4px";
+      s.panel.style.right = "auto";
+    }
+    if (pRect.bottom > window.innerHeight - 4) {
+      s.panel.style.top = Math.max(4, rect.top - pRect.height - 4) + "px";
+    }
+  });
+}
+function mselSharedBtnLabel(arr, options) {
+  const isEn = "en" === ("undefined" !== typeof LANG ? LANG : "ar");
+  if (!Array.isArray(arr) || !arr.length) return isEn ? "All" : "الكل";
+  if (1 === arr.length) {
+    const opt = (options || []).find((o) => o.value === arr[0]);
+    return opt ? opt.label : arr[0];
+  }
+  return isEn ? arr.length + " selected" : arr.length + " محدّدة";
+}
+window.mselSharedOpen = mselSharedOpen;
+window.mselSharedBtnLabel = mselSharedBtnLabel;
+
 function renderKPIs() {
   const D = FILTERED;
   // 🔑 (2026-09-05) تفريد بالمدرسة (رقم وزاري موحّد window.normSchoolId) —
@@ -1248,7 +1570,13 @@ function showTab(name, el) {
     "training"        === name && renderTrainingTab(),
     "hasr"            === name && renderHasrTab(),
     "emp-kpi"         === name && renderEmpKpiTab(),
-    "safety-kpi"      === name && renderSafetyKpiTab());
+    "safety-kpi"      === name && renderSafetyKpiTab(),
+    "correspondence"  === name && renderCorrespondenceTab(),
+    "org-structure"   === name && renderOrgStructureTab(),
+    "ls-payments"          === name && renderLsPaymentsTab(),
+    "contractor-payments"  === name && renderContractorPaymentsTab(),
+    "ppm-maximo"           === name && renderPpmMaximoTab(),
+    "visits"               === name && renderVisitsTab());
 
 }
 
@@ -3031,7 +3359,9 @@ let __bgRevalidatedOnce = false;
       (allSystems                  = sa(d.allSystems)),
       (elevators                   = sa(d.elevators)),
       (window.RAW_ELEVATOR_STATUS  = sa(d.elevatorStatus)),
-      (window.RAW_TAJHEEZ_INV      = sa(d.tajheezInventory)),
+      // ⚠️ tajheezInventory (المخصص والاحتياج) بقى ليه ملف جوجل شيتس مستقل خاص
+      // بيه (مش من CFG.GAS_URL الرئيسي بعد الآن) — شوف TAJINV_URL/loadTajheezInventoryData
+      // بالأسفل قرب renderTajheezInventoryTab. سطر window.RAW_TAJHEEZ_INV اتشال من هنا عمدًا.
       (window.RAW_BALAGH           = window.RAW_BALAGH || []),   // يُحمَّل بشكل منفصل — لا نمسح بيانات محمّلة مسبقاً
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
       (window.RAW_MAG_KPI          = sa(d.kpiContractor)),
@@ -3840,7 +4170,7 @@ let __bgRevalidatedOnce = false;
       }
       try {
         if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
-          throw new Error("لسه محطوطش رابط ملف Apps Script بتاع البلاغات (BALAGH_URL) في dashboard.js");
+          throw new Error("لم يتم إدراج رابط ملف Apps Script الخاص بالبلاغات (BALAGH_URL) في dashboard.js بعد");
         }
         const bResp = await fetch(BALAGH_URL, { cache: "no-store" });
         if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
@@ -3907,7 +4237,7 @@ let __bgRevalidatedOnce = false;
 
       try {
         if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
-          throw new Error("لسه محطوطش رابط ملف Apps Script بتاع البلاغات (BALAGH_URL) في dashboard.js");
+          throw new Error("لم يتم إدراج رابط ملف Apps Script الخاص بالبلاغات (BALAGH_URL) في dashboard.js بعد");
         }
         const sep = BALAGH_URL.indexOf("?") === -1 ? "?" : "&";
         const bResp = await fetch(BALAGH_URL + sep + "refresh=1", { cache: "no-store" });
@@ -3993,6 +4323,105 @@ let __bgRevalidatedOnce = false;
         if (!document.hidden) _balaghMetaCheckAndMaybeRefresh();
       });
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    // 🆕 (خطوة 1 — إضافة فقط، لا تغيير في أي تبويب قائم) تحميل بيانات
+    // "الملفات الجاهزة الجديدة" من آب سكريبت منفصل تماماً عن CFG.GAS_URL
+    // الرئيسي. السكريبت ده بيسحب 6 ملفات Google Sheets في رد واحد: سجل
+    // المراسلات، مؤشرات الأداء (المقاول/الاستشاري)، السيارات، التدريب
+    // والوقود، البوابين والمشرفين، الهيكل الوظيفي. هنا بس بنجيب البيانات
+    // ونخزّنها في window.RAW_NEW_* — لسه مفيش أي تبويب أو شارت بيقرأ منها؛
+    // التوصيل الفعلي هيتم تدريجياً في خطوات لاحقة بعد التأكد إنها شغالة صح.
+    const NEW_TEMPLATES_URL =
+      "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
+    window.loadNewTemplatesSeparate = async function (forceNetwork = false) {
+      if (window.__NEW_TEMPLATES_FETCH_INFLIGHT__) return;
+      window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = true;
+      window.__NEW_TEMPLATES_LOAD_STATE__ = "loading";
+      try {
+        const resp = await fetch(NEW_TEMPLATES_URL, { cache: "no-store" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        const d = json.data || {};
+        // كل ملف بييجي بشكل: { name, sheets: { "اسم التبويب": [صفوف...] } }
+        window.RAW_NEW_CORRESPONDENCE = d.correspondence?.sheets?.["سجل المراسلات"] || [];
+        window.RAW_NEW_KPI_CONTRACTOR = d.kpi?.sheets?.["المقاول"] || [];
+        window.RAW_NEW_KPI_CONSULTANT = d.kpi?.sheets?.["الاستشاري"] || [];
+        window.RAW_NEW_VEHICLES       = d.vehicles?.sheets?.["السيارات"] || [];
+        window.RAW_NEW_TRAINING       = d.training_fuel?.sheets?.["برامج التدريب"] || [];
+        window.RAW_NEW_FUEL           = d.training_fuel?.sheets?.["استهلاك الوقود"] || [];
+        window.RAW_NEW_GATEKEEPERS    = d.gatekeepers_supervisors?.sheets?.["البوابون"] || [];
+        window.RAW_NEW_SUPERVISORS    = d.gatekeepers_supervisors?.sheets?.["المشرفون والمهندسون"] || [];
+        window.RAW_NEW_ORG_STRUCTURE  = d.org_structure?.sheets?.["البيانات"] || [];
+        // ★ 2026-09-17: الملفات الأربعة الجديدة (نفس الرابط، نفس الآب سكريبت)
+        window.RAW_NEW_LS_PAYMENTS = d.ls_payments?.sheets?.["LS Payments and Contracts"] || [];
+        window.RAW_NEW_CONTRACTOR_PAYMENTS = d.contractor_payments?.sheets?.["Payments and Contracts"] || [];
+        // PPM Maximo: شيت مستقل لكل منطقة — بنجمعهم في مصفوفة واحدة مع
+        // إضافة عمود "المنطقة" لكل صف عشان نقدر نحسب إجمالي/انجاز كل
+        // منطقة ورول أب "المنطقة الغربية" (مجموع الأربع مناطق) من نفس المصفوفة.
+        const PPM_REGIONS = ["مكة المكرمة", "المدينة المنورة", "جدة", "الطائف"];
+        const ppmSheets = d.ppm_maximo?.sheets || {};
+        window.RAW_NEW_PPM_MAXIMO = PPM_REGIONS.flatMap((region) =>
+          (ppmSheets[region] || []).map((row) => ({ ...row, المنطقة: region }))
+        );
+        window.RAW_NEW_VISITS_MONTHLY = d.visits?.sheets?.["الملخص الشهري"] || [];
+        window.RAW_NEW_VISITS_BY_REGION = d.visits?.sheets?.["الزيارات حسب المنطقة"] || [];
+        window.__NEW_TEMPLATES_LOAD_STATE__ = "loaded";
+        window.__NEW_TEMPLATES_LAST_FETCH_TS__ = Date.now();
+        console.log("[NEW_TEMPLATES] ✅ تم تحميل الملفات الجاهزة الجديدة:", {
+          correspondence: window.RAW_NEW_CORRESPONDENCE.length,
+          kpiContractor : window.RAW_NEW_KPI_CONTRACTOR.length,
+          kpiConsultant : window.RAW_NEW_KPI_CONSULTANT.length,
+          vehicles      : window.RAW_NEW_VEHICLES.length,
+          training      : window.RAW_NEW_TRAINING.length,
+          fuel          : window.RAW_NEW_FUEL.length,
+          gatekeepers   : window.RAW_NEW_GATEKEEPERS.length,
+          supervisors   : window.RAW_NEW_SUPERVISORS.length,
+          orgStructure  : window.RAW_NEW_ORG_STRUCTURE.length,
+          lsPayments    : window.RAW_NEW_LS_PAYMENTS.length,
+          contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS.length,
+          ppmMaximo     : window.RAW_NEW_PPM_MAXIMO.length,
+          visitsMonthly : window.RAW_NEW_VISITS_MONTHLY.length,
+          visitsByRegion: window.RAW_NEW_VISITS_BY_REGION.length,
+        });
+        if (json.errors) console.warn("[NEW_TEMPLATES] ⚠️ بعض الملفات فيها خطأ:", json.errors);
+      } catch (e) {
+        window.__NEW_TEMPLATES_LOAD_STATE__ = "error";
+        window.__NEW_TEMPLATES_LOAD_ERR__ = e.message;
+        console.warn("[NEW_TEMPLATES] ❌ فشل تحميل الملفات الجاهزة الجديدة:", e);
+      } finally {
+        window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = false;
+      }
+      // ⚡ لو تبويب "سجل المراسلات" مفتوح فعلاً وقت ما التحميل خلص (تحميل
+      // منفصل غير متزامن — ممكن ياخد وقت أطول من فتح المستخدم للتبويب قبل
+      // ما البيانات توصل)، نعيد رسمه فورًا عشان يعرض البيانات الحقيقية من
+      // غير ما يحتاج المستخدم يبدّل تبويب يدويًا لتحديثه.
+      if (document.getElementById("tab-correspondence")?.classList.contains("active")) {
+        try { renderCorrespondenceTab(); } catch (e) { console.warn("[NEW_TEMPLATES][correspondence render]", e); }
+      }
+      if (document.getElementById("tab-org-structure")?.classList.contains("active")) {
+        try { renderOrgStructureTab(); } catch (e) { console.warn("[NEW_TEMPLATES][org-structure render]", e); }
+      }
+      if (document.getElementById("tab-ls-payments")?.classList.contains("active")) {
+        try { renderLsPaymentsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][ls-payments render]", e); }
+      }
+      if (document.getElementById("tab-contractor-payments")?.classList.contains("active")) {
+        try { renderContractorPaymentsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][contractor-payments render]", e); }
+      }
+      if (document.getElementById("tab-ppm-maximo")?.classList.contains("active")) {
+        try { renderPpmMaximoTab(); } catch (e) { console.warn("[NEW_TEMPLATES][ppm-maximo render]", e); }
+      }
+      if (document.getElementById("tab-visits")?.classList.contains("active")) {
+        try { renderVisitsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][visits render]", e); }
+      }
+    };
+    // تحميل تلقائي مرة واحدة بس عند بدء اللوحة — إضافة فقط، من غير ما تلمس
+    // أي تبويب أو منطق عرض موجود حالياً.
+    if (!window.__NEW_TEMPLATES_LOAD_STATE__) {
+      window.loadNewTemplatesSeparate();
+    }
+    // ══════════════════════════════════════════════════════════════════
+
     // تحميل صامت لبيانات حصر الأصول مرة واحدة عند بدء اللوحة — عشان بطاقات
     // "إجمالي الأصول" و"أصول متهالكة" في نظرة عامة تظهر بأرقام حقيقية من
     // غير ما ننتظر المستخدم يفتح تبويب "حصر الأصول" بنفسه.
@@ -5836,8 +6265,8 @@ function renderStudentsTab() {
    ║
    ║  📝 البيانات الآن تُقرأ مباشرة من جوجل شيت (لا يوجد أرقام ثابتة
    ║     بالكود). كل تبويب مصدره تبويب (sheet) مختلف داخل نفس الملف:
-   ║       - مؤشرات الأداء للمقاول    → window.RAW_MAG_KPI        (d.kpiContractor)
-   ║       - مؤشرات أداء الاستشاري    → window.RAW_CONSULTANT_KPI (d.consultantKpi)
+   ║       - مؤشرات الأداء للمقاول    → window.RAW_NEW_KPI_CONTRACTOR        (d.kpiContractor)
+   ║       - مؤشرات أداء الاستشاري    → window.RAW_NEW_KPI_CONSULTANT (d.consultantKpi)
    ║     شكل الصف المتوقع في الشيت: عمود "المنطقة" + عمود لكل شهر
    ║     بصيغة "اسم_الشهر سنة" مثل "يناير 2026" — القيمة كسر (0.85)
    ║     أو نسبة (85) وبيتم التعامل مع الحالتين تلقائيًا.
@@ -5893,6 +6322,18 @@ const toKpiPct_ = (v) => {
   return +n.toFixed(2);
 };
 
+// 🗓️ عمود الشهر في الشكل الطولي بيوصل أحيانًا رقم (1-12) وأحيانًا اسم الشهر
+// بالعربي كامل (زي "يناير") — الشيت الحقيقي "مؤشرات الأداء للاستشاري والمقاول"
+// بيستخدم اسم الشهر الكامل، فلازم ندعم الحالتين مع بعض بدل ما نفترض رقم بس.
+const kpiMonthNum_ = (v) => {
+  if (v === null || v === undefined || v === "") return NaN;
+  if (typeof v === "number") return v;
+  const s = String(v).trim();
+  if (KPI_MONTH_ORDER[s]) return KPI_MONTH_ORDER[s];
+  const n = parseInt(s, 10);
+  return isNaN(n) ? NaN : n;
+};
+
 /* 🧮 يحوّل صفوف الشيت الخام (array of objects) إلى سلسلة بيانات جاهزة
    للرسم والجدول: { months:[...labels], data:[{region, contract, values:[...]}] }
    بيدعم شكلين للشيت:
@@ -5922,7 +6363,7 @@ function buildKpiSeries_(rows) {
     // كل (شهر، سنة) فريدة موجودة فعليًا في الصفوف — مرتبة زمنيًا
     const colMap = new Map(); // sortKey -> {num, year, label}
     rows.forEach((r) => {
-      const num = parseInt(r[monthNumKey], 10),
+      const num = kpiMonthNum_(r[monthNumKey]),
         year = parseInt(r[yearKey], 10);
       if (!num || num < 1 || num > 12 || !year) return;
       const sortKey = year * 100 + num;
@@ -5938,7 +6379,7 @@ function buildKpiSeries_(rows) {
     const byRegion = new Map(); // region -> { contract, values[] }
     rows.forEach((r) => {
       const region = r[regionKey];
-      const num = parseInt(r[monthNumKey], 10),
+      const num = kpiMonthNum_(r[monthNumKey]),
         year = parseInt(r[yearKey], 10);
       if (!region || !num || !year) return;
       const idx = colIndex.get(num * 10000 + year);
@@ -6267,7 +6708,7 @@ function renderMagKpiTab() {
   renderKpiTabGeneric_({
     containerId: "mag-kpi-content",
     chartId: "ch-mag-kpi-line",
-    rawRows: window.RAW_MAG_KPI || [],
+    rawRows: window.RAW_NEW_KPI_CONTRACTOR || [],
     entityLabel: "مناطق",
     followUpLabel: "تحتاج متابعة مع المقاول",
     emptyIcon: "📊",
@@ -6278,7 +6719,7 @@ function renderConsultantKpiTab() {
   renderKpiTabGeneric_({
     containerId: "consultant-kpi-content",
     chartId: "ch-consultant-kpi-line",
-    rawRows: window.RAW_CONSULTANT_KPI || [],
+    rawRows: window.RAW_NEW_KPI_CONSULTANT || [],
     entityLabel: "مناطق",
     followUpLabel: "تحتاج متابعة مع الاستشاري",
     emptyIcon: "📈",
@@ -8436,10 +8877,10 @@ function renderSysMain() {
   if (!raw.length)
     return void (el.innerHTML =
       '<div class="card empty-state">\n      <div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>\n      <div class="empty-state-title">لم يتم التحميل</div>\n    </div>');
-  const cityF = document.getElementById("fCity")?.value || "",
-    sectorF = document.getElementById("fSector")?.value || "";
+  const cityArr = getMultiVal("fCity"),
+    sectorArr = getMultiVal("fSector");
   let data = raw.filter(
-    (r) => (!cityF || r["المدينة الرئيسية"] === cityF) && (!sectorF || r["المحافظة"] === sectorF),
+    (r) => (!cityArr.length || cityArr.includes(r["المدينة الرئيسية"])) && (!sectorArr.length || sectorArr.includes(r["المحافظة"])),
   );
   if (!data.length)
     return void (el.innerHTML = '<div class="empty-msg">لا توجد نتائج للفلاتر المحددة</div>');
@@ -8823,11 +9264,11 @@ function sysBrowseGoBack() {
 /* عرض قائمة الأنظمة الرئيسية */
 function _sysBrowseRenderMain() {
   const raw = window.RAW_ALL_SYSTEMS || [];
-  const cityF = document.getElementById("fCity")?.value || "";
-  const sectorF = document.getElementById("fSector")?.value || "";
+  const cityArr = getMultiVal("fCity");
+  const sectorArr = getMultiVal("fSector");
   const data = raw.filter(r =>
-    (!cityF || r["المدينة الرئيسية"] === cityF) &&
-    (!sectorF || r["المحافظة"] === sectorF)
+    (!cityArr.length || cityArr.includes(r["المدينة الرئيسية"])) &&
+    (!sectorArr.length || sectorArr.includes(r["المحافظة"]))
   );
 
   /* تجميع الأنظمة الرئيسية مع إحصائياتها */
@@ -8893,12 +9334,12 @@ function sysBrowseSelectMain(mainSys) {
   window._sysBrowseState = mainSys;
 
   const raw = window.RAW_ALL_SYSTEMS || [];
-  const cityF = document.getElementById("fCity")?.value || "";
-  const sectorF = document.getElementById("fSector")?.value || "";
+  const cityArr = getMultiVal("fCity");
+  const sectorArr = getMultiVal("fSector");
   const data = raw.filter(r =>
     r["القسم الرئيسي"] === mainSys &&
-    (!cityF || r["المدينة الرئيسية"] === cityF) &&
-    (!sectorF || r["المحافظة"] === sectorF)
+    (!cityArr.length || cityArr.includes(r["المدينة الرئيسية"])) &&
+    (!sectorArr.length || sectorArr.includes(r["المحافظة"]))
   );
 
   /* تجميع الأنظمة الفرعية */
@@ -8999,10 +9440,10 @@ function renderSysDetail() {
   if (!raw.length)
     return void (el.innerHTML =
       '<div class="card empty-state">\n      <div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>\n      <div class="empty-state-title">لا توجد بيانات</div>\n    </div>');
-  const cityF = document.getElementById("fCity")?.value || "",
-    sectorF = document.getElementById("fSector")?.value || "";
+  const cityArr = getMultiVal("fCity"),
+    sectorArr = getMultiVal("fSector");
   let base = raw.filter(
-    (r) => (!cityF || r["المدينة الرئيسية"] === cityF) && (!sectorF || r["المحافظة"] === sectorF),
+    (r) => (!cityArr.length || cityArr.includes(r["المدينة الرئيسية"])) && (!sectorArr.length || sectorArr.includes(r["المحافظة"])),
   );
   const allMainSys = [
     ...new Set(
@@ -9515,21 +9956,25 @@ function _sysDownloadFile(filename, content, mime) {
    ║  يعتمد على: window.RAW_BALAGH
    ╚════════════════════════════════════════════════════════════╝ */
 (function () {
+  // 🆕 فلاتر بقيم متعددة: status/category/priority/location/region/
+  // contractor/stage/gender/month بقوا مصفوفات (فاضية = "الكل")، بدل
+  // ما كانوا نص واحد. راجع filteredRows() تحت وقسم الفلاتر في
+  // renderBalaghTab للاستخدام.
   const STATE = (window.__BALAGH_STATE__ = window.__BALAGH_STATE__ || {
     page: 0,
     size: 25,
     search: "",
-    status: "",
-    category: "",
-    priority: "",
-    location: "",
-    region: "",
-    contractor: "",
-    stage: "",
-    gender: "",
+    status: [],
+    category: [],
+    priority: [],
+    location: [],
+    region: [],
+    contractor: [],
+    stage: [],
+    gender: [],
     dateFrom: "",
     dateTo: "",
-    month: "",
+    month: [],
     sort: "date_desc",
     topSchoolN: 10,
   });
@@ -9984,39 +10429,91 @@ function _sysDownloadFile(filename, content, mime) {
   window.getSecuritySafetyBalaghRows = getSecuritySafetyBalaghRows;
   window.debugSecuritySafetyMismatch = debugSecuritySafetyMismatch;
 
+  // 🆕 فلاتر بقيم متعددة: تطبّع أي قيمة قديمة (نص واحد) أو جديدة
+  // (مصفوفة) لمصفوفة موحّدة — مصفوفة فاضية = "الكل" (زي "" قديماً)
+  function balaghArr_(v) {
+    return Array.isArray(v) ? v : v ? [v] : [];
+  }
+
+  // 🆕 فتح لوحة الاختيار المتعدد المشتركة (mselSharedOpen) لأي فلتر من
+  // فلاتر البلاغات — بتتنادى من onclick في الـ HTML، فلازم تتعرّض على
+  // window. خيارات كل فلتر بتتخزّن في window.__BALAGH_FILTER_OPTIONS__
+  // وقت كل رندر (شوف balaghMselFg تحت) عشان تفضل متاحة وقت الضغط.
+  function balaghOpenMsel(key, ev) {
+    ev.stopPropagation();
+    const btn = ev.currentTarget;
+    const opts = (window.__BALAGH_FILTER_OPTIONS__ || {})[key] || [];
+    mselSharedOpen(
+      btn,
+      opts,
+      () => balaghArr_((window.__BALAGH_STATE__ || {})[key]),
+      (value, checked) => {
+        const st = window.__BALAGH_STATE__;
+        if (!st) return;
+        if (null === value) {
+          st[key] = [];
+        } else {
+          const set = new Set(balaghArr_(st[key]));
+          if (checked) set.add(value);
+          else set.delete(value);
+          st[key] = [...set];
+        }
+        st.page = 0;
+        renderBalaghTab();
+      },
+    );
+  }
+  window.balaghOpenMsel = balaghOpenMsel;
+
+  // 🆕 يبني زر + لوحة فلتر بقيم متعددة لحقل STATE معيّن، ويسجّل خياراته
+  // الحالية في window.__BALAGH_FILTER_OPTIONS__ عشان balaghOpenMsel
+  // يلاقيها وقت الضغط (مش متاحة غير وقت الرندر نفسه).
+  function balaghMselFg(label, key, options) {
+    window.__BALAGH_FILTER_OPTIONS__ = window.__BALAGH_FILTER_OPTIONS__ || {};
+    window.__BALAGH_FILTER_OPTIONS__[key] = options;
+    const selArr = balaghArr_(STATE[key]);
+    return `
+        <div class="fg">
+          <div class="fg-lbl">${escText(label)}</div>
+          <button type="button" class="msel-btn" onclick="balaghOpenMsel('${key}', event)">
+            <span class="msel-btn-label">${escText(mselSharedBtnLabel(selArr, options))}</span>
+            <span class="msel-chev">˅</span>
+          </button>
+        </div>`;
+  }
   function filteredRows(all) {
-    // نقرأ من STATE أولاً (دائماً محدّث)، ثم DOM كاحتياط
+    // نقرأ من STATE (دائماً محدّث)
     const ST = window.__BALAGH_STATE__ || {};
     const s = (ST.search || document.getElementById("balagh-search")?.value || "")
       .trim()
       .toLowerCase();
-    const status = ST.status || document.getElementById("balagh-status")?.value || "";
-    const category = ST.category || document.getElementById("balagh-category")?.value || "";
-    const priority = ST.priority || document.getElementById("balagh-priority")?.value || "";
-    const location = ST.location || document.getElementById("balagh-location")?.value || "";
-    const region = ST.region || document.getElementById("balagh-region")?.value || "";
+    const status = balaghArr_(ST.status);
+    const category = balaghArr_(ST.category);
+    const priority = balaghArr_(ST.priority);
+    const location = balaghArr_(ST.location);
+    const region = balaghArr_(ST.region);
     const dateFrom = ST.dateFrom || document.getElementById("balagh-date-from")?.value || "";
     const dateTo = ST.dateTo || document.getElementById("balagh-date-to")?.value || "";
-    const month = ST.month || document.getElementById("balagh-month")?.value || "";
-    const contractor = ST.contractor || document.getElementById("balagh-contractor")?.value || "";
-    const stage = ST.stage || document.getElementById("balagh-stage")?.value || "";
-    const gender = ST.gender || document.getElementById("balagh-gender")?.value || "";
+    const month = balaghArr_(ST.month);
+    const contractor = balaghArr_(ST.contractor);
+    const stage = balaghArr_(ST.stage);
+    const gender = balaghArr_(ST.gender);
     const schoolKeyFilter = ST.schoolKeyFilter || "";
 
     return all.filter((r) => {
       // فلترة دقيقة بمدرسة محدّدة (من الضغط على اسم مدرسة في "أكثر المدارس تكراراً") —
       // تعتمد المفتاح الموحّد بدل النص الحر حتى تشمل كل صيغ رقم المدرسة لنفس المدرسة
       if (schoolKeyFilter && r.schoolKey !== schoolKeyFilter) return false;
-      if (status && r.status !== status) return false;
-      if (category && r.category !== category) return false;
-      if (priority && r.priority !== priority) return false;
-      if (location && r.location !== location) return false;
-      if (region && r.region !== region) return false;
-      if (contractor && r.contractor !== contractor) return false;
-      if (stage && r.stage !== stage) return false;
-      if (gender && r.gender !== gender) return false;
-      if (month) {
-        if (!r.creationDateObj || (r.creationDateObj.getMonth() + 1) !== +month) return false;
+      if (status.length && !status.includes(r.status)) return false;
+      if (category.length && !category.includes(r.category)) return false;
+      if (priority.length && !priority.includes(r.priority)) return false;
+      if (location.length && !location.includes(r.location)) return false;
+      if (region.length && !region.includes(r.region)) return false;
+      if (contractor.length && !contractor.includes(r.contractor)) return false;
+      if (stage.length && !stage.includes(r.stage)) return false;
+      if (gender.length && !gender.includes(r.gender)) return false;
+      if (month.length) {
+        if (!r.creationDateObj || !month.includes(String(r.creationDateObj.getMonth() + 1))) return false;
       }
       // ⚠️ ملاحظة مهمة: تاريخ الإنشاء (creationDateObj) يُبنى دايماً بالتوقيت
       // المحلي عبر new Date(year, month-1, day) (شوف parseBalaghDate فوق).
@@ -10095,6 +10592,7 @@ function _sysDownloadFile(filename, content, mime) {
     if (!items.length) return '<div class="empty-msg" style="padding:18px">لا توجد بيانات</div>';
     return items
       .map((it) => {
+        const pct = total ? Math.round((it.v / total) * 100) : 0;
         const w = total ? Math.max(6, (it.v / total) * 100) : 0;
         // لو labelFormatter موجود يُرجع HTML جاهز — لا نُطبّق escText عليه
         // لو لم يكن موجوداً — نُطبّق escText على النص الخام لمنع XSS
@@ -10107,7 +10605,7 @@ function _sysDownloadFile(filename, content, mime) {
           <div style="flex:1">
             <div class="mini-track"><div class="mini-fill" style="width:${w}%;background:${color}"></div></div>
           </div>
-          <div style="min-width:56px;text-align:left;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${fmt(it.v)}</div>
+          <div style="min-width:78px;text-align:left;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${fmt(it.v)} <span style="font-weight:700;opacity:.7;font-size:11px">(${pct}%)</span></div>
         </div>`;
       })
       .join("");
@@ -10290,17 +10788,20 @@ function _sysDownloadFile(filename, content, mime) {
       "اسم المدرسة",
       "إجمالي البلاغات",
       "عالية الخطورة (حرج + مرتفع)",
+      "نسبة عالية الخطورة",
       ...prioritiesSorted.map((p) => "أولوية: " + p),
       ...categoriesSorted.map((c) => "فئة: " + c),
     ];
 
     const dataArr = [header];
     schoolsSorted.forEach((b) => {
+      const highRiskPct = b.total ? Math.round((b.highRisk / b.total) * 100) : 0;
       dataArr.push([
         b.number || "",
         b.name || "",
         b.total,
         b.highRisk,
+        highRiskPct + "%",
         ...prioritiesSorted.map((p) => b.byPriority[p] || 0),
         ...categoriesSorted.map((c) => b.byCategory[c] || 0),
       ]);
@@ -10308,7 +10809,7 @@ function _sysDownloadFile(filename, content, mime) {
 
     const ws = XLSX.utils.aoa_to_sheet(dataArr);
     ws["!cols"] = [
-      { wch: 14 }, { wch: 42 }, { wch: 16 }, { wch: 22 },
+      { wch: 14 }, { wch: 42 }, { wch: 16 }, { wch: 22 }, { wch: 16 },
       ...prioritiesSorted.map(() => ({ wch: 14 })),
       ...categoriesSorted.map(() => ({ wch: 18 })),
     ];
@@ -10371,7 +10872,7 @@ function _sysDownloadFile(filename, content, mime) {
       const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
       const msg =
         balaghState === "loading"
-          ? "جاري تحميل بيانات البلاغات في الخلفية — الأرقام والتشارتات هتتحدّث تلقائياً أول ما التحميل يخلص"
+          ? "جارٍ تحميل بيانات البلاغات في الخلفية، وستُحدَّث الأرقام والرسوم البيانية تلقائياً فور اكتمال التحميل"
           : balaghState === "error"
           ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
           : `البلاغات لم تُحمَّل بعد — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">اضغط هنا للتحميل</button>`;
@@ -10415,6 +10916,91 @@ function _sysDownloadFile(filename, content, mime) {
       ? oldestDate.toLocaleDateString("ar-SA", { year:"numeric", month:"short", day:"numeric" })
       : "—";
 
+    // ── مقارنة يومية وأسبوعية (الأسبوع من السبت إلى السبت) ──
+    // "اليوم" هنا هو أحدث تاريخ إنشاء موجود فعلياً ضمن البيانات المفلترة
+    // (latestDate)، وليس تاريخ اليوم الفعلي بجهاز المستخدم، لأن ملف
+    // البلاغات قد لا يحتوي بيانات حتى اللحظة الحالية.
+    function balaghDayKey_(d) {
+      return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+    }
+    function balaghWeekStart_(d) {
+      // السبت = بداية الأسبوع (getDay: الأحد=0 ... السبت=6)
+      const back = (d.getDay() - 6 + 7) % 7;
+      const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      s.setDate(s.getDate() - back);
+      return s;
+    }
+    function balaghShortDate_(d) {
+      return d.toLocaleDateString("ar-SA", { day: "numeric", month: "short" });
+    }
+    let dailyCompare = null;
+    let weeklyCompare = null;
+    if (latestDate) {
+      const today0 = new Date(latestDate.getFullYear(), latestDate.getMonth(), latestDate.getDate());
+      const yesterday0 = new Date(today0);
+      yesterday0.setDate(yesterday0.getDate() - 1);
+      const todayCount = rows.filter((r) => r.creationDateObj && balaghDayKey_(r.creationDateObj) === balaghDayKey_(today0)).length;
+      const yesterdayCount = rows.filter((r) => r.creationDateObj && balaghDayKey_(r.creationDateObj) === balaghDayKey_(yesterday0)).length;
+      dailyCompare = {
+        current: todayCount,
+        previous: yesterdayCount,
+        diff: todayCount - yesterdayCount,
+        pct: yesterdayCount ? Math.round(((todayCount - yesterdayCount) / yesterdayCount) * 100) : (todayCount ? 100 : 0),
+        currentLabel: balaghShortDate_(today0),
+        previousLabel: balaghShortDate_(yesterday0),
+      };
+
+      const curWeekStart = balaghWeekStart_(latestDate);
+      const curWeekEnd = new Date(curWeekStart);
+      curWeekEnd.setDate(curWeekEnd.getDate() + 6);
+      const curWeekEndFull = new Date(curWeekEnd.getFullYear(), curWeekEnd.getMonth(), curWeekEnd.getDate(), 23, 59, 59, 999);
+      const prevWeekStart = new Date(curWeekStart);
+      prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+      const prevWeekEnd = new Date(curWeekStart);
+      prevWeekEnd.setDate(prevWeekEnd.getDate() - 1);
+      const prevWeekEndFull = new Date(prevWeekEnd.getFullYear(), prevWeekEnd.getMonth(), prevWeekEnd.getDate(), 23, 59, 59, 999);
+      const curWeekCount = rows.filter((r) => r.creationDateObj && r.creationDateObj >= curWeekStart && r.creationDateObj <= curWeekEndFull).length;
+      const prevWeekCount = rows.filter((r) => r.creationDateObj && r.creationDateObj >= prevWeekStart && r.creationDateObj <= prevWeekEndFull).length;
+      weeklyCompare = {
+        current: curWeekCount,
+        previous: prevWeekCount,
+        diff: curWeekCount - prevWeekCount,
+        pct: prevWeekCount ? Math.round(((curWeekCount - prevWeekCount) / prevWeekCount) * 100) : (curWeekCount ? 100 : 0),
+        currentLabel: balaghShortDate_(curWeekStart) + " – " + balaghShortDate_(curWeekEnd),
+        previousLabel: balaghShortDate_(prevWeekStart) + " – " + balaghShortDate_(prevWeekEnd),
+      };
+    }
+    // شكل موحّد لكارت مقارنة (يومي/أسبوعي) — فرق ونسبة مئوية بلون ورمز
+    // يعكس الاتجاه (المزيد من البلاغات = تنبيه، الأقل = إيجابي)
+    function balaghCompareCardHtml_(title, cmp, unitLabel) {
+      if (!cmp) {
+        return `<div class="card" style="padding:16px">
+          <div style="font-size:12.5px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">${escText(title)}</div>
+          <div class="empty-msg" style="padding:6px 0">لا توجد بيانات كافية للمقارنة</div>
+        </div>`;
+      }
+      const up = cmp.diff > 0;
+      const down = cmp.diff < 0;
+      const color = up ? CSS_TOKENS.danger() : down ? CSS_TOKENS.positive() : "var(--tx-muted)";
+      const arrow = up ? "▲" : down ? "▼" : "—";
+      const deltaText = 0 === cmp.diff
+        ? "بلا تغيير"
+        : `${fmt(Math.abs(cmp.diff))} (${cmp.pct > 0 ? "+" : ""}${cmp.pct}%)`;
+      return `<div class="card" style="padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12.5px;font-weight:800;color:var(--tx-sec)">${escText(title)}</span>
+          <span style="font-size:10.5px;color:var(--tx-muted)">${escText(cmp.currentLabel)}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <div style="font-size:30px;font-weight:800;color:var(--tx-main);font-variant-numeric:tabular-nums">${fmt(cmp.current)}</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:800;color:${color}">
+            <span>${arrow}</span><span>${deltaText}</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">مقابل ${escText(unitLabel)} ${escText(cmp.previousLabel)} (${fmt(cmp.previous)})</div>
+      </div>`;
+    }
+
     // أكثر المدارس تكراراً: نستخدم اسم المدرسة الموحّد من الربط (إن وُجد) بدل الاسم الخام،
     // لتفادي تكرار نفس المدرسة بأكثر من اسم/تهجئة في ملف البلاغات
     // نعد بـ schoolKey (المفتاح الموحّد) لتجنب تكرار نفس المدرسة بصيغ رقم مختلفة (S-/M/S-M/بدون بادئة) أو أسماء مختلفة
@@ -10445,6 +11031,8 @@ function _sysDownloadFile(filename, content, mime) {
           highRisk: 0,
           byCategory: {},
           byPriority: {},
+          byStage: {},
+          byGender: {},
         };
       }
       const b = schoolBreakdownMap[key];
@@ -10454,6 +11042,8 @@ function _sysDownloadFile(filename, content, mime) {
       b.byCategory[cat] = (b.byCategory[cat] || 0) + 1;
       const pr = balaghPriorityLabel(r.priority);
       b.byPriority[pr] = (b.byPriority[pr] || 0) + 1;
+      if (r.stage) b.byStage[r.stage] = (b.byStage[r.stage] || 0) + 1;
+      if (r.gender) b.byGender[r.gender] = (b.byGender[r.gender] || 0) + 1;
     });
     const schoolBreakdownList = Object.values(schoolBreakdownMap).sort((a, b) => b.total - a.total);
     const schoolBreakdownShowN = STATE.breakdownShowN || 15;
@@ -10587,6 +11177,11 @@ function _sysDownloadFile(filename, content, mime) {
             <div class="kpi-sub">${[...new Set(rows.map(r=>r.category).filter(Boolean))].join(" · ") || "—"}</div>
           </div>
         </div>
+
+        <div class="g2" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:14px">
+          ${balaghCompareCardHtml_("مقارنة يومية", dailyCompare, "يوم")}
+          ${balaghCompareCardHtml_("مقارنة أسبوعية", weeklyCompare, "أسبوع")}
+        </div>
       </div>
 
       ${balaghSecHead(2, "🔍", "التصفية والبحث", "حدّد الفلاتر لتحديث كل الأقسام تلقائياً")}
@@ -10596,119 +11191,15 @@ function _sysDownloadFile(filename, content, mime) {
           <input class="finp" id="balagh-search" placeholder="🔍 رقم البلاغ أو المدرسة أو الوصف..." value="${escText(STATE.search)}"
             oninput="window.__BALAGH_STATE__.search=this.value;window.__BALAGH_STATE__.schoolKeyFilter='';window.__BALAGH_STATE__.page=0;var s=document.getElementById('balagh-table-search');if(s)s.value=this.value;smartSearchRerender(this, renderBalaghTab)">
         </div>
-        <div class="fg">
-          <div class="fg-lbl">الحالة</div>
-          <select class="fsel" id="balagh-status" onchange="window.__BALAGH_STATE__.status=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.status).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.status === v ? " selected" : ""}>${escText(balaghStatusLabel(v))}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">الفئة</div>
-          <select class="fsel" id="balagh-category" onchange="window.__BALAGH_STATE__.category=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.category).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.category === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">الأولوية</div>
-          <select class="fsel" id="balagh-priority" onchange="window.__BALAGH_STATE__.priority=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.priority).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.priority === v ? " selected" : ""}>${escText(balaghPriorityLabel(v))}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">المنطقة الرئيسية</div>
-          <select class="fsel" id="balagh-region" onchange="window.__BALAGH_STATE__.region=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.region).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.region === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">المحافظة</div>
-          <select class="fsel" id="balagh-location" onchange="window.__BALAGH_STATE__.location=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.location).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.location === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">المقاول</div>
-          <select class="fsel" id="balagh-contractor" onchange="window.__BALAGH_STATE__.contractor=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.contractor).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.contractor === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">المرحلة</div>
-          <select class="fsel" id="balagh-stage" onchange="window.__BALAGH_STATE__.stage=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.stage).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.stage === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">الجنس</div>
-          <select class="fsel" id="balagh-gender" onchange="window.__BALAGH_STATE__.gender=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${[...new Set(all.map((r) => r.gender).filter(Boolean))]
-              .sort()
-              .map(
-                (v) =>
-                  `<option value="${escText(v)}"${STATE.gender === v ? " selected" : ""}>${escText(v)}</option>`,
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="fg">
-          <div class="fg-lbl">الشهر</div>
-          <select class="fsel" id="balagh-month" onchange="window.__BALAGH_STATE__.month=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
-            <option value="">الكل</option>
-            ${["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
-              .map((name, i) => `<option value="${i + 1}"${String(STATE.month) === String(i + 1) ? " selected" : ""}>${name}</option>`)
-              .join("")}
-          </select>
-        </div>
+        ${balaghMselFg("الحالة", "status", [...new Set(all.map((r) => r.status).filter(Boolean))].sort().map((v) => ({ value: v, label: balaghStatusLabel(v) })))}
+        ${balaghMselFg("الفئة", "category", [...new Set(all.map((r) => r.category).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("الأولوية", "priority", [...new Set(all.map((r) => r.priority).filter(Boolean))].sort().map((v) => ({ value: v, label: balaghPriorityLabel(v) })))}
+        ${balaghMselFg("المنطقة الرئيسية", "region", [...new Set(all.map((r) => r.region).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("المحافظة", "location", [...new Set(all.map((r) => r.location).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("المقاول", "contractor", [...new Set(all.map((r) => r.contractor).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("المرحلة", "stage", [...new Set(all.map((r) => r.stage).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("الجنس", "gender", [...new Set(all.map((r) => r.gender).filter(Boolean))].sort().map((v) => ({ value: v, label: v })))}
+        ${balaghMselFg("الشهر", "month", ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"].map((name, i) => ({ value: String(i + 1), label: name })))}
         <div class="fg">
           <div class="fg-lbl">من تاريخ</div>
           <input class="finp" type="date" id="balagh-date-from" value="${escText(STATE.dateFrom)}"
@@ -10719,7 +11210,7 @@ function _sysDownloadFile(filename, content, mime) {
           <input class="finp" type="date" id="balagh-date-to" value="${escText(STATE.dateTo)}"
             onchange="window.__BALAGH_STATE__.dateTo=this.value;window.__BALAGH_STATE__.page=0;renderBalaghTab()">
         </div>
-        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',region:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
+        <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:[],category:[],priority:[],location:[],region:[],contractor:[],stage:[],gender:[],dateFrom:'',dateTo:'',month:[],sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر</button>
         <button class="export-btn export-btn-csv" onclick="window.balaghExportCSV()">⬇ تصدير CSV</button>
         <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolCountsCSV()">⬇ عدد البلاغات لكل مدرسة (Excel)</button>
       </div>
@@ -10769,16 +11260,15 @@ function _sysDownloadFile(filename, content, mime) {
             <button class="export-btn export-btn-excel" onclick="window.exportBalaghSchoolBreakdownExcel()" title="ملف Excel: كل مدرسة، إجمالي البلاغات، عالية الخطورة، وعدد البلاغات لكل فئة ولكل أولوية — لكل المدارس ضمن الفترة المحددة">⬇ تصدير Excel (كل الفئات والأولويات)</button>
           </span>
         </div>
-        <div style="font-size:11.5px;color:var(--tx-muted);padding:0 14px 10px;line-height:1.7">
-          الجدول يعرض أعلى المدارس من حيث عدد البلاغات ضمن الفترة والفلاتر المحددة حالياً. عمود "عالية الخطورة" = مجموع بلاغات الأولوية (حرج + مرتفع). لتفصيل كل الفئات (صيانة، نظافة، إلخ) لكل مدرسة، استخدم زر تصدير Excel.
-        </div>
         <div class="tbl-wrap" style="max-height:520px">
           <table>
             <thead>
               <tr>
                 <th style="text-align:right">المدرسة</th>
                 <th style="text-align:center;white-space:nowrap">إجمالي البلاغات</th>
-                <th style="text-align:center;white-space:nowrap">عالية الخطورة</th>
+                <th style="text-align:center;white-space:nowrap" title="مجموع بلاغات الأولوية حرج + مرتفع">عالية الخطورة</th>
+                <th style="text-align:center;white-space:nowrap">المرحلة</th>
+                <th style="text-align:center;white-space:nowrap">الجنس</th>
                 <th style="text-align:right">أكثر فئة تكرارًا</th>
               </tr>
             </thead>
@@ -10787,16 +11277,24 @@ function _sysDownloadFile(filename, content, mime) {
                 .slice(0, schoolBreakdownShowN)
                 .map((b) => {
                   const topCat = Object.entries(b.byCategory).sort((x, y) => y[1] - x[1])[0];
-                  const topCatStr = topCat ? `${escText(topCat[0])} (${fmt(topCat[1])})` : "—";
+                  const topCatPct = topCat && b.total ? Math.round((topCat[1] / b.total) * 100) : 0;
+                  const topCatStr = topCat
+                    ? `${escText(topCat[0])} (${fmt(topCat[1])} <span style="font-weight:700;opacity:.7;font-size:11px">(${topCatPct}%)</span>)`
+                    : "—";
+                  const topStage = Object.entries(b.byStage).sort((x, y) => y[1] - x[1])[0];
+                  const topGender = Object.entries(b.byGender).sort((x, y) => y[1] - x[1])[0];
+                  const highRiskPct = b.total ? Math.round((b.highRisk / b.total) * 100) : 0;
                   return `<tr>
                     <td style="text-align:right">${escText(b.name || b.number || "—")}</td>
                     <td style="text-align:center;font-weight:700">${fmt(b.total)}</td>
-                    <td style="text-align:center;font-weight:700;color:${b.highRisk > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(b.highRisk)}</td>
+                    <td style="text-align:center;font-weight:700;color:${b.highRisk > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(b.highRisk)} <span style="font-weight:700;opacity:.7;font-size:11px">(${highRiskPct}%)</span></td>
+                    <td style="text-align:center">${escText(topStage ? topStage[0] : "—")}</td>
+                    <td style="text-align:center">${escText(topGender ? topGender[0] : "—")}</td>
                     <td style="text-align:right">${topCatStr}</td>
                   </tr>`;
                 })
                 .join("")}
-              ${!schoolBreakdownList.length ? `<tr><td colspan="4" style="text-align:center;color:var(--tx-muted);padding:20px">لا توجد بيانات ضمن الفلاتر الحالية</td></tr>` : ""}
+              ${!schoolBreakdownList.length ? `<tr><td colspan="6" style="text-align:center;color:var(--tx-muted);padding:20px">لا توجد بيانات ضمن الفلاتر الحالية</td></tr>` : ""}
             </tbody>
           </table>
         </div>
@@ -10985,6 +11483,7 @@ function _sysDownloadFile(filename, content, mime) {
                     <tr style="text-align:right;font-size:11px;color:var(--tx-sec)">
                       <th style="padding:8px">المقاول</th>
                       <th style="padding:8px">عدد البلاغات</th>
+                      <th style="padding:8px">النسبة من الإجمالي</th>
                       <th style="padding:8px">متوسط SLA (أيام)</th>
                       <th style="padding:8px">نسبة الالتزام (غير متأخر)</th>
                     </tr>
@@ -10997,6 +11496,7 @@ function _sysDownloadFile(filename, content, mime) {
                       <tr style="border-top:1px solid var(--bd-light);font-size:12px">
                         <td style="padding:8px;font-weight:700">${escText(c.name)}</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums">${fmt(c.total)}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums;color:var(--tx-muted)">${filteredTotal ? Math.round((c.total / filteredTotal) * 100) : 0}%</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums;color:${CSS_TOKENS.info2()}">${c.avgSla != null ? c.avgSla.toFixed(1) : "—"}</td>
                         <td style="padding:8px">${
                           c.compliancePct == null
@@ -11063,6 +11563,7 @@ function _sysDownloadFile(filename, content, mime) {
                 <th>الرقم الوزاري</th>
                 <th>الموقع</th>
                 <th>الفئة</th>
+                <th>الفئة الفرعية</th>
                 <th>الأولوية</th>
                 <th>SLA (أيام)</th>
                 <th>المرحلة</th>
@@ -11087,6 +11588,7 @@ function _sysDownloadFile(filename, content, mime) {
                   <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? '#0891B2' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
                   <td>${escText(r.location)}</td>
                   <td>${escText(r.category)}</td>
+                  <td>${escText(r.subCategory || "—")}</td>
                   <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
                   <td style="font-variant-numeric:tabular-nums">${r.slaDurationDays != null ? fmt(r.slaDurationDays, 1) : "—"}</td>
                   <td>${escText(r.stage || "—")}</td>
@@ -11100,7 +11602,7 @@ function _sysDownloadFile(filename, content, mime) {
                       )
                       .join("")
                   : `
-                <tr><td colspan="15"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
+                <tr><td colspan="16"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
               `
               }
             </tbody>
@@ -11757,7 +12259,7 @@ function _sysDownloadFile(filename, content, mime) {
           <div style="font-size:40px;margin-bottom:10px">⚠️</div>
           <div style="font-size:15px;font-weight:800;color:var(--tx-main);margin-bottom:8px">حصل خطأ أثناء عرض بيانات البلاغات</div>
           <div style="font-size:12px;color:var(--tx-muted);margin-bottom:14px">جرّب مسح الفلاتر أو تحديث الصفحة. إن استمرت المشكلة أبلغ الدعم الفني.</div>
-          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:'',category:'',priority:'',location:'',region:'',dateFrom:'',dateTo:'',month:'',sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
+          <button class="f-clear" onclick="window.__BALAGH_STATE__={page:0,size:25,search:'',status:[],category:[],priority:[],location:[],region:[],contractor:[],stage:[],gender:[],dateFrom:'',dateTo:'',month:[],sort:'date_desc'};renderBalaghTab()">✕ مسح الفلاتر وإعادة المحاولة</button>
         </div>`;
     }
   }
@@ -14638,8 +15140,12 @@ function renderKhanadeqTab() {
 }
 
 /* ══════════════════════════════════════════════════════════
-   تبويب التجهيزات — نظام إدارة المخزون والاحتياجات
-   يقرأ من: window.RAW_TAJHEEZ_INV (key: tajheezInventory في GAS)
+   تبويب التجهيزات (المخصص والاحتياج) — نظام إدارة المخزون والاحتياجات
+   المصدر: ملف جوجل شيتس مستقل خاص به (4_المخصص_والاحتياج_Code.gs) —
+   نفس الرابط المستخدم في أداة التنظيف لرفع البيانات (زر "رفع مباشر
+   لجوجل شيت" لتبويب المخصص والاحتياج). لم يعد يُقرأ من CFG.GAS_URL
+   الرئيسي (شيت "التجهيزات_منظف" القديم) — استُبدل بالكامل بالرابط الجديد.
+   يقرأ من: window.RAW_TAJHEEZ_INV (تتحدث الآن عبر TAJINV_URL أدناه)
    ★ الشيت الجديد: كل الأقسام (مخصص/احتياج/PPP) موحّدة على 4 مدن رئيسية فقط
      (مكة تشمل القنفذة+الليث، المدينة تشمل ينبع+العلا+المهد)
    أعمدة: القسم، اسم_الصنف، سعر_الوحدة،
@@ -14648,6 +15154,52 @@ function renderKhanadeqTab() {
            PPP_{مكة,جدة,الطائف,المدينة}، PPP_الكمية_الكلية، PPP_القيمة_الكلية،
            فرق_الكمية، فرق_القيمة، نسبة_الاحتياج
 ══════════════════════════════════════════════════════════ */
+
+const TAJINV_URL = "https://script.google.com/macros/s/AKfycbzXf0GT3jFmHdDxx3nk65ZLEg6gE1ZAxsT6cn48Eh0IgBf6avWe9LM-4vBmmAtEb7Z7/exec";
+const TAJINV_CACHE_KEY = "tbc_tajheez_inventory_cache_v1";
+
+const TAJINV = { loaded: false, loading: false, error: "" };
+window.TAJINV = TAJINV;
+
+function _tajinvApply(json) {
+  const d = (json && json.data) || {};
+  window.RAW_TAJHEEZ_INV = Array.isArray(d.data) ? d.data : [];
+  TAJINV.loaded = true;
+}
+
+async function loadTajheezInventoryData(forceNetwork) {
+  if (TAJINV.loading) return;
+  TAJINV.loading = true;
+  try {
+    if (!forceNetwork && !TAJINV.loaded && window._idb) {
+      try {
+        const cached = await window._idb.get(TAJINV_CACHE_KEY);
+        if (cached) {
+          _tajinvApply(cached);
+          renderTajheezInventoryTab();
+        }
+      } catch (_) {}
+    }
+    if (!TAJINV_URL || TAJINV_URL.indexOf("PASTE_") === 0) {
+      TAJINV.error = "لم يتم إدراج رابط ملف Apps Script الخاص بالمخصص والاحتياج (TAJINV_URL) في dashboard.js بعد";
+      if (!TAJINV.loaded) renderTajheezInventoryTab();
+      return;
+    }
+    const resp = await fetch(TAJINV_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const json = await resp.json();
+    if (json && json.status === "error") throw new Error(json.message || "خطأ من Apps Script");
+    if (window._idb) window._idb.set(TAJINV_CACHE_KEY, json);
+    _tajinvApply(json);
+    TAJINV.error = "";
+    renderTajheezInventoryTab();
+  } catch (err) {
+    TAJINV.error = err && err.message ? err.message : String(err);
+    if (!TAJINV.loaded) renderTajheezInventoryTab();
+  } finally {
+    TAJINV.loading = false;
+  }
+}
 
 const TAJHEEZ_CITIES = ["مكة", "جدة", "الطائف", "المدينة"];
 const TAJHEEZ_NEED_CITIES = ["مكة", "جدة", "الطائف", "المدينة"];
@@ -15220,6 +15772,27 @@ function tajOpenDetail(topic, qismName) {
 function renderTajheezInventoryTab() {
   const el = document.getElementById("tajheez-content");
   if (!el) return;
+
+  if (!TAJINV.loaded) {
+    if (TAJINV.error) {
+      el.innerHTML = `
+      <div class="card" style="text-align:center;padding:40px">
+        <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+        <div style="font-weight:700;margin-bottom:6px">تعذّر تحميل بيانات المخصص والاحتياج</div>
+        <div style="color:${CSS_TOKENS.txMuted()};font-size:13px;margin-bottom:14px">${esc(TAJINV.error || "")}</div>
+        <button class="export-btn" onclick="loadTajheezInventoryData(true)">إعادة المحاولة</button>
+      </div>`;
+      return;
+    }
+    el.innerHTML = `
+    <div class="card loading-placeholder">
+      <div class="loading-placeholder-icon">🏗️</div>
+      <div class="loading-placeholder-text">جاري التحميل…</div>
+    </div>`;
+    loadTajheezInventoryData(false);
+    return;
+  }
+
   const raw = getTajheezRaw();
 
   if (!raw.length) {
@@ -16186,7 +16759,7 @@ async function loadTajheezSuppliesData(forceNetwork) {
       } catch (_) {}
     }
     if (!TAJHEEZ_SUPPLIES_URL || TAJHEEZ_SUPPLIES_URL.indexOf("PASTE_") === 0) {
-      TAJSUP.error = "لسه محطوطش رابط ملف Apps Script بتاع التوريدات (TAJHEEZ_SUPPLIES_URL) في dashboard.js";
+      TAJSUP.error = "لم يتم إدراج رابط ملف Apps Script الخاص بالتوريدات (TAJHEEZ_SUPPLIES_URL) في dashboard.js بعد";
       if (!TAJSUP.loaded) _tajsupRenderError();
       return;
     }
@@ -16905,7 +17478,7 @@ async function loadMokayefatData(forceNetwork) {
       } catch (_) {}
     }
     if (!MOKAYEFAT_URL || MOKAYEFAT_URL.indexOf("PASTE_") === 0) {
-      MOKAYEFAT.error = "لسه محطوطش رابط ملف Apps Script بتاع المكيفات (MOKAYEFAT_URL) في dashboard.js";
+      MOKAYEFAT.error = "لم يتم إدراج رابط ملف Apps Script الخاص بالمكيفات (MOKAYEFAT_URL) في dashboard.js بعد";
       if (!MOKAYEFAT.loaded) _mokRenderModalIfOpen();
       return;
     }
@@ -17474,7 +18047,7 @@ async function loadTajheezContractsData(forceNetwork) {
       } catch (_) {}
     }
     if (!TAJHEEZ_CONTRACTS_URL || TAJHEEZ_CONTRACTS_URL.indexOf("PASTE_") === 0) {
-      TAJCON.error = "لسه محطوطش رابط ملف Apps Script بتاع عقود التجهيزات (TAJHEEZ_CONTRACTS_URL) في dashboard.js";
+      TAJCON.error = "لم يتم إدراج رابط ملف Apps Script الخاص بعقود التجهيزات (TAJHEEZ_CONTRACTS_URL) في dashboard.js بعد";
       if (!TAJCON.loaded) _tajconRenderError();
       return;
     }
@@ -17845,7 +18418,8 @@ const NASHAT = {
   loading: false,
   error: "",
   rows: [], // التوزيع_التفصيلي بعد التطبيع (صف واحد لكل شركة×منطقة×صنف)
-  itemsGuide: [], // دليل_الأصناف بعد التطبيع (صف واحد لكل شركة×صنف — بدون تفصيل منطقة)
+  itemsGuide: [], // دليل_الأصناف — الشيت ده اتشال من مصدر البيانات بطلب صريح، فهتفضل دايمًا فاضية (سايبينها كمرجع بس، مش بيتم الاعتماد عليها في أي حساب)
+  deliverySummary: [], // ملخص_الإنجاز_والتوصيل (خام) — صف واحد لكل شركة + صف "الإجمالي"، فيه الأربعة أرقام الأهم
   byCompanyRaw: [], // ملخص_حسب_الشركة (خام، غير مفلتر — مرجعي فقط)
   byRegionRaw: [], // ملخص_حسب_المنطقة (خام، غير مفلتر — مرجعي فقط)
   timestamp: null,
@@ -17892,7 +18466,8 @@ function _nashatApply(json) {
   const d = (json && json.data) || {};
   const sa = (v) => (Array.isArray(v) ? v : []);
   NASHAT.rows = sa(d.distribution).map(parseNashatDistRow);
-  NASHAT.itemsGuide = sa(d.itemsGuide).map(parseNashatItemRow);
+  NASHAT.itemsGuide = sa(d.itemsGuide).map(parseNashatItemRow); // دايمًا فاضية الآن (الشيت اتشال من المصدر) — مُبقاة بدون ضرر
+  NASHAT.deliverySummary = sa(d.deliverySummary);
   NASHAT.byCompanyRaw = sa(d.byCompany);
   NASHAT.byRegionRaw = sa(d.byRegion);
   NASHAT.timestamp = json.timestamp || null;
@@ -17913,7 +18488,7 @@ async function loadNashatBadaniData(forceNetwork) {
       } catch (_) {}
     }
     if (!NASHAT_BADANI_URL || NASHAT_BADANI_URL.indexOf("PASTE_") === 0) {
-      NASHAT.error = "لسه محطوطش رابط ملف Apps Script بتاع مبادرة النشاط البدني (NASHAT_BADANI_URL) في dashboard.js";
+      NASHAT.error = "لم يتم إدراج رابط ملف Apps Script الخاص بمبادرة النشاط البدني (NASHAT_BADANI_URL) في dashboard.js بعد";
       if (!NASHAT.loaded) _nashatRenderError();
       return;
     }
@@ -18055,10 +18630,63 @@ function _nashatRenderAll() {
   const hasDelivered = filteredRows.some((r) => r.سعر !== null && r.موّرد !== null);
   const finPct = totAlloc > 0 && hasDelivered ? (totDelivered / totAlloc) * 100 : null;
 
-  // ── قيمة "التعاقد الإجمالي": من دليل الأصناف (مالهاش توزيع منطقي موثوق) —
-  // بتتعرض فقط لما مفيش فلتر منطقة مفعّل ──
-  const totContract = filteredItems.reduce((a, r) => a + (r.سعر !== null && r.اجمالي !== null ? r.سعر * r.اجمالي : 0), 0);
-  const hasContract = !fRegion && filteredItems.some((r) => r.سعر !== null && r.اجمالي !== null);
+  // ── قيمة "التعاقد الإجمالي": من شيت "ملخص_الإنجاز_والتوصيل" (رقم "إجمالي_التعاقد"
+  // منقول حرفيًا من قسم "الملخص" الجاهز آخر كل شيت شركة في الملف الخام — أدق من
+  // إعادة حسابه من دليل الأصناف، ومالوش توزيع منطقي موثوق فبيتعرض فقط لما مفيش
+  // فلتر منطقة مفعّل، زي ما كان قبل كده) ──
+  const dsAll = (NASHAT.deliverySummary || []).filter((r) => _nashatS(r["الشركة"]) !== "الإجمالي");
+  const dsFiltered = fCompany ? dsAll.filter((r) => _nashatS(r["الشركة"]) === fCompany) : dsAll;
+  const totContract = dsFiltered.reduce((a, r) => a + (_nashatN(r["إجمالي_التعاقد"]) || 0), 0);
+  const hasContract = !fRegion && dsFiltered.some((r) => _nashatN(r["إجمالي_التعاقد"]) !== null);
+
+  // ── الأربعة أرقام "الأهم جدًا" — من شيت ملخص_الإنجاز_والتوصيل، كارت مستقل
+  // لكل شركة (زي طلب المستخدم بالظبط: "كروت للأربعة لكل شركة")، بنفس شكل
+  // كروت KPI المستخدمة في تبويب عقود التجهيزات لكن بلون أحمر (kc-red) عشان
+  // دول الأرقام الأهم زي ما كانت متلوّنة بالأحمر في الملف الخام ──
+  const dsAllRows = NASHAT.deliverySummary || [];
+  const dsCompanyRows = dsAllRows.filter((r) => _nashatS(r["الشركة"]) !== "الإجمالي");
+  const dsTotalRow = dsAllRows.find((r) => _nashatS(r["الشركة"]) === "الإجمالي") || null;
+  const _dsMoney = (r, k) => {
+    const v = _nashatN(r[k]);
+    return v === null ? "—" : sarFmt(v);
+  };
+  const _dsPct = (r, k) => {
+    const v = _nashatN(r[k]);
+    return v === null ? "—" : pctFmt(v * 100);
+  };
+  const _dsCardHTML = (r, isTotal, label) => `
+    <div style="border:1px solid ${isTotal ? "var(--bd-danger)" : "var(--bd-light)"};border-radius:12px;padding:${isTotal ? "16px" : "12px"};${isTotal ? "background:#FEF2F2" : ""}">
+      <div style="font-weight:800;margin-bottom:8px;${isTotal ? "color:var(--red);font-size:16px" : ""}">${esc(label !== undefined ? label : _nashatS(r["الشركة"]))}</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="kpi kc-red">
+          <div class="kpi-val" style="font-size:${isTotal ? "17px" : "15px"}">${_dsMoney(r, "إجمالي_التعاقد_بالتوصيل")}</div>
+          <div class="kpi-lbl">إجمالي التعاقد بالتوصيل</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val">${_dsPct(r, "نسبة_الإنجاز_المورد_التعاقد_بالتوصيل")}</div>
+          <div class="kpi-lbl">نسبة الإنجاز (المورد/التعاقد بالتوصيل)</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val">${_dsPct(r, "نسبة_الإنجاز_المورد_المخصص")}</div>
+          <div class="kpi-lbl">نسبة الإنجاز (المورد/المخصص)</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val">${_dsPct(r, "نسبة_مشاهد_الإنجاز_الموقعة")}</div>
+          <div class="kpi-lbl">نسبة مشاهد الإنجاز الموقعة</div>
+        </div>
+      </div>
+    </div>`;
+  // ── الكارت العام (كل الشركات مجتمعة) بيتعرض فوق الأول — نظرة عامة سريعة قبل
+  // التفصيل لكل شركة لوحدها، زي ما طلب المستخدم بالظبط ──
+  const generalCardHtml = dsTotalRow ? _dsCardHTML(dsTotalRow, true, "كل الشركات (الإجمالي العام)") : "";
+  const perCompanyCardsHtml = dsCompanyRows.map((r) => _dsCardHTML(r, false)).join("");
+  const deliveryCardsHtml = dsCompanyRows.length || dsTotalRow
+    ? generalCardHtml +
+      (dsCompanyRows.length
+        ? `<div style="font-weight:700;font-size:13px;color:${CSS_TOKENS.txMuted()};margin:4px 0 -2px">لكل شركة على حدة</div>` +
+          perCompanyCardsHtml
+        : "")
+    : `<div class="card" style="text-align:center;padding:24px;color:${CSS_TOKENS.txMuted()}">لا توجد بيانات في شيت "ملخص_الإنجاز_والتوصيل" بعد</div>`;
 
   el.innerHTML = `
   <div class="filters-row" style="margin-bottom:18px">
@@ -18135,6 +18763,15 @@ function _nashatRenderAll() {
       <div class="kpi-val">${finPct === null ? "—" : pctFmt(finPct)}</div>
       <div class="kpi-lbl">نسبة الإنجاز المالي (المورد/المخصص)</div>
     </div>
+  </div>
+
+  <div class="card-title" style="margin-bottom:10px">
+    <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/></svg></span>
+    الأربعة مؤشرات الأهم — ملخص الإنجاز والتوصيل (حسب الشركة)
+    <span class="sub">منقولة حرفيًا من قسم "الملخص" الجاهز آخر كل شيت شركة في الملف الخام</span>
+  </div>
+  <div class="mb14" style="display:flex;flex-direction:column;gap:12px">
+    ${deliveryCardsHtml}
   </div>
 
   <div class="g2 mb14">
@@ -18710,7 +19347,7 @@ function exportNashatExcel(rows) {
       تحليل_FCA: {
         عدد_المدارس_المقيّمة: fcaArr.length,
         المتوسط_العام: fcbAvg(D, "fca"),
-        ملاحظة_منهجية: "المتوسط محسوب حصراً على المدارس اللي عندها قيمة FCA فعلية (" + fcaArr.length + " من إجمالي " + total + " مبنى) — المباني بدون تقييم FCA مستبعدة تلقائياً من الحساب، مش جزء من القاسم.",
+        ملاحظة_منهجية: "المتوسط محسوب حصراً على المدارس التي لديها قيمة FCA فعلية (" + fcaArr.length + " من إجمالي " + total + " مبنى) — المباني بدون تقييم FCA مستبعدة تلقائياً من الحساب، وليست جزءاً من القاسم.",
         عدد_حرجة_اقل_من_25: fcaArr.filter((r) => r.fca < 25).length,
         عدد_متوسطة_25_50: fcaArr.filter((r) => r.fca >= 25 && r.fca < 50).length,
         عدد_جيدة_50_75: fcaArr.filter((r) => r.fca >= 50 && r.fca < 75).length,
@@ -19176,11 +19813,11 @@ function exportNashatExcel(rows) {
     } catch (_) {}
 
     // ════════════════════════════════════════════════════════════════
-    // 🧍 تبويب البوابين (window.RAW_GATEKEEPERS)
+    // 🧍 تبويب البوابين (window.RAW_NEW_GATEKEEPERS)
     // أعمدة: المدينة، اسم المدرسة، الرقم الوزاري، اسم البواب، رقم الجوال، رقم الهوية
     // ════════════════════════════════════════════════════════════════
     try {
-      const gkRaw = Array.isArray(window.RAW_GATEKEEPERS) ? window.RAW_GATEKEEPERS : [];
+      const gkRaw = Array.isArray(window.RAW_NEW_GATEKEEPERS) ? window.RAW_NEW_GATEKEEPERS : [];
       if (gkRaw.length) {
         const norm = (v) => String(v == null ? "" : v).replace(/\uFEFF/g, "").trim();
         const gk = gkRaw.map(r => ({
@@ -19241,12 +19878,12 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 🧑‍💼 تبويب المشرفين (window.RAW_SUPERVISORS)
+    // 🧑‍💼 تبويب المشرفين (window.RAW_NEW_SUPERVISORS)
     // أعمدة: المنطقة، الرقم الوزاري، اسم المدرسة، المشرف الميداني (اسم/جوال/
     // إيميل)، المهندس (اسم/جوال/إيميل)، مسؤول تطوير (اسم/جوال)
     // ════════════════════════════════════════════════════════════════
     try {
-      const supRaw = Array.isArray(window.RAW_SUPERVISORS) ? window.RAW_SUPERVISORS : [];
+      const supRaw = Array.isArray(window.RAW_NEW_SUPERVISORS) ? window.RAW_NEW_SUPERVISORS : [];
       if (supRaw.length) {
         const norm = (v) => String(v == null ? "" : v).replace(/﻿/g, "").trim();
         const sup = supRaw.map(r => ({
@@ -19429,13 +20066,13 @@ function exportNashatExcel(rows) {
       };
     };
     try {
-      const mag = summarizeKpi_(window.RAW_MAG_KPI);
+      const mag = summarizeKpi_(window.RAW_NEW_KPI_CONTRACTOR);
       if (mag) summary.مؤشرات_أداء_المقاول = { مصدر: "تبويب مؤشرات الأداء للمقاول — شيت مؤشرات_الأداء_للمقاول", ...mag };
     } catch (e) {
       summary.مؤشرات_أداء_المقاول = { تنبيه: "تعذّر تلخيص مؤشرات أداء المقاول: " + (e?.message || e) };
     }
     try {
-      const con = summarizeKpi_(window.RAW_CONSULTANT_KPI);
+      const con = summarizeKpi_(window.RAW_NEW_KPI_CONSULTANT);
       if (con) summary.مؤشرات_أداء_الاستشاري = { مصدر: "تبويب مؤشرات أداء الاستشاري — شيت مؤشرات_اداء_الاستشاري", ...con };
     } catch (e) {
       summary.مؤشرات_أداء_الاستشاري = { تنبيه: "تعذّر تلخيص مؤشرات أداء الاستشاري: " + (e?.message || e) };
@@ -19490,10 +20127,10 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 🚗 تبويب السيارات (RAW_VEHICLES) — أُضيف لسياق الـ AI في 2026-08-23
+    // 🚗 تبويب السيارات (RAW_NEW_VEHICLES) — أُضيف لسياق الـ AI في 2026-08-23
     // ════════════════════════════════════════════════════════════════
     try {
-      const vRows = Array.isArray(window.RAW_VEHICLES) ? window.RAW_VEHICLES : [];
+      const vRows = Array.isArray(window.RAW_NEW_VEHICLES) ? window.RAW_NEW_VEHICLES : [];
       if (vRows.length) {
         const total = vRows.length;
         const withUser = vRows.filter(r => String(r["اسم المستخدم الفعلي"]||"").trim()).length;
@@ -19501,7 +20138,7 @@ function exportNashatExcel(rows) {
         const byModel = {};
         vRows.forEach(r => { const m = String(r["الماركة"] ?? r["الطراز"] ?? "غير محدد").trim() || "غير محدد"; byModel[m] = (byModel[m]||0)+1; });
         const byStatus = {};
-        vRows.forEach(r => { const s = String(r["الحالة"]||"").trim() || "غير محدد"; byStatus[s] = (byStatus[s]||0)+1; });
+        vRows.forEach(r => { const s = String(r["حالة المركبة"] ?? r["الحالة"] ?? "").trim() || "غير محدد"; byStatus[s] = (byStatus[s]||0)+1; });
         summary.السيارات = {
           مصدر: "تبويب السيارات — شيت السيارات",
           إجمالي_السيارات: total,
@@ -19519,25 +20156,26 @@ function exportNashatExcel(rows) {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // 🎓 تبويب برامج التدريب (RAW_TRAINING) — أُضيف لسياق الـ AI في 2026-08-23
+    // 🎓 تبويب برامج التدريب (RAW_NEW_TRAINING) — أُضيف لسياق الـ AI في 2026-08-23
     // ════════════════════════════════════════════════════════════════
     try {
-      const trRows = Array.isArray(window.RAW_TRAINING) ? window.RAW_TRAINING : [];
-      if (trRows.length) {
+      const trRowsRaw = Array.isArray(window.RAW_NEW_TRAINING) ? window.RAW_NEW_TRAINING : [];
+      if (trRowsRaw.length) {
         const n_ = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
+        const trRows = _trainPivotByEmployee_(trRowsRaw); // الشيت طولي (صف لكل موظف×برنامج) — نجمّعه لكل موظف أولاً
         const total = trRows.length;
-        const cleanCompleted  = trRows.filter(r => String(r["حالة دورة النظافة"]||"").includes("مكتمل")).length;
-        const cleanInProgress = trRows.filter(r => String(r["حالة دورة النظافة"]||"").includes("قيد")).length;
-        const cleanNotStarted = trRows.filter(r => String(r["حالة دورة النظافة"]||"").includes("لم يبدأ")).length;
-        const supCompleted  = trRows.filter(r => String(r["حالة برنامج المشرفين"]||"").includes("مكتمل")).length;
-        const supInProgress = trRows.filter(r => String(r["حالة برنامج المشرفين"]||"").includes("قيد")).length;
-        const supNotStarted = trRows.filter(r => String(r["حالة برنامج المشرفين"]||"").includes("لم يبدأ")).length;
-        const neverLogged = trRows.filter(r => String(r["آخر دخول للمنصة"]||"").includes("لم يدخل")).length;
-        const avgClean = trRows.filter(r=>n_(r["متوسط الدرجة %"])>0);
+        const cleanCompleted  = trRows.filter(r => r.clean.status === "مكتملة").length;
+        const cleanInProgress = trRows.filter(r => r.clean.status === "قيد التنفيذ").length;
+        const cleanNotStarted = trRows.filter(r => r.clean.status === "لم تبدأ").length;
+        const supCompleted  = trRows.filter(r => r.sup.status === "مكتملة").length;
+        const supInProgress = trRows.filter(r => r.sup.status === "قيد التنفيذ").length;
+        const supNotStarted = trRows.filter(r => r.sup.status === "لم تبدأ").length;
+        const neverLogged = trRows.filter(r => !r.lastLoginKey).length;
+        const avgClean = trRows.filter(r=>n_(r.clean.score)>0);
         summary.برامج_التدريب = {
-          مصدر: "تبويب برامج التدريب — شيت برامج_التدريب",
+          مصدر: "تبويب برامج التدريب — شيت برامج التدريب",
           إجمالي_الموظفين_المسجلين: total,
-          دورة_النظافة: { مكتملة: cleanCompleted, قيد_التنفيذ: cleanInProgress, لم_يبدأ: cleanNotStarted, متوسط_الدرجة: avgClean.length ? +(avgClean.reduce((s,r)=>s+n_(r["متوسط الدرجة %"]),0)/avgClean.length).toFixed(1) : null },
+          دورة_النظافة: { مكتملة: cleanCompleted, قيد_التنفيذ: cleanInProgress, لم_يبدأ: cleanNotStarted, متوسط_الدرجة: avgClean.length ? +(avgClean.reduce((s,r)=>s+n_(r.clean.score),0)/avgClean.length).toFixed(1) : null },
           برنامج_المشرفين: { مكتمل: supCompleted, قيد_التنفيذ: supInProgress, لم_يبدأ: supNotStarted },
           لم_يسجّل_دخول_للمنصة_إطلاقاً: neverLogged,
         };
@@ -21501,7 +22139,9 @@ function exportNashatExcel(rows) {
      البيانات المعروضة حالياً بعد الفلترة.
      ════════════════════════════════════════════════════════════════ */
   function fcbBuildDashboardContext() {
-    const g = (id) => document.getElementById(id)?.value || "";
+    // 🆕 فلاتر بقيم متعددة: getMultiValStr بترجع القيم المختارة مفصولة بـ"، "
+    // (نفس سلوك .value القديم تماماً لو الفلتر لسه بقيمة واحدة أو فاضي)
+    const g = (id) => ("function" === typeof getMultiValStr ? getMultiValStr(id) : document.getElementById(id)?.value || "");
     /* ⚠️ ملاحظة مهمة: كل المفاتيح هنا تمثل "فلاتر" (إعدادات عرض اختارها
        المستخدم) فقط — وليست بيانات إحصائية. لذلك سُمّيت جميعها بادئة
        "فلتر_" صراحةً لمنع أي التباس مع الإحصائيات الفعلية (مثال:
@@ -23039,12 +23679,12 @@ ${(() => {
 
 /* ══════════════════════════════════════════════════════════════════════
    تبويب البوابين
-   المصدر: window.RAW_GATEKEEPERS (key: gatekeepers في GAS)
+   المصدر: window.RAW_NEW_GATEKEEPERS (key: gatekeepers في GAS)
    أعمدة الملف: المدينة، اسم المدرسة، الرقم الوزاري، اسم البواب، رقم الجوال، رقم الهوية
 
    لتشخيص أي مشكلة، افتح Console واكتب:
       typeof renderGatekeepersTab   → يجب أن تكون "function"
-      window.RAW_GATEKEEPERS        → يجب أن تكون مصفوفة فيها بيانات
+      window.RAW_NEW_GATEKEEPERS        → يجب أن تكون مصفوفة فيها بيانات
 ══════════════════════════════════════════════════════════════════════ */
 
 /* ════════════════════════════════════════════════════════════
@@ -23080,7 +23720,7 @@ ${(() => {
   });
 
   function getRaw() {
-    return Array.isArray(window.RAW_GATEKEEPERS) ? window.RAW_GATEKEEPERS : [];
+    return Array.isArray(window.RAW_NEW_GATEKEEPERS) ? window.RAW_NEW_GATEKEEPERS : [];
   }
 
   function norm(v) {
@@ -23253,7 +23893,7 @@ ${(() => {
           '<div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>' +
           '<div class="empty-state-title">لم يتم التحميل</div>' +
           "</div></div>";
-        console.warn("[gatekeepers] window.RAW_GATEKEEPERS فارغة أو غير موجودة. القيمة الحالية:", window.RAW_GATEKEEPERS);
+        console.warn("[gatekeepers] window.RAW_NEW_GATEKEEPERS فارغة أو غير موجودة. القيمة الحالية:", window.RAW_NEW_GATEKEEPERS);
         return;
       }
 
@@ -23375,7 +24015,7 @@ ${(() => {
 
 /* ══════════════════════════════════════════════════════════════════════
    تبويب المشرفين
-   المصدر: window.RAW_SUPERVISORS (key: schoolsSupervisors في GAS)
+   المصدر: window.RAW_NEW_SUPERVISORS (key: schoolsSupervisors في GAS)
    أعمدة الملف: المنطقة، الرقم الوزاري، اسم المدرسة، المشرف الميداني (اسم/
                 جوال/إيميل)، المهندس (اسم/جوال/إيميل)، مسؤول تطوير (اسم/جوال)
 ══════════════════════════════════════════════════════════════════════ */
@@ -23402,7 +24042,7 @@ ${(() => {
   }
 
   function getRaw() {
-    return Array.isArray(window.RAW_SUPERVISORS) ? window.RAW_SUPERVISORS : [];
+    return Array.isArray(window.RAW_NEW_SUPERVISORS) ? window.RAW_NEW_SUPERVISORS : [];
   }
 
   function normalizeRows() {
@@ -25787,14 +26427,14 @@ ${panelHTML}
     { key:"RAW_SPARE_PARTS", label:"قطع الغيار", singular:"قطعة", icon:"🔩", rows:()=>window.RAW_SPARE_PARTS },
     { key:"RAW_SECURITY_SAFETY", label:"الأمن والسلامة", singular:"بند", icon:"🛡️", rows:()=>window.RAW_SECURITY_SAFETY },
     { key:"RAW_CORRECTIONS_ESCALATIONS", label:"التصحيحات والتصعيدات", singular:"تصعيد", icon:"🚨", rows:()=>window.RAW_CORRECTIONS_ESCALATIONS },
-    { key:"RAW_FUEL", label:"الوقود", singular:"عملية تزويد", icon:"⛽", rows:()=>window.RAW_FUEL },
-    { key:"RAW_VEHICLES", label:"المركبات", singular:"مركبة", icon:"🚐", rows:()=>window.RAW_VEHICLES },
-    { key:"RAW_TRAINING", label:"التدريب", singular:"برنامج تدريبي", icon:"🎓", rows:()=>window.RAW_TRAINING },
-    { key:"RAW_GATEKEEPERS", label:"البوابون", singular:"بوّاب", icon:"👮", rows:()=>window.RAW_GATEKEEPERS },
-    { key:"RAW_SUPERVISORS", label:"المشرفون والمهندسون", singular:"سجل إشراف", icon:"🧑‍💼", rows:()=>window.RAW_SUPERVISORS },
+    { key:"RAW_NEW_FUEL", label:"الوقود", singular:"عملية تزويد", icon:"⛽", rows:()=>window.RAW_NEW_FUEL },
+    { key:"RAW_NEW_VEHICLES", label:"المركبات", singular:"مركبة", icon:"🚐", rows:()=>window.RAW_NEW_VEHICLES },
+    { key:"RAW_NEW_TRAINING", label:"التدريب", singular:"برنامج تدريبي", icon:"🎓", rows:()=>window.RAW_NEW_TRAINING },
+    { key:"RAW_NEW_GATEKEEPERS", label:"البوابون", singular:"بوّاب", icon:"👮", rows:()=>window.RAW_NEW_GATEKEEPERS },
+    { key:"RAW_NEW_SUPERVISORS", label:"المشرفون والمهندسون", singular:"سجل إشراف", icon:"🧑‍💼", rows:()=>window.RAW_NEW_SUPERVISORS },
     { key:"RAW_RECRUITMENT", label:"التوظيف", singular:"طلب توظيف", icon:"👥", rows:()=>window.RAW_RECRUITMENT },
-    { key:"RAW_MAG_KPI", label:"مؤشرات أداء المقاول", singular:"مؤشر", icon:"📊", rows:()=>window.RAW_MAG_KPI },
-    { key:"RAW_CONSULTANT_KPI", label:"مؤشرات الاستشاري", singular:"مؤشر", icon:"🧭", rows:()=>window.RAW_CONSULTANT_KPI },
+    { key:"RAW_NEW_KPI_CONTRACTOR", label:"مؤشرات أداء المقاول", singular:"مؤشر", icon:"📊", rows:()=>window.RAW_NEW_KPI_CONTRACTOR },
+    { key:"RAW_NEW_KPI_CONSULTANT", label:"مؤشرات الاستشاري", singular:"مؤشر", icon:"🧭", rows:()=>window.RAW_NEW_KPI_CONSULTANT },
     { key:"RAW_EMP_KPI", label:"مؤشرات الموظفين", singular:"مؤشر", icon:"👤", rows:()=>window.RAW_EMP_KPI },
     { key:"RAW_SAFETY_KPI", label:"مؤشرات السلامة", singular:"مؤشر", icon:"🦺", rows:()=>window.RAW_SAFETY_KPI },
     { key:"HASR", label:"حصر الأصول", singular:"أصل", icon:"📦", rows:()=>window.HASR?.data?.schools },
@@ -28150,7 +28790,7 @@ function renderFuelTab(_fromMonth, _toMonth) {
   const el = document.getElementById("fuel-content");
   if (!el) return;
 
-  const allRows = window.RAW_FUEL || [];
+  const allRows = window.RAW_NEW_FUEL || [];
   if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">⛽</div>
@@ -28196,7 +28836,7 @@ function renderFuelTab(_fromMonth, _toMonth) {
 
   // ── اسم السائق: مش عمود في شيت الوقود — بيتربط برقم اللوحة من شيت "السيارات" (المستخدم الفعلي) ──
   const plateToDriver = {};
-  (window.RAW_VEHICLES || []).forEach(v => {
+  (window.RAW_NEW_VEHICLES || []).forEach(v => {
     const p = v["رقم اللوحة"];
     const u = (v["اسم المستخدم الفعلي"] || "").trim();
     if (p && u) plateToDriver[String(p).trim()] = u;
@@ -28460,9 +29100,9 @@ function renderFuelTab(_fromMonth, _toMonth) {
     var tbody = document.getElementById('fuel-tbody');
     var cntEl = document.getElementById('fuel-tbl-cnt');
     if (!tbody) return;
-    var rows = window.RAW_FUEL ? [...window.RAW_FUEL] : [];
+    var rows = window.RAW_NEW_FUEL ? [...window.RAW_NEW_FUEL] : [];
     var plateToDriver = {};
-    (window.RAW_VEHICLES || []).forEach(function(v){
+    (window.RAW_NEW_VEHICLES || []).forEach(function(v){
       var p = v['رقم اللوحة'], u = (v['اسم المستخدم الفعلي'] || '').trim();
       if (p && u) plateToDriver[String(p).trim()] = u;
     });
@@ -28514,7 +29154,7 @@ function renderVehiclesTab() {
   const el = document.getElementById("vehicles-content");
   if (!el) return;
 
-  const rows = window.RAW_VEHICLES || [];
+  const rows = window.RAW_NEW_VEHICLES || [];
   if (!rows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">🚗</div>
@@ -28527,7 +29167,8 @@ function renderVehiclesTab() {
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
   const getBrand  = (r) => r["الماركة"] ?? r["الطراز"] ?? "";
-  const getStatus = (r) => (r["الحالة"] ?? "").toString().trim();
+  // ⚠️ اسم العمود الحقيقي في شيت "السيارات" هو "حالة المركبة" — نتعامل مع "الحالة" كاحتياط فقط
+  const getStatus = (r) => (r["حالة المركبة"] ?? r["الحالة"] ?? "").toString().trim();
   const getAuthUntil = (r) => (r["تفويض حتى (اختياري)"] ?? r["تفويض حتى"] ?? "").toString().trim();
 
   const total        = rows.length;
@@ -28693,7 +29334,7 @@ function renderVehiclesTab() {
     var sort = document.getElementById('veh-sort') ? document.getElementById('veh-sort').value : 'year_desc';
     var tbody = document.getElementById('veh-tbody');
     if (!tbody) return;
-    var vrows = window.RAW_VEHICLES ? [...window.RAW_VEHICLES] : [];
+    var vrows = window.RAW_NEW_VEHICLES ? [...window.RAW_NEW_VEHICLES] : [];
     function gb(r){ return r['الماركة'] ?? r['الطراز'] ?? ''; }
     vrows.sort(function(a,b){
       if (sort==='plate') return String(a['رقم اللوحة']||'').localeCompare(String(b['رقم اللوحة']||''),'ar');
@@ -28713,6 +29354,1308 @@ function renderVehiclesTab() {
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
+   ║  ✉️  JS تبويب: سجل المراسلات (خطوة 2 — تبويب جديد)
+   ║  (tab-correspondence)
+   ║  المصدر: window.RAW_NEW_CORRESPONDENCE (من الآب سكريبت الجديد
+   ║  المنفصل — راجع loadNewTemplatesSeparate أعلى الملف). الهدف
+   ║  الأساسي المطلوب: معرفة الصادر والوارد لكل منطقة.
+   ║  أعمدة الشيت: رقم أعمالي، الرقم المرجعي، النوع (صادر/وارد)،
+   ║  التصنيف، المرسِل، المرسَل إليه، المنطقة (أكواد: JED/MAK/TAF/
+   ║  MAD/WR)، تاريخ الخطاب، تاريخ الاستلام أو الإرسال، الموضوع،
+   ║  الأولوية، الحالة، حالة الاعتماد، ملاحظات، إذن الإصدار،
+   ║  اسم المعتمد، الرد.
+   ╚════════════════════════════════════════════════════════════╝ */
+const CORR_REGION_LABELS = { JED: "جدة", MAK: "مكة المكرمة", TAF: "الطائف", MAD: "المدينة المنورة", WR: "WR" };
+const CORR = { _region: "", _type: "", filtered: [] };
+window.CORR = CORR;
+
+function _corrRegionLabel(code) {
+  const c = String(code == null ? "" : code).trim();
+  return CORR_REGION_LABELS[c] || c || "غير محدد";
+}
+function _corrFmtDate(v) {
+  if (!v) return "—";
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString("ar-SA", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+function _corrEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function _corrApplyFilters() {
+  const rows = window.RAW_NEW_CORRESPONDENCE || [];
+  CORR.filtered = rows.filter((r) => {
+    const region = _corrRegionLabel(r["المنطقة"]);
+    const type = String(r["النوع"] || "").trim();
+    return (!CORR._region || region === CORR._region) && (!CORR._type || type === CORR._type);
+  });
+  _corrRenderTable();
+}
+
+function _corrRowHtml(r) {
+  const type = String(r["النوع"] || "").trim();
+  const typeColor = type === "صادر" ? CSS_TOKENS.info() : CSS_TOKENS.warning();
+  return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_corrEsc(r["الرقم المرجعي"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center"><span style="background:${CSS_TOKENS.α(typeColor,0.12)};color:${typeColor};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${_corrEsc(type) || "—"}</span></td>
+    <td style="padding:6px 10px;font-size:11px">${_corrEsc(r["المرسِل"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_corrEsc(r["المرسَل إليه"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_corrEsc(_corrRegionLabel(r["المنطقة"]))}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_corrFmtDate(r["تاريخ الخطاب"])}</td>
+    <td style="padding:6px 10px;font-size:11px;max-width:280px">${_corrEsc(r["الموضوع"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${_corrEsc(r["الأولوية"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${_corrEsc(r["الحالة"]) || "—"}</td>
+  </tr>`;
+}
+
+function _corrRenderTable() {
+  const tbody = document.getElementById("corr-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    CORR.filtered.map((r) => _corrRowHtml(r)).join("") ||
+    `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("corr-count");
+  if (countEl) countEl.textContent = CORR.filtered.length.toLocaleString("ar");
+}
+
+function _corrExportCSV() {
+  const src = CORR.filtered.length ? CORR.filtered : window.RAW_NEW_CORRESPONDENCE || [];
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["الرقم المرجعي", "النوع", "المرسِل", "المرسَل إليه", "المنطقة", "تاريخ الخطاب", "الموضوع", "الأولوية", "الحالة"];
+  const getVal = (r, h) => {
+    if (h === "المنطقة") return _corrRegionLabel(r["المنطقة"]);
+    if (h === "تاريخ الخطاب") return _corrFmtDate(r[h]);
+    return r[h];
+  };
+  const rows = src.map((r) => headers.map((h) => `"${String(getVal(r, h) ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "سجل_المراسلات.csv",
+  });
+  a.click();
+}
+
+function renderCorrespondenceTab() {
+  const el = document.getElementById("correspondence-content");
+  if (!el) return;
+
+  const rows = window.RAW_NEW_CORRESPONDENCE || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">✉️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  const total = rows.length;
+  const outCount = rows.filter((r) => String(r["النوع"] || "").trim() === "صادر").length;
+  const inCount = rows.filter((r) => String(r["النوع"] || "").trim() === "وارد").length;
+  const regionsSet = [...new Set(rows.map((r) => _corrRegionLabel(r["المنطقة"])))].filter(Boolean).sort();
+
+  // توزيع الصادر/الوارد حسب المنطقة — الهدف الأساسي من هذا التبويب
+  const byRegionType = {};
+  regionsSet.forEach((rg) => { byRegionType[rg] = { صادر: 0, وارد: 0 }; });
+  rows.forEach((r) => {
+    const rg = _corrRegionLabel(r["المنطقة"]);
+    const tp = String(r["النوع"] || "").trim();
+    if (!byRegionType[rg]) byRegionType[rg] = { صادر: 0, وارد: 0 };
+    if (tp === "صادر" || tp === "وارد") byRegionType[rg][tp]++;
+  });
+
+  // توزيع حسب الحالة
+  const byStatus = {};
+  rows.forEach((r) => {
+    const s = String(r["الحالة"] || "").trim() || "غير محدد";
+    byStatus[s] = (byStatus[s] || 0) + 1;
+  });
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي المراسلات</div>
+      <div class="kpi-sub">صادر ووارد</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${outCount.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">صادر</div>
+      <div class="kpi-sub">${total ? ((outCount / total) * 100).toFixed(1) : 0}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${inCount.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">وارد</div>
+      <div class="kpi-sub">${total ? ((inCount / total) * 100).toFixed(1) : 0}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${regionsSet.length.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد المناطق</div>
+      <div class="kpi-sub">مناطق التشغيل</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">الصادر والوارد حسب المنطقة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-corr-region-type"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">توزيع المراسلات حسب النوع</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-corr-type"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">توزيع المراسلات حسب الحالة</div>
+    <div class="chart-box" style="height:200px"><canvas id="ch-corr-status"></canvas></div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">جدول الصادر والوارد لكل منطقة (أرقام دقيقة)</div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">صادر</th>
+          <th style="padding:8px 10px;text-align:center">وارد</th>
+          <th style="padding:8px 10px;text-align:center">الإجمالي</th>
+        </tr></thead>
+        <tbody>
+          ${regionsSet
+            .map((rg) => {
+              const o = byRegionType[rg]["صادر"] || 0, i = byRegionType[rg]["وارد"] || 0;
+              return `<tr style="border-bottom:1px solid var(--brd)">
+                <td style="padding:6px 10px;font-weight:700">${_corrEsc(rg)}</td>
+                <td style="padding:6px 10px;text-align:center">${o.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center">${i.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${(o + i).toLocaleString("ar")}</td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المراسلات <span class="sub" id="corr-count">${total}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="corr-filter-region" onchange="CORR._region=this.value;_corrApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map((rg) => `<option value="${_corrEsc(rg)}">${_corrEsc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="corr-filter-type" onchange="CORR._type=this.value;_corrApplyFilters()" style="font-size:11px">
+          <option value="">— كل الأنواع —</option>
+          <option value="صادر">صادر</option>
+          <option value="وارد">وارد</option>
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_corrExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="corr-table">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">الرقم المرجعي</th>
+          <th style="padding:8px 10px;text-align:center">النوع</th>
+          <th style="padding:8px 10px;text-align:right">المرسِل</th>
+          <th style="padding:8px 10px;text-align:right">المرسَل إليه</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">تاريخ الخطاب</th>
+          <th style="padding:8px 10px;text-align:right">الموضوع</th>
+          <th style="padding:8px 10px;text-align:center">الأولوية</th>
+          <th style="padding:8px 10px;text-align:center">الحالة</th>
+        </tr></thead>
+        <tbody id="corr-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  CORR._region = "";
+  CORR._type = "";
+  CORR.filtered = rows.slice();
+  _corrRenderTable();
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-corr-region-type", regionsSet, [
+      {
+        label: "صادر",
+        data: regionsSet.map((rg) => byRegionType[rg]["صادر"] || 0),
+        backgroundColor: CSS_TOKENS.info() + "88",
+        borderColor: CSS_TOKENS.info(),
+      },
+      {
+        label: "وارد",
+        data: regionsSet.map((rg) => byRegionType[rg]["وارد"] || 0),
+        backgroundColor: CSS_TOKENS.warning() + "88",
+        borderColor: CSS_TOKENS.warning(),
+      },
+    ]);
+    makeDoughnut("ch-corr-type", { صادر: outCount, وارد: inCount }, { صادر: CSS_TOKENS.info(), وارد: CSS_TOKENS.warning() });
+    makeDoughnut("ch-corr-status", byStatus, {});
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🗂️  JS تبويب: الهيكل الوظيفي للاستشاري
+   ║  (tab-org-structure)
+   ║  المصدر: window.RAW_NEW_ORG_STRUCTURE (من الآب سكريبت الجديد
+   ║  المنفصل — راجع loadNewTemplatesSeparate أعلى الملف). الهدف
+   ║  الأساسي: معرفة نسبة الإشغال والشواغر لكل منطقة ومسمى وظيفي.
+   ║  أعمدة الشيت: حالة التوظيف (موظف حالي/شاغر)، المنطقة، المسمى
+   ║  الوظيفي (TBC)، المسمى الوظيفي (LS)، التصنيف الرئيسي، نوع
+   ║  الفريق، الاسم (موظف/مرشح)، رقم الموظف، الجنسية، سنوات الخبرة،
+   ║  المؤهل، تاريخ الالتحاق، تاريخ بداية العقد، تاريخ نهاية العقد،
+   ║  المدير المباشر، ملاحظات.
+   ╚════════════════════════════════════════════════════════════╝ */
+const ORG = { _region: "", _status: "", filtered: [] };
+window.ORG = ORG;
+
+function _orgEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _orgFmtDate(v) {
+  if (!v) return "—";
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString("ar-SA", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+function _orgIsVacant(r) {
+  return String(r["حالة التوظيف"] || "").trim() === "شاغر";
+}
+function _orgTitle(r) {
+  return String(r["المسمى الوظيفي (LS)"] || r["المسمى الوظيفي (TBC)"] || "").trim() || "غير محدد";
+}
+
+function _orgApplyFilters() {
+  const rows = window.RAW_NEW_ORG_STRUCTURE || [];
+  ORG.filtered = rows.filter((r) => {
+    const region = String(r["المنطقة"] || "").trim();
+    const status = String(r["حالة التوظيف"] || "").trim();
+    return (!ORG._region || region === ORG._region) && (!ORG._status || status === ORG._status);
+  });
+  _orgRenderTable();
+}
+
+function _orgRowHtml(r) {
+  const vacant = _orgIsVacant(r);
+  const statusColor = vacant ? CSS_TOKENS.danger() : CSS_TOKENS.positive();
+  return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["المنطقة"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgTitle(r))}</td>
+    <td style="padding:6px 10px;font-size:11px">${_orgEsc(r["الاسم (موظف / مرشح)"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center"><span style="background:${CSS_TOKENS.α(statusColor,0.12)};color:${statusColor};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${_orgEsc(r["حالة التوظيف"]) || "—"}</span></td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_orgEsc(r["رقم الموظف"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ الالتحاق"])}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ بداية العقد"])}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ نهاية العقد"])}</td>
+  </tr>`;
+}
+
+function _orgRenderTable() {
+  const tbody = document.getElementById("org-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    ORG.filtered.map((r) => _orgRowHtml(r)).join("") ||
+    `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("org-count");
+  if (countEl) countEl.textContent = ORG.filtered.length.toLocaleString("ar");
+}
+
+function _orgExportCSV() {
+  const src = ORG.filtered.length ? ORG.filtered : window.RAW_NEW_ORG_STRUCTURE || [];
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["المنطقة", "المسمى الوظيفي", "الاسم", "حالة التوظيف", "رقم الموظف", "تاريخ الالتحاق", "تاريخ بداية العقد", "تاريخ نهاية العقد"];
+  const getVal = (r, h) => {
+    if (h === "المسمى الوظيفي") return _orgTitle(r);
+    if (h === "الاسم") return r["الاسم (موظف / مرشح)"];
+    if (h === "تاريخ الالتحاق" || h === "تاريخ بداية العقد" || h === "تاريخ نهاية العقد") {
+      const key = h === "تاريخ الالتحاق" ? "تاريخ الالتحاق" : h === "تاريخ بداية العقد" ? "تاريخ بداية العقد" : "تاريخ نهاية العقد";
+      return _orgFmtDate(r[key]);
+    }
+    return r[h];
+  };
+  const rows = src.map((r) => headers.map((h) => `"${String(getVal(r, h) ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "الهيكل_الوظيفي.csv",
+  });
+  a.click();
+}
+
+function renderOrgStructureTab() {
+  const el = document.getElementById("org-structure-content");
+  if (!el) return;
+
+  const rows = window.RAW_NEW_ORG_STRUCTURE || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🗂️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  const total = rows.length;
+  const vacantRows = rows.filter(_orgIsVacant);
+  const occupiedCount = total - vacantRows.length;
+  const vacantCount = vacantRows.length;
+  const regionsSet = [...new Set(rows.map((r) => String(r["المنطقة"] || "").trim()))].filter(Boolean).sort();
+
+  // توزيع الإشغال والشواغر حسب المنطقة — الهدف الأساسي من هذا التبويب
+  const byRegion = {};
+  regionsSet.forEach((rg) => { byRegion[rg] = { مشغولة: 0, شاغرة: 0 }; });
+  rows.forEach((r) => {
+    const rg = String(r["المنطقة"] || "").trim();
+    if (!byRegion[rg]) byRegion[rg] = { مشغولة: 0, شاغرة: 0 };
+    byRegion[rg][_orgIsVacant(r) ? "شاغرة" : "مشغولة"]++;
+  });
+
+  // توزيع حسب المسمى الوظيفي
+  const byTitle = {};
+  rows.forEach((r) => {
+    const t = _orgTitle(r);
+    if (!byTitle[t]) byTitle[t] = { مشغولة: 0, شاغرة: 0 };
+    byTitle[t][_orgIsVacant(r) ? "شاغرة" : "مشغولة"]++;
+  });
+  const titleEntries = Object.entries(byTitle).sort((a, b) => (b[1].مشغولة + b[1].شاغرة) - (a[1].مشغولة + a[1].شاغرة));
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي المسميات الوظيفية</div>
+      <div class="kpi-sub">في كل المناطق</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${occupiedCount.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">مشغولة</div>
+      <div class="kpi-sub">${total ? ((occupiedCount / total) * 100).toFixed(1) : 0}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${vacantCount.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">شواغر</div>
+      <div class="kpi-sub">${total ? ((vacantCount / total) * 100).toFixed(1) : 0}% تحتاج متابعة</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${regionsSet.length.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد المناطق</div>
+      <div class="kpi-sub">مناطق التشغيل</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">الإشغال والشواغر حسب المنطقة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-org-region-status"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">توزيع المسميات: مشغولة مقابل شاغرة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-org-status"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">الشواغر حسب المسمى الوظيفي (الأكثر من حيث العدد)</div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المسمى الوظيفي</th>
+          <th style="padding:8px 10px;text-align:center">مشغولة</th>
+          <th style="padding:8px 10px;text-align:center">شاغرة</th>
+          <th style="padding:8px 10px;text-align:center">الإجمالي</th>
+        </tr></thead>
+        <tbody>
+          ${titleEntries
+            .map(([t, v]) => `<tr style="border-bottom:1px solid var(--brd)">
+                <td style="padding:6px 10px;font-weight:700">${_orgEsc(t)}</td>
+                <td style="padding:6px 10px;text-align:center">${v.مشغولة.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center${v.شاغرة ? ";color:" + CSS_TOKENS.danger() + ";font-weight:700" : ""}">${v.شاغرة.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${(v.مشغولة + v.شاغرة).toLocaleString("ar")}</td>
+              </tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المسميات الوظيفية <span class="sub" id="org-count">${total}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="org-filter-region" onchange="ORG._region=this.value;_orgApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map((rg) => `<option value="${_orgEsc(rg)}">${_orgEsc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="org-filter-status" onchange="ORG._status=this.value;_orgApplyFilters()" style="font-size:11px">
+          <option value="">— كل الحالات —</option>
+          <option value="موظف حالي">موظف حالي</option>
+          <option value="شاغر">شاغر</option>
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_orgExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="org-table">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">المسمى الوظيفي</th>
+          <th style="padding:8px 10px;text-align:right">الاسم</th>
+          <th style="padding:8px 10px;text-align:center">حالة التوظيف</th>
+          <th style="padding:8px 10px;text-align:center">رقم الموظف</th>
+          <th style="padding:8px 10px;text-align:right">تاريخ الالتحاق</th>
+          <th style="padding:8px 10px;text-align:right">تاريخ بداية العقد</th>
+          <th style="padding:8px 10px;text-align:right">تاريخ نهاية العقد</th>
+        </tr></thead>
+        <tbody id="org-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  ORG._region = "";
+  ORG._status = "";
+  ORG.filtered = rows.slice();
+  _orgRenderTable();
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-org-region-status", regionsSet, [
+      {
+        label: "مشغولة",
+        data: regionsSet.map((rg) => byRegion[rg].مشغولة || 0),
+        backgroundColor: CSS_TOKENS.positive() + "88",
+        borderColor: CSS_TOKENS.positive(),
+      },
+      {
+        label: "شاغرة",
+        data: regionsSet.map((rg) => byRegion[rg].شاغرة || 0),
+        backgroundColor: CSS_TOKENS.danger() + "88",
+        borderColor: CSS_TOKENS.danger(),
+      },
+    ]);
+    makeDoughnut("ch-org-status", { مشغولة: occupiedCount, شاغرة: vacantCount }, { مشغولة: CSS_TOKENS.positive(), شاغرة: CSS_TOKENS.danger() });
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  💳  JS تبويب: مدفوعات وعقود LS (الاستشاري)
+   ║  (tab-ls-payments)
+   ║  المصدر: window.RAW_NEW_LS_PAYMENTS. عقود Landsterling نفسها
+   ║  (احنا) كاستشاري — أعمدة الشيت: Contract No., Region, Contract
+   ║  Start Date, Contract End Date, Scope / Description, Category,
+   ║  Base Value, Updated Value, Paid, Payment %, Remaining, Notes.
+   ║  بعض القيم بتوصل كنص "-" بدل رقم (يعني مفيش قيمة محدّثة/متبقي
+   ║  مسجّلة)، فلازم نتعامل معاها كـ0 مش نكسر عليها.
+   ╚════════════════════════════════════════════════════════════╝ */
+const LSP = { _region: "", filtered: [] };
+window.LSP = LSP;
+function _lspNum(v) {
+  if (v === null || v === undefined || v === "" || v === "-") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+}
+function _lspEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _lspEffectiveValue(r) {
+  const updated = _lspNum(r["Updated Value"]);
+  return updated !== null ? updated : (_lspNum(r["Base Value"]) || 0);
+}
+function _lspApplyFilters() {
+  const rows = window.RAW_NEW_LS_PAYMENTS || [];
+  LSP.filtered = rows.filter((r) => !LSP._region || String(r["Region"] || "").trim() === LSP._region);
+  _lspRenderTable();
+}
+function _lspRowHtml(r) {
+  const base = _lspNum(r["Base Value"]);
+  const updated = _lspNum(r["Updated Value"]);
+  const paid = _lspNum(r["Paid"]) || 0;
+  const remaining = _lspNum(r["Remaining"]);
+  const pctRaw = _lspNum(r["Payment %"]);
+  const pct = pctRaw === null ? null : (pctRaw <= 1 ? pctRaw * 100 : pctRaw);
+  const pctColor = pct === null ? CSS_TOKENS.txMuted() : pct >= 80 ? CSS_TOKENS.positive() : pct >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${_lspEsc(r["Contract No."]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_lspEsc(r["Region"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_lspEsc(r["Category"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${base !== null ? base.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${updated !== null ? updated.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${paid.toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center"><span style="color:${pctColor};font-weight:700;font-size:11px">${pct === null ? "—" : pct.toFixed(1) + "%"}</span></td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${remaining !== null ? remaining.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">${_lspEsc(r["Notes"]) || "—"}</td>
+  </tr>`;
+}
+function _lspRenderTable() {
+  const tbody = document.getElementById("lsp-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    LSP.filtered.map((r) => _lspRowHtml(r)).join("") ||
+    `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("lsp-count");
+  if (countEl) countEl.textContent = LSP.filtered.length.toLocaleString("ar");
+}
+function _lspExportCSV() {
+  const src = LSP.filtered.length ? LSP.filtered : window.RAW_NEW_LS_PAYMENTS || [];
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["Contract No.", "Region", "Category", "Base Value", "Updated Value", "Paid", "Payment %", "Remaining", "Notes"];
+  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "مدفوعات_وعقود_LS.csv",
+  });
+  a.click();
+}
+function renderLsPaymentsTab() {
+  const el = document.getElementById("ls-payments-content");
+  if (!el) return;
+
+  const rows = window.RAW_NEW_LS_PAYMENTS || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">💳</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  const total = rows.length;
+  const totalValue = rows.reduce((s, r) => s + _lspEffectiveValue(r), 0);
+  const totalPaid = rows.reduce((s, r) => s + (_lspNum(r["Paid"]) || 0), 0);
+  const totalRemaining = rows.reduce((s, r) => { const rem = _lspNum(r["Remaining"]); return s + (rem !== null ? rem : Math.max(_lspEffectiveValue(r) - (_lspNum(r["Paid"]) || 0), 0)); }, 0);
+  const overallPct = totalValue ? (totalPaid / totalValue) * 100 : 0;
+  const regionsSet = [...new Set(rows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
+
+  const byRegion = {};
+  regionsSet.forEach((rg) => { byRegion[rg] = { value: 0, paid: 0 }; });
+  rows.forEach((r) => {
+    const rg = String(r["Region"] || "").trim();
+    if (!byRegion[rg]) byRegion[rg] = { value: 0, paid: 0 };
+    byRegion[rg].value += _lspEffectiveValue(r);
+    byRegion[rg].paid += _lspNum(r["Paid"]) || 0;
+  });
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي العقود</div>
+      <div class="kpi-sub">عقود الاستشاري (LS)</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي قيمة العقود</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المدفوع</div>
+      <div class="kpi-sub">${overallPct.toFixed(1)}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${Math.round(totalRemaining).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المتبقي</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">قيمة العقود مقابل المدفوع حسب المنطقة</div>
+    <div class="chart-box" style="height:260px"><canvas id="ch-lsp-region"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة العقود <span class="sub" id="lsp-count">${total}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="lsp-filter-region" onchange="LSP._region=this.value;_lspApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map((rg) => `<option value="${_lspEsc(rg)}">${_lspEsc(rg)}</option>`).join("")}
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_lspExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="lsp-table">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">رقم العقد</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">التصنيف</th>
+          <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
+          <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
+          <th style="padding:8px 10px;text-align:center">المدفوع</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+          <th style="padding:8px 10px;text-align:center">المتبقي</th>
+          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
+        </tr></thead>
+        <tbody id="lsp-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  LSP._region = "";
+  LSP.filtered = rows.slice();
+  _lspRenderTable();
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-lsp-region", regionsSet, [
+      { label: "القيمة", data: regionsSet.map((rg) => Math.round(byRegion[rg].value)), backgroundColor: CSS_TOKENS.info() + "88", borderColor: CSS_TOKENS.info() },
+      { label: "المدفوع", data: regionsSet.map((rg) => Math.round(byRegion[rg].paid)), backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive() },
+    ]);
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  💰  JS تبويب: مدفوعات وعقود المقاولين
+   ║  (tab-contractor-payments)
+   ║  المصدر: window.RAW_NEW_CONTRACTOR_PAYMENTS. أعمدة الشيت:
+   ║  Contract No., Contractor, Region, Project Name, Classification,
+   ║  Base Contract Value (SAR), Updated Contract Value (SAR),
+   ║  Payment Released (SAR), % Paid, Remaining (SAR), KPI Deduction,
+   ║  Deduction, Total Deduction, Contract Start/End Date, Rev End Date, Notes.
+   ╚════════════════════════════════════════════════════════════╝ */
+const CTP = { _region: "", _classification: "", filtered: [] };
+window.CTP = CTP;
+function _ctpNum(v) {
+  if (v === null || v === undefined || v === "" || v === "-") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+}
+function _ctpEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _ctpEffectiveValue(r) {
+  const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
+  return updated !== null ? updated : (_ctpNum(r["Base Contract Value (SAR)"]) || 0);
+}
+function _ctpApplyFilters() {
+  const rows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  CTP.filtered = rows.filter((r) =>
+    (!CTP._region || String(r["Region"] || "").trim() === CTP._region) &&
+    (!CTP._classification || String(r["Classification"] || "").trim() === CTP._classification)
+  );
+  _ctpRenderTable();
+}
+function _ctpRowHtml(r) {
+  const base = _ctpNum(r["Base Contract Value (SAR)"]);
+  const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
+  const paid = _ctpNum(r["Payment Released (SAR)"]) || 0;
+  const remaining = _ctpNum(r["Remaining (SAR)"]);
+  const totalDeduction = _ctpNum(r["Total Deduction"]) || 0;
+  const pctRaw = _ctpNum(r["% Paid"]);
+  const pct = pctRaw === null ? null : (pctRaw <= 1 ? pctRaw * 100 : pctRaw);
+  const pctColor = pct === null ? CSS_TOKENS.txMuted() : pct >= 80 ? CSS_TOKENS.positive() : pct >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${_ctpEsc(r["Contract No."]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_ctpEsc(r["Contractor"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ctpEsc(r["Region"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ctpEsc(r["Classification"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${base !== null ? base.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${updated !== null ? updated.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${paid.toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center"><span style="color:${pctColor};font-weight:700;font-size:11px">${pct === null ? "—" : pct.toFixed(1) + "%"}</span></td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${remaining !== null ? remaining.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px${totalDeduction ? ";color:" + CSS_TOKENS.danger() + ";font-weight:700" : ""}">${totalDeduction.toLocaleString("en-US")}</td>
+  </tr>`;
+}
+function _ctpRenderTable() {
+  const tbody = document.getElementById("ctp-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    CTP.filtered.map((r) => _ctpRowHtml(r)).join("") ||
+    `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("ctp-count");
+  if (countEl) countEl.textContent = CTP.filtered.length.toLocaleString("ar");
+}
+function _ctpExportCSV() {
+  const src = CTP.filtered.length ? CTP.filtered : window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["Contract No.", "Contractor", "Region", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Payment Released (SAR)", "% Paid", "Remaining (SAR)", "Total Deduction"];
+  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "مدفوعات_وعقود_المقاولين.csv",
+  });
+  a.click();
+}
+function renderContractorPaymentsTab() {
+  const el = document.getElementById("contractor-payments-content");
+  if (!el) return;
+
+  const rows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">💰</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  const total = rows.length;
+  const totalValue = rows.reduce((s, r) => s + _ctpEffectiveValue(r), 0);
+  const totalPaid = rows.reduce((s, r) => s + (_ctpNum(r["Payment Released (SAR)"]) || 0), 0);
+  const totalDeduction = rows.reduce((s, r) => s + (_ctpNum(r["Total Deduction"]) || 0), 0);
+  const overallPct = totalValue ? (totalPaid / totalValue) * 100 : 0;
+  const regionsSet = [...new Set(rows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
+  const classSet = [...new Set(rows.map((r) => String(r["Classification"] || "").trim()))].filter(Boolean).sort();
+
+  const byClass = {};
+  classSet.forEach((c) => { byClass[c] = { value: 0, paid: 0, count: 0 }; });
+  rows.forEach((r) => {
+    const c = String(r["Classification"] || "").trim();
+    if (!byClass[c]) byClass[c] = { value: 0, paid: 0, count: 0 };
+    byClass[c].value += _ctpEffectiveValue(r);
+    byClass[c].paid += _ctpNum(r["Payment Released (SAR)"]) || 0;
+    byClass[c].count++;
+  });
+  const classEntries = Object.entries(byClass).sort((a, b) => b[1].value - a[1].value);
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${total.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي العقود</div>
+      <div class="kpi-sub">عقود المقاولين</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي قيمة العقود</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المدفوع</div>
+      <div class="kpi-sub">${overallPct.toFixed(1)}% من الإجمالي</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${Math.round(totalDeduction).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي الخصومات</div>
+      <div class="kpi-sub">شامل خصم مؤشرات الأداء</div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">القيمة مقابل المدفوع حسب تصنيف العقد</div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">التصنيف</th>
+          <th style="padding:8px 10px;text-align:center">عدد العقود</th>
+          <th style="padding:8px 10px;text-align:center">القيمة</th>
+          <th style="padding:8px 10px;text-align:center">المدفوع</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+        </tr></thead>
+        <tbody>
+          ${classEntries
+            .map(([c, v]) => `<tr style="border-bottom:1px solid var(--brd)">
+                <td style="padding:6px 10px;font-weight:700">${_ctpEsc(c)}</td>
+                <td style="padding:6px 10px;text-align:center">${v.count.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center">${Math.round(v.value).toLocaleString("en-US")}</td>
+                <td style="padding:6px 10px;text-align:center">${Math.round(v.paid).toLocaleString("en-US")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${v.value ? ((v.paid / v.value) * 100).toFixed(1) : "0.0"}%</td>
+              </tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة العقود <span class="sub" id="ctp-count">${total}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="ctp-filter-region" onchange="CTP._region=this.value;_ctpApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map((rg) => `<option value="${_ctpEsc(rg)}">${_ctpEsc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="ctp-filter-class" onchange="CTP._classification=this.value;_ctpApplyFilters()" style="font-size:11px">
+          <option value="">— كل التصنيفات —</option>
+          ${classSet.map((c) => `<option value="${_ctpEsc(c)}">${_ctpEsc(c)}</option>`).join("")}
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_ctpExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="ctp-table">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">رقم العقد</th>
+          <th style="padding:8px 10px;text-align:right">المقاول</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">التصنيف</th>
+          <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
+          <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
+          <th style="padding:8px 10px;text-align:center">المدفوع</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+          <th style="padding:8px 10px;text-align:center">المتبقي</th>
+          <th style="padding:8px 10px;text-align:center">إجمالي الخصم</th>
+        </tr></thead>
+        <tbody id="ctp-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  CTP._region = "";
+  CTP._classification = "";
+  CTP.filtered = rows.slice();
+  _ctpRenderTable();
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🛠️  JS تبويب: الصيانة الدورية المخططة PPM (Maximo)
+   ║  (tab-ppm-maximo)
+   ║  المصدر: window.RAW_NEW_PPM_MAXIMO — مُجمّع من 4 شيتات إقليمية
+   ║  (كل شيت = منطقة)، مع إضافة عمود "المنطقة" لكل صف عند التحميل.
+   ║  أعمدة كل صف: اسم المهمة، تاريخ البداية، المستهدف التراكمي،
+   ║  المحقق التراكمي، نسبة الإنجاز التراكمي، اجمالي المستهدف،
+   ║  نسبة الإنجاز الكلي.
+   ║
+   ║  ⚠️ الصيغة الحسابية (مُتحقق منها بدقة الفاصلة العائمة الكاملة
+   ║  من ملفات Report Summary 6 الأصلية عبر الأربع مناطق):
+   ║    Planned% = Σ(المستهدف التراكمي) ÷ Σ(اجمالي المستهدف)
+   ║    Actual%  = Σ(المحقق التراكمي)   ÷ Σ(اجمالي المستهدف)
+   ║  تُحسب هذه النسب من مجموع الأعمدة الخام على مستوى المهام،
+   ║  وليست متوسط النسب الجاهزة الموجودة في كل صف (تفادياً لانحياز
+   ║  المتوسط عند اختلاف حجم المهام). "المنطقة الغربية" = نفس
+   ║  الصيغة بالضبط، لكن بعد جمع الأعمدة الخام للمناطق الأربع
+   ║  الحقيقية سويًا أولاً (وليس متوسط نسب المناطق الأربع).
+   ╚════════════════════════════════════════════════════════════╝ */
+const PPM = { _region: "", filtered: [] };
+window.PPM = PPM;
+const PPM_REAL_REGIONS = ["مكة المكرمة", "المدينة المنورة", "جدة", "الطائف"];
+const PPM_WESTERN_LABEL = "المنطقة الغربية (إجمالي)";
+function _ppmNum(v) {
+  if (v === null || v === undefined || v === "" || v === "_" || v === "-") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+}
+function _ppmEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _ppmFmtDate(v) {
+  if (!v) return "—";
+  const d = v instanceof Date ? v : new Date(String(v));
+  return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("en-GB", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+/** يحسب المجاميع الخام (Σ المستهدف التراكمي، Σ المحقق التراكمي،
+ *  Σ اجمالي المستهدف) لمجموعة صفوف (مهام)، ومنها Planned%/Actual%
+ *  محسوبتين على مستوى المجموع — الصيغة المُتحقق منها أعلاه. */
+function _ppmAggregate(rows) {
+  let targetCum = 0, achievedCum = 0, totalTarget = 0;
+  rows.forEach((r) => {
+    targetCum += _ppmNum(r["المستهدف التراكمي"]) || 0;
+    achievedCum += _ppmNum(r["المحقق التراكمي"]) || 0;
+    totalTarget += _ppmNum(r["اجمالي المستهدف"]) || 0;
+  });
+  const plannedPct = totalTarget ? (targetCum / totalTarget) * 100 : 0;
+  const actualPct = totalTarget ? (achievedCum / totalTarget) * 100 : 0;
+  // ★ 2026-09-20: نسبة إضافية بناءً على طلب صريح — المحقق التراكمي مقابل
+  // المستهدف التراكمي (وليس اجمالي المستهدف الكلي زي Planned%/Actual% فوق) —
+  // يعني نسبة تنفيذ الفعلي من المخطط له حتى الآن لكل منطقة.
+  const progressPct = targetCum ? (achievedCum / targetCum) * 100 : 0;
+  return { tasks: rows.length, targetCum, achievedCum, totalTarget, plannedPct, actualPct, progressPct };
+}
+function _ppmApplyFilters() {
+  const rows = window.RAW_NEW_PPM_MAXIMO || [];
+  PPM.filtered = rows.filter((r) => !PPM._region || String(r["المنطقة"] || "").trim() === PPM._region);
+  _ppmRenderTable();
+}
+function _ppmRowHtml(r) {
+  const targetCum = _ppmNum(r["المستهدف التراكمي"]);
+  const achievedCum = _ppmNum(r["المحقق التراكمي"]);
+  const totalTarget = _ppmNum(r["اجمالي المستهدف"]);
+  const pctCumRaw = _ppmNum(r["نسبة الإنجاز التراكمي"]);
+  const pctCum = pctCumRaw === null ? null : (pctCumRaw <= 1 ? pctCumRaw * 100 : pctCumRaw);
+  const pctOverallRaw = _ppmNum(r["نسبة الإنجاز الكلي"]);
+  const pctOverall = pctOverallRaw === null ? null : (pctOverallRaw <= 1 ? pctOverallRaw * 100 : pctOverallRaw);
+  const pctColor = pctOverall === null ? CSS_TOKENS.txMuted() : pctOverall >= 70 ? CSS_TOKENS.positive() : pctOverall >= 35 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ppmEsc(r["المنطقة"]) || "—"}</td>
+    <td style="padding:6px 10px;font-weight:700;font-size:11px">${_ppmEsc(r["اسم المهمة"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_ppmFmtDate(r["تاريخ البداية"])}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${targetCum !== null ? targetCum.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${achievedCum !== null ? achievedCum.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${pctCum === null ? "—" : pctCum.toFixed(1) + "%"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${totalTarget !== null ? totalTarget.toLocaleString("en-US") : "—"}</td>
+    <td style="padding:6px 10px;text-align:center"><span style="color:${pctColor};font-weight:700;font-size:11px">${pctOverall === null ? "—" : pctOverall.toFixed(1) + "%"}</span></td>
+  </tr>`;
+}
+function _ppmRenderTable() {
+  const tbody = document.getElementById("ppm-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    PPM.filtered.map((r) => _ppmRowHtml(r)).join("") ||
+    `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("ppm-count");
+  if (countEl) countEl.textContent = PPM.filtered.length.toLocaleString("ar");
+}
+function _ppmExportCSV() {
+  const src = PPM.filtered.length ? PPM.filtered : window.RAW_NEW_PPM_MAXIMO || [];
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["المنطقة", "اسم المهمة", "تاريخ البداية", "المستهدف التراكمي", "المحقق التراكمي", "نسبة الإنجاز التراكمي", "اجمالي المستهدف", "نسبة الإنجاز الكلي"];
+  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "PPM_Maximo.csv",
+  });
+  a.click();
+}
+function renderPpmMaximoTab() {
+  const el = document.getElementById("ppm-maximo-content");
+  if (!el) return;
+
+  const rows = window.RAW_NEW_PPM_MAXIMO || [];
+  if (!rows.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🛠️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  // ── تجميع المهام حسب المنطقة (المناطق الحقيقية الموجودة فعليًا بالبيانات فقط، بترتيب ثابت) ──
+  const regionsPresent = PPM_REAL_REGIONS.filter((rg) => rows.some((r) => String(r["المنطقة"] || "").trim() === rg));
+  const byRegion = {};
+  regionsPresent.forEach((rg) => {
+    byRegion[rg] = _ppmAggregate(rows.filter((r) => String(r["المنطقة"] || "").trim() === rg));
+  });
+  // "المنطقة الغربية" = رول أب المناطق الأربعة الحقيقية، محسوب من نفس الصفوف الخام مجمّعة سويًا (مش متوسط نسب)
+  const western = _ppmAggregate(rows.filter((r) => regionsPresent.includes(String(r["المنطقة"] || "").trim())));
+
+  const chartLabels = [...regionsPresent, PPM_WESTERN_LABEL];
+  const chartPlanned = [...regionsPresent.map((rg) => byRegion[rg].plannedPct), western.plannedPct];
+  const chartActual = [...regionsPresent.map((rg) => byRegion[rg].actualPct), western.actualPct];
+  // ★ 2026-09-20: نسبة إضافية بناءً على طلب صريح — لكل منطقة على حدة:
+  // Σ(المحقق التراكمي) ÷ Σ(المستهدف التراكمي) — تختلف عن Actual% فوق
+  // (اللي بيقسم على اجمالي المستهدف الكلي مش المستهدف التراكمي حتى الآن).
+  const chartProgress = [...regionsPresent.map((rg) => byRegion[rg].progressPct), western.progressPct];
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${western.tasks.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي المهام</div>
+      <div class="kpi-sub">عبر ${regionsPresent.length} مناطق</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${Math.round(western.totalTarget).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المستهدف الكلي</div>
+      <div class="kpi-sub">المنطقة الغربية بالكامل</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${western.plannedPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة الإنجاز المخطط (Planned)</div>
+    </div>
+    <div class="kpi kc-green">
+      <div class="kpi-val">${western.actualPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة الإنجاز الفعلي (Actual)</div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">نسبة الإنجاز المخطط مقابل الفعلي حسب المنطقة (وإجمالي المنطقة الغربية)</div>
+    <div class="chart-box" style="height:280px"><canvas id="ch-ppm-region"></canvas></div>
+  </div>
+
+  <div class="card mb14">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">عدد المهام</th>
+          <th style="padding:8px 10px;text-align:center">إجمالي المستهدف</th>
+          <th style="padding:8px 10px;text-align:center">Planned%</th>
+          <th style="padding:8px 10px;text-align:center">Actual%</th>
+        </tr></thead>
+        <tbody>
+          ${[...regionsPresent.map((rg) => [rg, byRegion[rg]]), [PPM_WESTERN_LABEL, western]]
+            .map(([label, agg], i) => `<tr style="border-bottom:1px solid var(--brd)${i === regionsPresent.length ? ";background:var(--bg2);font-weight:700" : ""}">
+                <td style="padding:6px 10px">${_ppmEsc(label)}</td>
+                <td style="padding:6px 10px;text-align:center">${agg.tasks.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center">${Math.round(agg.totalTarget).toLocaleString("en-US")}</td>
+                <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.warning()}">${agg.plannedPct.toFixed(1)}%</td>
+                <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.positive()}">${agg.actualPct.toFixed(1)}%</td>
+              </tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">نسبة المحقق التراكمي إلى المستهدف التراكمي حسب المنطقة (وإجمالي المنطقة الغربية)</div>
+    <div class="chart-box" style="height:280px"><canvas id="ch-ppm-progress"></canvas></div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0);margin-top:12px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">المحقق التراكمي</th>
+          <th style="padding:8px 10px;text-align:center">المستهدف التراكمي</th>
+          <th style="padding:8px 10px;text-align:center">النسبة</th>
+        </tr></thead>
+        <tbody>
+          ${[...regionsPresent.map((rg) => [rg, byRegion[rg]]), [PPM_WESTERN_LABEL, western]]
+            .map(([label, agg], i) => `<tr style="border-bottom:1px solid var(--brd)${i === regionsPresent.length ? ";background:var(--bg2);font-weight:700" : ""}">
+                <td style="padding:6px 10px">${_ppmEsc(label)}</td>
+                <td style="padding:6px 10px;text-align:center">${Math.round(agg.achievedCum).toLocaleString("en-US")}</td>
+                <td style="padding:6px 10px;text-align:center">${Math.round(agg.targetCum).toLocaleString("en-US")}</td>
+                <td style="padding:6px 10px;text-align:center"><span style="color:${CSS_TOKENS.info()};font-weight:700">${agg.progressPct.toFixed(1)}%</span></td>
+              </tr>`)
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">تفاصيل المهام <span class="sub" id="ppm-count">${rows.length}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="ppm-filter-region" onchange="PPM._region=this.value;_ppmApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsPresent.map((rg) => `<option value="${_ppmEsc(rg)}">${_ppmEsc(rg)}</option>`).join("")}
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_ppmExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="ppm-table">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">اسم المهمة</th>
+          <th style="padding:8px 10px;text-align:center">تاريخ البداية</th>
+          <th style="padding:8px 10px;text-align:center">المستهدف التراكمي</th>
+          <th style="padding:8px 10px;text-align:center">المحقق التراكمي</th>
+          <th style="padding:8px 10px;text-align:center">نسبة الإنجاز التراكمي</th>
+          <th style="padding:8px 10px;text-align:center">اجمالي المستهدف</th>
+          <th style="padding:8px 10px;text-align:center">نسبة الإنجاز الكلي</th>
+        </tr></thead>
+        <tbody id="ppm-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  PPM._region = "";
+  PPM.filtered = rows.slice();
+  _ppmRenderTable();
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-ppm-region", chartLabels, [
+      { label: "Planned %", data: chartPlanned.map((v) => +v.toFixed(1)), backgroundColor: CSS_TOKENS.warning() + "88", borderColor: CSS_TOKENS.warning() },
+      { label: "Actual %", data: chartActual.map((v) => +v.toFixed(1)), backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive() },
+    ]);
+    makeVBar("ch-ppm-progress", chartLabels, [
+      { label: "المحقق ÷ المستهدف التراكمي %", data: chartProgress.map((v) => +v.toFixed(1)), backgroundColor: CSS_TOKENS.info() + "88", borderColor: CSS_TOKENS.info() },
+    ]);
+  });
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🚚  JS تبويب: الزيارات
+   ║  (tab-visits)
+   ║  المصدر: شيتان صغيران فقط من ملف "قالب الزيارات" (بقرار من
+   ║  المستخدم، وليس شيت الـData الضخم):
+   ║    window.RAW_NEW_VISITS_MONTHLY  ← شيت "الملخص الشهري"
+   ║      أعمدة: الشهر (بصيغة YYYY-MM)، مكتملة (COMPLETED)، مسندة (ASSIGNED)
+   ║    window.RAW_NEW_VISITS_BY_REGION ← شيت "الزيارات حسب المنطقة"
+   ║      أعمدة: المنطقة، عدد الزيارات المكتملة
+   ║  ⚠️ ملحوظة: تسمية المناطق هنا مستقلة عن باقي الملفات (مثلاً
+   ║  "المدينة" هنا مقابل "المدينة المنورة" في ملفات أخرى) — التبويب
+   ║  مستقل تمامًا بدون أي مقارنة أو دمج مع تبويبات أخرى.
+   ╚════════════════════════════════════════════════════════════╝ */
+function _visNum(v) {
+  if (v === null || v === undefined || v === "" || v === "-") return null;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? null : n;
+}
+function _visEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+/** "2026-09" → "سبتمبر 2026"؛ لو الصيغة مش متوقعة بيرجّع القيمة زي ما هي */
+function _visFmtMonth(v) {
+  const s = String(v || "").trim();
+  const m = /^(\d{4})-(\d{1,2})$/.exec(s);
+  if (!m) return s || "—";
+  const year = m[1];
+  const num = parseInt(m[2], 10);
+  const name = KPI_MONTH_NAME_BY_NUM[num] || s;
+  return `${name} ${year}`;
+}
+/* ── حالة فلاتر تبويب الزيارات (منطقة + مدى شهري) ──────────────────
+   المصدران منفصلان تمامًا (لا عمود منطقة في الملخص الشهري، ولا عمود
+   شهر في جدول المناطق)، فكل فلتر بيأثر بس على قسمه المرتبط بيه —
+   نفس مبدأ فلاتر مناطق LS/المقاولين/PPM اللي بتأثر بس على الجدول
+   التفصيلي المرتبطة بيه دون كروت الـKPI العلوية. */
+const VIS = { _region: "", _monthFrom: "", _monthTo: "" };
+window.VIS = VIS;
+
+function _visRenderRegionSection() {
+  const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
+  const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
+  const totalCompletedByRegion = regionsSorted.reduce((s, r) => s + (_visNum(r["عدد الزيارات المكتملة"]) || 0), 0);
+  const shown = VIS._region ? regionsSorted.filter((r) => String(r["المنطقة"] || "").trim() === VIS._region) : regionsSorted;
+
+  const tbody = document.getElementById("vis-region-tbody");
+  if (tbody) {
+    tbody.innerHTML =
+      shown
+        .map((r) => {
+          const v = _visNum(r["عدد الزيارات المكتملة"]) || 0;
+          const pct = totalCompletedByRegion ? (v / totalCompletedByRegion) * 100 : 0;
+          return `<tr style="border-bottom:1px solid var(--brd)">
+            <td style="padding:6px 10px;font-weight:700">${_visEsc(r["المنطقة"]) || "—"}</td>
+            <td style="padding:6px 10px;text-align:center">${v.toLocaleString("ar")}</td>
+            <td style="padding:6px 10px;text-align:center">${pct.toFixed(1)}%</td>
+          </tr>`;
+        })
+        .join("") || `<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد بيانات مطابقة</td></tr>`;
+  }
+  const countEl = document.getElementById("vis-region-count");
+  if (countEl) countEl.textContent = shown.length.toLocaleString("ar");
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-vis-region", shown.map((r) => r["المنطقة"] || "—"), [
+      { label: "الزيارات المكتملة", data: shown.map((r) => _visNum(r["عدد الزيارات المكتملة"]) || 0), backgroundColor: CSS_TOKENS.special() + "88", borderColor: CSS_TOKENS.special() },
+    ]);
+  });
+}
+function _visApplyRegionFilter() {
+  _visRenderRegionSection();
+}
+
+function _visRenderMonthlySection() {
+  const monthly = window.RAW_NEW_VISITS_MONTHLY || [];
+  let monthlySorted = monthly.slice().sort((a, b) => String(a["الشهر"] || "").localeCompare(String(b["الشهر"] || "")));
+  if (VIS._monthFrom) monthlySorted = monthlySorted.filter((r) => String(r["الشهر"] || "") >= VIS._monthFrom);
+  if (VIS._monthTo) monthlySorted = monthlySorted.filter((r) => String(r["الشهر"] || "") <= VIS._monthTo);
+
+  const rangeCompleted = monthlySorted.reduce((s, r) => s + (_visNum(r["مكتملة (COMPLETED)"]) || 0), 0);
+  const rangeAssigned = monthlySorted.reduce((s, r) => s + (_visNum(r["مسندة (ASSIGNED)"]) || 0), 0);
+  const rangePct = rangeAssigned ? (rangeCompleted / rangeAssigned) * 100 : 0;
+  const noteEl = document.getElementById("vis-month-range-note");
+  if (noteEl) {
+    noteEl.textContent = monthlySorted.length
+      ? `${monthlySorted.length.toLocaleString("ar")} شهر معروض — ${rangeCompleted.toLocaleString("ar")} مكتملة من ${rangeAssigned.toLocaleString("ar")} مسندة (${rangePct.toFixed(1)}%)`
+      : "لا توجد أشهر مطابقة للمدى المحدد";
+  }
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    makeVBar("ch-vis-monthly", monthlySorted.map((r) => _visFmtMonth(r["الشهر"])), [
+      { label: "مكتملة", data: monthlySorted.map((r) => _visNum(r["مكتملة (COMPLETED)"]) || 0), backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive() },
+      { label: "مسندة", data: monthlySorted.map((r) => _visNum(r["مسندة (ASSIGNED)"]) || 0), backgroundColor: CSS_TOKENS.info() + "88", borderColor: CSS_TOKENS.info() },
+    ]);
+  });
+}
+function _visApplyMonthFilter() {
+  _visRenderMonthlySection();
+}
+
+function renderVisitsTab() {
+  const el = document.getElementById("visits-content");
+  if (!el) return;
+
+  const monthly = window.RAW_NEW_VISITS_MONTHLY || [];
+  const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
+  if (!monthly.length && !byRegion.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:48px;margin-bottom:12px">🚚</div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
+    </div>`;
+    return;
+  }
+
+  VIS._region = "";
+  VIS._monthFrom = "";
+  VIS._monthTo = "";
+
+  // ── ترتيب زمني تصاعدي حسب "الشهر" (صيغة YYYY-MM قابلة للترتيب نصيًا مباشرة) ──
+  const monthlySorted = monthly.slice().sort((a, b) => String(a["الشهر"] || "").localeCompare(String(b["الشهر"] || "")));
+  const totalCompleted = monthlySorted.reduce((s, r) => s + (_visNum(r["مكتملة (COMPLETED)"]) || 0), 0);
+  const totalAssigned = monthlySorted.reduce((s, r) => s + (_visNum(r["مسندة (ASSIGNED)"]) || 0), 0);
+  const overallPct = totalAssigned ? (totalCompleted / totalAssigned) * 100 : 0;
+
+  const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
+  const regionsPresent = [...new Set(regionsSorted.map((r) => String(r["المنطقة"] || "").trim()))].filter(Boolean);
+  const totalCompletedByRegion = regionsSorted.reduce((s, r) => s + (_visNum(r["عدد الزيارات المكتملة"]) || 0), 0);
+  const monthOptions = monthlySorted.map((r) => String(r["الشهر"] || "")).filter(Boolean);
+
+  el.innerHTML = `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-green">
+      <div class="kpi-val">${totalCompleted.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي الزيارات المكتملة</div>
+      <div class="kpi-sub">عبر ${monthlySorted.length} شهر</div>
+    </div>
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${totalAssigned.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي الزيارات المسندة</div>
+      <div class="kpi-sub">حسب الملخص الشهري</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${overallPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة الإنجاز الكلي</div>
+      <div class="kpi-sub">مكتملة ÷ مسندة</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${regionsSorted.length.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد المناطق المسجّلة</div>
+      <div class="kpi-sub">${totalCompletedByRegion.toLocaleString("ar")} زيارة مكتملة إجمالاً</div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">الاتجاه الشهري: الزيارات المكتملة مقابل المسندة</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--tx-muted)">من</span>
+        <select class="fsel" id="vis-filter-month-from" onchange="VIS._monthFrom=this.value;_visApplyMonthFilter()" style="font-size:11px">
+          <option value="">— البداية —</option>
+          ${monthOptions.map((m) => `<option value="${_visEsc(m)}">${_visEsc(_visFmtMonth(m))}</option>`).join("")}
+        </select>
+        <span style="font-size:11px;color:var(--tx-muted)">إلى</span>
+        <select class="fsel" id="vis-filter-month-to" onchange="VIS._monthTo=this.value;_visApplyMonthFilter()" style="font-size:11px">
+          <option value="">— النهاية —</option>
+          ${monthOptions.map((m) => `<option value="${_visEsc(m)}">${_visEsc(_visFmtMonth(m))}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="chart-box" style="height:280px"><canvas id="ch-vis-monthly"></canvas></div>
+    <div id="vis-month-range-note" style="font-size:11px;color:var(--tx-muted);margin-top:8px;text-align:center"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">الزيارات المكتملة حسب المنطقة <span class="sub" id="vis-region-count">${regionsSorted.length}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="vis-filter-region" onchange="VIS._region=this.value;_visApplyRegionFilter()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsPresent.map((rg) => `<option value="${_visEsc(rg)}">${_visEsc(rg)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="chart-box" style="height:260px;margin-bottom:14px"><canvas id="ch-vis-region"></canvas></div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">عدد الزيارات المكتملة</th>
+          <th style="padding:8px 10px;text-align:center">النسبة من الإجمالي</th>
+        </tr></thead>
+        <tbody id="vis-region-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+
+  _visRenderMonthlySection();
+  _visRenderRegionSection();
+}
+
+/* ╔════════════════════════════════════════════════════════════╗
    ║  🎓  JS تبويب: برامج التدريب
    ║  (tab-training)
    ║  أعمدة الشيت: تاريخ التقرير، الاسم، البريد الإلكتروني،
@@ -28721,22 +30664,79 @@ function renderVehiclesTab() {
    ║               متوسط الدرجة %، حالة برنامج المشرفين،
    ║               وحدات مكتملة (من 24)، نسبة الإنجاز، ملاحظات التنظيف
    ╚════════════════════════════════════════════════════════════╝ */
+/* 🧩 قالب "قالب التدريب والوقود.xlsx" شيت "برامج التدريب" شكله طولي
+   (Long/Tidy): صف مستقل لكل (موظف × برنامج) — يعني ممكن يبقى في صفّين
+   للموظف الواحد (صف لـ"دورة النظافة" وصف لـ"برنامج المشرفين"). الأعمدة
+   الحقيقية: اسم الموظف، البريد الإلكتروني، اسم البرنامج / الدورة
+   التدريبية، تاريخ التقرير، تاريخ آخر دخول للمنصة، إجمالي عدد الوحدات،
+   عدد الوحدات المكتملة، نسبة الإنجاز، الحالة، متوسط الدرجة %، ملاحظات.
+   الدالة دي بتجمّع الصفوف دي في سجل واحد لكل موظف (زي ما التبويب متوقّع
+   يعرضها) بدل ما تفترض عمودين منفصلين لكل برنامج زي شكل قديم مختلف. */
+function _trainClassifyStatus_(s) {
+  s = String(s || "").trim();
+  if (!s) return "لم تبدأ";
+  if (s.includes("مكتمل")) return "مكتملة";
+  if (s.includes("قيد")) return "قيد التنفيذ";
+  return "لم تبدأ";
+}
+function _trainPivotByEmployee_(allRows) {
+  const byEmp = new Map();
+  allRows.forEach((r) => {
+    const name = String(r["اسم الموظف"] || r["الاسم"] || "").trim();
+    const email = String(r["البريد الإلكتروني"] || "").trim();
+    const key = name || email || Math.random().toString(36);
+    if (!byEmp.has(key)) {
+      byEmp.set(key, {
+        name: name || "—",
+        email,
+        lastLogin: "",
+        lastLoginKey: "",
+        notes: "",
+        clean: { status: "لم تبدأ", units: 0, totalUnits: 12, score: 0 },
+        sup: { status: "لم تبدأ", units: 0, totalUnits: 24 },
+      });
+    }
+    const emp = byEmp.get(key);
+    const prog = String(r["اسم البرنامج / الدورة التدريبية"] || "").trim();
+    const bucket = prog.includes("مشرف") ? "sup" : "clean"; // أي حاجة غير "برنامج المشرفين" تتحسب دورة نظافة (القيمة الوحيدة التانية فعليًا)
+    const status = _trainClassifyStatus_(r["الحالة"]);
+    const units = parseFloat(String(r["عدد الوحدات المكتملة"] ?? 0)) || 0;
+    const totalUnits = parseFloat(String(r["إجمالي عدد الوحدات"] ?? (bucket === "sup" ? 24 : 12))) || (bucket === "sup" ? 24 : 12);
+    emp[bucket] = { status, units, totalUnits, score: bucket === "clean" ? (parseFloat(String(r["متوسط الدرجة %"] ?? 0)) || 0) : 0 };
+
+    const loginRaw = r["تاريخ آخر دخول للمنصة"];
+    const loginStr = loginRaw instanceof Date ? loginRaw.toISOString() : String(loginRaw || "");
+    const loginKey = loginStr.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(loginKey) && (!emp.lastLoginKey || loginKey > emp.lastLoginKey)) {
+      emp.lastLoginKey = loginKey;
+      emp.lastLogin = loginKey;
+    } else if (!emp.lastLogin && loginStr) {
+      emp.lastLogin = loginStr; // مثلاً "لم يدخل أبداً"
+    }
+    const note = String(r["ملاحظات"] || "").trim();
+    if (note && !emp.notes) emp.notes = note;
+  });
+  return [...byEmp.values()];
+}
+
 function renderTrainingTab(_fromDate, _toDate) {
   const el = document.getElementById("training-content");
   if (!el) return;
 
-  const allRows = window.RAW_TRAINING || [];
-  if (!allRows.length) {
+  const allRawRows = window.RAW_NEW_TRAINING || [];
+  if (!allRawRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">🎓</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات تدريب</div>
-      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "برامج_التدريب" وأن الـ Apps Script يقرأها</div>
+      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "برامج التدريب" وأن الـ Apps Script يقرأها</div>
     </div>`;
     return;
   }
 
-  // ── استخراج نطاق التواريخ (حسب آخر دخول للمنصة أو تاريخ التسجيل) ──
-  const dateCol = (r) => String(r["آخر دخول للمنصة"]||r["تاريخ التسجيل"]||r["التاريخ"]||"").slice(0,10);
+  const allRows = _trainPivotByEmployee_(allRawRows);
+
+  // ── استخراج نطاق التواريخ (حسب آخر دخول للمنصة) ──
+  const dateCol = (r) => r.lastLoginKey || "";
   const allDates = allRows.map(dateCol).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   const minDate  = allDates[0] || "";
   const maxDate  = allDates[allDates.length-1] || "";
@@ -28759,26 +30759,26 @@ function renderTrainingTab(_fromDate, _toDate) {
   const total = rows.length;
 
   // دورة النظافة (12 وحدة)
-  const clean_completed  = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("مكتمل")).length;
-  const clean_inProgress = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("قيد")).length;
-  const clean_notStarted = rows.filter(r => (r["حالة دورة النظافة"]||"").includes("لم يبدأ")).length;
-  const clean_avgScore   = rows.filter(r=>n_(r["متوسط الدرجة %"])>0).reduce((s,r,_,a)=>s+n_(r["متوسط الدرجة %"])/a.length, 0);
+  const clean_completed  = rows.filter(r => r.clean.status === "مكتملة").length;
+  const clean_inProgress = rows.filter(r => r.clean.status === "قيد التنفيذ").length;
+  const clean_notStarted = rows.filter(r => r.clean.status === "لم تبدأ").length;
+  const clean_avgScore   = rows.filter(r=>n_(r.clean.score)>0).reduce((s,r,_,a)=>s+n_(r.clean.score)/a.length, 0);
 
   // برنامج المشرفين (24 وحدة)
-  const sup_completed  = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("مكتمل")).length;
-  const sup_inProgress = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("قيد")).length;
-  const sup_notStarted = rows.filter(r => (r["حالة برنامج المشرفين"]||"").includes("لم يبدأ")).length;
+  const sup_completed  = rows.filter(r => r.sup.status === "مكتملة").length;
+  const sup_inProgress = rows.filter(r => r.sup.status === "قيد التنفيذ").length;
+  const sup_notStarted = rows.filter(r => r.sup.status === "لم تبدأ").length;
 
-  const neverLogged = rows.filter(r => (r["آخر دخول للمنصة"]||"").includes("لم يدخل")).length;
+  const neverLogged = rows.filter(r => !r.lastLoginKey).length;
 
   // توزيع حالة دورة النظافة
-  const cleanStatusMap = { "مكتملة": clean_completed, "قيد التنفيذ": clean_inProgress, "لم يبدأ": clean_notStarted };
-  const supStatusMap   = { "مكتملة": sup_completed, "قيد التنفيذ": sup_inProgress, "لم يبدأ": sup_notStarted };
+  const cleanStatusMap = { "مكتملة": clean_completed, "قيد التنفيذ": clean_inProgress, "لم تبدأ": clean_notStarted };
+  const supStatusMap   = { "مكتملة": sup_completed, "قيد التنفيذ": sup_inProgress, "لم تبدأ": sup_notStarted };
 
   // توزيع عدد الوحدات المكتملة (نظافة)
   const unitBuckets12 = {"0":0,"1-3":0,"4-6":0,"7-9":0,"10-11":0,"12":0};
   rows.forEach(r => {
-    const u = n_(r["وحدات مكتملة (من 12)"]);
+    const u = n_(r.clean.units);
     if (u===12)       unitBuckets12["12"]++;
     else if (u>=10)   unitBuckets12["10-11"]++;
     else if (u>=7)    unitBuckets12["7-9"]++;
@@ -28876,24 +30876,24 @@ function renderTrainingTab(_fromDate, _toDate) {
         </tr></thead>
         <tbody id="train-tbody">
           ${rows.map(r => {
-            const cleanDone = (r["حالة دورة النظافة"]||"").includes("مكتمل");
-            const supDone   = (r["حالة برنامج المشرفين"]||"").includes("مكتمل");
-            const neverIn   = (r["آخر دخول للمنصة"]||"").includes("لم يدخل");
-            const score     = n_(r["متوسط الدرجة %"]);
+            const cleanDone = r.clean.status === "مكتملة";
+            const supDone   = r.sup.status === "مكتملة";
+            const neverIn   = !r.lastLoginKey;
+            const score     = n_(r.clean.score);
             const scoreColor = score >= 80 ? CSS_TOKENS.positive() : score >= 60 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
             return `<tr style="border-bottom:1px solid var(--brd)${neverIn?';background:#FFFBEB':''}">
-              <td style="padding:6px 10px;font-weight:600">${esc(r["الاسم"])||"—"}</td>
-              <td style="padding:6px 10px;font-size:11px;color:${neverIn?'#DC2626':'var(--tx-muted)'}">${esc(r["آخر دخول للمنصة"])||"—"}</td>
+              <td style="padding:6px 10px;font-weight:600">${esc(r.name)||"—"}</td>
+              <td style="padding:6px 10px;font-size:11px;color:${neverIn?'#DC2626':'var(--tx-muted)'}">${esc(r.lastLogin)||"—"}</td>
               <td style="padding:6px 10px;text-align:center">${cleanDone
                 ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
-                : `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r["حالة دورة النظافة"])||"—"}</span>`}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r["وحدات مكتملة (من 12)"])||"0"} / 12</td>
+                : `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r.clean.status)||"—"}</span>`}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r.clean.units)||"0"} / 12</td>
               <td style="padding:6px 10px;text-align:center;font-weight:700;color:${scoreColor}">${score ? score+"%":"—"}</td>
               <td style="padding:6px 10px;text-align:center">${supDone
                 ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
-                : `<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r["حالة برنامج المشرفين"])||"—"}</span>`}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r["وحدات مكتملة (من 24)"])||"0"} / 24</td>
-              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">${esc(r["ملاحظات التنظيف"])||"—"}</td>
+                : `<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r.sup.status)||"—"}</span>`}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r.sup.units)||"0"} / 24</td>
+              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">${esc(r.notes)||"—"}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -28943,41 +30943,41 @@ function renderTrainingTab(_fromDate, _toDate) {
     var sort = document.getElementById('train-sort') ? document.getElementById('train-sort').value : 'name';
     var tbody = document.getElementById('train-tbody');
     if (!tbody) return;
-    var rows = window.RAW_TRAINING ? [...window.RAW_TRAINING] : [];
+    var rows = _trainPivotByEmployee_(window.RAW_NEW_TRAINING || []);
     function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
     rows.sort(function(a,b){
-      if (sort==='name') return String(a['الاسم']||'').localeCompare(String(b['الاسم']||''),'ar');
-      if (sort==='units12_desc') return n_(b['وحدات مكتملة (من 12)']) - n_(a['وحدات مكتملة (من 12)']);
-      if (sort==='score_desc')   return n_(b['متوسط الدرجة %']) - n_(a['متوسط الدرجة %']);
-      if (sort==='score_asc')    return n_(a['متوسط الدرجة %']) - n_(b['متوسط الدرجة %']);
-      if (sort==='units24_desc') return n_(b['وحدات مكتملة (من 24)']) - n_(a['وحدات مكتملة (من 24)']);
+      if (sort==='name') return String(a.name||'').localeCompare(String(b.name||''),'ar');
+      if (sort==='units12_desc') return n_(b.clean.units) - n_(a.clean.units);
+      if (sort==='score_desc')   return n_(b.clean.score) - n_(a.clean.score);
+      if (sort==='score_asc')    return n_(a.clean.score) - n_(b.clean.score);
+      if (sort==='units24_desc') return n_(b.sup.units) - n_(a.sup.units);
       if (sort==='never_in') {
-        var fa = String(a['آخر دخول للمنصة']||'').includes('لم يدخل')?0:1;
-        var fb = String(b['آخر دخول للمنصة']||'').includes('لم يدخل')?0:1;
+        var fa = a.lastLoginKey ? 1 : 0;
+        var fb = b.lastLoginKey ? 1 : 0;
         return fa - fb;
       }
       return 0;
     });
     function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     tbody.innerHTML = rows.map(function(r){
-      var cleanDone = String(r['حالة دورة النظافة']||'').includes('مكتمل');
-      var supDone   = String(r['حالة برنامج المشرفين']||'').includes('مكتمل');
-      var neverIn   = String(r['آخر دخول للمنصة']||'').includes('لم يدخل');
-      var score     = n_(r['متوسط الدرجة %']);
+      var cleanDone = r.clean.status === 'مكتملة';
+      var supDone   = r.sup.status === 'مكتملة';
+      var neverIn   = !r.lastLoginKey;
+      var score     = n_(r.clean.score);
       var scoreColor = score>=80?'#16A34A':score>=60?'#D97706':'#DC2626';
       return '<tr style="border-bottom:1px solid var(--brd)'+(neverIn?';background:#FFFBEB':'')+'">'+
-        '<td style="padding:6px 10px;font-weight:600">'+esc(r['الاسم']||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px;color:'+(neverIn?'#DC2626':'var(--tx-muted)')+'">'+esc(r['آخر دخول للمنصة']||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-weight:600">'+esc(r.name||'—')+'</td>'+
+        '<td style="padding:6px 10px;font-size:11px;color:'+(neverIn?'#DC2626':'var(--tx-muted)')+'">'+esc(r.lastLogin||'—')+'</td>'+
         '<td style="padding:6px 10px;text-align:center">'+(cleanDone
           ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
-          :'<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r['حالة دورة النظافة']||'—')+'</span>')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r['وحدات مكتملة (من 12)']||'0')+' / 12</td>'+
+          :'<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r.clean.status||'—')+'</span>')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r.clean.units||'0')+' / 12</td>'+
         '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+scoreColor+'">'+(score?score+'%':'—')+'</td>'+
         '<td style="padding:6px 10px;text-align:center">'+(supDone
           ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
-          :'<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r['حالة برنامج المشرفين']||'—')+'</span>')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r['وحدات مكتملة (من 24)']||'0')+' / 24</td>'+
-        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">'+esc(r['ملاحظات التنظيف']||'—')+'</td>'+
+          :'<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r.sup.status||'—')+'</span>')+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r.sup.units||'0')+' / 24</td>'+
+        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">'+esc(r.notes||'—')+'</td>'+
         '</tr>';
     }).join('');
   };
@@ -29041,6 +31041,61 @@ function renderTrainingTab(_fromDate, _toDate) {
           'إجمالي ساعات التدريب',
           'معدل الإتمام (%)'
         ]
+      },
+      {
+        id: 'org-structure',
+        label: 'الهيكل الوظيفي',
+        keywords: [
+          'الهيكل الوظيفي','هيكل وظيفي','org structure','organization structure','تنظيم',
+          'staffing','التوظيف','وظائف شاغرة','شواغر','vacancy','vacancies','موظفين',
+          'employees','مسمى وظيفي','job title','فريق','team','كادر','manpower',
+          'عدد الموظفين','نسبة الإشغال','occupancy rate'
+        ],
+        charts: ['توزيع الموظفين حسب المنطقة', 'نسبة الإشغال والشواغر'],
+        kpis: ['إجمالي الوظائف', 'الوظائف المشغولة', 'الوظائف الشاغرة', 'نسبة الإشغال']
+      },
+      {
+        id: 'ls-payments',
+        label: 'مدفوعات وعقود LS',
+        keywords: [
+          'مدفوعات LS','عقود LS','ls payments','ls contracts','عقد الاستشاري',
+          'consultant contract','مدفوعات الاستشاري','قيمة العقد','نسبة الصرف',
+          'remaining value','متبقي العقد','land sterling payments','مدفوعات لاند سترلينج'
+        ],
+        charts: ['نسبة السداد حسب المنطقة', 'توزيع قيمة العقود'],
+        kpis: ['إجمالي قيمة العقود', 'إجمالي المدفوع', 'نسبة السداد الكلية', 'المتبقي']
+      },
+      {
+        id: 'contractor-payments',
+        label: 'مدفوعات وعقود المقاولين',
+        keywords: [
+          'مدفوعات المقاولين','عقود المقاولين','contractor payments','contractor contracts',
+          'خصومات المقاول','kpi deduction','قيمة عقد المقاول','مستخلص مقاول',
+          'تصنيف المقاول','classification','خصم أداء'
+        ],
+        charts: ['نسبة السداد حسب المقاول', 'توزيع الخصومات'],
+        kpis: ['إجمالي قيمة عقود المقاولين', 'إجمالي المدفوع', 'إجمالي الخصومات', 'نسبة السداد']
+      },
+      {
+        id: 'ppm-maximo',
+        label: 'الصيانة الوقائية (Maximo)',
+        keywords: [
+          'ppm','maximo','الصيانة الوقائية','preventive maintenance','مهام الصيانة',
+          'planned percentage','actual percentage','نسبة الإنجاز التراكمي',
+          'نسبة الإنجاز الكلي','خطة الصيانة','planned%','actual%'
+        ],
+        charts: ['Planned% مقابل Actual% حسب المنطقة'],
+        kpis: ['عدد المهام', 'Planned% الإجمالي', 'Actual% الإجمالي']
+      },
+      {
+        id: 'visits',
+        label: 'الزيارات',
+        keywords: [
+          'زيارات','زيارة','visits','visit','زيارات ميدانية','field visits',
+          'زيارات مكتملة','زيارات مسندة','completed visits','assigned visits','معدل الزيارات'
+        ],
+        charts: ['الاتجاه الشهري للزيارات', 'الزيارات حسب المنطقة'],
+        kpis: ['إجمالي الزيارات المكتملة', 'إجمالي الزيارات المسندة', 'نسبة الإنجاز الكلي']
       }
     ];
 
@@ -29058,7 +31113,12 @@ function renderTrainingTab(_fromDate, _toDate) {
 
         const extraRules = `
 - "سيارات/أسطول/لوحة/ماركة/طراز سيارة/fleet/vehicles" → تبويب السيارات
-- "تدريب/دورة/متدربين/ساعات تدريب/training/courses" → تبويب برامج التدريب`;
+- "تدريب/دورة/متدربين/ساعات تدريب/training/courses" → تبويب برامج التدريب
+- "هيكل وظيفي/شواغر/موظفين/توظيف/org structure" → تبويب الهيكل الوظيفي
+- "مدفوعات LS/عقود LS/الاستشاري/ls payments" → تبويب مدفوعات وعقود LS
+- "مدفوعات المقاولين/عقود المقاولين/contractor payments" → تبويب مدفوعات وعقود المقاولين
+- "PPM/Maximo/الصيانة الوقائية/preventive maintenance" → تبويب الصيانة الوقائية (Maximo)
+- "زيارات/visits/زيارات ميدانية" → تبويب الزيارات`;
 
         prompt = prompt.replace(
           '- "خنادق/drainage/صرف" → تبويب خنادق الصرف',
@@ -29066,14 +31126,38 @@ function renderTrainingTab(_fromDate, _toDate) {
         );
 
         /* إضافة snapshot للتبويبات الجديدة */
-        const vehRows  = window.RAW_VEHICLES || [];
-        const trRows   = window.RAW_TRAINING || [];
+        const vehRows  = window.RAW_NEW_VEHICLES || [];
+        const trRows   = window.RAW_NEW_TRAINING || [];
+        const orgRows  = window.RAW_NEW_ORG_STRUCTURE || [];
+        const lspRows  = window.RAW_NEW_LS_PAYMENTS || [];
+        const ctpRows  = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+        const ppmRows  = window.RAW_NEW_PPM_MAXIMO || [];
+        const visMonthlyRows = window.RAW_NEW_VISITS_MONTHLY || [];
+        const visRegionRows  = window.RAW_NEW_VISITS_BY_REGION || [];
 
-        if (vehRows.length || trRows.length) {
+        if (vehRows.length || trRows.length || orgRows.length || lspRows.length || ctpRows.length || ppmRows.length || visMonthlyRows.length || visRegionRows.length) {
           const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة (الأعمدة: رقم اللوحة، الماركة، سنة الصنع، رقم/اسم المستخدم الفعلي = السائق، تفويض حتى، الحالة)` : '';
           const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
 
-          prompt += '\n' + (vehData + trData).trim();
+          const orgVacant = orgRows.filter(function(r){ return String(r["حالة التوظيف"]||"").trim() === "شاغر"; }).length;
+          const orgData  = orgRows.length  ? `\n- بيانات الهيكل الوظيفي: ${orgRows.length.toLocaleString()} وظيفة/سجل (الشاغر منها: ${orgVacant.toLocaleString()})` : '';
+
+          const lspTotalValue = lspRows.reduce(function(s,r){ return s + (typeof _lspEffectiveValue === 'function' ? _lspEffectiveValue(r) : 0); }, 0);
+          const lspTotalPaid  = lspRows.reduce(function(s,r){ return s + ((typeof _lspNum === 'function' ? _lspNum(r["Paid"]) : 0) || 0); }, 0);
+          const lspData  = lspRows.length  ? `\n- بيانات مدفوعات وعقود LS: ${lspRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(lspTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(lspTotalPaid).toLocaleString()} ريال` : '';
+
+          const ctpTotalValue = ctpRows.reduce(function(s,r){ return s + (typeof _ctpEffectiveValue === 'function' ? _ctpEffectiveValue(r) : 0); }, 0);
+          const ctpTotalPaid  = ctpRows.reduce(function(s,r){ return s + ((typeof _ctpNum === 'function' ? _ctpNum(r["Payment Released (SAR)"]) : 0) || 0); }, 0);
+          const ctpData  = ctpRows.length  ? `\n- بيانات مدفوعات وعقود المقاولين: ${ctpRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(ctpTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(ctpTotalPaid).toLocaleString()} ريال` : '';
+
+          const ppmAgg   = (typeof _ppmAggregate === 'function') ? _ppmAggregate(ppmRows) : null;
+          const ppmData  = (ppmRows.length && ppmAgg) ? `\n- بيانات الصيانة الوقائية (Maximo): ${ppmAgg.tasks.toLocaleString()} مهمة، Planned% = ${ppmAgg.plannedPct.toFixed(1)}%، Actual% = ${ppmAgg.actualPct.toFixed(1)}%` : '';
+
+          const visCompleted = visMonthlyRows.reduce(function(s,r){ return s + ((typeof _visNum === 'function' ? _visNum(r["مكتملة (COMPLETED)"]) : 0) || 0); }, 0);
+          const visAssigned  = visMonthlyRows.reduce(function(s,r){ return s + ((typeof _visNum === 'function' ? _visNum(r["مسندة (ASSIGNED)"]) : 0) || 0); }, 0);
+          const visData  = (visMonthlyRows.length || visRegionRows.length) ? `\n- بيانات الزيارات: ${visCompleted.toLocaleString()} زيارة مكتملة من أصل ${visAssigned.toLocaleString()} مسندة عبر ${visMonthlyRows.length.toLocaleString()} شهر و${visRegionRows.length.toLocaleString()} منطقة` : '';
+
+          prompt += '\n' + (vehData + trData + orgData + lspData + ctpData + ppmData + visData).trim();
         }
 
         return prompt;
@@ -29139,7 +31223,26 @@ function renderTrainingTab(_fromDate, _toDate) {
 
   /* ── 3. تطبيق الـ patches ── */
   function init() {
-    patchTabIndex();
+    /* 🛠️ إصلاح: TAB_INDEX الأصلي (وربطه بـ window.__FCB_TAB_INDEX) بيتحدد
+       جوّه معالج window.addEventListener('load', ...) — يعني بيجهز بعد
+       DOMContentLoaded مش قبله. لو استدعينا patchTabIndex() هنا مباشرة
+       (بيتنفذ عند DOMContentLoaded) هيلاقي window.__FCB_TAB_INDEX لسه
+       undefined فيرجع من غير ما يعمل حاجة، والمصفوفة الأصلية بعدين بتتحدد
+       فوق أي تعديل حاولنا نعمله (فقدان صامت — التبويبات المضافة هنا
+       فعلياً ماكانتش بتوصل للشات بوت). الحل: ننتظر بنفس أسلوب الـ polling
+       المستخدم في باقي أجزاء الملف لحد ما يبقى window.__FCB_TAB_INDEX
+       مصفوفة فعلية، وبعدين نطبّق الـ patch. */
+    var _tiAttempts = 0;
+    var _tiInterval = setInterval(function () {
+      _tiAttempts++;
+      if (Array.isArray(window.__FCB_TAB_INDEX)) {
+        clearInterval(_tiInterval);
+        patchTabIndex();
+      } else if (_tiAttempts > 150) {
+        clearInterval(_tiInterval);
+        console.warn('[TabIndexPatch] لم يُعثر على window.__FCB_TAB_INDEX بعد 15 ثانية');
+      }
+    }, 100);
     /* نؤخر patchChartGuard قليلاً حتى يكتمل تحميل Chart.js */
     if (typeof Chart !== 'undefined') {
       patchChartGuard();
@@ -31911,6 +34014,11 @@ function _safetyKpiExportCSV() {
    ════════════════════════════════════════════════════════════ */
 /* Task 5: جميع معالجات الأحداث المنقولة من index.html (كانت Inline) */
 document.addEventListener('DOMContentLoaded', function () {
+  // 🆕 فلاتر بقيم متعددة: تفعيل واجهة الاختيار المتعدد فوق selects الفلاتر
+  // الرئيسية — لازم تشتغل قبل أي شيء تاني عشان الـ selects تبقى جاهزة.
+  if ("function" === typeof initMultiSelectFilters) {
+    try { initMultiSelectFilters(); } catch (e) { console.error("[initMultiSelectFilters]", e); }
+  }
   function bind(n, ev, fn) {
     document.querySelectorAll('[data-evt="' + n + '"]').forEach(function (el) { el.addEventListener(ev, fn); });
   }
@@ -31976,12 +34084,12 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(63, 'change', function (event) { renderFcaRefTab() });
   bind(64, 'change', function (event) { setFcaRefPageSize(this.value) });
   bind(65, 'click', function (event) { exportFcaRefCSV() });
-  bind(66, 'click', function (event) { showTab('NEW_ID',this) });
-  bind(67, 'click', function (event) { showTab('NEW_ID',this) });
-  bind(68, 'click', function (event) { showTab('NEW_ID',this) });
-  bind(69, 'click', function (event) { showTab('NEW_ID',this) });
-  bind(70, 'click', function (event) { showTab('NEW_ID',this) });
-  bind(71, 'click', function (event) { showTab('NEW_ID',this) });
+  bind(66, 'click', function (event) { showTab('correspondence',this) });
+  bind(67, 'click', function (event) { showTab('org-structure',this) });
+  bind(68, 'click', function (event) { showTab('ls-payments',this) });
+  bind(69, 'click', function (event) { showTab('contractor-payments',this) });
+  bind(70, 'click', function (event) { showTab('ppm-maximo',this) });
+  bind(71, 'click', function (event) { showTab('visits',this) });
   bind(72, 'click', function (event) { showTab('NEW_ID',this) });
   bind(73, 'click', function (event) { showTab('NEW_ID',this) });
   bind(74, 'click', function (event) { showTab('NEW_ID',this) });
@@ -32264,22 +34372,27 @@ document.addEventListener("DOMContentLoaded", function () {
    صراحةً — بترث currentColor من العنصر المحيط بيها فبتتلوّن تلقائياً
    بلون النص في كل مكان (بدل تكرار نظام --cat-accent في مكان تاني). */
 var CATEGORY_ICON_SVG = {
+  overview: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
   fca: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg>',
   otherAssessments: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
-  assets:     '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg>',
+  systemsMaintenance: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></svg>',
   equipment:  '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12v4"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M17 6a2 2 0 0 1 1.414.586l3 3A2 2 0 0 1 22 11v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 .586-1.414l3-3A2 2 0 0 1 7 6z"/><path d="M2 14h20"/><path d="M8 12v4"/></svg>',
   contracts:  '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
   operations: '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
   safety:     '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg>',
   geo:        '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>',
-  explore:    '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>',
+  kpi:        '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
   raci:       '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg>',
   digital:    '<svg class="cat-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>'
 };
 function __catIconSvg(catKey) { return CATEGORY_ICON_SVG[catKey] || ''; }
 
 /* خريطة الأقسام → التبويبات الفرعية (name يطابق تماماً القيم المستخدمة
-   في استدعاءات showTab() الأصلية داخل الكود القديم — لم تُخترع أسماء جديدة) */
+   في استدعاءات showTab() الأصلية داخل الكود القديم — لم تُخترع أسماء جديدة)
+   ★ 2026-09-17: أُعيد توزيع كل التبويبات على 10 أقسام جديدة بناءً على طلب
+   صريح من المستخدم (بالإضافة لقسم "الأنظمة الرقمية" digital المستقل الذي
+   لم يتغيّر). كل تبويب قديم موجود هنا بنفس name تمامًا — لا تبويب اتحذف
+   ولا name اتغيّر، فقط أُعيد تجميعها. */
 var PORTAL_CATEGORIES = {
   digital: {
     title: "الأنظمة الرقمية",
@@ -32294,13 +34407,30 @@ var PORTAL_CATEGORIES = {
       { name: "sys-hr",      label: "نظام إدارة الموارد" }
     ]
   },
-  // كل حاجة ليها علاقة بـ FCA في مكان واحد (بناءً على طلب صريح) — بما فيها
-  // "نظرة عامة" لأنها بقت تستضيف تشارتات أسوأ/أفضل 20 مدرسة FCA
+  // 1) نظرة عامة — قسم مستقل بذاته بناءً على طلب صريح
+  // ★ 2026-09-17: أُضيفت "المرحلة الدراسية" هنا بناءً على طلب صريح لاحق
+  // ★ 2026-09-19: أُضيفت "الطلاب وعمر المبنى" هنا بناءً على طلب صريح —
+  // كانت لوحدها في فئة كبيرة اسمها "المدارس والطلاب" رغم إنها تبويب واحد
+  // بس (مفيش تبويب "مدارس" حقيقي منفصل)، فاتشالت الفئة دي واندمج تبويبها
+  // هنا مع باقي تبويبات النظرة العامة/التصنيفات العريضة.
+  overview: {
+    title: "نظرة عامة",
+    icon: "🏠",
+    tabs: [
+      { name: "overview", label: "نظرة عامة" },
+      { name: "stages",   label: "المرحلة الدراسية" },
+      { name: "students", label: "الطلاب وعمر المبنى" }
+    ]
+  },
+  // 2) تقييم حالة المرافق FCA — تحليل FCA الفعلي بس (مقارنة مراحله، مرجعيته،
+  // وأنظمته الرئيسية/التفصيلية). ★ 2026-09-19: تقييمات أصول/عاين/البيئة
+  // المدرسية اتشالت من هنا بناءً على طلب صريح — دول تقييمات منفصلة تمامًا
+  // عن FCA (مش جزء من تحليله)، ونقلناهم لفئة "التقييمات الأخرى"
+  // المستقلة تحت.
   fca: {
-    title: "تحليل ومؤشرات FCA",
+    title: "تقييم حالة المرافق FCA",
     icon: "📈",
     tabs: [
-      { name: "overview",     label: "نظرة عامة" },
       { name: "fca",          label: "تحليل FCA" },
       { name: "stage-compare",label: "مقارنة مراحل FCA" },
       { name: "fca-ref",      label: "FCA المرجعي" },
@@ -32308,81 +34438,93 @@ var PORTAL_CATEGORIES = {
       { name: "sys-detail",   label: "الأنظمة التفصيلية FCA" }
     ]
   },
-  // التقييمات التانية اللي مالهاش علاقة مباشرة بـ FCA
+  // 3) التقييمات الأخرى — فئة مستقلة تمامًا عن FCA (كل واحد منهم
+  // تقييم/منصة منفصلة من وزارة التعليم، مش جزء من تحليل FCA نفسه).
+  // ★ 2026-09-19: فئة جديدة بناءً على طلب صريح.
+  // ★ 2026-09-20: تقصير الاسم إلى "التقييمات الأخرى" بناءً على طلب صريح.
   otherAssessments: {
-    title: "تقييمات أخرى",
+    title: "التقييمات الأخرى",
     icon: "📋",
     tabs: [
-      { name: "env",          label: "البيئة المدرسية" },
-      { name: "ayen",         label: "تقييم عاين" },
-      { name: "asol",         label: "تقييم منصة أصول" },
-      { name: "stages",       label: "المرحلة الدراسية" }
+      { name: "asol", label: "تقييم منصة أصول" },
+      { name: "ayen", label: "تقييم عاين" },
+      { name: "env",  label: "البيئة المدرسية" }
     ]
   },
-  assets: {
-    title: "الأصول والمرافق",
-    icon: "🏗️",
+  // 4) الأنظمة والصيانة الفنية
+  systemsMaintenance: {
+    title: "الأنظمة والصيانة الفنية",
+    icon: "🔧",
     tabs: [
-      { name: "hasr",            label: "حصر الأصول" },
-      { name: "spare",           label: "قطع الغيار" },
       { name: "elevators",       label: "المصاعد" },
       { name: "elevator-status", label: "حالة المصاعد" },
       { name: "khanadeq",        label: "خنادق الصرف" },
-      { name: "students",        label: "الطلاب وعمر المبنى" },
-      { name: "vehicles",        label: "السيارات" }
+      { name: "spare",           label: "قطع الغيار" },
+      { name: "ppm-maximo",      label: "الصيانة الوقائية (Maximo)" }
     ]
   },
+  // 5) البلاغات والسلامة
+  safety: {
+    title: "البلاغات والسلامة",
+    icon: "📢",
+    tabs: [
+      { name: "balagh",                  label: "البلاغات" },
+      { name: "security-safety",         label: "بلاغات الأمن والسلامة" },
+      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" }
+    ]
+  },
+  // 6) الموارد البشرية والتشغيل
+  operations: {
+    title: "الموارد البشرية والتشغيل",
+    icon: "⚙️",
+    tabs: [
+      { name: "gatekeepers",     label: "البوابين" },
+      { name: "supervisors",     label: "المشرفون والمهندسون" },
+      { name: "training",        label: "برامج التدريب" },
+      { name: "vehicles",        label: "السيارات" },
+      { name: "correspondence",  label: "سجل المراسلات" },
+      { name: "org-structure",   label: "الهيكل الوظيفي" },
+      { name: "visits",          label: "الزيارات" }
+    ]
+  },
+  // 7) التوريدات والمخزون (نشاط بداني بقى فيها لحد ما تتحدد فئة أنسب ليها)
   equipment: {
-    title: "التجهيزات والتوريدات",
+    title: "التوريدات والمخزون",
     icon: "🧰",
     tabs: [
-      { name: "tajheez",           label: "المخصص والاحتياج" },
       { name: "tajheez-supplies",  label: "التوريدات" },
       { name: "tajheez-contracts", label: "عقود التجهيزات" },
+      { name: "tajheez",           label: "المخصص والاحتياج" },
+      { name: "hasr",              label: "حصر الأصول" },
       { name: "nashat-badani",     label: "مبادرة النشاط البدني" }
     ]
   },
+  // 8) العقود والتكاليف
   contracts: {
     title: "العقود والتكاليف",
     icon: "💰",
     tabs: [
-      { name: "cost",          label: "التكلفة" },
-      { name: "payments",      label: "المدفوعات للمجال" },
-      { name: "all-contracts", label: "عقود عدا المجال" }
+      { name: "cost",                  label: "التكلفة" },
+      { name: "ls-payments",           label: "مدفوعات وعقود LS" },
+      { name: "contractor-payments",   label: "مدفوعات وعقود المقاولين" }
     ]
   },
-  operations: {
-    title: "التشغيل",
-    icon: "⚙️",
-    tabs: [
-      { name: "mag-kpi",         label: "مؤشرات الأداء للمقاول" },
-      { name: "consultant-kpi",  label: "مؤشرات أداء الاستشاري" },
-      { name: "training",        label: "برامج التدريب" },
-      { name: "gatekeepers",     label: "البوابين" },
-      { name: "supervisors",     label: "المشرفون والمهندسون" }
-    ]
-  },
-  safety: {
-    title: "الأمن والسلامة والبلاغات",
-    icon: "📢",
-    tabs: [
-      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
-      { name: "security-safety", label: "بلاغات الأمن والسلامة" },
-      { name: "balagh",          label: "البلاغات" }
-    ]
-  },
+  // 9) الخرائط والتفاصيل (دمج geo + explore القديمين)
   geo: {
-    title: "التحليل الجغرافي",
+    title: "الخرائط والتفاصيل",
     icon: "🗺️",
     tabs: [
-      { name: "map", label: "الخريطة" }
+      { name: "map",   label: "الخريطة" },
+      { name: "table", label: "الجدول التفصيلي" }
     ]
   },
-  explore: {
-    title: "استكشاف البيانات",
-    icon: "🔍",
+  // 10) مؤشرات الأداء
+  kpi: {
+    title: "مؤشرات الأداء",
+    icon: "📊",
     tabs: [
-      { name: "table", label: "الجدول التفصيلي" }
+      { name: "mag-kpi",        label: "مؤشرات الأداء للمقاول" },
+      { name: "consultant-kpi", label: "مؤشرات أداء الاستشاري" }
     ]
   }
 };
@@ -33124,7 +35266,7 @@ function __renderPortalFavoritesCard() {
   if (!favs.length) {
     card.innerHTML =
       '<div class="portal-favorites-empty" onclick="openFavoritesModal()">' +
-      '  <div class="portal-favorites-empty-text">اختر ما تريد رؤيته — اعمل اختصارات سريعة لأهم التبويبات اللي بتستخدمها كل يوم</div>' +
+      '  <div class="portal-favorites-empty-text">اختر ما تريد رؤيته — أنشئ اختصارات سريعة لأهم التبويبات التي تستخدمها يومياً</div>' +
       '  <button type="button" class="portal-favorites-cta-btn" onclick="openFavoritesModal()">اختيار الآن</button>' +
       '</div>';
     return;
@@ -33309,7 +35451,7 @@ function renderCategorySidebar(catKey) {
     html += '  <div class="cat-sidebar-list">';
     favs.forEach(function (f) {
       var isCurrent = f.category === catKey;
-      html += '<button type="button" class="cat-sidebar-item cat-sidebar-fav-item" data-subtab="' + f.name + '" onclick="openFavoriteTab(\'' + f.category + '\',\'' + f.name + '\')">' + f.label + (isCurrent ? '' : ' <span class="cat-sidebar-fav-cat">(' + PORTAL_CATEGORIES[f.category].title + ')</span>') + '</button>';
+      html += '<button type="button" class="cat-sidebar-item cat-sidebar-fav-item" data-subtab="' + f.name + '" onclick="openFavoriteTab(\'' + f.category + '\',\'' + f.name + '\')">' + f.label + (isCurrent || !PORTAL_CATEGORIES[f.category] ? '' : ' <span class="cat-sidebar-fav-cat">(' + PORTAL_CATEGORIES[f.category].title + ')</span>') + '</button>';
     });
     html += '  </div>';
     html += '</div>';
@@ -33625,6 +35767,8 @@ setTimeout(function tellUserStillTrying() {
 
       /* ── الفلاتر والتبويب الحالي ── */
       var gv = function(id) {
+        // 🆕 فلاتر بقيم متعددة: نفضّل getMultiValStr (قيم مفصولة بـ"، ") لو موجودة
+        if ("function" === typeof getMultiValStr) return getMultiValStr(id).trim();
         var el = document.getElementById(id);
         return el ? (el.value || "").trim() : "";
       };
@@ -34190,6 +36334,11 @@ setTimeout(function tellUserStillTrying() {
     return el ? (el.textContent || el.value || "").trim() : null;
   }
   function domVal(id) {
+    // 🆕 فلاتر بقيم متعددة: نفضّل getMultiValStr (قيم مفصولة بـ"، ") لو موجودة
+    if ("function" === typeof getMultiValStr) {
+      var s = getMultiValStr(id).trim();
+      return s || null;
+    }
     var el = document.getElementById(id);
     return el ? (el.value || "").trim() : null;
   }
@@ -34268,8 +36417,14 @@ setTimeout(function tellUserStillTrying() {
       rawAllSystems: window.RAW_ALL_SYSTEMS|| [],
       rawElevators:  window.RAW_ELEVATORS  || [],
       hasr:          window.HASR           || null,
-      rawFuel:       window.RAW_FUEL       || [],
-      rawVehicles:   window.RAW_VEHICLES   || [],
+      rawFuel:       window.RAW_NEW_FUEL       || [],
+      rawVehicles:   window.RAW_NEW_VEHICLES   || [],
+      rawOrgStructure:       window.RAW_NEW_ORG_STRUCTURE       || [],
+      rawLsPayments:         window.RAW_NEW_LS_PAYMENTS         || [],
+      rawContractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS || [],
+      rawPpmMaximo:          window.RAW_NEW_PPM_MAXIMO          || [],
+      rawVisitsMonthly:      window.RAW_NEW_VISITS_MONTHLY      || [],
+      rawVisitsByRegion:     window.RAW_NEW_VISITS_BY_REGION    || [],
     };
 
     /* RAW + FILTERED من DataService أو المتغيرات العامة */
@@ -34326,6 +36481,12 @@ setTimeout(function tellUserStillTrying() {
         hasr:       collected.hasr,
         fuel:       collected.rawFuel,
         vehicles:   collected.rawVehicles,
+        orgStructure:       collected.rawOrgStructure,
+        lsPayments:         collected.rawLsPayments,
+        contractorPayments: collected.rawContractorPayments,
+        ppmMaximo:          collected.rawPpmMaximo,
+        visitsMonthly:      collected.rawVisitsMonthly,
+        visitsByRegion:     collected.rawVisitsByRegion,
       }
     };
 
@@ -34494,7 +36655,7 @@ setTimeout(function tellUserStillTrying() {
         المصدر_الصحيح_للأرقام: "هذه الإحصاءات محسوبة من البيانات الفعلية — ليس من الفلاتر",
         عدد_المدارس_المقيّمة: fcaArr.length,
         المتوسط_الفعلي:       fcaAvg,
-        ملاحظة_منهجية:        "المتوسط والقاسم = " + fcaArr.length + " مدرسة (اللي عندها قيمة FCA فقط) — مش " + D.length + " (إجمالي السجلات المعروضة)، لأن المباني بدون تقييم FCA مستبعدة تلقائياً من الحساب.",
+        ملاحظة_منهجية:        "المتوسط والقاسم = " + fcaArr.length + " مدرسة (التي لديها قيمة FCA فقط) — وليس " + D.length + " (إجمالي السجلات المعروضة)، لأن المباني بدون تقييم FCA مستبعدة تلقائياً من الحساب.",
         أدنى_قيمة_FCA_فعلية:  {
           _note:    "هذا أدنى تقييم FCA فعلي في البيانات المعروضة — ليس من الفلتر",
           المدرسة:  fcaMin.name,
@@ -34746,7 +36907,7 @@ setTimeout(function tellUserStillTrying() {
         plateInfo[p] = {
           الماركة:  v["الماركة"] || "",
           السائق:   v["اسم المستخدم الفعلي"] || "",
-          الحالة:   v["الحالة"] || "",
+          الحالة:   v["حالة المركبة"] || v["الحالة"] || "",
         };
       });
     }
@@ -34819,6 +36980,83 @@ setTimeout(function tellUserStillTrying() {
       };
     }
 
+    /* الهيكل الوظيفي */
+    var org = sup.orgStructure;
+    if (Array.isArray(org) && org.length) {
+      var orgVacant = org.filter(function(r){ return String(r["حالة التوظيف"]||"").trim() === "شاغر"; }).length;
+      var orgByRegion = {};
+      org.forEach(function(r){ var rg = String(r["المنطقة"]||"غير محدد").trim()||"غير محدد"; orgByRegion[rg]=(orgByRegion[rg]||0)+1; });
+      sec.الهيكل_الوظيفي = {
+        _source:            "Statistics→OrgStructure",
+        إجمالي_الوظائف_والسجلات: org.length,
+        الوظائف_الشاغرة:   orgVacant,
+        الوظائف_المشغولة:  org.length - orgVacant,
+        نسبة_الإشغال:      org.length ? (Math.round((org.length - orgVacant) / org.length * 1000) / 10 + "%") : null,
+        توزيع_حسب_المنطقة: orgByRegion,
+      };
+    }
+
+    /* مدفوعات وعقود LS (الاستشاري) */
+    var lsp = sup.lsPayments;
+    if (Array.isArray(lsp) && lsp.length && typeof _lspEffectiveValue === "function" && typeof _lspNum === "function") {
+      var lspTotalValue = lsp.reduce(function(s,r){ return s + _lspEffectiveValue(r); }, 0);
+      var lspTotalPaid  = lsp.reduce(function(s,r){ return s + (_lspNum(r["Paid"]) || 0); }, 0);
+      sec.مدفوعات_وعقود_LS = {
+        _source:           "Statistics→LsPayments",
+        عدد_العقود:        lsp.length,
+        إجمالي_القيمة_SAR: Math.round(lspTotalValue),
+        إجمالي_المدفوع_SAR: Math.round(lspTotalPaid),
+        نسبة_السداد_الكلية: lspTotalValue ? (Math.round(lspTotalPaid / lspTotalValue * 1000) / 10 + "%") : null,
+        المتبقي_SAR:        Math.round(Math.max(lspTotalValue - lspTotalPaid, 0)),
+      };
+    }
+
+    /* مدفوعات وعقود المقاولين */
+    var ctp = sup.contractorPayments;
+    if (Array.isArray(ctp) && ctp.length && typeof _ctpEffectiveValue === "function" && typeof _ctpNum === "function") {
+      var ctpTotalValue = ctp.reduce(function(s,r){ return s + _ctpEffectiveValue(r); }, 0);
+      var ctpTotalPaid  = ctp.reduce(function(s,r){ return s + (_ctpNum(r["Payment Released (SAR)"]) || 0); }, 0);
+      var ctpTotalDeduction = ctp.reduce(function(s,r){ return s + (_ctpNum(r["Total Deduction"]) || 0); }, 0);
+      sec.مدفوعات_وعقود_المقاولين = {
+        _source:            "Statistics→ContractorPayments",
+        عدد_العقود:         ctp.length,
+        إجمالي_القيمة_SAR:  Math.round(ctpTotalValue),
+        إجمالي_المدفوع_SAR: Math.round(ctpTotalPaid),
+        إجمالي_الخصومات_SAR: Math.round(ctpTotalDeduction),
+        نسبة_السداد_الكلية: ctpTotalValue ? (Math.round(ctpTotalPaid / ctpTotalValue * 1000) / 10 + "%") : null,
+      };
+    }
+
+    /* الصيانة الوقائية PPM Maximo */
+    var ppm = sup.ppmMaximo;
+    if (Array.isArray(ppm) && ppm.length && typeof _ppmAggregate === "function") {
+      var ppmAgg = _ppmAggregate(ppm);
+      sec.الصيانة_الوقائية_Maximo = {
+        _source:       "Statistics→PpmMaximo",
+        عدد_المهام:    ppmAgg.tasks,
+        Planned_الإجمالي: Math.round(ppmAgg.plannedPct * 10) / 10 + "%",
+        Actual_الإجمالي:  Math.round(ppmAgg.actualPct * 10) / 10 + "%",
+      };
+    }
+
+    /* الزيارات */
+    var visM = sup.visitsMonthly, visR = sup.visitsByRegion;
+    if ((Array.isArray(visM) && visM.length) || (Array.isArray(visR) && visR.length)) {
+      var _vn = function(v){ if (v===null||v===undefined||v==="") return 0; var n=parseFloat(String(v).replace(/,/g,"")); return isNaN(n)?0:n; };
+      var visCompleted = (visM||[]).reduce(function(s,r){ return s + _vn(r["مكتملة (COMPLETED)"]); }, 0);
+      var visAssigned  = (visM||[]).reduce(function(s,r){ return s + _vn(r["مسندة (ASSIGNED)"]); }, 0);
+      var visByRegionOut = {};
+      (visR||[]).forEach(function(r){ visByRegionOut[String(r["المنطقة"]||"غير محدد")] = _vn(r["عدد الزيارات المكتملة"]); });
+      sec.الزيارات = {
+        _source:              "Statistics→Visits",
+        إجمالي_الزيارات_المكتملة: visCompleted,
+        إجمالي_الزيارات_المسندة:  visAssigned,
+        نسبة_الإنجاز_الكلية:      visAssigned ? (Math.round(visCompleted / visAssigned * 1000) / 10 + "%") : null,
+        عدد_الأشهر_المسجلة:       (visM||[]).length,
+        الزيارات_المكتملة_حسب_المنطقة: visByRegionOut,
+      };
+    }
+
     return sec;
   }
 
@@ -34835,8 +37073,13 @@ setTimeout(function tellUserStillTrying() {
       بيانات_الأنظمة_متاحة: (Array.isArray(window.RAW_ALL_SYSTEMS) && window.RAW_ALL_SYSTEMS.length) ? "نعم" : "لا",
       بيانات_المصاعد_متاحة: (Array.isArray(window.RAW_ELEVATORS) && window.RAW_ELEVATORS.length) ? "نعم" : "لا",
       بيانات_الحصر_متاحة:  (window.HASR && window.HASR.loaded) ? "نعم" : "لا",
-      بيانات_الوقود_متاحة: (Array.isArray(window.RAW_FUEL) && window.RAW_FUEL.length) ? "نعم" : "لا",
-      بيانات_السيارات_متاحة: (Array.isArray(window.RAW_VEHICLES) && window.RAW_VEHICLES.length) ? "نعم" : "لا",
+      بيانات_الوقود_متاحة: (Array.isArray(window.RAW_NEW_FUEL) && window.RAW_NEW_FUEL.length) ? "نعم" : "لا",
+      بيانات_السيارات_متاحة: (Array.isArray(window.RAW_NEW_VEHICLES) && window.RAW_NEW_VEHICLES.length) ? "نعم" : "لا",
+      بيانات_الهيكل_الوظيفي_متاحة: (Array.isArray(window.RAW_NEW_ORG_STRUCTURE) && window.RAW_NEW_ORG_STRUCTURE.length) ? "نعم" : "لا",
+      بيانات_مدفوعات_LS_متاحة: (Array.isArray(window.RAW_NEW_LS_PAYMENTS) && window.RAW_NEW_LS_PAYMENTS.length) ? "نعم" : "لا",
+      بيانات_مدفوعات_المقاولين_متاحة: (Array.isArray(window.RAW_NEW_CONTRACTOR_PAYMENTS) && window.RAW_NEW_CONTRACTOR_PAYMENTS.length) ? "نعم" : "لا",
+      بيانات_الصيانة_الوقائية_Maximo_متاحة: (Array.isArray(window.RAW_NEW_PPM_MAXIMO) && window.RAW_NEW_PPM_MAXIMO.length) ? "نعم" : "لا",
+      بيانات_الزيارات_متاحة: ((Array.isArray(window.RAW_NEW_VISITS_MONTHLY) && window.RAW_NEW_VISITS_MONTHLY.length) || (Array.isArray(window.RAW_NEW_VISITS_BY_REGION) && window.RAW_NEW_VISITS_BY_REGION.length)) ? "نعم" : "لا",
       تحذير_بيانات_غير_كافية:
         "إذا كانت البيانات المطلوبة تظهر 'لا' أعلاه، أبلغ المستخدم: " +
         "'البيانات الحالية لا تكفي لإثبات هذه العلاقة.' ولا تخترع أي نتائج.",

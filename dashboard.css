@@ -7030,6 +7030,98 @@ button.ix-profile-source:hover{
   .brand-select-card img { max-height: 34px; max-width: 130px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   خطوة كلمة مرور شعار Land Sterling — ★ 2026-09-20 بناءً على طلب صريح.
+   بتظهر جوه نفس صندوق بوابة اختيار الشعار (.brand-select-box) بدل
+   البطاقات، فبتستخدم نفس ألوان الخلفية وخط العناوين، مع لمسة Brass/Gold
+   (--brass / --brass-2) للزر الأساسي عشان تفضل متسقة مع باقي الداشبورد.
+   ══════════════════════════════════════════════════════════════════ */
+.brand-password-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.brand-password-step #brandPasswordForm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 260px;
+}
+.brand-password-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-family: 'Tajawal', sans-serif;
+  color: #fff;
+  text-align: center;
+  letter-spacing: 2px;
+  outline: none;
+  transition: border-color .2s ease, background .2s ease;
+}
+.brand-password-input::placeholder {
+  color: rgba(255,255,255,.4);
+  letter-spacing: normal;
+}
+.brand-password-input:focus {
+  border-color: var(--brass-2, #d4af6a);
+  background: rgba(255,255,255,.12);
+}
+.brand-password-input-error {
+  border-color: #e05252 !important;
+  animation: brandPwShake .32s ease;
+}
+@keyframes brandPwShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.brand-password-error {
+  color: #ff9d9d;
+  font-size: 12px;
+  margin-top: 10px;
+  text-align: center;
+}
+.brand-password-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  width: 100%;
+}
+.brand-password-btn {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s ease, opacity .15s ease;
+}
+.brand-password-btn:active {
+  transform: translateY(1px);
+}
+.brand-password-btn-primary {
+  background: linear-gradient(135deg, var(--brass, #b08a4e), var(--brass-2, #d4af6a));
+  color: #1a1207;
+}
+.brand-password-btn-primary:hover {
+  opacity: .92;
+}
+.brand-password-btn-secondary {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.85);
+}
+.brand-password-btn-secondary:hover {
+  background: rgba(255,255,255,.14);
+}
+
 /* شاشة التحميل تبدأ مخفية لحد ما المستخدم يختار شعار من شاشة "اختر" —
    ★ 2026-09-20 بناءً على طلب صريح. التحميل الحقيقي للبيانات مش متأخر،
    بس الظهور البصري لشاشة التحميل بيتأجل لحد لحظة الاختيار. */

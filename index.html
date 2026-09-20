@@ -75,15 +75,39 @@
      ════════════════════════════════════════════════════════════════ -->
 <div id="brandSelectScreen" class="brand-select-screen">
   <div class="brand-select-box">
-    <div class="brand-select-title">اختر</div>
-    <div class="brand-select-sub">اختر الشعار للدخول إلى لوحة البيانات</div>
-    <div class="brand-select-options">
-      <button type="button" class="brand-select-card" data-brand="landsterling">
-        <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" />
-      </button>
-      <button type="button" class="brand-select-card" data-brand="tbc">
-        <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" />
-      </button>
+    <div id="brandSelectStep1">
+      <div class="brand-select-title">اختر</div>
+      <div class="brand-select-sub">اختر الشعار للدخول إلى لوحة البيانات</div>
+      <div class="brand-select-options">
+        <button type="button" class="brand-select-card" data-brand="landsterling">
+          <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" />
+        </button>
+        <button type="button" class="brand-select-card" data-brand="tbc">
+          <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" />
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════
+         خطوة كلمة المرور — ★ 2026-09-20 بناءً على طلب صريح: شعار
+         Land Sterling أصبح محميًا بكلمة مرور. تظهر هذه الخطوة بدلاً
+         من الدخول المباشر عند اختيار Land Sterling فقط، ولا تؤثر
+         إطلاقًا على مسار الدخول بشعار TBC.
+         ════════════════════════════════════════════════════════════ -->
+    <div id="brandPasswordStep" class="brand-password-step" style="display:none">
+      <div class="brand-select-title">كلمة المرور</div>
+      <div class="brand-select-sub">أدخل كلمة المرور للدخول بشعار Land Sterling</div>
+      <form id="brandPasswordForm" autocomplete="off" novalidate>
+        <input type="password" id="brandPasswordInput" class="brand-password-input"
+               placeholder="كلمة المرور" autocomplete="new-password" inputmode="numeric" />
+        <div id="brandPasswordError" class="brand-password-error" style="display:none">
+          كلمة المرور غير صحيحة، حاول مرة أخرى
+        </div>
+        <div class="brand-password-actions">
+          <button type="button" id="brandPasswordBack" class="brand-password-btn brand-password-btn-secondary">رجوع</button>
+          <button type="submit" class="brand-password-btn brand-password-btn-primary">دخول</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -162,12 +186,66 @@
       if (window.applyBrandVisibilityUI) window.applyBrandVisibilityUI();
     }
 
+    // ★ 2026-09-20: كلمة مرور شعار Land Sterling — بناءً على طلب صريح.
+    // الحماية هنا بصرية فقط (طبقة دخول واجهة، مش تشفير حقيقي)، تمامًا
+    // زي طبيعة بوابة اختيار الشعار نفسها أصلاً. غيّر القيمة هنا في أي
+    // وقت لتحديث كلمة المرور لاحقًا.
+    var LANDSTERLING_PASSWORD = "1248";
+    var pwStepEl = document.getElementById("brandPasswordStep");
+    var step1El = document.getElementById("brandSelectStep1");
+    var pwFormEl = document.getElementById("brandPasswordForm");
+    var pwInputEl = document.getElementById("brandPasswordInput");
+    var pwErrorEl = document.getElementById("brandPasswordError");
+    var pwBackBtn = document.getElementById("brandPasswordBack");
+
+    function showPasswordStep() {
+      if (step1El) step1El.style.display = "none";
+      if (pwStepEl) pwStepEl.style.display = "";
+      if (pwErrorEl) pwErrorEl.style.display = "none";
+      if (pwInputEl) {
+        pwInputEl.value = "";
+        pwInputEl.classList.remove("brand-password-input-error");
+        setTimeout(function () { pwInputEl.focus(); }, 50);
+      }
+    }
+    function hidePasswordStep() {
+      if (pwStepEl) pwStepEl.style.display = "none";
+      if (step1El) step1El.style.display = "";
+      if (pwErrorEl) pwErrorEl.style.display = "none";
+      if (pwInputEl) { pwInputEl.value = ""; pwInputEl.classList.remove("brand-password-input-error"); }
+    }
+
     // ★ 2026-09-20: الأزرار بتتربط دايمًا (سواء فيه اختيار محفوظ أو لأ) —
     // عشان لو المستخدم رجع تاني لشاشة الاختيار (من زر "تغيير الشعار" في
     // الشريط العلوي) يقدر يختار شعار جديد وتشتغل الأزرار طبيعي من أول مرة.
     if (screenEl) {
       screenEl.querySelectorAll(".brand-select-card").forEach(function (btn) {
-        btn.addEventListener("click", function () { enterWithBrand(btn.getAttribute("data-brand")); });
+        btn.addEventListener("click", function () {
+          var brand = btn.getAttribute("data-brand");
+          if (brand === "landsterling") {
+            showPasswordStep();
+          } else {
+            enterWithBrand(brand);
+          }
+        });
+      });
+    }
+    if (pwBackBtn) pwBackBtn.addEventListener("click", hidePasswordStep);
+    if (pwFormEl) {
+      pwFormEl.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var entered = pwInputEl ? pwInputEl.value : "";
+        if (entered === LANDSTERLING_PASSWORD) {
+          hidePasswordStep();
+          enterWithBrand("landsterling");
+        } else {
+          if (pwErrorEl) pwErrorEl.style.display = "";
+          if (pwInputEl) {
+            pwInputEl.classList.add("brand-password-input-error");
+            pwInputEl.value = "";
+            pwInputEl.focus();
+          }
+        }
       });
     }
 
@@ -186,6 +264,7 @@
     // يعرض شاشة الاختيار تاني (من غير ما يمسح البيانات المحملة أصلاً) —
     // المستخدم يقدر يختار شعار مختلف في أي وقت.
     window.__reopenBrandSelect = function () {
+      hidePasswordStep(); // دايمًا ابدأ من شاشة الاختيار الأساسية، مش من خطوة كلمة المرور
       if (screenEl) screenEl.classList.remove("brand-select-hidden");
     };
   })();

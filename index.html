@@ -64,12 +64,37 @@
 <body class="portal-active">
 
 <!-- ════════════════════════════════════════════════════════════════
+     شاشة اختيار الشعار (Brand Gate) — ★ 2026-09-20 بناءً على طلب صريح
+     تظهر فوق كل شيء (أعلى z-index في الصفحة) قبل شاشة التحميل وقبل
+     الداشبورد نفسه، وتطلب من المستخدم يختار شعار (Land Sterling أو TBC)
+     قبل الدخول. الاختيار بيتخزّن في localStorage عشان ميتكررش كل مرة،
+     وبيتحط في window.SELECTED_BRAND. حاليًا الاختيار مجرد بوابة دخول
+     بس (مفيهوش فلترة بيانات لسه — هتتضاف لاحقًا بناءً على طلب صريح).
+     الشاشة دي طبقة بصرية فقط فوق الصفحة — لا تؤخر ولا تمنع أي تحميل
+     بيانات أو تهيئة JS شغالة أصلاً تحتها.
+     ════════════════════════════════════════════════════════════════ -->
+<div id="brandSelectScreen" class="brand-select-screen">
+  <div class="brand-select-box">
+    <div class="brand-select-title">اختر</div>
+    <div class="brand-select-sub">اختر الشعار للدخول إلى لوحة البيانات</div>
+    <div class="brand-select-options">
+      <button type="button" class="brand-select-card" data-brand="landsterling">
+        <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" />
+      </button>
+      <button type="button" class="brand-select-card" data-brand="tbc">
+        <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" />
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
      LOADING SCREEN (المرحلة 6 — Loading Screen)
      شاشة تحميل تراقب فقط جاهزية عناصر KPI الموجودة مسبقاً في الصفحة
      (لا تتدخل في أي fetch أو منطق قراءة بيانات) — تختفي تلقائياً
      عند اكتمال البيانات الأساسية (k-total).
      ════════════════════════════════════════════════════════════════ -->
-<div id="appLoadingScreen" class="app-loading-screen">
+<div id="appLoadingScreen" class="app-loading-screen brand-gate-pending">
   <div class="app-loading-box">
     <div class="app-loading-logo">
       <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling" />
@@ -109,6 +134,58 @@
     <div class="app-loading-updated">آخر تحديث: <span id="appLoadStatUpdated">—</span></div>
   </div>
 </div>
+<script>
+  (function () {
+    var BRAND_STORAGE_KEY = "tbc_dashboard_selected_brand";
+    var screenEl = document.getElementById("brandSelectScreen");
+
+    // ★ 2026-09-20: شاشة التحميل (appLoadingScreen) تبدأ مخفية (كلاس
+    // brand-gate-pending) وميبانش شكلها إلا بعد ما المستخدم يختار شعار —
+    // التحميل الحقيقي للبيانات شغال أصلاً في الخلفية زي ما هو (من غير أي
+    // تأخير)، إحنا بس بنأجّل الظهور البصري لشاشة التحميل لحد لحظة الاختيار.
+    // ★ السكريبت اتنقل هنا (بعد appLoadingScreen في الترتيب) عشان
+    // getElementById("appLoadingScreen") يلاقي العنصر موجود فعلاً وقت
+    // التنفيذ، حتى لو كان الاختيار محفوظ من زيارة سابقة.
+    function revealLoadingScreen() {
+      var loadingEl = document.getElementById("appLoadingScreen");
+      if (loadingEl) loadingEl.classList.remove("brand-gate-pending");
+    }
+
+    function enterWithBrand(brand) {
+      window.SELECTED_BRAND = brand;
+      try { localStorage.setItem(BRAND_STORAGE_KEY, brand); } catch (_) {}
+      if (screenEl) screenEl.classList.add("brand-select-hidden");
+      revealLoadingScreen();
+    }
+
+    // ★ 2026-09-20: الأزرار بتتربط دايمًا (سواء فيه اختيار محفوظ أو لأ) —
+    // عشان لو المستخدم رجع تاني لشاشة الاختيار (من زر "تغيير الشعار" في
+    // الشريط العلوي) يقدر يختار شعار جديد وتشتغل الأزرار طبيعي من أول مرة.
+    if (screenEl) {
+      screenEl.querySelectorAll(".brand-select-card").forEach(function (btn) {
+        btn.addEventListener("click", function () { enterWithBrand(btn.getAttribute("data-brand")); });
+      });
+    }
+
+    // لو فيه اختيار محفوظ من قبل، ادخل على طول من غير ما تعرض الشاشة —
+    // وشاشة التحميل تظهر فورًا زي سلوكها الأصلي (مفيش بوابة اختيار أصلاً
+    // تتأخر بعدها).
+    var saved = null;
+    try { saved = localStorage.getItem(BRAND_STORAGE_KEY); } catch (_) {}
+    if (saved === "landsterling" || saved === "tbc") {
+      window.SELECTED_BRAND = saved;
+      if (screenEl) screenEl.classList.add("brand-select-hidden");
+      revealLoadingScreen();
+    }
+
+    // زر "تغيير الشعار" في الشريط العلوي بيستدعي الدالة دي عشان يرجع
+    // يعرض شاشة الاختيار تاني (من غير ما يمسح البيانات المحملة أصلاً) —
+    // المستخدم يقدر يختار شعار مختلف في أي وقت.
+    window.__reopenBrandSelect = function () {
+      if (screenEl) screenEl.classList.remove("brand-select-hidden");
+    };
+  })();
+</script>
 
 <div class="topbar">
 
@@ -138,6 +215,10 @@
     <button class="tb-btn" id="btnReload" data-evt="3">↻ <span data-ar="تحديث" data-en="Refresh">تحديث</span></button>
     <button class="tb-btn" id="btnAuto"   data-evt="4">◷ <span id="btnAutoText" data-ar="تلقائي" data-en="Auto">تلقائي</span></button>
     <button class="tb-btn" id="btnDownloadTab" data-evt="5">⬇ <span data-ar="تنزيل التبويب" data-en="Download Tab">تنزيل التبويب</span></button>
+    <button class="tb-btn" id="btnSwitchBrand" title="تغيير الشعار"
+            onclick="if (window.__reopenBrandSelect) window.__reopenBrandSelect()">⇄
+      <span data-ar="تغيير الشعار" data-en="Switch Brand">تغيير الشعار</span>
+    </button>
     <button class="tb-btn" id="btnPresentationMode" title="Presentation Mode" aria-pressed="true" style="padding:4px 8px;min-width:30px;opacity:.12;font-size:10px;line-height:1" data-evt="6">◌</button>
   </div>
 </div>
@@ -168,6 +249,17 @@
         </div>
       </div>
       <div class="portal-hero-meta">
+        <button type="button" id="btnSwitchBrandOuter"
+                onclick="if (window.__reopenBrandSelect) window.__reopenBrandSelect()"
+                title="تغيير الشعار"
+                style="display:flex;align-items:center;gap:6px;padding:6px 14px;
+                       background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+                       color:rgba(255,255,255,.85);border-radius:999px;font-size:11px;
+                       font-weight:700;cursor:pointer;transition:.15s;margin-left:10px;
+                       font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif;white-space:nowrap"
+                onmouseover="this.style.background='rgba(255,255,255,.16)';this.style.color='#fff'"
+                onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.85)'"
+                >⇄ <span>تغيير الشعار</span></button>
         <button type="button" id="btnPresentationModeOuter"
                 onclick="togglePresentationMode()"
                 style="display:flex;align-items:center;justify-content:center;
@@ -245,7 +337,7 @@
       <div class="portal-card" id="portal-card-equipment" data-category="equipment" data-wm="🧰">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12v4"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M17 6a2 2 0 0 1 1.414.586l3 3A2 2 0 0 1 22 11v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 .586-1.414l3-3A2 2 0 0 1 7 6z"/><path d="M2 14h20"/><path d="M8 12v4"/></svg></div>
         <div class="portal-card-title">التوريدات والمخزون</div>
-        <div class="portal-card-desc">التوريدات، عقود التجهيزات، المخصص والاحتياج، حصر الأصول</div>
+        <div class="portal-card-desc">عقود التجهيزات، المخصص والاحتياج، التوريدات، مبادرة النشاط البدني، حصر الأصول</div>
       </div>
 
       <div class="portal-card" id="portal-card-contracts" data-category="contracts" data-wm="💰">

@@ -239,7 +239,12 @@ window.__PRESENTATION_MODE__ = true;
 // أسماء التبويبات (name في PORTAL_CATEGORIES) المخفية في وضع العرض —
 // أضف أي اسم تبويب هنا عشان يختفي تلقائياً من: كارت الصفحة الرئيسية (برا)،
 // القائمة الجانبية داخل القسم (جوا)، ونافذة الاختصارات — بدون حذف أي كود.
-var PRESENTATION_HIDDEN_TABS = ["students"];
+// ★ 2026-09-20: أُضيفت "تقييم عاين"، "المصاعد"، "حالة المصاعد"،
+// "خنادق الصرف"، "قطع الغيار" هنا بناءً على طلب صريح — نفس آلية زر
+// العين 👁 المستخدمة أصلاً لإخفاء "الطلاب وعمر المبنى"، من غير حذف أي
+// كود أو دالة عرض (لسه كل الدوال والـ switch-case بتاعتهم موجودين
+// بالكامل، وممكن ترجع تظهر تاني في أي وقت بالضغط على زر العين).
+var PRESENTATION_HIDDEN_TABS = ["students", "elevators", "elevator-status", "khanadeq", "spare"];
 function __isPresentationHiddenTab(name) {
   return !!window.__PRESENTATION_MODE__ && PRESENTATION_HIDDEN_TABS.indexOf(name) !== -1;
 }
@@ -4334,64 +4339,72 @@ let __bgRevalidatedOnce = false;
     // التوصيل الفعلي هيتم تدريجياً في خطوات لاحقة بعد التأكد إنها شغالة صح.
     const NEW_TEMPLATES_URL =
       "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
-    window.loadNewTemplatesSeparate = async function (forceNetwork = false) {
-      if (window.__NEW_TEMPLATES_FETCH_INFLIGHT__) return;
-      window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = true;
-      window.__NEW_TEMPLATES_LOAD_STATE__ = "loading";
-      try {
-        const resp = await fetch(NEW_TEMPLATES_URL, { cache: "no-store" });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-        const d = json.data || {};
-        // كل ملف بييجي بشكل: { name, sheets: { "اسم التبويب": [صفوف...] } }
-        window.RAW_NEW_CORRESPONDENCE = d.correspondence?.sheets?.["سجل المراسلات"] || [];
-        window.RAW_NEW_KPI_CONTRACTOR = d.kpi?.sheets?.["المقاول"] || [];
-        window.RAW_NEW_KPI_CONSULTANT = d.kpi?.sheets?.["الاستشاري"] || [];
-        window.RAW_NEW_VEHICLES       = d.vehicles?.sheets?.["السيارات"] || [];
-        window.RAW_NEW_TRAINING       = d.training_fuel?.sheets?.["برامج التدريب"] || [];
-        window.RAW_NEW_FUEL           = d.training_fuel?.sheets?.["استهلاك الوقود"] || [];
-        window.RAW_NEW_GATEKEEPERS    = d.gatekeepers_supervisors?.sheets?.["البوابون"] || [];
-        window.RAW_NEW_SUPERVISORS    = d.gatekeepers_supervisors?.sheets?.["المشرفون والمهندسون"] || [];
-        window.RAW_NEW_ORG_STRUCTURE  = d.org_structure?.sheets?.["البيانات"] || [];
-        // ★ 2026-09-17: الملفات الأربعة الجديدة (نفس الرابط، نفس الآب سكريبت)
-        window.RAW_NEW_LS_PAYMENTS = d.ls_payments?.sheets?.["LS Payments and Contracts"] || [];
-        window.RAW_NEW_CONTRACTOR_PAYMENTS = d.contractor_payments?.sheets?.["Payments and Contracts"] || [];
-        // PPM Maximo: شيت مستقل لكل منطقة — بنجمعهم في مصفوفة واحدة مع
-        // إضافة عمود "المنطقة" لكل صف عشان نقدر نحسب إجمالي/انجاز كل
-        // منطقة ورول أب "المنطقة الغربية" (مجموع الأربع مناطق) من نفس المصفوفة.
-        const PPM_REGIONS = ["مكة المكرمة", "المدينة المنورة", "جدة", "الطائف"];
-        const ppmSheets = d.ppm_maximo?.sheets || {};
-        window.RAW_NEW_PPM_MAXIMO = PPM_REGIONS.flatMap((region) =>
-          (ppmSheets[region] || []).map((row) => ({ ...row, المنطقة: region }))
-        );
-        window.RAW_NEW_VISITS_MONTHLY = d.visits?.sheets?.["الملخص الشهري"] || [];
-        window.RAW_NEW_VISITS_BY_REGION = d.visits?.sheets?.["الزيارات حسب المنطقة"] || [];
-        window.__NEW_TEMPLATES_LOAD_STATE__ = "loaded";
-        window.__NEW_TEMPLATES_LAST_FETCH_TS__ = Date.now();
-        console.log("[NEW_TEMPLATES] ✅ تم تحميل الملفات الجاهزة الجديدة:", {
-          correspondence: window.RAW_NEW_CORRESPONDENCE.length,
-          kpiContractor : window.RAW_NEW_KPI_CONTRACTOR.length,
-          kpiConsultant : window.RAW_NEW_KPI_CONSULTANT.length,
-          vehicles      : window.RAW_NEW_VEHICLES.length,
-          training      : window.RAW_NEW_TRAINING.length,
-          fuel          : window.RAW_NEW_FUEL.length,
-          gatekeepers   : window.RAW_NEW_GATEKEEPERS.length,
-          supervisors   : window.RAW_NEW_SUPERVISORS.length,
-          orgStructure  : window.RAW_NEW_ORG_STRUCTURE.length,
-          lsPayments    : window.RAW_NEW_LS_PAYMENTS.length,
-          contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS.length,
-          ppmMaximo     : window.RAW_NEW_PPM_MAXIMO.length,
-          visitsMonthly : window.RAW_NEW_VISITS_MONTHLY.length,
-          visitsByRegion: window.RAW_NEW_VISITS_BY_REGION.length,
-        });
-        if (json.errors) console.warn("[NEW_TEMPLATES] ⚠️ بعض الملفات فيها خطأ:", json.errors);
-      } catch (e) {
-        window.__NEW_TEMPLATES_LOAD_STATE__ = "error";
-        window.__NEW_TEMPLATES_LOAD_ERR__ = e.message;
-        console.warn("[NEW_TEMPLATES] ❌ فشل تحميل الملفات الجاهزة الجديدة:", e);
-      } finally {
-        window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = false;
-      }
+    // ★ 2026-09-20: مفتاح كاش IndexedDB لهذا المصدر — عشان لو حصل تعطل مؤقت
+    // في الآب سكريبت (زي 404 بسبب Redeploy غلط)، التبويبات المتغذية من هنا
+    // (المراسلات، KPI، السيارات، التدريب، الوقود، البوابين، المشرفين،
+    // الهيكل الوظيفي، مدفوعات LS، مدفوعات المقاولين، PPM Maximo، الزيارات)
+    // تفضل عارضة آخر بيانات محفوظة بدل ما تفضح فاضية تمامًا.
+    const NEW_TEMPLATES_CACHE_KEY = "tbc_new_templates_cache_v1";
+
+    // استخراج منطق تطبيق الـ JSON (سواء جاي من الكاش أو من الشبكة) في دالة
+    // واحدة قابلة لإعادة الاستخدام — نفس المنطق بالظبط اللي كان جوه try
+    // سابقًا، من غير أي تغيير في أسماء الحقول أو طريقة الحساب.
+    function _applyNewTemplatesJson(json) {
+      const d = (json && json.data) || {};
+      // كل ملف بييجي بشكل: { name, sheets: { "اسم التبويب": [صفوف...] } }
+      window.RAW_NEW_CORRESPONDENCE = d.correspondence?.sheets?.["سجل المراسلات"] || [];
+      window.RAW_NEW_KPI_CONTRACTOR = d.kpi?.sheets?.["المقاول"] || [];
+      window.RAW_NEW_KPI_CONSULTANT = d.kpi?.sheets?.["الاستشاري"] || [];
+      window.RAW_NEW_VEHICLES       = d.vehicles?.sheets?.["السيارات"] || [];
+      window.RAW_NEW_TRAINING       = d.training_fuel?.sheets?.["برامج التدريب"] || [];
+      window.RAW_NEW_FUEL           = d.training_fuel?.sheets?.["استهلاك الوقود"] || [];
+      window.RAW_NEW_GATEKEEPERS    = d.gatekeepers_supervisors?.sheets?.["البوابون"] || [];
+      window.RAW_NEW_SUPERVISORS    = d.gatekeepers_supervisors?.sheets?.["المشرفون والمهندسون"] || [];
+      window.RAW_NEW_ORG_STRUCTURE  = d.org_structure?.sheets?.["البيانات"] || [];
+      // ★ 2026-09-17: الملفات الأربعة الجديدة (نفس الرابط، نفس الآب سكريبت)
+      window.RAW_NEW_LS_PAYMENTS = d.ls_payments?.sheets?.["LS Payments and Contracts"] || [];
+      // ★ 2026-09-20: بناءً على طلب صريح — استبدال المصدر بالكامل من شيت
+      // "Payments and Contracts" (65 صف، عقد واحد لكل صف، فيه بيانات
+      // المدفوعات) إلى "Copy of Payments and Contracts" (108 صف، نفس
+      // رقم العقد بيتكرر لعدة مشاريع/نطاقات فرعية تحته، فيه القيمة
+      // الأساسية والمحدثة والتواريخ بس — أعمدة المدفوعات
+      // (Payment Released/% Paid/Remaining/Deduction) فاضية تمامًا في
+      // المصدر الجديد). تبويب "مدفوعات وعقود المقاولين" اتعدّل بالتبعية
+      // ليعرض مستوى المشروع الفرعي بدل مستوى العقد ويشيل كروت/أعمدة
+      // المدفوعات بدل ما يوريها صفر بشكل مضلل.
+      window.RAW_NEW_CONTRACTOR_PAYMENTS = d.contractor_payments?.sheets?.["Copy of Payments and Contracts"] || [];
+      // PPM Maximo: شيت مستقل لكل منطقة — بنجمعهم في مصفوفة واحدة مع
+      // إضافة عمود "المنطقة" لكل صف عشان نقدر نحسب إجمالي/انجاز كل
+      // منطقة ورول أب "المنطقة الغربية" (مجموع الأربع مناطق) من نفس المصفوفة.
+      const PPM_REGIONS = ["مكة المكرمة", "المدينة المنورة", "جدة", "الطائف"];
+      const ppmSheets = d.ppm_maximo?.sheets || {};
+      window.RAW_NEW_PPM_MAXIMO = PPM_REGIONS.flatMap((region) =>
+        (ppmSheets[region] || []).map((row) => ({ ...row, المنطقة: region }))
+      );
+      window.RAW_NEW_VISITS_MONTHLY = d.visits?.sheets?.["الملخص الشهري"] || [];
+      window.RAW_NEW_VISITS_BY_REGION = d.visits?.sheets?.["الزيارات حسب المنطقة"] || [];
+      console.log("[NEW_TEMPLATES] ✅ تم تطبيق بيانات الملفات الجاهزة الجديدة:", {
+        correspondence: window.RAW_NEW_CORRESPONDENCE.length,
+        kpiContractor : window.RAW_NEW_KPI_CONTRACTOR.length,
+        kpiConsultant : window.RAW_NEW_KPI_CONSULTANT.length,
+        vehicles      : window.RAW_NEW_VEHICLES.length,
+        training      : window.RAW_NEW_TRAINING.length,
+        fuel          : window.RAW_NEW_FUEL.length,
+        gatekeepers   : window.RAW_NEW_GATEKEEPERS.length,
+        supervisors   : window.RAW_NEW_SUPERVISORS.length,
+        orgStructure  : window.RAW_NEW_ORG_STRUCTURE.length,
+        lsPayments    : window.RAW_NEW_LS_PAYMENTS.length,
+        contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS.length,
+        ppmMaximo     : window.RAW_NEW_PPM_MAXIMO.length,
+        visitsMonthly : window.RAW_NEW_VISITS_MONTHLY.length,
+        visitsByRegion: window.RAW_NEW_VISITS_BY_REGION.length,
+      });
+      if (json && json.errors) console.warn("[NEW_TEMPLATES] ⚠️ بعض الملفات فيها خطأ:", json.errors);
+    }
+
+    // استخراج منطق إعادة رسم أي تبويب مفتوح فعلاً حاليًا — نفس المنطق
+    // بالظبط اللي كان بعد الـ try/catch/finally سابقًا.
+    function _reRenderActiveNewTemplateTabs() {
       // ⚡ لو تبويب "سجل المراسلات" مفتوح فعلاً وقت ما التحميل خلص (تحميل
       // منفصل غير متزامن — ممكن ياخد وقت أطول من فتح المستخدم للتبويب قبل
       // ما البيانات توصل)، نعيد رسمه فورًا عشان يعرض البيانات الحقيقية من
@@ -4414,6 +4427,48 @@ let __bgRevalidatedOnce = false;
       if (document.getElementById("tab-visits")?.classList.contains("active")) {
         try { renderVisitsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][visits render]", e); }
       }
+    }
+
+    window.loadNewTemplatesSeparate = async function (forceNetwork = false) {
+      if (window.__NEW_TEMPLATES_FETCH_INFLIGHT__) return;
+      window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = true;
+      const alreadyLoaded = window.__NEW_TEMPLATES_LOAD_STATE__ === "loaded";
+      if (!alreadyLoaded) window.__NEW_TEMPLATES_LOAD_STATE__ = "loading";
+      try {
+        // ⚡ كاش أولاً: لو موجود كاش محفوظ من قبل في المتصفح ولسه ما
+        // طبّقناش بيانات في الجلسة دي، نعرضه فورًا (بدل شاشة "جاري
+        // التحميل" أو تبويبات فاضية)، وبعدين نكمّل تحميل حي من النت في
+        // الخلفية يحدّث البيانات بأحدث نسخة.
+        if (!forceNetwork && !alreadyLoaded && window._idb) {
+          try {
+            const cachedJson = await window._idb.get(NEW_TEMPLATES_CACHE_KEY);
+            if (cachedJson) {
+              _applyNewTemplatesJson(cachedJson);
+              window.__NEW_TEMPLATES_LOAD_STATE__ = "loaded";
+              _reRenderActiveNewTemplateTabs();
+            }
+          } catch (_) {}
+        }
+        const resp = await fetch(NEW_TEMPLATES_URL, { cache: "no-store" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        if (window._idb) window._idb.set(NEW_TEMPLATES_CACHE_KEY, json); // بدون await — ما نأخّر عرض البيانات لحفظ الكاش
+        _applyNewTemplatesJson(json);
+        window.__NEW_TEMPLATES_LOAD_STATE__ = "loaded";
+        window.__NEW_TEMPLATES_LAST_FETCH_TS__ = Date.now();
+      } catch (e) {
+        // لو فشل التحميل الحي لكن كان عندنا كاش قديم اتطبّق فوق، نسيب
+        // الحالة "loaded" (البيانات المعروضة حاليًا صحيحة، بس مش أحدث
+        // نسخة) بدل ما نقلب الحالة لـ "error" ونمسح اللي المستخدم شايفه.
+        if (!alreadyLoaded && window.__NEW_TEMPLATES_LOAD_STATE__ !== "loaded") {
+          window.__NEW_TEMPLATES_LOAD_STATE__ = "error";
+        }
+        window.__NEW_TEMPLATES_LOAD_ERR__ = e.message;
+        console.warn("[NEW_TEMPLATES] ❌ فشل تحميل الملفات الجاهزة الجديدة من الشبكة (هيتم الاعتماد على آخر نسخة محفوظة إن وُجدت):", e);
+      } finally {
+        window.__NEW_TEMPLATES_FETCH_INFLIGHT__ = false;
+      }
+      _reRenderActiveNewTemplateTabs();
     };
     // تحميل تلقائي مرة واحدة بس عند بدء اللوحة — إضافة فقط، من غير ما تلمس
     // أي تبويب أو منطق عرض موجود حالياً.
@@ -15258,9 +15313,30 @@ function parseTajheezRow(r) {
       كلي: n("PPP_الكمية_الكلية"),
       قيمة: n("PPP_القيمة_الكلية"),
     },
-    فرق_كمية: n("فرق_الكمية"),
-    فرق_قيمة: n("فرق_القيمة"),
-    نسبة: n("نسبة_الاحتياج"),
+    // ★ 2026-09-20 (مُصحَّح): بنحسب الفرق/النسبة هنا محلياً بدل ما نثق في
+    // أعمدة "فرق_الكمية"/"فرق_القيمة"/"نسبة_الاحتياج" الجاهزة اللي جايه
+    // من الشيت — لأن دي كانت محسوبة بمنطق قديم غلط (بيعتبر PPP إضافة
+    // للمخصص/التوريد بدل ما يعتبره جزء من الاحتياج/الطلب زي ما الملف
+    // الخام نفسه بيوضح). حساب محلي هنا يضمن إن الداشبورد صح فورًا حتى
+    // لو الشيت المصدر لسه ما اتحدّثش من أداة التنظيف. الصح: الفرق =
+    // المخصص − (الاحتياج + PPP). لو موجب = فائض حقيقي، لو سالب = عجز.
+    ...(() => {
+      const allocQty = n("مخصص_الكمية_الكلية");
+      const needQty = n("احتياج_الكمية_الكلية");
+      const pppQty = n("PPP_الكمية_الكلية") || 0;
+      const allocVal = n("مخصص_القيمة_الكلية");
+      const needVal = n("احتياج_القيمة_الكلية");
+      const pppVal = n("PPP_القيمة_الكلية") || 0;
+      const فرق_كمية = allocQty !== null && needQty !== null ? Math.round((allocQty - (needQty + pppQty)) * 100) / 100 : null;
+      const فرق_قيمة = allocVal !== null && needVal !== null ? Math.round((allocVal - (needVal + pppVal)) * 100) / 100 : null;
+      // نفس تعريف "نسبة الاحتياج" الأصلي (الاحتياج بالنسبة للمتاح — كل
+      // ما زادت يبقى الوضع أسوأ، وده اللي شرايح الألوان الحالية في
+      // الجداول مبنية عليه: >100% أحمر، 75–100% برتقالي، غير كده أخضر)
+      // لكن دلوقتي بيتحسب صح: الاحتياج = احتياج+PPP، والمتاح = المخصص لوحده.
+      const needQtyTot = needQty !== null ? needQty + pppQty : null;
+      const نسبة = allocQty ? Math.round(((needQtyTot || 0) / allocQty) * 1000000) / 1000000 : null;
+      return { فرق_كمية, فرق_قيمة, نسبة };
+    })(),
     _raw: r,
   };
 }
@@ -15288,12 +15364,20 @@ function pctFmt(v) {
   );
 }
 
-/* مؤشر تغطية لوني */
-function coverageBadge(need, alloc) {
+/* مؤشر تغطية لوني — ★ 2026-09-20 (مُصحَّح): تأكدنا من بنية الملف الخام
+   نفسه إن PPP جزء من "الاحتياج" (جانب الطلب) مش جزء من "المخصص" (جانب
+   التوريد) — الملف نفسه بيجمع عمود إجمالي احتياج+PPP في تريو واحد
+   منفصل عن تريو إجمالي المخصص، وصف "الفرق" الداخلي فيه بيحسب
+   (احتياج+PPP) − مخصص. يعني المطلوب الحقيقي = احتياج + PPP، والمتاح
+   لتغطيته = المخصص لوحده. ppp اختياري (افتراضي 0) عشان الاستدعاءات
+   القديمة تفضل شغالة. */
+function coverageBadge(need, alloc, ppp) {
+  ppp = ppp || 0;
   if (need === null || alloc === null)
     return { color: CSS_TOKENS.txMuted(), bg: "#F1F5F9", label: "غير محدد" };
-  if (alloc === 0 && need > 0) return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز كامل" };
-  const pct = need > 0 ? (alloc / need) * 100 : 100;
+  const demand = need + ppp;
+  if (alloc === 0 && demand > 0) return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز كامل" };
+  const pct = demand > 0 ? (alloc / demand) * 100 : 100;
   if (pct >= 100) return { color: CSS_TOKENS.positive(), bg: CSS_TOKENS.bgPositive(), label: "مغطى ✓" };
   if (pct >= 75) return { color: CSS_TOKENS.warning(), bg: CSS_TOKENS.bgWarning(), label: "قريب" };
   return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز" };
@@ -15598,6 +15682,11 @@ const TAJ_TOPIC_META = {
   alloc:     { icon: "📦", title: "إجمالي المخصصات" },
   need:      { icon: "📋", title: "إجمالي الاحتياج" },
   ppp:       { icon: "🧮", title: "إجمالي PPP" },
+  // ★ 2026-09-20: كارت إضافي بناءً على طلب صريح — "الاحتياج + PPP" مع
+  // بعض (احتياج_قيمة + PPP_قيمة). ده هو الرقم اللي بيطابق عمود "الإجمالي"
+  // الموجود في الملف الخام نفسه لقسم الاحتياج/PPP المدموج — مختلف عن
+  // كارت "إجمالي الاحتياج" اللي بيعرض الاحتياج لوحده من غير PPP.
+  need_ppp:  { icon: "🧾", title: "إجمالي الاحتياج + PPP" },
   diff:      { icon: "📊", title: "الفائض / العجز" },
   coverage:  { icon: "✅", title: "نسبة تغطية التجهيزات" },
   suppliers: { icon: "🏭", title: "الموردون" },
@@ -15622,7 +15711,9 @@ function tajOpenDetail(topic, qismName) {
   const totalPppQty = rows.reduce((s, r) => s + (r.ppp?.كلي || 0), 0);
   const surplusVal = rows.filter((r) => (r.فرق_قيمة || 0) > 0).reduce((s, r) => s + r.فرق_قيمة, 0);
   const deficitVal = rows.filter((r) => (r.فرق_قيمة || 0) < 0).reduce((s, r) => s + r.فرق_قيمة, 0);
-  const covered = rows.filter((r) => r.احتياج.كلي !== null && r.مخصص.كلي !== null && r.مخصص.كلي >= r.احتياج.كلي);
+  // ★ 2026-09-20 (مُصحَّح): PPP جزء من المطلوب (الاحتياج) مش من المخصص —
+  // التغطية = هل المخصص لوحده كافٍ لتغطية (الاحتياج + PPP)؟
+  const covered = rows.filter((r) => r.احتياج.كلي !== null && r.مخصص.كلي !== null && r.مخصص.كلي >= (r.احتياج.كلي + (r.ppp?.كلي || 0)));
   const notCoveredCount = totalItems - covered.length;
   const coverPct = totalItems > 0 ? Math.round((covered.length / totalItems) * 100) : 0;
   const suppliersCount = new Set(rows.map((r) => r.مورد).filter(Boolean)).size;
@@ -15655,6 +15746,13 @@ function tajOpenDetail(topic, qismName) {
       { l: "كمية PPP", v: numFmt(totalPppQty), c: "#7C3AED" },
       { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
       { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+    ];
+  } else if (topic === "need_ppp") {
+    tiles = [
+      { l: "احتياج + PPP (قيمة)", v: sarFmt(totalNeedVal + totalPppVal), c: "#B45309" },
+      { l: "قيمة الاحتياج وحده", v: sarFmt(totalNeedVal), c: "#D97706" },
+      { l: "قيمة PPP وحده", v: sarFmt(totalPppVal), c: "#7C3AED" },
+      { l: "احتياج + PPP (كمية)", v: numFmt(totalNeedQty + totalPppQty), c: "#B45309" },
     ];
   } else if (topic === "diff") {
     tiles = [
@@ -15698,13 +15796,14 @@ function tajOpenDetail(topic, qismName) {
     const agg = {};
     rows.forEach((r) => {
       const key = r.مورد || "غير محدد";
-      if (!agg[key]) agg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0 };
+      if (!agg[key]) agg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0, ppp_كلي: 0 };
       const g = agg[key];
       g.أصناف++;
       g.مخصص_قيمة += r.مخصص.قيمة || 0;
       g.احتياج_قيمة += r.احتياج.قيمة || 0;
       g.مخصص_كلي += r.مخصص.كلي || 0;
       g.احتياج_كلي += r.احتياج.كلي || 0;
+      g.ppp_كلي += r.ppp?.كلي || 0;
     });
     const supRows = Object.values(agg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
     bodyExtra = `
@@ -15712,7 +15811,9 @@ function tajOpenDetail(topic, qismName) {
       ${
         supRows
           .map((m) => {
-            const pct = m.احتياج_كلي > 0 ? Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
+            // ★ 2026-09-20 (مُصحَّح): PPP جزء من المطلوب، والمتاح هو المخصص لوحده.
+            const demand = m.احتياج_كلي + m.ppp_كلي;
+            const pct = demand > 0 ? Math.round((m.مخصص_كلي / demand) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
             const pc = pct >= 100 ? "#059669" : pct >= 75 ? "#D97706" : "#DC2626";
             return `<div class="hasr-srow" style="cursor:default">
               <div style="flex:1;min-width:0">
@@ -15731,6 +15832,7 @@ function tajOpenDetail(topic, qismName) {
     if (topic === "alloc") sorted.sort((a, b) => (b.مخصص.قيمة || 0) - (a.مخصص.قيمة || 0));
     else if (topic === "need") sorted.sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
     else if (topic === "ppp") sorted.sort((a, b) => (b.ppp?.قيمة || 0) - (a.ppp?.قيمة || 0));
+    else if (topic === "need_ppp") sorted.sort((a, b) => ((b.احتياج.قيمة || 0) + (b.ppp?.قيمة || 0)) - ((a.احتياج.قيمة || 0) + (a.ppp?.قيمة || 0)));
     else if (topic === "diff") sorted.sort((a, b) => Math.abs(b.فرق_قيمة || 0) - Math.abs(a.فرق_قيمة || 0));
     else if (topic === "coverage") sorted.sort((a, b) => (a.نسبة ?? 999) - (b.نسبة ?? 999));
     else sorted.sort((a, b) => (b.احتياج.قيمة || 0) - (a.احتياج.قيمة || 0));
@@ -15745,12 +15847,16 @@ function tajOpenDetail(topic, qismName) {
       ${
         shown
           .map((r) => {
-            const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+            const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي, r.ppp?.كلي);
             return `<div class="hasr-srow" style="cursor:default;align-items:flex-start">
               <div style="flex:1;min-width:0">
                 <div class="hasr-sname">${esc(r.صنف || "—")}</div>
                 <div class="hasr-smeta">${esc(r.قسم || "—")} · ${esc(r.مورد || "—")}</div>
-                <div style="font-size:13px;color:var(--tx-muted);margin-top:4px">احتياج: ${sarFmt(r.احتياج.قيمة)} · مخصص: ${sarFmt(r.مخصص.قيمة)}</div>
+                <div style="font-size:13px;color:var(--tx-muted);margin-top:4px">${
+                  topic === "need_ppp"
+                    ? `احتياج + PPP: ${sarFmt((r.احتياج.قيمة || 0) + (r.ppp?.قيمة || 0))} (احتياج ${sarFmt(r.احتياج.قيمة)} + PPP ${sarFmt(r.ppp?.قيمة)})`
+                    : `احتياج: ${sarFmt(r.احتياج.قيمة)} · مخصص: ${sarFmt(r.مخصص.قيمة)}`
+                }</div>
               </div>
               <span class="hasr-sbadge" style="background:${cb.bg};color:${cb.color}">${esc(cb.label)}</span>
             </div>`;
@@ -15835,7 +15941,12 @@ function renderTajheezInventoryTab() {
   const _allocVal  = (r) => fC ? ((r.سعر || 0) * (r.مخصص[fC] || 0)) : (r.مخصص.قيمة || 0);
   const _needVal   = (r) => fC ? ((r.سعر || 0) * (r.احتياج[fC] || 0)) : (r.احتياج.قيمة || 0);
   const _pppVal    = (r) => fC ? ((r.سعر || 0) * (r.ppp?.[fC] || 0)) : (r.ppp?.قيمة || 0);
-  const _diffVal   = (r) => _allocVal(r) - _needVal(r);
+  // ★ 2026-09-20 (مُصحَّح): تأكدنا من بنية الملف الخام (عمود إجمالي
+  // احتياج+PPP مدمج ومنفصل عن عمود إجمالي المخصص، وصف "الفرق" الداخلي
+  // في الملف نفسه بيحسب (احتياج+PPP) − مخصص) — PPP جزء من "المطلوب"
+  // (الاحتياج) مش جزء من "المتاح" (المخصص). يعني الفائض/العجز الصح هو:
+  // المخصص − (الاحتياج + PPP). لو موجب = فائض حقيقي، لو سالب = عجز.
+  const _diffVal   = (r) => _allocVal(r) - (_needVal(r) + _pppVal(r));
   const totalAllocVal = filtered.reduce((s, r) => s + _allocVal(r), 0);
   const totalNeedVal = filtered.reduce((s, r) => s + _needVal(r), 0);
   const totalPppVal = filtered.reduce((s, r) => s + _pppVal(r), 0);
@@ -15843,7 +15954,7 @@ function renderTajheezInventoryTab() {
   const surplus = filtered.filter((r) => { const d = _diffVal(r); return d !== null && d > 0; });
   const deficit = filtered.filter((r) => { const d = _diffVal(r); return d !== null && d < 0; });
   const covered = filtered.filter(
-    (r) => { const nq = _needQty(r), aq = _allocQty(r); return nq !== null && aq !== null && aq >= nq; },
+    (r) => { const nq = _needQty(r), aq = _allocQty(r), pq = _pppQty(r); return nq !== null && aq !== null && aq >= (nq + (pq || 0)); },
   );
   const coverPct = totalItems > 0 ? Math.round((covered.length / totalItems) * 100) : 0;
   const موردونَ_فيَ_النتيجة = new Set(filtered.map((r) => r.مورد).filter(Boolean));
@@ -15872,7 +15983,7 @@ function renderTajheezInventoryTab() {
   filtered.forEach((r) => {
     const key = r.مورد || "غير محدد";
     if (!byMoredAgg[key])
-      byMoredAgg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, ppp_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0 };
+      byMoredAgg[key] = { مورد: key, أصناف: 0, مخصص_قيمة: 0, احتياج_قيمة: 0, ppp_قيمة: 0, مخصص_كلي: 0, احتياج_كلي: 0, ppp_كلي: 0 };
     const g = byMoredAgg[key];
     g.أصناف++;
     g.مخصص_قيمة += _allocVal(r);
@@ -15880,6 +15991,7 @@ function renderTajheezInventoryTab() {
     g.ppp_قيمة += _pppVal(r);
     g.مخصص_كلي += _allocQty(r);
     g.احتياج_كلي += _needQty(r);
+    g.ppp_كلي += _pppQty(r);
   });
   const moredRows = Object.values(byMoredAgg).sort((a, b) => b.احتياج_قيمة - a.احتياج_قيمة);
 
@@ -15965,6 +16077,12 @@ function renderTajheezInventoryTab() {
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalPppVal)}</div>
       <div class="kpi-lbl">إجمالي PPP${fC ? " — " + fC : ""}</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + _pppQty(r), 0))} وحدة</div>
+    </div>
+    <div class="kpi kc-amber hasr-clickable" style="background:#FFF7ED" onclick="tajOpenDetail('need_ppp')" title="اضغط لعرض التفاصيل — الاحتياج مجموع مع PPP">
+      <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/><path d="M9 20h6"/></svg></div>
+      <div class="kpi-val" style="font-size:18px">${sarFmt(totalNeedVal + totalPppVal)}</div>
+      <div class="kpi-lbl">إجمالي الاحتياج + PPP${fC ? " — " + fC : ""}</div>
+      <div class="kpi-sub">احتياج ${sarFmt(totalNeedVal)} + PPP ${sarFmt(totalPppVal)}</div>
     </div>
     <div class="kpi ${totalDiffVal >= 0 ? "kc-green" : "kc-red"} hasr-clickable" onclick="tajOpenDetail('diff')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon">${totalDiffVal >= 0 ? EMPTY_ICON_SVG_["📈"] : '<svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>'}</div>
@@ -16095,7 +16213,9 @@ function renderTajheezInventoryTab() {
         <tbody>
           ${moredRows
             .map((m) => {
-              const pct = m.احتياج_كلي > 0 ? Math.round((m.مخصص_كلي / m.احتياج_كلي) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
+              // ★ 2026-09-20 (مُصحَّح): PPP جزء من المطلوب، والمتاح هو المخصص لوحده.
+              const mDemand = m.احتياج_كلي + m.ppp_كلي;
+              const pct = mDemand > 0 ? Math.round((m.مخصص_كلي / mDemand) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
               const pctColor = pct >= 100 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
               return `<tr>
                 <td style="text-align:right;padding-right:14px;font-weight:700;font-size:12px">${esc(m.مورد)}</td>
@@ -16374,7 +16494,7 @@ function renderTajheezInventoryTab() {
     killChart("ch-taj-coverage");
     const cov3 = { مغطى: 0, قريب: 0, عجز: 0 };
     filtered.forEach((r) => {
-      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+      const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي, r.ppp?.كلي);
       if (cb.label === "مغطى ✓" || cb.label === "مغطى") cov3.مغطى++;
       else if (cb.label === "قريب") cov3.قريب++;
       else if (cb.label.includes("عجز")) cov3.عجز++;
@@ -16564,7 +16684,7 @@ function renderTajheezNeedTable() {
       (r) =>
         `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? CSS_TOKENS.danger() : r.نسبة !== null && r.نسبة > 75 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${pctFmt(r.نسبة)}</td>`,
       (r) => {
-        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي, r.ppp?.كلي);
         return `<td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
       },
     ],
@@ -16657,7 +16777,7 @@ function renderTajheezAllTable() {
       (r) =>
         `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? CSS_TOKENS.danger() : r.نسبة !== null && r.نسبة > 75 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${pctFmt(r.نسبة)}</td>`,
       (r) => {
-        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي);
+        const cb = coverageBadge(r.احتياج.كلي, r.مخصص.كلي, r.ppp?.كلي);
         return `<td><span style="padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${cb.bg};color:${cb.color};border:1px solid ${cb.color}33;white-space:nowrap">${cb.label}</span></td>`;
       },
     ],
@@ -20132,21 +20252,54 @@ function exportNashatExcel(rows) {
     try {
       const vRows = Array.isArray(window.RAW_NEW_VEHICLES) ? window.RAW_NEW_VEHICLES : [];
       if (vRows.length) {
+        // ★ 2026-09-20: اتحدّث ليطابق شيت "السيارات" الحالي — عمود "تفويض
+        // حتى" القديم ملوش وجود في الشيت خالص (كان دايمًا صفر)، وبدل منه
+        // بقى فيه عمودي "المنطقة" و"نوع المركبة".
         const total = vRows.length;
         const withUser = vRows.filter(r => String(r["اسم المستخدم الفعلي"]||"").trim()).length;
-        const withAuthUntil = vRows.filter(r => String(r["تفويض حتى (اختياري)"] ?? r["تفويض حتى"] ?? "").trim()).length;
+        // ★ 2026-09-20: نفس المطابقة المتسامحة المستخدمة في renderVehiclesTab
+        // لعمود "المنطقة" — تدور على أي عمود قريب من الاسم (فرق مسافة أو
+        // ة/ه أو همزة) لو المطابقة المباشرة فشلت.
+        const _vehNormKeyAI = (s) => String(s || "").trim()
+          .replace(/[ً-ْ]/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/\s+/g, "");
+        // ★ 2026-09-20: الاسم الحقيقي للعمود في الشيت هو "موقع السيارة" —
+        // "المنطقة" باقي كاحتياط قديم فقط.
+        const _vehRegionCandidatesAI = ["موقع السيارة", "المنطقة"];
+        const getRegionAI = (r) => {
+          for (const cand of _vehRegionCandidatesAI) {
+            const direct = (r[cand] ?? "").toString().trim();
+            if (direct) return direct;
+          }
+          for (const cand of _vehRegionCandidatesAI) {
+            const target = _vehNormKeyAI(cand);
+            for (const k of Object.keys(r || {})) {
+              if (_vehNormKeyAI(k) === target) {
+                const v = (r[k] ?? "").toString().trim();
+                if (v) return v;
+              }
+            }
+          }
+          return "";
+        };
+        const withRegion = vRows.filter(r => getRegionAI(r)).length;
         const byModel = {};
         vRows.forEach(r => { const m = String(r["الماركة"] ?? r["الطراز"] ?? "غير محدد").trim() || "غير محدد"; byModel[m] = (byModel[m]||0)+1; });
         const byStatus = {};
         vRows.forEach(r => { const s = String(r["حالة المركبة"] ?? r["الحالة"] ?? "").trim() || "غير محدد"; byStatus[s] = (byStatus[s]||0)+1; });
+        const byRegion = {};
+        vRows.forEach(r => { const rg = getRegionAI(r) || "غير محدد"; byRegion[rg] = (byRegion[rg]||0)+1; });
+        const byType = {};
+        vRows.forEach(r => { const t = String(r["نوع المركبة"]||"").trim() || "غير محدد"; byType[t] = (byType[t]||0)+1; });
         summary.السيارات = {
           مصدر: "تبويب السيارات — شيت السيارات",
           إجمالي_السيارات: total,
           لها_مستخدم_فعلي: withUser,
           بدون_مستخدم: total - withUser,
-          تفويض_له_تاريخ_انتهاء: withAuthUntil,
+          لها_منطقة_محددة: withRegion,
           توزيع_حسب_الماركة: Object.entries(byModel).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الماركة:k,عدد:v})),
           توزيع_حسب_الحالة: Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({الحالة:k,عدد:v})),
+          توزيع_حسب_المنطقة: Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({المنطقة:k,عدد:v})),
+          توزيع_حسب_نوع_المركبة: Object.entries(byType).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({النوع:k,عدد:v})),
         };
       } else {
         summary.السيارات = { تنبيه: "لم تُحمَّل بيانات السيارات بعد أو التبويب لم يُفتح بعد." };
@@ -29142,9 +29295,12 @@ function renderFuelTab(_fromMonth, _toMonth) {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🚗  JS تبويب: السيارات
    ║  (tab-vehicles)
-   ║  أعمدة الشيت الجديدة: رقم اللوحة، الماركة، سنة الصنع،
-   ║               رقم هوية المستخدم الفعلي، اسم المستخدم الفعلي،
-   ║               تفويض حتى (اختياري)، الحالة
+   ║  ★ 2026-09-20: اتحدّثت الأعمدة بناءً على طلب صريح لتطابق شيت
+   ║  "السيارات" الحالي بالظبط: رقم اللوحة، الماركة، نوع المركبة
+   ║  (سيدان/SUV)، سنة الصنع، رقم هوية المستخدم الفعلي، اسم المستخدم
+   ║  الفعلي، حالة المركبة، المنطقة، ملاحظات. عمود "تفويض حتى" القديم
+   ║  ملوش وجود في الشيت الحالي خالص فاتشال، وعمود "المنطقة" الجديد ده
+   ║  اللي كان ناقص وبقى ظاهر لكل سيارة (فلتر + عمود + رسم بياني).
    ╚════════════════════════════════════════════════════════════╝ */
 /* 📏 ملاحظة/برومبت ثابت: أي جدول بيانات (table) داخل أي تبويب لازم يكون
    بحجم صغير ومحدود الارتفاع (overflow:auto + max-height ~420px) زي باقي
@@ -29167,15 +29323,49 @@ function renderVehiclesTab() {
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
   const getBrand  = (r) => r["الماركة"] ?? r["الطراز"] ?? "";
+  const getVehType = (r) => (r["نوع المركبة"] ?? "").toString().trim();
   // ⚠️ اسم العمود الحقيقي في شيت "السيارات" هو "حالة المركبة" — نتعامل مع "الحالة" كاحتياط فقط
   const getStatus = (r) => (r["حالة المركبة"] ?? r["الحالة"] ?? "").toString().trim();
-  const getAuthUntil = (r) => (r["تفويض حتى (اختياري)"] ?? r["تفويض حتى"] ?? "").toString().trim();
+  // ★ 2026-09-20: مطابقة متسامحة لعمود المنطقة/الموقع — بالإضافة للمطابقة
+  // المباشرة، لو اسم العمود في الشيت الحقيقي مكتوب بفرق بسيط (مسافة زيادة
+  // في آخر اسم العمود، أو "المنطقه" بالهاء بدل التاء المربوطة، أو أي فرق
+  // شائع تاني في الكتابة العربية) بندور على أي عمود قريب منه بدل ما نعتبر
+  // القيمة غير موجودة ونعرض "غير محدد" غلط مع إن البيانات موجودة فعليًا.
+  // ★ 2026-09-20 (تحديث): الاسم الحقيقي للعمود في شيت "السيارات" الحالي
+  // هو "موقع السيارة" مش "المنطقة" (ده اللي كان سبب اختفاء المنطقة في
+  // التبويب رغم وجود بيانات فعلية) — بندور عليه هو الأساسي، مع الإبقاء على
+  // "المنطقة" كاحتياط للتوافق مع أي نسخة قديمة من الشيت.
+  const _vehNormKey = (s) =>
+    String(s || "")
+      .trim()
+      .replace(/[ً-ْ]/g, "") // إزالة التشكيل
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+      .replace(/\s+/g, "");
+  const _vehRegionCandidates = ["موقع السيارة", "المنطقة"];
+  const getRegion = (r) => {
+    for (const cand of _vehRegionCandidates) {
+      const direct = (r[cand] ?? "").toString().trim();
+      if (direct) return direct;
+    }
+    for (const cand of _vehRegionCandidates) {
+      const target = _vehNormKey(cand);
+      for (const k of Object.keys(r || {})) {
+        if (_vehNormKey(k) === target) {
+          const v = (r[k] ?? "").toString().trim();
+          if (v) return v;
+        }
+      }
+    }
+    return "";
+  };
+  const getNotes = (r) => (r["ملاحظات"] ?? "").toString().trim();
 
   const total        = rows.length;
   const assignedUsers = rows.filter(r => (r["اسم المستخدم الفعلي"]||"").trim()).length;
   const unassigned     = total - assignedUsers;
-  const pendingAuth    = rows.filter(r => getAuthUntil(r)).length;
-  const uniqueUsers   = new Set(rows.map(r=>r["اسم المستخدم الفعلي"]||"").filter(Boolean)).size;
+  const withRegion    = rows.filter(r => getRegion(r)).length;
 
   // توزيع حسب الماركة
   const byModel = {};
@@ -29195,10 +29385,25 @@ function renderVehiclesTab() {
   });
   const statusEntries = Object.entries(byStatus).sort((a,b)=>b[1]-a[1]);
 
+  // توزيع حسب المنطقة
+  const byRegion = {};
+  rows.forEach(r => { const rg = getRegion(r) || "غير محدد"; byRegion[rg]=(byRegion[rg]||0)+1; });
+  const regionEntries = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]);
+  const regionsSet = [...new Set(rows.map(getRegion))].filter(Boolean).sort((a,b)=>a.localeCompare(b,"ar"));
+
+  // توزيع حسب نوع المركبة
+  const byType = {};
+  rows.forEach(r => { const t = getVehType(r) || "غير محدد"; byType[t]=(byType[t]||0)+1; });
+  const typeEntries = Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+  const typesSet = [...new Set(rows.map(getVehType))].filter(Boolean).sort((a,b)=>a.localeCompare(b,"ar"));
+
   function statusColor(s) {
     const t = (s||"").trim();
     if (!t || t === "غير محدد") return CSS_TOKENS.txMuted();
-    if (/نشط|فعال|سار|متاح/.test(t)) return CSS_TOKENS.positive();
+    // ★ 2026-09-20: "مخصَّصة لمستخدم" هي القيمة الفعلية الوحيدة الموجودة في
+    // الشيت الحالي لعمود "حالة المركبة" — دي حالة طبيعية/إيجابية (السيارة
+    // مخصصة ومُستخدمة فعليًا)، مش تحذيرية، فبنضيفها صراحة لقائمة الإيجابي.
+    if (/نشط|فعال|سار|متاح|مخصَّص|مخصص/.test(t)) return CSS_TOKENS.positive();
     if (/غير|منتهٍ|منتهي|موقوف|ملغ/.test(t)) return CSS_TOKENS.danger();
     return CSS_TOKENS.warning();
   }
@@ -29211,18 +29416,20 @@ function renderVehiclesTab() {
   }
 
   function vehRowHtml(r) {
-    const auth = getAuthUntil(r);
-    const rowBg = auth ? `background:${CSS_TOKENS.α(CSS_TOKENS.warning(),0.06)}` : '';
-    return `<tr style="border-bottom:1px solid var(--brd);${rowBg}">
+    const region = getRegion(r);
+    return `<tr style="border-bottom:1px solid var(--brd)">
       <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${esc(r["رقم اللوحة"])||"—"}</td>
       <td style="padding:6px 10px">${esc(getBrand(r))||"—"}</td>
+      <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(getVehType(r))||"—"}</td>
       <td style="padding:6px 10px;text-align:center">${esc(r["سنة الصنع"])||"—"}</td>
       <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(r["رقم هوية المستخدم الفعلي"])||"—"}</td>
       <td style="padding:6px 10px;font-size:11px">${esc(r["اسم المستخدم الفعلي"])||"—"}</td>
-      <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${esc(auth)||"—"}</td>
       <td style="padding:6px 10px;text-align:center">${vehStatusBadge(r)}</td>
+      <td style="padding:6px 10px;font-size:11px;white-space:nowrap${region?"":";color:var(--tx-muted)"}">${esc(region)||"غير محدد"}</td>
+      <td style="padding:6px 10px;font-size:11px;max-width:200px;white-space:normal">${esc(getNotes(r))||"—"}</td>
     </tr>`;
   }
+  window.__vehRowHtml = vehRowHtml;
 
   el.innerHTML = `
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
@@ -29237,9 +29444,9 @@ function renderVehiclesTab() {
       <div class="kpi-sub">${total ? ((assignedUsers/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
     <div class="kpi kc-purple">
-      <div class="kpi-val">${pendingAuth.toLocaleString()}</div>
-      <div class="kpi-lbl">تفويض له تاريخ انتهاء</div>
-      <div class="kpi-sub">يحتاج متابعة التجديد</div>
+      <div class="kpi-val">${withRegion.toLocaleString()}</div>
+      <div class="kpi-lbl">لها منطقة محددة</div>
+      <div class="kpi-sub">${total ? ((withRegion/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
     <div class="kpi kc-red">
       <div class="kpi-val">${unassigned.toLocaleString()}</div>
@@ -29259,6 +29466,17 @@ function renderVehiclesTab() {
     </div>
   </div>
 
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">توزيع السيارات حسب المنطقة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-region"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">توزيع السيارات حسب نوع المركبة</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-veh-type"></canvas></div>
+    </div>
+  </div>
+
   <div class="card mb14">
     <div class="card-title">توزيع السيارات حسب سنة الصنع</div>
     <div class="chart-box" style="height:200px"><canvas id="ch-veh-year"></canvas></div>
@@ -29266,15 +29484,26 @@ function renderVehiclesTab() {
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <div class="card-title" style="margin:0;padding:0;border:0">قائمة السيارات الكاملة <span class="sub">${total} سيارة</span></div>
-      <select class="fsel" id="veh-sort" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
-        <option value="plate">رقم اللوحة (أبجدي)</option>
-        <option value="model">الماركة (أبجدي)</option>
-        <option value="year_desc" selected>السنة ↓ الأحدث</option>
-        <option value="year_asc">السنة ↑ الأقدم</option>
-        <option value="user">اسم المستخدم (أبجدي)</option>
-        <option value="unauth">بدون مستخدم أولاً</option>
-      </select>
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة السيارات الكاملة <span class="sub" id="veh-count">${total} سيارة</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="veh-filter-region" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map(rg => `<option value="${esc(rg)}">${esc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="veh-filter-type" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
+          <option value="">— كل الأنواع —</option>
+          ${typesSet.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="veh-sort" onchange="window.__vehSort && window.__vehSort()" style="font-size:11px">
+          <option value="plate">رقم اللوحة (أبجدي)</option>
+          <option value="model">الماركة (أبجدي)</option>
+          <option value="year_desc" selected>السنة ↓ الأحدث</option>
+          <option value="year_asc">السنة ↑ الأقدم</option>
+          <option value="user">اسم المستخدم (أبجدي)</option>
+          <option value="region">المنطقة (أبجدي)</option>
+          <option value="unauth">بدون مستخدم أولاً</option>
+        </select>
+      </div>
     </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
     <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
@@ -29282,11 +29511,13 @@ function renderVehiclesTab() {
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
           <th style="padding:8px 10px;text-align:right">الماركة</th>
+          <th style="padding:8px 10px;text-align:right">النوع</th>
           <th style="padding:8px 10px;text-align:center">السنة</th>
           <th style="padding:8px 10px;text-align:right">رقم هوية المستخدم الفعلي</th>
           <th style="padding:8px 10px;text-align:right">اسم المستخدم الفعلي</th>
-          <th style="padding:8px 10px;text-align:right">تفويض حتى</th>
           <th style="padding:8px 10px;text-align:center">الحالة</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
         </tr></thead>
         <tbody id="veh-tbody">
           ${rows.map(r => vehRowHtml(r)).join('')}
@@ -29318,6 +29549,26 @@ function renderVehiclesTab() {
       });
     }
 
+    const cRegion = document.getElementById("ch-veh-region");
+    if (cRegion && typeof Chart !== "undefined") {
+      killChart("ch-veh-region");
+      CHARTS["ch-veh-region"] = new Chart(cRegion, {
+        type:"doughnut",
+        data:{ labels:regionEntries.map(e=>e[0]), datasets:[{ data:regionEntries.map(e=>e[1]), backgroundColor:PAL, borderWidth:2 }] },
+        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"right",labels:{font:{size:10},boxWidth:10}}} }
+      });
+    }
+
+    const cType = document.getElementById("ch-veh-type");
+    if (cType && typeof Chart !== "undefined") {
+      killChart("ch-veh-type");
+      CHARTS["ch-veh-type"] = new Chart(cType, {
+        type:"bar",
+        data:{ labels:typeEntries.map(e=>e[0]), datasets:[{ data:typeEntries.map(e=>e[1]), backgroundColor:CSS_TOKENS.special(), borderRadius:4 }] },
+        options:{ indexAxis:"y", maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{stepSize:1}}} }
+      });
+    }
+
     const cYear = document.getElementById("ch-veh-year");
     if (cYear && typeof Chart !== "undefined") {
       killChart("ch-veh-year");
@@ -29329,19 +29580,49 @@ function renderVehiclesTab() {
     }
   });
 
-  // ── فلتر الترتيب لجدول السيارات ──
+  // ── فلتر/ترتيب جدول السيارات ──
   window.__vehSort = function() {
     var sort = document.getElementById('veh-sort') ? document.getElementById('veh-sort').value : 'year_desc';
+    var fRegion = document.getElementById('veh-filter-region') ? document.getElementById('veh-filter-region').value : '';
+    var fType = document.getElementById('veh-filter-type') ? document.getElementById('veh-filter-type').value : '';
     var tbody = document.getElementById('veh-tbody');
+    var countEl = document.getElementById('veh-count');
     if (!tbody) return;
     var vrows = window.RAW_NEW_VEHICLES ? [...window.RAW_NEW_VEHICLES] : [];
     function gb(r){ return r['الماركة'] ?? r['الطراز'] ?? ''; }
+    // ★ 2026-09-20: نفس المطابقة المتسامحة لعمود "المنطقة" المستخدمة في
+    // renderVehiclesTab (getRegion) — لازم تتطابق معاها، وإلا فلتر المنطقة
+    // هيفشل يلاقي أي صف حتى لو الجدول نفسه عارض قيمة المنطقة صح.
+    function _vehNormKeySort(s){ return String(s||'').trim().replace(/[ً-ْ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,''); }
+    // ★ 2026-09-20: الاسم الحقيقي للعمود هو "موقع السيارة" — "المنطقة" احتياط قديم فقط.
+    var _vehRegionCandidatesSort = ['موقع السيارة', 'المنطقة'];
+    function gr(r){
+      for (var ci=0; ci<_vehRegionCandidatesSort.length; ci++) {
+        var direct = (r[_vehRegionCandidatesSort[ci]] ?? '').toString().trim();
+        if (direct) return direct;
+      }
+      for (var cj=0; cj<_vehRegionCandidatesSort.length; cj++) {
+        var target = _vehNormKeySort(_vehRegionCandidatesSort[cj]);
+        for (var k in r) {
+          if (Object.prototype.hasOwnProperty.call(r, k) && _vehNormKeySort(k) === target) {
+            var v = (r[k] ?? '').toString().trim();
+            if (v) return v;
+          }
+        }
+      }
+      return '';
+    }
+    function gt(r){ return (r['نوع المركبة'] ?? '').toString().trim(); }
+    vrows = vrows.filter(function(r){
+      return (!fRegion || gr(r) === fRegion) && (!fType || gt(r) === fType);
+    });
     vrows.sort(function(a,b){
       if (sort==='plate') return String(a['رقم اللوحة']||'').localeCompare(String(b['رقم اللوحة']||''),'ar');
       if (sort==='model') return String(gb(a)||'').localeCompare(String(gb(b)||''),'ar');
       if (sort==='year_desc') return Number(b['سنة الصنع']||0) - Number(a['سنة الصنع']||0);
       if (sort==='year_asc') return Number(a['سنة الصنع']||0) - Number(b['سنة الصنع']||0);
       if (sort==='user') return String(a['اسم المستخدم الفعلي']||'').localeCompare(String(b['اسم المستخدم الفعلي']||''),'ar');
+      if (sort==='region') return String(gr(a)||'').localeCompare(String(gr(b)||''),'ar');
       if (sort==='unauth') {
         var fa = (a['اسم المستخدم الفعلي']||'').trim() ? 1 : 0;
         var fb = (b['اسم المستخدم الفعلي']||'').trim() ? 1 : 0;
@@ -29349,7 +29630,9 @@ function renderVehiclesTab() {
       }
       return 0;
     });
-    tbody.innerHTML = vrows.map(function(r){ return vehRowHtml(r); }).join('');
+    if (countEl) countEl.textContent = vrows.length + ' سيارة';
+    tbody.innerHTML = vrows.map(function(r){ return window.__vehRowHtml(r); }).join('') ||
+      '<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>';
   };
 }
 
@@ -30011,14 +30294,33 @@ function renderLsPaymentsTab() {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  💰  JS تبويب: مدفوعات وعقود المقاولين
    ║  (tab-contractor-payments)
-   ║  المصدر: window.RAW_NEW_CONTRACTOR_PAYMENTS. أعمدة الشيت:
+   ║  المصدر: window.RAW_NEW_CONTRACTOR_PAYMENTS.
+   ║  ★ 2026-09-20: اتغيّر مصدر الشيت بالكامل بناءً على طلب صريح — من
+   ║  "Payments and Contracts" (عقد واحد لكل صف، فيه متابعة مدفوعات
+   ║  كاملة) إلى "Copy of Payments and Contracts" (نفس رقم العقد بيتكرر
+   ║  لعدة مشاريع/نطاقات فرعية تحته). أعمدة الشيت الجديد:
    ║  Contract No., Contractor, Region, Project Name, Classification,
    ║  Base Contract Value (SAR), Updated Contract Value (SAR),
    ║  Payment Released (SAR), % Paid, Remaining (SAR), KPI Deduction,
    ║  Deduction, Total Deduction, Contract Start/End Date, Rev End Date, Notes.
+   ║  ⚠️ في المصدر الجديد أعمدة المدفوعات (Payment Released/% Paid/
+   ║  Remaining/Deduction) فاضية تمامًا لكل الصفوف — فمفيش متابعة مدفوعات
+   ║  متاحة، والتبويب اتعدّل عشان يعرض مستوى "المشروع/النطاق الفرعي تحت
+   ║  العقد" (القيمة الأساسية/المحدثة + التواريخ) من غير ما يورّي أرقام
+   ║  مدفوعات صفرية بشكل مضلل.
    ╚════════════════════════════════════════════════════════════╝ */
-const CTP = { _region: "", _classification: "", filtered: [] };
+const CTP = { _region: "", _classification: "", _q: "", filtered: [] };
 window.CTP = CTP;
+// ★ 2026-09-20: قسم مستقل بناءً على طلب صريح — "المجال العربي" (Al majal
+// al arabi group) هو المقاول المهيمن على المصدر الجديد (67 من أصل 108
+// صف)، فبيتفصل في جزء لوحده أعلى التبويب، وباقي المقاولين (كل الباقي)
+// في جزء منفصل تحته.
+const CTP_MAJAL_NAME = "al majal al arabi group";
+const CTP_MAJAL = { _region: "", _q: "", filtered: [] };
+window.CTP_MAJAL = CTP_MAJAL;
+function _ctpIsMajal(r) {
+  return String(r["Contractor"] || "").trim().toLowerCase() === CTP_MAJAL_NAME;
+}
 function _ctpNum(v) {
   if (v === null || v === undefined || v === "" || v === "-") return null;
   const n = parseFloat(String(v).replace(/,/g, ""));
@@ -30031,62 +30333,130 @@ function _ctpEffectiveValue(r) {
   const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
   return updated !== null ? updated : (_ctpNum(r["Base Contract Value (SAR)"]) || 0);
 }
+function _ctpFmtDate(v) {
+  if (!v || v === "_" || v === "-") return "—";
+  const d = v instanceof Date ? v : new Date(String(v));
+  return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("en-GB", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
 function _ctpApplyFilters() {
-  const rows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  const rows = (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter((r) => !_ctpIsMajal(r));
+  const q = (CTP._q || "").trim().toLowerCase();
   CTP.filtered = rows.filter((r) =>
     (!CTP._region || String(r["Region"] || "").trim() === CTP._region) &&
-    (!CTP._classification || String(r["Classification"] || "").trim() === CTP._classification)
+    (!CTP._classification || String(r["Classification"] || "").trim() === CTP._classification) &&
+    (!q ||
+      String(r["Contract No."] || "").toLowerCase().includes(q) ||
+      String(r["Contractor"] || "").toLowerCase().includes(q) ||
+      String(r["Project Name"] || "").toLowerCase().includes(q))
   );
   _ctpRenderTable();
 }
-function _ctpRowHtml(r) {
+function _ctpMajalApplyFilters() {
+  const rows = (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter(_ctpIsMajal);
+  const q = (CTP_MAJAL._q || "").trim().toLowerCase();
+  CTP_MAJAL.filtered = rows.filter((r) =>
+    (!CTP_MAJAL._region || String(r["Region"] || "").trim() === CTP_MAJAL._region) &&
+    (!q ||
+      String(r["Contract No."] || "").toLowerCase().includes(q) ||
+      String(r["Project Name"] || "").toLowerCase().includes(q))
+  );
+  _ctpMajalRenderTable();
+}
+function _ctpRowHtml(r, withContractor) {
   const base = _ctpNum(r["Base Contract Value (SAR)"]);
   const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
-  const paid = _ctpNum(r["Payment Released (SAR)"]) || 0;
-  const remaining = _ctpNum(r["Remaining (SAR)"]);
-  const totalDeduction = _ctpNum(r["Total Deduction"]) || 0;
-  const pctRaw = _ctpNum(r["% Paid"]);
-  const pct = pctRaw === null ? null : (pctRaw <= 1 ? pctRaw * 100 : pctRaw);
-  const pctColor = pct === null ? CSS_TOKENS.txMuted() : pct >= 80 ? CSS_TOKENS.positive() : pct >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  const variance = (updated !== null && base !== null) ? (updated - base) : null;
+  const varColor = variance === null ? CSS_TOKENS.txMuted() : variance > 0 ? CSS_TOKENS.warning() : variance < 0 ? CSS_TOKENS.positive() : CSS_TOKENS.txMuted();
   return `<tr style="border-bottom:1px solid var(--brd)">
     <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${_ctpEsc(r["Contract No."]) || "—"}</td>
-    <td style="padding:6px 10px;font-size:11px">${_ctpEsc(r["Contractor"]) || "—"}</td>
+    ${withContractor ? `<td style="padding:6px 10px;font-size:11px">${_ctpEsc(r["Contractor"]) || "—"}</td>` : ""}
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ctpEsc(r["Region"]) || "—"}</td>
-    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ctpEsc(r["Classification"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;max-width:260px;white-space:normal;line-height:1.4">${_ctpEsc(r["Project Name"]) || "—"}</td>
+    ${withContractor ? `<td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_ctpEsc(r["Classification"]) || "—"}</td>` : ""}
     <td style="padding:6px 10px;text-align:center;font-size:11px">${base !== null ? base.toLocaleString("en-US") : "—"}</td>
     <td style="padding:6px 10px;text-align:center;font-size:11px">${updated !== null ? updated.toLocaleString("en-US") : "—"}</td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px">${paid.toLocaleString("en-US")}</td>
-    <td style="padding:6px 10px;text-align:center"><span style="color:${pctColor};font-weight:700;font-size:11px">${pct === null ? "—" : pct.toFixed(1) + "%"}</span></td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px">${remaining !== null ? remaining.toLocaleString("en-US") : "—"}</td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px${totalDeduction ? ";color:" + CSS_TOKENS.danger() + ";font-weight:700" : ""}">${totalDeduction.toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:${varColor}">${variance === null ? "—" : (variance > 0 ? "+" : "") + variance.toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_ctpFmtDate(r["Contract Start Date"])}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_ctpFmtDate(r["Contract End Date"])}</td>
   </tr>`;
 }
 function _ctpRenderTable() {
   const tbody = document.getElementById("ctp-tbody");
   if (!tbody) return;
   tbody.innerHTML =
-    CTP.filtered.map((r) => _ctpRowHtml(r)).join("") ||
+    CTP.filtered.map((r) => _ctpRowHtml(r, true)).join("") ||
     `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("ctp-count");
   if (countEl) countEl.textContent = CTP.filtered.length.toLocaleString("ar");
 }
+function _ctpMajalRenderTable() {
+  const tbody = document.getElementById("ctp-majal-tbody");
+  if (!tbody) return;
+  tbody.innerHTML =
+    CTP_MAJAL.filtered.map((r) => _ctpRowHtml(r, false)).join("") ||
+    `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  const countEl = document.getElementById("ctp-majal-count");
+  if (countEl) countEl.textContent = CTP_MAJAL.filtered.length.toLocaleString("ar");
+}
 function _ctpExportCSV() {
-  const src = CTP.filtered.length ? CTP.filtered : window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  const src = CTP.filtered.length ? CTP.filtered : (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter((r) => !_ctpIsMajal(r));
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["Contract No.", "Contractor", "Region", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Payment Released (SAR)", "% Paid", "Remaining (SAR)", "Total Deduction"];
+  const headers = ["Contract No.", "Contractor", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Contract Start Date", "Contract End Date", "Notes"];
   const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
-    download: "مدفوعات_وعقود_المقاولين.csv",
+    download: "مدفوعات_وعقود_باقي_المقاولين.csv",
   });
   a.click();
+}
+function _ctpMajalExportCSV() {
+  const src = CTP_MAJAL.filtered.length ? CTP_MAJAL.filtered : (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter(_ctpIsMajal);
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["Contract No.", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Contract Start Date", "Contract End Date", "Notes"];
+  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "عقود_المجال_العربي.csv",
+  });
+  a.click();
+}
+/** كروت KPI + جدول لمجموعة صفوف (تُستخدم لكل من قسم "المجال العربي"
+ *  وقسم "باقي المقاولين" بنفس الشكل، فرقهم بس مصدر الصفوف والعناوين) */
+function _ctpSectionKpisHtml(rows) {
+  const distinctContracts = new Set(rows.map((r) => String(r["Contract No."] || "").trim()).filter(Boolean)).size;
+  const totalBase = rows.reduce((s, r) => s + (_ctpNum(r["Base Contract Value (SAR)"]) || 0), 0);
+  const totalValue = rows.reduce((s, r) => s + _ctpEffectiveValue(r), 0);
+  const totalVariance = totalValue - totalBase;
+  return `
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${distinctContracts.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد العقود</div>
+      <div class="kpi-sub">عقود مميّزة</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-val">${rows.length.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد المشاريع/النطاقات</div>
+      <div class="kpi-sub">صف لكل مشروع فرعي تحت العقد</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي القيمة المحدّثة</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${totalVariance > 0 ? "+" : ""}${Math.round(totalVariance).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">صافي التغيير عن القيمة الأساسية</div>
+      <div class="kpi-sub">المحدّثة − الأساسية</div>
+    </div>
+  </div>`;
 }
 function renderContractorPaymentsTab() {
   const el = document.getElementById("contractor-payments-content");
   if (!el) return;
 
-  const rows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
-  if (!rows.length) {
+  const allRows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+  if (!allRows.length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:12px">💰</div>
       <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لم يتم تحميل البيانات</div>
@@ -30094,79 +30464,58 @@ function renderContractorPaymentsTab() {
     return;
   }
 
-  const total = rows.length;
-  const totalValue = rows.reduce((s, r) => s + _ctpEffectiveValue(r), 0);
-  const totalPaid = rows.reduce((s, r) => s + (_ctpNum(r["Payment Released (SAR)"]) || 0), 0);
-  const totalDeduction = rows.reduce((s, r) => s + (_ctpNum(r["Total Deduction"]) || 0), 0);
-  const overallPct = totalValue ? (totalPaid / totalValue) * 100 : 0;
-  const regionsSet = [...new Set(rows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
-  const classSet = [...new Set(rows.map((r) => String(r["Classification"] || "").trim()))].filter(Boolean).sort();
+  const majalRows = allRows.filter(_ctpIsMajal);
+  const restRows  = allRows.filter((r) => !_ctpIsMajal(r));
 
-  const byClass = {};
-  classSet.forEach((c) => { byClass[c] = { value: 0, paid: 0, count: 0 }; });
-  rows.forEach((r) => {
-    const c = String(r["Classification"] || "").trim();
-    if (!byClass[c]) byClass[c] = { value: 0, paid: 0, count: 0 };
-    byClass[c].value += _ctpEffectiveValue(r);
-    byClass[c].paid += _ctpNum(r["Payment Released (SAR)"]) || 0;
-    byClass[c].count++;
-  });
-  const classEntries = Object.entries(byClass).sort((a, b) => b[1].value - a[1].value);
+  const majalRegionsSet = [...new Set(majalRows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
+  const regionsSet = [...new Set(restRows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
+  const classSet = [...new Set(restRows.map((r) => String(r["Classification"] || "").trim()))].filter(Boolean).sort();
 
   el.innerHTML = `
-  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi kc-blue">
-      <div class="kpi-val">${total.toLocaleString("ar")}</div>
-      <div class="kpi-lbl">إجمالي العقود</div>
-      <div class="kpi-sub">عقود المقاولين</div>
-    </div>
-    <div class="kpi kc-purple">
-      <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
-      <div class="kpi-lbl">إجمالي قيمة العقود</div>
-      <div class="kpi-sub">ريال سعودي</div>
-    </div>
-    <div class="kpi kc-green">
-      <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
-      <div class="kpi-lbl">إجمالي المدفوع</div>
-      <div class="kpi-sub">${overallPct.toFixed(1)}% من الإجمالي</div>
-    </div>
-    <div class="kpi kc-red">
-      <div class="kpi-val">${Math.round(totalDeduction).toLocaleString("en-US")}</div>
-      <div class="kpi-lbl">إجمالي الخصومات</div>
-      <div class="kpi-sub">شامل خصم مؤشرات الأداء</div>
-    </div>
+  <div class="card-title" style="border:0;padding:0;margin:0 0 8px;display:flex;align-items:center;gap:8px">
+    🏢 المجال العربي <span class="sub">Al majal al arabi group · تصنيف IFM</span>
   </div>
+  ${_ctpSectionKpisHtml(majalRows)}
 
-  <div class="card mb14">
-    <div class="card-title">القيمة مقابل المدفوع حسب تصنيف العقد</div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
+  <div class="card mb14" style="margin-top:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div class="card-title" style="margin:0;padding:0;border:0">مشاريع المجال العربي <span class="sub" id="ctp-majal-count">${majalRows.length}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="finp" id="ctp-majal-filter-q" type="text" placeholder="بحث برقم العقد/اسم المشروع…" oninput="CTP_MAJAL._q=this.value;_ctpMajalApplyFilters()" style="font-size:11px;min-width:200px">
+        <select class="fsel" id="ctp-majal-filter-region" onchange="CTP_MAJAL._region=this.value;_ctpMajalApplyFilters()" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${majalRegionsSet.map((rg) => `<option value="${_ctpEsc(rg)}">${_ctpEsc(rg)}</option>`).join("")}
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_ctpMajalExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px" id="ctp-majal-table">
         <thead><tr style="background:var(--bg2)">
-          <th style="padding:8px 10px;text-align:right">التصنيف</th>
-          <th style="padding:8px 10px;text-align:center">عدد العقود</th>
-          <th style="padding:8px 10px;text-align:center">القيمة</th>
-          <th style="padding:8px 10px;text-align:center">المدفوع</th>
-          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+          <th style="padding:8px 10px;text-align:right">رقم العقد</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">اسم المشروع</th>
+          <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
+          <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
+          <th style="padding:8px 10px;text-align:center">الفرق</th>
+          <th style="padding:8px 10px;text-align:center">تاريخ البداية</th>
+          <th style="padding:8px 10px;text-align:center">تاريخ النهاية</th>
         </tr></thead>
-        <tbody>
-          ${classEntries
-            .map(([c, v]) => `<tr style="border-bottom:1px solid var(--brd)">
-                <td style="padding:6px 10px;font-weight:700">${_ctpEsc(c)}</td>
-                <td style="padding:6px 10px;text-align:center">${v.count.toLocaleString("ar")}</td>
-                <td style="padding:6px 10px;text-align:center">${Math.round(v.value).toLocaleString("en-US")}</td>
-                <td style="padding:6px 10px;text-align:center">${Math.round(v.paid).toLocaleString("en-US")}</td>
-                <td style="padding:6px 10px;text-align:center;font-weight:700">${v.value ? ((v.paid / v.value) * 100).toFixed(1) : "0.0"}%</td>
-              </tr>`)
-            .join("")}
-        </tbody>
+        <tbody id="ctp-majal-tbody"></tbody>
       </table>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card-title" style="border:0;padding:0;margin:22px 0 8px;display:flex;align-items:center;gap:8px">
+    🏗️ باقي المقاولين <span class="sub">كل المقاولين ما عدا المجال العربي</span>
+  </div>
+  ${_ctpSectionKpisHtml(restRows)}
+
+  <div class="card" style="margin-top:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <div class="card-title" style="margin:0;padding:0;border:0">قائمة العقود <span class="sub" id="ctp-count">${total}</span></div>
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المشاريع/النطاقات <span class="sub" id="ctp-count">${restRows.length}</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="finp" id="ctp-filter-q" type="text" placeholder="بحث برقم العقد/المقاول/اسم المشروع…" oninput="CTP._q=this.value;_ctpApplyFilters()" style="font-size:11px;min-width:200px">
         <select class="fsel" id="ctp-filter-region" onchange="CTP._region=this.value;_ctpApplyFilters()" style="font-size:11px">
           <option value="">— كل المناطق —</option>
           ${regionsSet.map((rg) => `<option value="${_ctpEsc(rg)}">${_ctpEsc(rg)}</option>`).join("")}
@@ -30184,13 +30533,13 @@ function renderContractorPaymentsTab() {
           <th style="padding:8px 10px;text-align:right">رقم العقد</th>
           <th style="padding:8px 10px;text-align:right">المقاول</th>
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">اسم المشروع</th>
           <th style="padding:8px 10px;text-align:right">التصنيف</th>
           <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
           <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
-          <th style="padding:8px 10px;text-align:center">المدفوع</th>
-          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
-          <th style="padding:8px 10px;text-align:center">المتبقي</th>
-          <th style="padding:8px 10px;text-align:center">إجمالي الخصم</th>
+          <th style="padding:8px 10px;text-align:center">الفرق</th>
+          <th style="padding:8px 10px;text-align:center">تاريخ البداية</th>
+          <th style="padding:8px 10px;text-align:center">تاريخ النهاية</th>
         </tr></thead>
         <tbody id="ctp-tbody"></tbody>
       </table>
@@ -30199,8 +30548,14 @@ function renderContractorPaymentsTab() {
 
   CTP._region = "";
   CTP._classification = "";
-  CTP.filtered = rows.slice();
+  CTP._q = "";
+  CTP.filtered = restRows.slice();
   _ctpRenderTable();
+
+  CTP_MAJAL._region = "";
+  CTP_MAJAL._q = "";
+  CTP_MAJAL.filtered = majalRows.slice();
+  _ctpMajalRenderTable();
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -31147,8 +31502,11 @@ function renderTrainingTab(_fromDate, _toDate) {
           const lspData  = lspRows.length  ? `\n- بيانات مدفوعات وعقود LS: ${lspRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(lspTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(lspTotalPaid).toLocaleString()} ريال` : '';
 
           const ctpTotalValue = ctpRows.reduce(function(s,r){ return s + (typeof _ctpEffectiveValue === 'function' ? _ctpEffectiveValue(r) : 0); }, 0);
-          const ctpTotalPaid  = ctpRows.reduce(function(s,r){ return s + ((typeof _ctpNum === 'function' ? _ctpNum(r["Payment Released (SAR)"]) : 0) || 0); }, 0);
-          const ctpData  = ctpRows.length  ? `\n- بيانات مدفوعات وعقود المقاولين: ${ctpRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(ctpTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(ctpTotalPaid).toLocaleString()} ريال` : '';
+          const ctpDistinctContracts = new Set(ctpRows.map(function(r){ return String(r["Contract No."]||"").trim(); }).filter(Boolean)).size;
+          // ★ 2026-09-20: المصدر بقى على مستوى المشروع/النطاق الفرعي وملوش
+          // بيانات مدفوعات خالص — قبل كده كان بيقول "المدفوع X ريال" وده
+          // كان بيبقى صفر دايمًا ويوهم إن المقاول ملوش أي مدفوعات.
+          const ctpData  = ctpRows.length  ? `\n- بيانات عقود المقاولين (مستوى المشروع/النطاق الفرعي — بدون بيانات مدفوعات): ${ctpDistinctContracts.toLocaleString()} عقد عبر ${ctpRows.length.toLocaleString()} مشروع/نطاق فرعي، إجمالي القيمة المحدّثة ${Math.round(ctpTotalValue).toLocaleString()} ريال` : '';
 
           const ppmAgg   = (typeof _ppmAggregate === 'function') ? _ppmAggregate(ppmRows) : null;
           const ppmData  = (ppmRows.length && ppmAgg) ? `\n- بيانات الصيانة الوقائية (Maximo): ${ppmAgg.tasks.toLocaleString()} مهمة، Planned% = ${ppmAgg.plannedPct.toFixed(1)}%، Actual% = ${ppmAgg.actualPct.toFixed(1)}%` : '';
@@ -32042,31 +32400,66 @@ function renderHasrTab() {
    بوت يقدر يجاوب على أي سؤال يخص حصر الأصول حتى لو المستخدم لسه ما فتحش
    تبويب "حصر الأصول" وما ضغطش زر التحديث ↻ فيه. النتيجة تتخزّن في نفس
    window.HASR.data/loaded عشان لو المستخدم فتح التبويب بعدين يلاقيها جاهزة. */
+// ★ 2026-09-20: مفتاح كاش IndexedDB لتبويب "حصر الأصول" — نفس الفكرة
+// المطبّقة على باقي التبويبات: أول ما يوصل رد شبكة صحيح بنحفظه هنا، وبعدين
+// أي تحميل لاحق (سواء الصامت للشات بوت أو تحميل التبويب نفسه) بيعرض النسخة
+// المحفوظة فورًا وهو بيجيب نسخة أحدث من الشبكة في الخلفية.
+const HASR_CACHE_KEY = "tbc_hasr_cache_v1";
+
+// تطبيق الـ JSON (من الكاش أو من الشبكة) على HASR.data — نفس المنطق اللي
+// كان مكرر جوه fcbEnsureHasrLoaded و loadHasrData.
+function _hasrApplyData(json) {
+  HASR.data = json;
+  HASR.loaded = true;
+  const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
+  if (typeof targetFromApi === 'number' && targetFromApi > 0) {
+    HASR_TOTAL_TARGET = targetFromApi;
+  }
+  // 🧠 مهم جداً: نبطّل كاش ملخص اللوحة (fcbBuildDashboardSummary) عشان
+  // يُعاد حسابه ويشمل حصر الأصول اللي لسه واصل. من غير السطر ده، أول
+  // سؤال بيُبنى له ملخص قبل ما التحميل يخلص، ويفضل الشات بوت شايف
+  // نسخة قديمة من الملخص من غير حصر_الأصول حتى لو HASR.loaded بقت true.
+  window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1;
+}
+
 async function fcbEnsureHasrLoaded() {
   if (HASR.loaded && HASR.data) return true;
   if (fcbEnsureHasrLoaded._inflight) return fcbEnsureHasrLoaded._inflight;
   fcbEnsureHasrLoaded._inflight = (async () => {
     try {
+      // ⚡ كاش أولاً: يعرض فورًا آخر نسخة محفوظة (لو موجودة) قبل ما ننتظر
+      // رد الشبكة، عشان بطاقات "إجمالي الأصول" في نظرة عامة والشات بوت ما
+      // يفضلوش شايفين صفر لحد ما التحميل الحي يخلص.
+      if (!HASR.loaded && window._idb) {
+        try {
+          const cached = await window._idb.get(HASR_CACHE_KEY);
+          if (cached) {
+            _hasrApplyData(cached);
+            console.log('✅ fcbEnsureHasrLoaded: طُبّقت نسخة محفوظة (كاش) من بيانات حصر الأصول فورًا، وجاري التحديث من الشبكة في الخلفية');
+            if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
+            if (document.getElementById('tab-hasr')?.classList.contains('active') && typeof _hasrRenderAll === 'function') {
+              try { _hasrRenderAll(); } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
       const r = await fetch(HASR_SCRIPT_URL);
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      HASR.data = await r.json();
-      HASR.loaded = true;
-      const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
-      if (typeof targetFromApi === 'number' && targetFromApi > 0) {
-        HASR_TOTAL_TARGET = targetFromApi;
-      }
-      // 🧠 مهم جداً: نبطّل كاش ملخص اللوحة (fcbBuildDashboardSummary) عشان
-      // يُعاد حسابه ويشمل حصر الأصول اللي لسه واصل. من غير السطر ده، أول
-      // سؤال بيُبنى له ملخص قبل ما التحميل يخلص، ويفضل الشات بوت شايف
-      // نسخة قديمة من الملخص من غير حصر_الأصول حتى لو HASR.loaded بقت true.
-      window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1;
+      const json = await r.json();
+      if (window._idb) window._idb.set(HASR_CACHE_KEY, json); // بدون await — ما نأخّر العرض
+      _hasrApplyData(json);
       console.log('✅ fcbEnsureHasrLoaded: بيانات حصر الأصول اتحمّلت بنجاح للشات بوت', HASR.data?.summary);
       if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
+      if (document.getElementById('tab-hasr')?.classList.contains('active') && typeof _hasrRenderAll === 'function') {
+        try { _hasrRenderAll(); } catch (_) {}
+      }
       return true;
     } catch (e) {
       HASR._lastLoadError = (e && e.message) ? e.message : String(e);
       console.error('fcbEnsureHasrLoaded فشل السحب:', e);
-      return false;
+      // لو كان عندنا كاش اتطبق فوق، البيانات متاحة (ولو مش أحدث نسخة) —
+      // نرجّع true عشان الشات بوت يعتبرها محمّلة بدل ما يفتكرها فاضية.
+      return !!(HASR.loaded && HASR.data);
     } finally {
       fcbEnsureHasrLoaded._inflight = null;
     }
@@ -32074,19 +32467,29 @@ async function fcbEnsureHasrLoaded() {
   return fcbEnsureHasrLoaded._inflight;
 }
 
-async function loadHasrData() {
-  _hasrShowLoading(true);
+async function loadHasrData(forceNetwork) {
+  // ⚡ كاش أولاً: لو مفيش بيانات محمّلة لسه في الجلسة دي، نطبّق آخر نسخة
+  // محفوظة فورًا (فيه تحديث فوري للشاشة من غير ما نستنى الشبكة)، وبعدين
+  // نكمّل تحميل حي يحدّثها.
+  if (!forceNetwork && !HASR.loaded && window._idb) {
+    try {
+      const cached = await window._idb.get(HASR_CACHE_KEY);
+      if (cached) {
+        _hasrApplyData(cached);
+        const elCached = document.getElementById('hasr-fetch-time');
+        if (elCached) elCached.textContent = 'آخر تحديث: (نسخة محفوظة) ' + new Date().toLocaleString('ar-SA');
+        if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
+        _hasrRenderAll();
+      }
+    } catch (_) {}
+  }
+  _hasrShowLoading(!HASR.loaded);
   try {
     const r = await fetch(HASR_SCRIPT_URL);
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    HASR.data   = await r.json();
-    HASR.loaded = true;
-    window.__DATA_REV__ = (window.__DATA_REV__ || 0) + 1; // 🧠 يبطّل كاش ملخص الشات بوت أيضاً
-    /* مزامنة الهدف الإجمالي من الـ payload — Code.gs هو المصدر الوحيد للرقم */
-    const targetFromApi = HASR.data?.meta?.totalTarget ?? HASR.data?.summary?.totalTarget;
-    if (typeof targetFromApi === 'number' && targetFromApi > 0) {
-      HASR_TOTAL_TARGET = targetFromApi;
-    }
+    const json = await r.json();
+    if (window._idb) window._idb.set(HASR_CACHE_KEY, json); // بدون await — ما نأخّر العرض
+    _hasrApplyData(json);
     const el = document.getElementById('hasr-fetch-time');
     if (el) el.textContent = 'آخر تحديث: ' + new Date().toLocaleString('ar-SA');
     if (typeof renderOverviewAssetKpis === 'function') renderOverviewAssetKpis();
@@ -32094,7 +32497,14 @@ async function loadHasrData() {
     _hasrRenderAll();
   } catch(e) {
     _hasrShowLoading(false);
-    _hasrShowError('فشل سحب البيانات: ' + e.message);
+    // لو كان عندنا كاش اتطبق فوق، خلي المستخدم شايف البيانات المحفوظة
+    // بدل ما نمسحها برسالة خطأ — بس ننبّهه إن التحديث الحي فشل.
+    if (HASR.loaded && HASR.data) {
+      const el = document.getElementById('hasr-fetch-time');
+      if (el) el.textContent = 'آخر تحديث: (نسخة محفوظة — فشل التحديث الحي: ' + e.message + ')';
+    } else {
+      _hasrShowError('فشل سحب البيانات: ' + e.message);
+    }
   }
 }
 
@@ -34326,7 +34736,16 @@ document.addEventListener("DOMContentLoaded", function () {
       var dataReady = (typeof RAW !== "undefined" && Array.isArray(RAW) && RAW.length > 0);
       if (dataReady || tries > 120) {          /* مهلة قصوى ~60 ثانية */
         clearInterval(t);
-        if (dataReady) warmNext(WARM_LIST.slice(), { ok: 0, fail: 0 });
+        if (dataReady) {
+          // ★ 2026-09-20: نتخطى إحماء أي تبويب مخفي حالياً بزر العين 👁
+          // (PRESENTATION_HIDDEN_TABS) — مفيش داعي نستهلك وقت/معالجة في
+          // تجهيز تبويبات المستخدم مش شايفها أصلاً؛ لو رجع فتحها بالعين
+          // هترسم عادي وقتها زي أي تبويب تاني أول ما يفتحها.
+          var warmQueue = WARM_LIST.slice().filter(function (item) {
+            return !(typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(item[0]));
+          });
+          warmNext(warmQueue, { ok: 0, fail: 0 });
+        }
       }
     }, 500);
   }
@@ -34491,12 +34910,13 @@ var PORTAL_CATEGORIES = {
   equipment: {
     title: "التوريدات والمخزون",
     icon: "🧰",
+    // ★ 2026-09-20: الترتيب بناءً على طلب صريح
     tabs: [
-      { name: "tajheez-supplies",  label: "التوريدات" },
       { name: "tajheez-contracts", label: "عقود التجهيزات" },
       { name: "tajheez",           label: "المخصص والاحتياج" },
-      { name: "hasr",              label: "حصر الأصول" },
-      { name: "nashat-badani",     label: "مبادرة النشاط البدني" }
+      { name: "tajheez-supplies",  label: "التوريدات" },
+      { name: "nashat-badani",     label: "مبادرة النشاط البدني" },
+      { name: "hasr",              label: "حصر الأصول" }
     ]
   },
   // 8) العقود والتكاليف
@@ -37011,19 +37431,23 @@ setTimeout(function tellUserStillTrying() {
       };
     }
 
-    /* مدفوعات وعقود المقاولين */
+    /* عقود المقاولين — ★ 2026-09-20: المصدر بقى على مستوى المشروع/النطاق
+       الفرعي تحت العقد (Copy of Payments and Contracts) وملوش بيانات
+       مدفوعات خالص (كانت هتبقى صفر دايمًا وتوهم المساعد الذكي إن السداد
+       صفر أو الخصومات صفر). */
     var ctp = sup.contractorPayments;
-    if (Array.isArray(ctp) && ctp.length && typeof _ctpEffectiveValue === "function" && typeof _ctpNum === "function") {
+    if (Array.isArray(ctp) && ctp.length && typeof _ctpEffectiveValue === "function") {
       var ctpTotalValue = ctp.reduce(function(s,r){ return s + _ctpEffectiveValue(r); }, 0);
-      var ctpTotalPaid  = ctp.reduce(function(s,r){ return s + (_ctpNum(r["Payment Released (SAR)"]) || 0); }, 0);
-      var ctpTotalDeduction = ctp.reduce(function(s,r){ return s + (_ctpNum(r["Total Deduction"]) || 0); }, 0);
-      sec.مدفوعات_وعقود_المقاولين = {
-        _source:            "Statistics→ContractorPayments",
-        عدد_العقود:         ctp.length,
-        إجمالي_القيمة_SAR:  Math.round(ctpTotalValue),
-        إجمالي_المدفوع_SAR: Math.round(ctpTotalPaid),
-        إجمالي_الخصومات_SAR: Math.round(ctpTotalDeduction),
-        نسبة_السداد_الكلية: ctpTotalValue ? (Math.round(ctpTotalPaid / ctpTotalValue * 1000) / 10 + "%") : null,
+      var ctpTotalBase  = ctp.reduce(function(s,r){ return s + ((typeof _ctpNum === "function" ? _ctpNum(r["Base Contract Value (SAR)"]) : 0) || 0); }, 0);
+      var ctpDistinct = {};
+      ctp.forEach(function(r){ var cn = String(r["Contract No."]||"").trim(); if (cn) ctpDistinct[cn] = true; });
+      sec.عقود_المقاولين = {
+        _source:                 "Statistics→ContractorPayments",
+        ملاحظة:                  "مستوى المشروع/النطاق الفرعي تحت العقد — بدون بيانات مدفوعات (المدفوع/الباقي/الخصومات غير متاحة في هذا المصدر)",
+        عدد_العقود:              Object.keys(ctpDistinct).length,
+        عدد_المشاريع_الفرعية:    ctp.length,
+        إجمالي_القيمة_الأساسية_SAR: Math.round(ctpTotalBase),
+        إجمالي_القيمة_المحدثة_SAR:  Math.round(ctpTotalValue),
       };
     }
 

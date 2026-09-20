@@ -6944,3 +6944,88 @@ button.ix-profile-source:hover{
     background-attachment: local, local;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   شاشة اختيار الشعار (Brand Gate) — ★ 2026-09-20 بناءً على طلب صريح
+   طبقة كاملة الشاشة، أعلى من أي عنصر آخر (z-index أعلى من شاشة
+   التحميل)، تختفي بمجرد اختيار المستخدم لشعار (أو لو كان محفوظ سابقاً
+   في localStorage). أسماء classes فريدة (brand-select-*) لتفادي أي
+   تعارض مع أي تنسيق موجود.
+   ══════════════════════════════════════════════════════════════════ */
+.brand-select-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: linear-gradient(160deg, #0a2530 0%, #123b52 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity .35s ease, visibility .35s ease;
+  opacity: 1;
+  visibility: visible;
+}
+.brand-select-screen.brand-select-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.brand-select-box {
+  text-align: center;
+  padding: 32px 24px;
+  max-width: 92vw;
+}
+.brand-select-title {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 30px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 8px;
+  letter-spacing: .5px;
+}
+.brand-select-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,.65);
+  margin-bottom: 32px;
+}
+.brand-select-options {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.brand-select-card {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 16px;
+  padding: 28px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+  min-height: 90px;
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.brand-select-card:hover,
+.brand-select-card:focus-visible {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.4);
+  transform: translateY(-2px);
+  outline: none;
+}
+.brand-select-card:active {
+  transform: translateY(0);
+}
+.brand-select-card img {
+  max-height: 42px;
+  max-width: 160px;
+  filter: brightness(0) invert(1);
+  opacity: .95;
+  display: block;
+}
+@media (max-width: 480px) {
+  .brand-select-title { font-size: 24px; }
+  .brand-select-card { padding: 22px 26px; min-width: 140px; }
+  .brand-select-card img { max-height: 34px; max-width: 130px; }
+}

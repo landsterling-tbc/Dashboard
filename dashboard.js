@@ -245,9 +245,63 @@ window.__PRESENTATION_MODE__ = true;
 // كود أو دالة عرض (لسه كل الدوال والـ switch-case بتاعتهم موجودين
 // بالكامل، وممكن ترجع تظهر تاني في أي وقت بالضغط على زر العين).
 var PRESENTATION_HIDDEN_TABS = ["students", "elevators", "elevator-status", "khanadeq", "spare"];
-function __isPresentationHiddenTab(name) {
-  return !!window.__PRESENTATION_MODE__ && PRESENTATION_HIDDEN_TABS.indexOf(name) !== -1;
+
+// ★ 2026-09-20: تبويبات مقصورة على شعار Landsterling فقط — راجعها المستخدم
+// تبويب تبويب بالكامل (39 تبويب في الشريط الرئيسي + 7 تبويبات فرعية) وحدد
+// دول بالذات كاستثناءات، والباقي كله يظهر لـ Landsterling و TBC معًا.
+// تختفي هذه التبويبات بالكامل — من شريط التبويبات العلوي (للي منهم ليه
+// خانة في الشريط: العهدة، السيارات، برامج التدريب، سجل المراسلات،
+// الهيكل الوظيفي)، ومن التصنيفات الجانبية/المفضلة (لكل الثمانية، عن طريق
+// __isPresentationHiddenTab تحت)، ومنع الدخول المباشر عبر showTab —
+// لما يكون الشعار المختار TBC. أضف/احذف اسم من هنا في أي وقت لتغيير
+// القرار لاحقًا.
+var LANDSTERLING_ONLY_TABS = [
+  "petty-cash", "vehicles", "training", "correspondence",
+  "org-structure", "emp-kpi", "recruitment", "fuel",
+];
+// أرقام data-evt الخاصة بالتبويبات اللي ليها خانة فعلية في شريط التبويبات
+// العلوي (index.html) — تُستخدم لإخفاء تلك الخانة بصريًا. أي تبويب من
+// LANDSTERLING_ONLY_TABS مش موجود هنا (زي emp-kpi/recruitment/fuel) معناه
+// إنه مش في الشريط العلوي أصلًا، ويتغطى إخفاؤه بالكامل من التصنيفات/المفضلة.
+var LANDSTERLING_ONLY_TAB_EVT = { "petty-cash": 218, vehicles: 46, training: 47, correspondence: 66, "org-structure": 67 };
+
+function __currentBrand() {
+  if (window.SELECTED_BRAND) return window.SELECTED_BRAND;
+  try { return localStorage.getItem("tbc_dashboard_selected_brand") || ""; } catch (_) { return ""; }
 }
+function __isBrandHiddenTab(name) {
+  return __currentBrand() !== "landsterling" && LANDSTERLING_ONLY_TABS.indexOf(name) !== -1;
+}
+function __isPresentationHiddenTab(name) {
+  return (!!window.__PRESENTATION_MODE__ && PRESENTATION_HIDDEN_TABS.indexOf(name) !== -1) || __isBrandHiddenTab(name);
+}
+
+// يطبّق إخفاء/إظهار خانات شريط التبويبات العلوي + البانلز المطابقة حسب
+// الشعار المختار حاليًا. يُستدعى مرة عند تحميل الصفحة (لو فيه شعار محفوظ
+// من زيارة سابقة) وكل مرة يختار فيها المستخدم شعار جديد (enterWithBrand
+// في index.html).
+function applyBrandVisibilityUI() {
+  var hideForThisBrand = __currentBrand() !== "landsterling";
+  var hiddenEvts = [];
+  Object.keys(LANDSTERLING_ONLY_TAB_EVT).forEach(function (name) {
+    var evt = LANDSTERLING_ONLY_TAB_EVT[name];
+    hiddenEvts.push(evt);
+    var pill = document.querySelector('.tab[data-evt="' + evt + '"]');
+    if (pill) pill.classList.toggle("brand-hidden-tab", hideForThisBrand);
+    var panel = document.getElementById("tab-" + name);
+    if (panel) panel.classList.toggle("brand-hidden-tab", hideForThisBrand);
+  });
+  if (hideForThisBrand) {
+    var activeTab = document.querySelector(".tab.active");
+    var activeEvt = activeTab ? parseInt(activeTab.getAttribute("data-evt"), 10) : null;
+    if (activeEvt != null && hiddenEvts.indexOf(activeEvt) !== -1) {
+      var fallback = document.getElementById("tabbtn-overview");
+      if (typeof showTab === "function") showTab("overview", fallback);
+    }
+  }
+  if (typeof __fillPortalCardTabsList === "function") __fillPortalCardTabsList();
+}
+window.applyBrandVisibilityUI = applyBrandVisibilityUI;
 
 function setPresentationMode(nextMode) {
   window.__PRESENTATION_MODE__ = !!nextMode;
@@ -316,6 +370,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // عند كل فتح: تأكد إن الوضع ON (كروت الطلاب/عمر المبنى مخفية افتراضياً)
   window.__PRESENTATION_MODE__ = true;
   applyPresentationModeUI();
+  // ★ 2026-09-20: تطبيق إخفاء تبويبات Landsterling-only حسب الشعار
+  // المحفوظ (لو المستخدم عنده اختيار سابق محفوظ، window.SELECTED_BRAND
+  // بيبقى متظبط من سكريبت اختيار الشعار في index.html قبل ما السطر ده
+  // يتنفذ). لو أول زيارة ولسه ماختارش، هيتنفذ تاني فور الاختيار من
+  // enterWithBrand في index.html.
+  applyBrandVisibilityUI();
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey && e.shiftKey && (e.key || "").toLowerCase() === "p") {
       e.preventDefault();
@@ -995,6 +1055,8 @@ function applyFilters() {
       safeRun(renderGatekeepersTab, "gatekeepers");
     if (activeId === "tab-supervisors" && typeof renderSupervisorsTab === "function")
       safeRun(renderSupervisorsTab, "supervisors");
+    if (activeId === "tab-petty-cash" && typeof renderPettyCashTab === "function")
+      safeRun(renderPettyCashTab, "petty-cash");
     if (activeId === "tab-khanadeq") safeRun(renderKhanadeqTab, "khanadeq");
     if (activeId === "tab-map") safeRun(renderMap, "map");
     if (activeId === "tab-spare") safeRun(renderSpareTab, "spare");
@@ -1553,6 +1615,7 @@ function showTab(name, el) {
     "nashat-badani" === name && renderNashatBadaniTab(),
     "gatekeepers" === name && "function" === typeof renderGatekeepersTab && renderGatekeepersTab(),
     "supervisors" === name && "function" === typeof renderSupervisorsTab && renderSupervisorsTab(),
+    "petty-cash" === name && "function" === typeof renderPettyCashTab && renderPettyCashTab(),
     "recruitment" === name && "function" === typeof renderRecruitmentTab && renderRecruitmentTab(),
 
     "khanadeq" === name && renderKhanadeqTab(),
@@ -4383,6 +4446,9 @@ let __bgRevalidatedOnce = false;
       );
       window.RAW_NEW_VISITS_MONTHLY = d.visits?.sheets?.["الملخص الشهري"] || [];
       window.RAW_NEW_VISITS_BY_REGION = d.visits?.sheets?.["الزيارات حسب المنطقة"] || [];
+      // ★ 2026-09-20: العهدة — شيتين منفصلين (ليندا / مير) نفس المصدر
+      window.RAW_NEW_PETTY_CASH_LAYNADA = d.petty_cash?.sheets?.["ليندا"] || [];
+      window.RAW_NEW_PETTY_CASH_MEER    = d.petty_cash?.sheets?.["مير"] || [];
       console.log("[NEW_TEMPLATES] ✅ تم تطبيق بيانات الملفات الجاهزة الجديدة:", {
         correspondence: window.RAW_NEW_CORRESPONDENCE.length,
         kpiContractor : window.RAW_NEW_KPI_CONTRACTOR.length,
@@ -4398,6 +4464,8 @@ let __bgRevalidatedOnce = false;
         ppmMaximo     : window.RAW_NEW_PPM_MAXIMO.length,
         visitsMonthly : window.RAW_NEW_VISITS_MONTHLY.length,
         visitsByRegion: window.RAW_NEW_VISITS_BY_REGION.length,
+        pettyCashLaynada: window.RAW_NEW_PETTY_CASH_LAYNADA.length,
+        pettyCashMeer    : window.RAW_NEW_PETTY_CASH_MEER.length,
       });
       if (json && json.errors) console.warn("[NEW_TEMPLATES] ⚠️ بعض الملفات فيها خطأ:", json.errors);
     }
@@ -4426,6 +4494,9 @@ let __bgRevalidatedOnce = false;
       }
       if (document.getElementById("tab-visits")?.classList.contains("active")) {
         try { renderVisitsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][visits render]", e); }
+      }
+      if (document.getElementById("tab-petty-cash")?.classList.contains("active")) {
+        try { renderPettyCashTab(); } catch (e) { console.warn("[NEW_TEMPLATES][petty-cash render]", e); }
       }
     }
 
@@ -24167,6 +24238,300 @@ ${(() => {
 })();
 
 /* ══════════════════════════════════════════════════════════════════════
+   تبويب العهدة (Petty Cash)
+   المصدر: window.RAW_NEW_PETTY_CASH_LAYNADA / window.RAW_NEW_PETTY_CASH_MEER
+           (key: petty_cash في GAS — شيتين "ليندا" و"مير")
+   أعمدة كل شيت: التاريخ، رقم_السند، المسؤول، النوع، المستلم، المصروف، المتبقي
+══════════════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var fmt_ = typeof fmt === "function" ? fmt : function (v, d) {
+    d = d || 0;
+    return v == null ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
+  var esc_ = typeof esc === "function" ? esc : function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+    });
+  };
+
+  var STATE = (window.__PC_STATE__ = window.__PC_STATE__ || {
+    page: 0,
+    size: 25,
+    search: "",
+    person: "",
+    sort: "dateDesc",
+  });
+
+  function norm(v) {
+    return String(v == null ? "" : v).replace(/﻿/g, "").trim();
+  }
+
+  function numOf(v) {
+    if (v === null || v === undefined || v === "") return 0;
+    var n = Number(v);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function parseDateVal(v) {
+    if (v === null || v === undefined || v === "") return null;
+    if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+    var dt = new Date(v);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function fmtDate(v) {
+    var dt = parseDateVal(v);
+    if (!dt) return "—";
+    var day = String(dt.getUTCDate()).padStart(2, "0");
+    var month = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    var year = dt.getUTCFullYear();
+    return day + "-" + month + "-" + year;
+  }
+
+  function escText(v) {
+    return esc_(v);
+  }
+
+  function getRaw() {
+    var a = Array.isArray(window.RAW_NEW_PETTY_CASH_LAYNADA) ? window.RAW_NEW_PETTY_CASH_LAYNADA : [];
+    var b = Array.isArray(window.RAW_NEW_PETTY_CASH_MEER) ? window.RAW_NEW_PETTY_CASH_MEER : [];
+    return a
+      .map(function (r) { return { row: r, sheet: "ليندا" }; })
+      .concat(b.map(function (r) { return { row: r, sheet: "مير" }; }));
+  }
+
+  function normalizeRows() {
+    return getRaw()
+      .filter(function (x) { return norm(x.row["رقم_السند"]); }) // استبعاد صف الإجمالي وصف ملاحظة المطابقة
+      .map(function (x) {
+        var r = x.row;
+        return {
+          sheet: x.sheet,
+          date: r["التاريخ"],
+          voucher: norm(r["رقم_السند"]),
+          person: norm(r["المسؤول"]) || x.sheet,
+          type: norm(r["النوع"]),
+          received: numOf(r["المستلم"]),
+          spent: numOf(r["المصروف"]),
+          balance: numOf(r["المتبقي"]),
+        };
+      });
+  }
+
+  function filteredRows(all) {
+    var q = STATE.search.trim().toLowerCase();
+    return all.filter(function (r) {
+      if (STATE.person && r.sheet !== STATE.person) return false;
+      if (!q) return true;
+      return r.person.toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  var SORTERS = {
+    dateDesc: function (a, b) { return (parseDateVal(b.date) || 0) - (parseDateVal(a.date) || 0); },
+    dateAsc: function (a, b) { return (parseDateVal(a.date) || 0) - (parseDateVal(b.date) || 0); },
+    person: function (a, b) { return a.person.localeCompare(b.person, "ar"); },
+  };
+
+  function sortRows(rows, sort) {
+    return rows.slice().sort(SORTERS[sort] || SORTERS.dateDesc);
+  }
+
+  function pctOf(n, total) {
+    if (!total) return "0%";
+    return ((n / total) * 100).toFixed(1) + "%";
+  }
+
+  function renderPager(total) {
+    var pages = Math.max(1, Math.ceil(total / STATE.size));
+    var current = Math.min(STATE.page, pages - 1);
+    STATE.page = current;
+    var start = current * STATE.size;
+    var end = Math.min(start + STATE.size, total);
+    var prevDisabled = current <= 0 ? "disabled" : "";
+    var nextDisabled = current >= pages - 1 ? "disabled" : "";
+    return (
+      '<div class="pag-bar">' +
+      '<div class="pag-info">عرض ' + fmt_(start + 1) + " - " + fmt_(end) + " من " + fmt_(total) + " سجل</div>" +
+      '<div class="pag-btns">' +
+      '<button class="pag-btn" ' + prevDisabled + ' onclick="window.__PC_STATE__.page=Math.max(0,window.__PC_STATE__.page-1);renderPettyCashTab()">◀ السابق</button>' +
+      '<button class="pag-btn active">' + fmt_(current + 1) + " / " + fmt_(pages) + "</button>" +
+      '<button class="pag-btn" ' + nextDisabled + ' onclick="window.__PC_STATE__.page=Math.min(' + (pages - 1) + ',window.__PC_STATE__.page+1);renderPettyCashTab()">التالي ▶</button>' +
+      "</div></div>"
+    );
+  }
+
+  function exportPettyCashCSV(rows) {
+    var headers = ["المسؤول", "التاريخ", "المستلم", "المصروف", "المتبقي"];
+    var csv = [headers.map(function (h) { return '"' + String(h).replace(/"/g, '""') + '"'; }).join(",")];
+    rows.forEach(function (r) {
+      var vals = [r.person, fmtDate(r.date), r.received, r.spent, r.balance].map(function (v) {
+        return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+      });
+      csv.push(vals.join(","));
+    });
+    var blob = new Blob(["﻿" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "العهدة_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 150);
+  }
+
+  function showErrorState(el, message) {
+    el.innerHTML =
+      '<div class="card empty-state">' +
+      '<div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>' +
+      '<div class="empty-state-title">تعذّر عرض بيانات العهدة</div>' +
+      '<div class="empty-state-sub">' + escText(message) + "</div></div>";
+  }
+
+  window.renderPettyCashTab = function renderPettyCashTab() {
+    var el = document.getElementById("petty-cash-content");
+    if (!el) {
+      console.warn('[petty-cash] العنصر "petty-cash-content" غير موجود في الصفحة — تحقق من index.html');
+      return;
+    }
+
+    try {
+      var all = normalizeRows();
+
+      if (!all.length) {
+        el.innerHTML =
+          '<div class="card empty-state">' +
+          '<div class="empty-state-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></div>' +
+          '<div class="empty-state-title">لم يتم التحميل</div>' +
+          "</div></div>";
+        console.warn("[petty-cash] بيانات العهدة فارغة أو غير موجودة.");
+        return;
+      }
+
+      var rows = sortRows(filteredRows(all), STATE.sort);
+      var total = all.length;
+      var filteredTotal = rows.length;
+
+      var people = [];
+      var seen = {};
+      all.forEach(function (r) { if (!seen[r.sheet]) { seen[r.sheet] = true; people.push(r.sheet); } });
+
+      var totalReceived = all.reduce(function (s, r) { return s + r.received; }, 0);
+      var totalSpent = all.reduce(function (s, r) { return s + r.spent; }, 0);
+      var totalRemaining = totalReceived - totalSpent;
+
+      var byPerson = people.map(function (p) {
+        var prows = all.filter(function (r) { return r.sheet === p; });
+        var received = prows.reduce(function (s, r) { return s + r.received; }, 0);
+        var spent = prows.reduce(function (s, r) { return s + r.spent; }, 0);
+        var sorted = prows.slice().sort(SORTERS.dateAsc);
+        var lastBalance = sorted.length ? sorted[sorted.length - 1].balance : received - spent;
+        var lastDate = sorted.length ? sorted[sorted.length - 1].date : null;
+        var name = prows.length ? prows[0].person : p;
+        return { sheet: p, name: name, received: received, spent: spent, remaining: lastBalance, lastDate: lastDate, count: prows.length };
+      });
+
+      var personOptions = people
+        .map(function (p) {
+          return '<option value="' + escText(p) + '"' + (STATE.person === p ? " selected" : "") + ">" + escText(p) + "</option>";
+        })
+        .join("");
+
+      var list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
+
+      var rowsHtml = list.length
+        ? list
+            .map(function (r) {
+              return (
+                "<tr>" +
+                '<td style="text-align:right;font-weight:700">' + escText(r.person) + "</td>" +
+                '<td style="font-variant-numeric:tabular-nums">' + escText(fmtDate(r.date)) + "</td>" +
+                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#059669;font-weight:700">' + (r.received ? fmt_(r.received, 2) : "—") + "</td>" +
+                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#B91C1C;font-weight:700">' + (r.spent ? fmt_(r.spent, 2) : "—") + "</td>" +
+                '<td style="text-align:center;font-variant-numeric:tabular-nums;font-weight:700">' + fmt_(r.balance, 2) + "</td>" +
+                "</tr>"
+              );
+            })
+            .join("")
+        : '<tr><td colspan="5"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>';
+
+      var breakdownHtml = byPerson
+        .map(function (p) {
+          return (
+            '<div class="school-row" style="align-items:flex-start;flex-wrap:wrap;gap:8px">' +
+            '<div style="min-width:140px;flex:0 0 auto;font-size:13px;font-weight:800;color:var(--tx-main)">' + escText(p.name) + "</div>" +
+            '<div style="flex:1;min-width:200px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px">' +
+            '<span>المستلم: <b style="color:#059669">' + fmt_(p.received, 2) + "</b></span>" +
+            '<span>المصروف: <b style="color:#B91C1C">' + fmt_(p.spent, 2) + "</b></span>" +
+            '<span>المتبقي: <b>' + fmt_(p.remaining, 2) + "</b></span>" +
+            '<span style="color:var(--tx-muted)">آخر تاريخ: ' + escText(fmtDate(p.lastDate)) + "</span>" +
+            "</div></div>"
+          );
+        })
+        .join("");
+
+      el.innerHTML =
+        '<div class="card mb14">' +
+        '<div class="card-title">' +
+        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>' +
+        "<span>العهدة</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
+        "</div>" +
+        '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
+        '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(totalReceived, 2) + '</div><div class="kpi-lbl">إجمالي المستلم</div><div class="kpi-sub">لكل المسؤولين عن العهدة</div></div>' +
+        '<div class="kpi kc-red"><div class="kpi-val" style="color:#B91C1C">' + fmt_(totalSpent, 2) + '</div><div class="kpi-lbl">إجمالي المصروف</div><div class="kpi-sub">' + pctOf(totalSpent, totalReceived) + " من المستلم</div></div>" +
+        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(totalRemaining, 2) + '</div><div class="kpi-lbl">الرصيد المتبقي</div><div class="kpi-sub">المستلم - المصروف</div></div>' +
+        '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(people.length) + '</div><div class="kpi-lbl">عدد المسؤولين</div><div class="kpi-sub">' + escText(byPerson.map(function (p) { return p.name; }).join("، ")) + "</div></div>" +
+        "</div></div>" +
+        '<div class="card mb14"><div class="card-title">' +
+        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
+        "<span>حسب المسؤول</span></div>" +
+        breakdownHtml +
+        "</div>" +
+        '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
+        '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
+        '<input class="finp" id="pc-search" placeholder="🔍 اسم المسؤول..." value="' + escText(STATE.search) + '" style="width:100%" ' +
+        'oninput="window.__PC_STATE__.search=this.value;window.__PC_STATE__.page=0;smartSearchRerender(this, renderPettyCashTab)"></div>' +
+        '<div class="fg"><div class="fg-lbl">المسؤول</div>' +
+        '<select class="fsel" id="pc-person" onchange="window.__PC_STATE__.person=this.value;window.__PC_STATE__.page=0;renderPettyCashTab()">' +
+        '<option value="">الكل</option>' + personOptions + "</select></div>" +
+        '<div class="fg"><div class="fg-lbl">الترتيب</div>' +
+        '<select class="fsel" id="pc-sort" onchange="window.__PC_STATE__.sort=this.value;window.__PC_STATE__.page=0;renderPettyCashTab()">' +
+        '<option value="dateDesc"' + (STATE.sort === "dateDesc" ? " selected" : "") + ">الأحدث أولاً</option>" +
+        '<option value="dateAsc"' + (STATE.sort === "dateAsc" ? " selected" : "") + ">الأقدم أولاً</option>" +
+        '<option value="person"' + (STATE.sort === "person" ? " selected" : "") + ">المسؤول (أبجدي)</option>" +
+        "</select></div>" +
+        '<button class="f-clear" onclick="window.__PC_STATE__={page:0,size:25,search:\'\',person:\'\',sort:\'dateDesc\'};renderPettyCashTab()">✕ مسح الفلاتر</button>' +
+        '<button class="export-btn export-btn-csv" onclick="window.exportPettyCashCSV_dispatch && window.exportPettyCashCSV_dispatch()">⬇ تصدير CSV</button>' +
+        "</div>" +
+        '<div class="card"><div class="card-title">' +
+        '<span class="card-title-icon" style="background:#FEF3C7;color:#92400E"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
+        "<span>سجل العهدة</span>" +
+        '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
+        '<div class="tbl-wrap"><table><thead><tr>' +
+        '<th style="text-align:right;padding-right:14px;min-width:170px">المسؤول</th>' +
+        '<th style="min-width:100px">التاريخ</th>' +
+        '<th style="min-width:100px">المستلم</th>' +
+        '<th style="min-width:100px">المصروف</th>' +
+        '<th style="min-width:100px">المتبقي</th>' +
+        "</tr></thead><tbody>" + rowsHtml + "</tbody></table></div>" +
+        renderPager(filteredTotal) +
+        "</div>";
+
+      window.exportPettyCashCSV_dispatch = function () { exportPettyCashCSV(rows); };
+    } catch (err) {
+      console.error("[petty-cash] خطأ أثناء رسم تبويب العهدة:", err);
+      showErrorState(el, "حدث خطأ غير متوقع: " + (err && err.message ? err.message : String(err)) + " — افتح Console (F12) للتفاصيل.");
+    }
+  };
+
+  console.log("[petty-cash] تم تحميل الملف بنجاح. typeof renderPettyCashTab =", typeof window.renderPettyCashTab);
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
    تبويب المشرفين
    المصدر: window.RAW_NEW_SUPERVISORS (key: schoolsSupervisors في GAS)
    أعمدة الملف: المنطقة، الرقم الوزاري، اسم المدرسة، المشرف الميداني (اسم/
@@ -28169,6 +28534,12 @@ window.addEventListener('load', function () {
       kpis: ['عدد المدارس المغطاة','مشرفون ميدانيون','المهندسون','مسؤولو التطوير']
     },
     {
+      id: 'petty-cash', label: 'العهدة',
+      keywords: ['عهدة','العهدة','عهدة نثرية','petty cash','بيتي كاش','مصروفات','صرف','مستلم','المستلم','المصروف','المتبقي','رصيد','مسؤول العهدة','custodian','حائز العهدة','سند صرف','voucher'],
+      charts: ['حسب المسؤول'],
+      kpis: ['إجمالي المستلم','إجمالي المصروف','الرصيد المتبقي','عدد المسؤولين']
+    },
+    {
       id: 'all-contracts', label: 'عقود عدا المجال',
       keywords: ['عقود عدا المجال','عقود خارجية','other contracts','all contracts','عقود أخرى','عقد','contracts','نظافة','cleaning contract','صيانة','maintenance contract','حراسة','تشغيل','operations','عقد تشغيل'],
       charts: ['قائمة العقود','توزيع العقود حسب النوع'],
@@ -29886,18 +30257,37 @@ function renderCorrespondenceTab() {
    ║  (tab-org-structure)
    ║  المصدر: window.RAW_NEW_ORG_STRUCTURE (من الآب سكريبت الجديد
    ║  المنفصل — راجع loadNewTemplatesSeparate أعلى الملف). الهدف
-   ║  الأساسي: معرفة نسبة الإشغال والشواغر لكل منطقة ومسمى وظيفي.
-   ║  أعمدة الشيت: حالة التوظيف (موظف حالي/شاغر)، المنطقة، المسمى
-   ║  الوظيفي (TBC)، المسمى الوظيفي (LS)، التصنيف الرئيسي، نوع
-   ║  الفريق، الاسم (موظف/مرشح)، رقم الموظف، الجنسية، سنوات الخبرة،
-   ║  المؤهل، تاريخ الالتحاق، تاريخ بداية العقد، تاريخ نهاية العقد،
-   ║  المدير المباشر، ملاحظات.
+   ║  الأساسي: معرفة نسبة الإشغال والشواغر لكل منطقة ومسمى وظيفي،
+   ║  بالإضافة لعرض تنظيمي (ORG CHART) داخل نفس الكارت.
+   ║  ★ 2026-09-20 — بناءً على طلب صريح + ملف "قالب الهيكل الوظيفي
+   ║  للاستشاري" المحدّث: الكارت بقى فيه عرضين (مبدّل بالأعلى):
+   ║  "📊 التحليل" (المحتوى القديم زي ما هو) و"🗂️ ORG CHART" (شجرة
+   ║  تنظيمية قابلة للطي، بدون أي مكتبة خارجية جديدة).
+   ║  أعمدة الشيت الفعلية (مطابقة للملف المرفوع بالحرف): حالة
+   ║  التوظيف (موظف حالي/شاغر)، المنطقة، المسمى الوظيفي (TBC)،
+   ║  المسمى الوظيفي (LS)، الهوية، نوع الفريق (الفريق التقني/
+   ║  التجهيزات)، اسم الموظف\المرشح، رقم الموظف، الجنسية، سنوات
+   ║  الخبرة، المؤهل، تاريخ بداية العقد، تاريخ نهاية العقد،
+   ║  المدير المباشر.
+   ║  ⚠️ تصحيح مهم: اسم عمود الاسم في الملف الفعلي هو بالضبط
+   ║  "اسم الموظف\المرشح" (مش "الاسم (موظف / مرشح)" اللي كان
+   ║  مستخدم غلط قبل كده وكان بيرجّع عمود الاسم فاضي دايمًا).
+   ║  ⚠️ عمود "تاريخ الالتحاق" مش موجود في الملف أصلاً — اتشال من
+   ║  الجدول والتصدير، وبدل منه اتضافت الجنسية/سنوات الخبرة/نوع
+   ║  الفريق كأعمدة وفلاتر حقيقية موجودة في المصدر.
+   ║  📌 عمود "المدير المباشر" لسه فاضي بالكامل في كل الصفوف وقت
+   ║  كتابة هذا الكود — بمجرد ما يتملى، ORG CHART هيتحول تلقائيًا
+   ║  من عرض تجميعي (منطقة ← نوع فريق ← مسمى وظيفي) إلى هيكل
+   ║  تنظيمي حقيقي بالأسماء (شوف _orgBuildPersonChart تحت).
    ╚════════════════════════════════════════════════════════════╝ */
-const ORG = { _region: "", _status: "", filtered: [] };
+const ORG = { _region: "", _status: "", _team: "", filtered: [] };
 window.ORG = ORG;
 
 function _orgEsc(v) {
   return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _orgNorm(v) {
+  return String(v == null ? "" : v).replace(/﻿/g, "").trim();
 }
 function _orgFmtDate(v) {
   if (!v) return "—";
@@ -29906,18 +30296,27 @@ function _orgFmtDate(v) {
   return d.toLocaleDateString("ar-SA", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 function _orgIsVacant(r) {
-  return String(r["حالة التوظيف"] || "").trim() === "شاغر";
+  return _orgNorm(r["حالة التوظيف"]) === "شاغر";
 }
 function _orgTitle(r) {
-  return String(r["المسمى الوظيفي (LS)"] || r["المسمى الوظيفي (TBC)"] || "").trim() || "غير محدد";
+  return _orgNorm(r["المسمى الوظيفي (LS)"] || r["المسمى الوظيفي (TBC)"]) || "غير محدد";
+}
+// ★ اسم العمود الصح في الملف الفعلي (فيه \ حرفيًا) — مع fallback للاسم
+// القديم احتياطًا لو اختلفت تسمية العمود في نسخة تانية من نفس الملف.
+function _orgName(r) {
+  return _orgNorm(r["اسم الموظف\\المرشح"] || r["الاسم (موظف / مرشح)"]);
+}
+function _orgManager(r) {
+  return _orgNorm(r["المدير المباشر"]);
 }
 
 function _orgApplyFilters() {
   const rows = window.RAW_NEW_ORG_STRUCTURE || [];
   ORG.filtered = rows.filter((r) => {
-    const region = String(r["المنطقة"] || "").trim();
-    const status = String(r["حالة التوظيف"] || "").trim();
-    return (!ORG._region || region === ORG._region) && (!ORG._status || status === ORG._status);
+    const region = _orgNorm(r["المنطقة"]);
+    const status = _orgNorm(r["حالة التوظيف"]);
+    const team = _orgNorm(r["نوع الفريق"]);
+    return (!ORG._region || region === ORG._region) && (!ORG._status || status === ORG._status) && (!ORG._team || team === ORG._team);
   });
   _orgRenderTable();
 }
@@ -29927,11 +30326,12 @@ function _orgRowHtml(r) {
   const statusColor = vacant ? CSS_TOKENS.danger() : CSS_TOKENS.positive();
   return `<tr style="border-bottom:1px solid var(--brd)">
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["المنطقة"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["نوع الفريق"]) || "—"}</td>
     <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgTitle(r))}</td>
-    <td style="padding:6px 10px;font-size:11px">${_orgEsc(r["الاسم (موظف / مرشح)"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgName(r)) || "—"}</td>
     <td style="padding:6px 10px;text-align:center"><span style="background:${CSS_TOKENS.α(statusColor,0.12)};color:${statusColor};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${_orgEsc(r["حالة التوظيف"]) || "—"}</span></td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_orgEsc(r["رقم الموظف"]) || "—"}</td>
-    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ الالتحاق"])}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["الجنسية"]) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["سنوات الخبرة"]) || "—"}</td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ بداية العقد"])}</td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgFmtDate(r["تاريخ نهاية العقد"])}</td>
   </tr>`;
@@ -29942,7 +30342,7 @@ function _orgRenderTable() {
   if (!tbody) return;
   tbody.innerHTML =
     ORG.filtered.map((r) => _orgRowHtml(r)).join("") ||
-    `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+    `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("org-count");
   if (countEl) countEl.textContent = ORG.filtered.length.toLocaleString("ar");
 }
@@ -29950,14 +30350,11 @@ function _orgRenderTable() {
 function _orgExportCSV() {
   const src = ORG.filtered.length ? ORG.filtered : window.RAW_NEW_ORG_STRUCTURE || [];
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["المنطقة", "المسمى الوظيفي", "الاسم", "حالة التوظيف", "رقم الموظف", "تاريخ الالتحاق", "تاريخ بداية العقد", "تاريخ نهاية العقد"];
+  const headers = ["المنطقة", "نوع الفريق", "المسمى الوظيفي", "الاسم", "حالة التوظيف", "الجنسية", "سنوات الخبرة", "تاريخ بداية العقد", "تاريخ نهاية العقد"];
   const getVal = (r, h) => {
     if (h === "المسمى الوظيفي") return _orgTitle(r);
-    if (h === "الاسم") return r["الاسم (موظف / مرشح)"];
-    if (h === "تاريخ الالتحاق" || h === "تاريخ بداية العقد" || h === "تاريخ نهاية العقد") {
-      const key = h === "تاريخ الالتحاق" ? "تاريخ الالتحاق" : h === "تاريخ بداية العقد" ? "تاريخ بداية العقد" : "تاريخ نهاية العقد";
-      return _orgFmtDate(r[key]);
-    }
+    if (h === "الاسم") return _orgName(r);
+    if (h === "تاريخ بداية العقد" || h === "تاريخ نهاية العقد") return _orgFmtDate(r[h]);
     return r[h];
   };
   const rows = src.map((r) => headers.map((h) => `"${String(getVal(r, h) ?? "").replace(/"/g, '""')}"`).join(","));
@@ -29967,6 +30364,138 @@ function _orgExportCSV() {
   });
   a.click();
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// ORG CHART — شجرة تنظيمية قابلة للطي (details/summary أصلية، بدون أي
+// مكتبة خارجية). فيها مسارين:
+//  1) _orgBuildPersonChart: هيكل حقيقي بالأسماء مبني على "المدير
+//     المباشر" — يشتغل تلقائيًا بمجرد ما العمود ده يتملى ولو جزئيًا.
+//  2) _orgBuildGroupedChart: عرض احتياطي (نوع الفريق ← المنطقة ←
+//     المسمى الوظيفي) يشتغل دلوقتي طول ما "المدير المباشر" فاضي.
+// ═══════════════════════════════════════════════════════════════════
+function _orgNodeHtml(cls, label, count, extra) {
+  return `<span class="org-node org-node-${cls}"><span class="org-node-arrow">▸</span>${_orgEsc(label)}${
+    count != null ? `<span class="org-node-count">${_orgEsc(count)}</span>` : ""
+  }${extra || ""}</span>`;
+}
+
+function _orgBuildPersonNode(person, byManager, visited) {
+  if (visited.has(person.name)) {
+    // وقاية من حلقة دائرية (لو حصل خطأ بيانات ومدير حد بقى مرؤوسه)
+    return `<li><span class="org-node org-node-person">⚠ ${_orgEsc(person.name)} (حلقة دائرية في البيانات)</span></li>`;
+  }
+  visited.add(person.name);
+  const children = byManager[person.name] || [];
+  const childrenHtml = children.length
+    ? `<ul class="org-tree-children">${children.map((c) => _orgBuildPersonNode(c, byManager, visited)).join("")}</ul>`
+    : "";
+  const nodeInner = `<span class="org-node org-node-person">${children.length ? '<span class="org-node-arrow">▸</span>' : ""}${_orgEsc(person.name)}<span class="org-node-sub">${_orgEsc(_orgTitle(person.row))}</span></span>`;
+  if (children.length) {
+    return `<li><details class="org-node-details" open><summary>${nodeInner}</summary>${childrenHtml}</details></li>`;
+  }
+  return `<li>${nodeInner}</li>`;
+}
+
+function _orgBuildPersonChart(rows) {
+  const named = rows.filter((r) => _orgName(r));
+  if (!named.length) return null;
+  const byName = {};
+  named.forEach((r) => { byName[_orgName(r)] = r; });
+  const byManager = {};
+  named.forEach((r) => {
+    const mgr = _orgManager(r);
+    if (mgr && byName[mgr] && mgr !== _orgName(r)) {
+      (byManager[mgr] = byManager[mgr] || []).push({ name: _orgName(r), row: r });
+    }
+  });
+  const roots = named
+    .filter((r) => { const mgr = _orgManager(r); return !mgr || !byName[mgr]; })
+    .map((r) => ({ name: _orgName(r), row: r }));
+  if (!roots.length) return null;
+  const html = roots.map((p) => _orgBuildPersonNode(p, byManager, new Set())).join("");
+  return `<ul class="org-chart-root-list">${html}</ul>`;
+}
+
+function _orgBuildGroupedChart(rows) {
+  const teams = {};
+  rows.forEach((r) => {
+    const team = _orgNorm(r["نوع الفريق"]) || "غير مصنف";
+    const region = _orgNorm(r["المنطقة"]) || "غير محدد";
+    const title = _orgTitle(r);
+    teams[team] = teams[team] || {};
+    teams[team][region] = teams[team][region] || {};
+    teams[team][region][title] = teams[team][region][title] || [];
+    teams[team][region][title].push(r);
+  });
+
+  const teamNames = Object.keys(teams).sort((a, b) => a.localeCompare(b, "ar"));
+  const html = teamNames
+    .map((team) => {
+      const regions = teams[team];
+      const regionNames = Object.keys(regions).sort((a, b) => a.localeCompare(b, "ar"));
+      const teamTotal = regionNames.reduce((s, rg) => s + Object.values(regions[rg]).reduce((s2, list) => s2 + list.length, 0), 0);
+
+      const regionsHtml = regionNames
+        .map((rg) => {
+          const titles = regions[rg];
+          const titleNames = Object.keys(titles).sort((a, b) => a.localeCompare(b, "ar"));
+          const regionTotal = titleNames.reduce((s, t) => s + titles[t].length, 0);
+
+          const titlesHtml = titleNames
+            .map((t) => {
+              const list = titles[t];
+              const occupied = list.filter((r) => !_orgIsVacant(r));
+              const vacant = list.filter(_orgIsVacant);
+              const peopleItems = occupied
+                .map((r) => `<li><span class="org-node org-node-person">${_orgEsc(_orgName(r)) || "—"}</span></li>`)
+                .join("");
+              const vacantItem = vacant.length ? `<li><span class="org-node org-node-vacant">شاغر × ${vacant.length}</span></li>` : "";
+              const peopleHtml = peopleItems || vacantItem ? `<ul class="org-tree-children">${peopleItems}${vacantItem}</ul>` : "";
+              const summary = _orgNodeHtml("title", t, list.length + (vacant.length ? ` (شاغر ${vacant.length})` : ""));
+              return `<li><details class="org-node-details"><summary>${summary}</summary>${peopleHtml}</details></li>`;
+            })
+            .join("");
+
+          const regionSummary = _orgNodeHtml("region", rg, regionTotal);
+          return `<li><details class="org-node-details"><summary>${regionSummary}</summary><ul class="org-tree-children">${titlesHtml}</ul></details></li>`;
+        })
+        .join("");
+
+      const teamSummary = _orgNodeHtml("team", team, teamTotal);
+      return `<li><details class="org-node-details" open><summary>${teamSummary}</summary><ul class="org-tree-children">${regionsHtml}</ul></details></li>`;
+    })
+    .join("");
+
+  return `<ul class="org-chart-root-list">${html}</ul>`;
+}
+
+function _orgBuildChartPanel(rows) {
+  const mgrCount = rows.filter((r) => _orgManager(r)).length;
+  if (mgrCount > 0) {
+    const personHtml = _orgBuildPersonChart(rows);
+    if (personHtml) {
+      return (
+        `<div class="org-chart-note">📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString("ar")} صف معبّى من ${rows.length.toLocaleString("ar")}).</div>` +
+        `<div class="org-chart-wrap">${personHtml}</div>`
+      );
+    }
+  }
+  return (
+    `<div class="org-chart-note">📌 عمود "المدير المباشر" لسه مش متعبّى في الملف — العرض الحالي مبني على نوع الفريق/المنطقة/المسمى الوظيفي. بمجرد تعبئة "المدير المباشر" هيتحول العرض هنا تلقائيًا لهيكل تنظيمي فعلي بالأسماء من غير أي تعديل تاني.</div>` +
+    `<div class="org-chart-wrap">${_orgBuildGroupedChart(rows)}</div>`
+  );
+}
+
+function _orgSwitchView(view) {
+  document.querySelectorAll("#org-structure-content .org-view-btn").forEach((b) => {
+    b.classList.toggle("active", b.getAttribute("data-org-view") === view);
+  });
+  const elAnalysis = document.getElementById("org-view-analysis");
+  const elChart = document.getElementById("org-view-chart");
+  if (elAnalysis) elAnalysis.classList.toggle("active", view === "analysis");
+  if (elChart) elChart.classList.toggle("active", view === "chart");
+}
+window._orgSwitchView = _orgSwitchView;
 
 function renderOrgStructureTab() {
   const el = document.getElementById("org-structure-content");
@@ -29985,13 +30514,14 @@ function renderOrgStructureTab() {
   const vacantRows = rows.filter(_orgIsVacant);
   const occupiedCount = total - vacantRows.length;
   const vacantCount = vacantRows.length;
-  const regionsSet = [...new Set(rows.map((r) => String(r["المنطقة"] || "").trim()))].filter(Boolean).sort();
+  const regionsSet = [...new Set(rows.map((r) => _orgNorm(r["المنطقة"])))].filter(Boolean).sort();
+  const teamsSet = [...new Set(rows.map((r) => _orgNorm(r["نوع الفريق"])))].filter(Boolean).sort();
 
   // توزيع الإشغال والشواغر حسب المنطقة — الهدف الأساسي من هذا التبويب
   const byRegion = {};
   regionsSet.forEach((rg) => { byRegion[rg] = { مشغولة: 0, شاغرة: 0 }; });
   rows.forEach((r) => {
-    const rg = String(r["المنطقة"] || "").trim();
+    const rg = _orgNorm(r["المنطقة"]);
     if (!byRegion[rg]) byRegion[rg] = { مشغولة: 0, شاغرة: 0 };
     byRegion[rg][_orgIsVacant(r) ? "شاغرة" : "مشغولة"]++;
   });
@@ -30005,11 +30535,19 @@ function renderOrgStructureTab() {
   });
   const titleEntries = Object.entries(byTitle).sort((a, b) => (b[1].مشغولة + b[1].شاغرة) - (a[1].مشغولة + a[1].شاغرة));
 
+  const chartPanelHtml = _orgBuildChartPanel(rows);
+
   el.innerHTML = `
+  <div class="org-view-switch">
+    <button type="button" class="org-view-btn active" data-org-view="analysis" onclick="_orgSwitchView('analysis')">📊 التحليل</button>
+    <button type="button" class="org-view-btn" data-org-view="chart" onclick="_orgSwitchView('chart')">🗂️ ORG CHART</button>
+  </div>
+
+  <div class="org-view-panel active" id="org-view-analysis">
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="kpi kc-blue">
       <div class="kpi-val">${total.toLocaleString("ar")}</div>
-      <div class="kpi-lbl">إجمالي المسميات الوظيفية</div>
+      <div class="kpi-lbl">إجمالي الوظائف</div>
       <div class="kpi-sub">في كل المناطق</div>
     </div>
     <div class="kpi kc-green">
@@ -30035,7 +30573,7 @@ function renderOrgStructureTab() {
       <div class="chart-box" style="height:260px"><canvas id="ch-org-region-status"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">توزيع المسميات: مشغولة مقابل شاغرة</div>
+      <div class="card-title">توزيع الوظائف: مشغولة مقابل شاغرة</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-org-status"></canvas></div>
     </div>
   </div>
@@ -30066,11 +30604,15 @@ function renderOrgStructureTab() {
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المسميات الوظيفية <span class="sub" id="org-count">${total}</span></div>
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة الوظائف <span class="sub" id="org-count">${total}</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select class="fsel" id="org-filter-region" onchange="ORG._region=this.value;_orgApplyFilters()" style="font-size:11px">
           <option value="">— كل المناطق —</option>
           ${regionsSet.map((rg) => `<option value="${_orgEsc(rg)}">${_orgEsc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="org-filter-team" onchange="ORG._team=this.value;_orgApplyFilters()" style="font-size:11px">
+          <option value="">— كل الفرق —</option>
+          ${teamsSet.map((tm) => `<option value="${_orgEsc(tm)}">${_orgEsc(tm)}</option>`).join("")}
         </select>
         <select class="fsel" id="org-filter-status" onchange="ORG._status=this.value;_orgApplyFilters()" style="font-size:11px">
           <option value="">— كل الحالات —</option>
@@ -30084,21 +30626,28 @@ function renderOrgStructureTab() {
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="org-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">نوع الفريق</th>
           <th style="padding:8px 10px;text-align:right">المسمى الوظيفي</th>
           <th style="padding:8px 10px;text-align:right">الاسم</th>
           <th style="padding:8px 10px;text-align:center">حالة التوظيف</th>
-          <th style="padding:8px 10px;text-align:center">رقم الموظف</th>
-          <th style="padding:8px 10px;text-align:right">تاريخ الالتحاق</th>
+          <th style="padding:8px 10px;text-align:right">الجنسية</th>
+          <th style="padding:8px 10px;text-align:right">سنوات الخبرة</th>
           <th style="padding:8px 10px;text-align:right">تاريخ بداية العقد</th>
           <th style="padding:8px 10px;text-align:right">تاريخ نهاية العقد</th>
         </tr></thead>
         <tbody id="org-tbody"></tbody>
       </table>
     </div>
+  </div>
+  </div>
+
+  <div class="org-view-panel" id="org-view-chart">
+    ${chartPanelHtml}
   </div>`;
 
   ORG._region = "";
   ORG._status = "";
+  ORG._team = "";
   ORG.filtered = rows.slice();
   _orgRenderTable();
 
@@ -34469,6 +35018,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(35, 'click', function (event) { showTab('spare',this) });
   bind(36, 'click', function (event) { showTab('gatekeepers',this) });
   bind(217, 'click', function (event) { showTab('supervisors',this) });
+  bind(218, 'click', function (event) { showTab('petty-cash',this) });
   bind(38, 'click', function (event) { showTab('all-contracts',this) });
   bind(39, 'click', function (event) { showTab('payments',this);paymentsInitTab() });
   bind(40, 'click', function (event) { showTab('cost',this) });
@@ -34926,7 +35476,8 @@ var PORTAL_CATEGORIES = {
     tabs: [
       { name: "cost",                  label: "التكلفة" },
       { name: "ls-payments",           label: "مدفوعات وعقود LS" },
-      { name: "contractor-payments",   label: "مدفوعات وعقود المقاولين" }
+      { name: "contractor-payments",   label: "مدفوعات وعقود المقاولين" },
+      { name: "petty-cash",            label: "العهدة" }
     ]
   },
   // 9) الخرائط والتفاصيل (دمج geo + explore القديمين)
@@ -36146,10 +36697,18 @@ setTimeout(function tellUserStillTrying() {
     var originalShowTab = window.showTab;
     var wrapped = function (name, el) {
       var result = originalShowTab(name, el);
-      window.CURRENT_SECTION = name;
-      window.__ACTIVE_TAB__ = name;
-      if (window.CURRENT_PORTAL_CATEGORY) highlightSidebarActive(name);
-      if (typeof __toggleOverviewKpisVisibility === "function") __toggleOverviewKpisVisibility(name);
+      // 🛡️ 2026-09-20: لو الاسم المطلوب كان محجوب (Presentation/Brand) فالدالة
+      // الأصلية بتعمل redirect داخلي لـ "overview" وبتظبط window.__ACTIVE_TAB__
+      // صح جوه الاستدعاء المتداخل. المشكلة إن الكود القديم هنا كان بيكتب فوق
+      // القيمة الصحيحة دي بالـ "name" الأصلي (اللي اتحجب) تاني بعد الرجوع من
+      // originalShowTab، فيرجّع التبويب المحجوب يظهر كـ "نشط" رغم إخفاؤه فعليًا.
+      // الإصلاح: نعتمد على القيمة اللي الدالة الأصلية ضبطتها فعلاً (__ACTIVE_TAB__)
+      // بدل ما نفرض الاسم اللي اتبعت لـ wrapped نفسها.
+      var effectiveName = window.__ACTIVE_TAB__ || name;
+      window.CURRENT_SECTION = effectiveName;
+      window.__ACTIVE_TAB__ = effectiveName;
+      if (window.CURRENT_PORTAL_CATEGORY) highlightSidebarActive(effectiveName);
+      if (typeof __toggleOverviewKpisVisibility === "function") __toggleOverviewKpisVisibility(effectiveName);
       return result;
     };
     wrapped.__contextWrapped = true;

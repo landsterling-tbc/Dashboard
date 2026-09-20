@@ -7029,3 +7029,116 @@ button.ix-profile-source:hover{
   .brand-select-card { padding: 22px 26px; min-width: 140px; }
   .brand-select-card img { max-height: 34px; max-width: 130px; }
 }
+
+/* شاشة التحميل تبدأ مخفية لحد ما المستخدم يختار شعار من شاشة "اختر" —
+   ★ 2026-09-20 بناءً على طلب صريح. التحميل الحقيقي للبيانات مش متأخر،
+   بس الظهور البصري لشاشة التحميل بيتأجل لحد لحظة الاختيار. */
+.app-loading-screen.brand-gate-pending {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* تبويبات مقصورة على شعار Landsterling فقط — تختفي بالكامل (الخانة في
+   الشريط العلوي + البانل بتاعها) لما يكون الشعار المختار TBC.
+   ★ 2026-09-20 بناءً على طلب صريح — راجع LANDSTERLING_ONLY_TABS في
+   dashboard.js. */
+.tab.brand-hidden-tab,
+.panel.brand-hidden-tab {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   الهيكل الوظيفي — مبدّل "📊 التحليل" / "🗂️ ORG CHART" داخل نفس الكارت
+   + شجرة تنظيمية قابلة للطي (details/summary أصلية بدون مكتبات خارجية)
+   ★ 2026-09-20 بناءً على طلب صريح
+   ══════════════════════════════════════════════════════════════════ */
+.org-view-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.org-view-btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--bd-light, #e2e8f0);
+  background: #fff;
+  color: var(--tx-muted, #64748b);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .15s;
+  font-family: inherit;
+}
+.org-view-btn:hover { background: #f1f5f9; }
+.org-view-btn.active { background: #0b6b7e; border-color: #0b6b7e; color: #fff; }
+.org-view-panel { display: none; }
+.org-view-panel.active { display: block; }
+
+.org-chart-note {
+  font-size: 12px;
+  color: #92400e;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 9px 14px;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+.org-chart-wrap { padding: 4px 2px 14px; overflow-x: auto; }
+.org-chart-root-list { list-style: none; margin: 0; padding: 0; }
+.org-chart-root-list > li { margin-bottom: 10px; }
+.org-tree-children {
+  list-style: none;
+  margin: 6px 0;
+  padding-inline-start: 22px;
+  border-inline-start: 2px dashed #d7dee6;
+}
+.org-tree-children > li { margin: 6px 0; position: relative; }
+.org-tree-children > li::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  inset-inline-start: -22px;
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed #d7dee6;
+}
+details.org-node-details > summary { list-style: none; cursor: pointer; }
+details.org-node-details > summary::-webkit-details-marker { display: none; }
+details.org-node-details > summary::marker { content: ''; }
+.org-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.org-node .org-node-arrow { font-size: 10px; color: #94a3b8; transition: .15s; }
+details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
+.org-node .org-node-sub {
+  display: block;
+  font-weight: 500;
+  font-size: 10.5px;
+  color: var(--tx-muted, #64748b);
+  margin-top: 2px;
+}
+.org-node-count {
+  background: rgba(0,0,0,.06);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.org-node.org-node-team { background: #ECFDF5; border-color: #a7f3d0; color: #065f46; }
+.org-node.org-node-region { background: #EEF2FF; border-color: #c7d2fe; color: #3730a3; }
+.org-node.org-node-title { background: #FFF7ED; border-color: #fed7aa; color: #9a3412; }
+.org-node.org-node-vacant { background: #FEF2F2; border-color: #fecaca; color: #991b1b; }
+.org-node.org-node-person { background: #F8FAFC; border-color: #e2e8f0; color: #334155; font-weight: 600; }

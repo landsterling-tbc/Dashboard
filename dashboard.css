@@ -6862,6 +6862,40 @@ button.ix-profile-source:hover{
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   20) إصلاح محاذاة سهم عنوان كارت البوابة عند hover (RTL) — ★ 2026-09-21
+   ──────────────────────────────────────────────────────────────────────
+   بناءً على طلب صريح ("خلي شكل صفحة الكروت أكثر حداثة وجمالاً")، راجعنا
+   حالة hover الحقيقية لكل كارت (فحص فعلي بمتصفح، مش تخمين) ولقينا خللاً:
+   السهم "‹" (قسم 12 أعلاه) كان position:absolute + left:0 نسبةً لعرض
+   صندوق العنوان الكامل (div يمتد بعرض الكارت)، بينما نص العنوان نفسه
+   محاذى لليمين (RTL) — فكان السهم يظهر منفصلاً تماماً عن الكلمة، عالقاً
+   في الحافة اليسرى الفارغة من الكارت بدل ما يكون ملاصقاً لآخر حرف في
+   العنوان (مؤكَّد بالقياس الفعلي: كان يظهر على بعد أكثر من 300px من
+   النص). الحل: نلغي الـ position:absolute تماماً ونخلّي السهم عنصر
+   عادي داخل تدفق النص (inline-block) يظهر مباشرة بعد آخر حرف — في RTL
+   معناه يظهر بصرياً ملاصقاً لآخر كلمة في العنوان مباشرة، ومع لفّ العنوان
+   لسطرين (لو طويل) هيفضل ملازماً لآخر سطر تلقائياً بدون أي حسابات إضافية.
+   ══════════════════════════════════════════════════════════════════════ */
+.portal-card-title {
+  padding-left: 0;
+}
+.portal-card-title::after {
+  content: "‹";
+  position: static;
+  display: inline-block;
+  margin-inline-start: 6px;
+  font-weight: 800;
+  color: var(--tx-muted);
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.portal-card:hover .portal-card-title::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    19) تحسينات الموبايل — طيّ شريط الفلاتر + تباعد أقرب في وضع الفتح +
    تلميح تمرير أفقي للجداول. قسم جديد بالكامل — إضافة فقط، كل القواعد
    هنا محصورة داخل @media (max-width) فمفيش أي تأثير على الديسكتوب.
@@ -7234,3 +7268,350 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .org-node.org-node-title { background: #FFF7ED; border-color: #fed7aa; color: #9a3412; }
 .org-node.org-node-vacant { background: #FEF2F2; border-color: #fecaca; color: #991b1b; }
 .org-node.org-node-person { background: #F8FAFC; border-color: #e2e8f0; color: #334155; font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   21) PORTAL HOME — تحديث المرحلة 1: شريط أدوات الـ Hero (زجاجي موحّد)
+   ──────────────────────────────────────────────────────────────────────
+   بناءً على طلب صريح ("خليه يبقى أحدث حاجة، نفّذ من غير ما تكسر الكود،
+   على 3 مراحل") — المرحلة 1 هنا. زرّي "تغيير الشعار" و"وضع العرض
+   التقديمي" كانا inline style="" خام (نص "⇄" اصطلاحي بدل أيقونة حقيقية،
+   وإيموجي "👁" مباشر) بمعزل تام عن نظام الأيقونات SVG (Lucide) المستخدم
+   في باقي الصفحة — فكانا واضحين كعنصر "غريب" أقل حداثة وسط بقية العناصر.
+   استبدلناهم بأيقونات SVG من نفس عائلة أيقونات كروت البوابة + كلاس CSS
+   زجاجي موحّد (glass pill) بدل inline style، مع الحفاظ الكامل على نفس
+   id/onclick/title في index.html — فلا شيء من منطق التبديل بين TBC/Land
+   Sterling أو وضع العرض التقديمي تغيّر، التعديل بصري بحت.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.portal-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.85);
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+  margin-inline-start: 10px;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+  white-space: nowrap;
+}
+.portal-toolbar-btn svg { flex-shrink: 0; }
+.portal-toolbar-btn:hover {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  border-color: rgba(255,255,255,.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.18);
+}
+.portal-toolbar-btn:active { transform: translateY(0); }
+
+.portal-toolbar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: .55;
+  transition: opacity .18s ease, background .18s ease, transform .18s ease, border-color .18s ease;
+  margin-inline-start: 10px;
+  flex-shrink: 0;
+}
+.portal-toolbar-icon-btn:hover {
+  opacity: 1;
+  background: rgba(255,255,255,.16);
+  border-color: rgba(255,255,255,.26);
+  transform: translateY(-1px);
+}
+.portal-toolbar-icon-btn:active { transform: translateY(0); }
+
+/* توحيد شفافية خلفية كل الـ"حبّات" (pills) داخل شريط الـ Hero العلوي —
+   الساعة الحية + آخر تحديث + الزرّين أعلاه — كانت كل واحدة بقيمة شفافية
+   مختلفة شوية (٠٫٠٨ / ٠٫١٠ / ٠٫١٢ / ٠٫١٤) فيبان الشريط غير متّسق بصريًا
+   عن قرب. كلها دلوقتي بنفس القيمة بالظبط. */
+.portal-updated-val,
+.portal-live-clock {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.22);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   22) PORTAL HOME — تحديث المرحلة 2: عمق أكبر لنظام الكروت + ربط لون
+       كل قسم بكل تفاصيله (المرحلة 2 من 3)
+   ──────────────────────────────────────────────────────────────────────
+   إضافة فقط، تعتمد بالكامل على متغيرات --cat-accent/--cat-soft/--cat-bd
+   الموجودة بالفعل لكل كارت (قسم 20 أعلاه) — من غير أي تعديل على HTML أو
+   على تعريفات الألوان نفسها، فمفيش أي خطر على الكود الحالي.
+   1) شارة الأيقونة: تدرّج لوني بدل تلوين مسطّح + عند hover تنقلب لتعبئة
+      كاملة بلون القسم مع أيقونة بيضاء (تأثير "activation" شائع في لوحات
+      SaaS الحديثة).
+   2) عنوان الكارت يتلوّن بلون القسم عند hover (بدل اللون الموحّد الثابت)
+      — إشارة بصرية إضافية إن الكارت قابل للفتح.
+   3) نقاط قائمة التبويبات الفرعية داخل كل كارت تاخد لون القسم نفسه بدل
+      التيل الموحّد — يخلي كل كارت متّسق بصريًا 100% مع لونه من الأيقونة
+      للنقاط.
+   4) ظل ارتياح أعمق قليلاً في وضع السكون (rest state) — إحساس "رفع" أوضح
+      حتى قبل التفاعل، يتماشى مع باقي عناصر الصفحة (KPI/Hero).
+   ══════════════════════════════════════════════════════════════════════ */
+
+.portal-card {
+  box-shadow:
+    0 1px 2px rgba(8,45,60,.05),
+    0 8px 22px rgba(8,45,60,.08),
+    inset 0 1px 0 rgba(255,255,255,.85);
+}
+
+.portal-card-icon {
+  background: linear-gradient(160deg, var(--cat-soft, rgba(22,164,191,.15)) 0%, rgba(255,255,255,.35) 100%);
+  transition: background .22s ease, color .22s ease, box-shadow .22s ease, transform .22s var(--ease-std);
+}
+
+.portal-card:hover .portal-card-icon {
+  background: var(--cat-accent, var(--teal-3));
+  color: #fff;
+  box-shadow: 0 6px 16px -2px var(--cat-bd, rgba(22,164,191,.4)), inset 0 1px 0 rgba(255,255,255,.3);
+}
+
+.portal-card-title {
+  transition: color .18s ease;
+}
+.portal-card:hover .portal-card-title {
+  color: var(--cat-accent, var(--tx-main));
+}
+
+.portal-card-tab-dot {
+  background: var(--cat-accent, #0d7490);
+  box-shadow: 0 0 0 2px var(--cat-soft, rgba(13,116,144,.15));
+  transition: box-shadow .18s ease;
+}
+.portal-card:hover .portal-card-tab-dot {
+  box-shadow: 0 0 0 3px var(--cat-soft, rgba(13,116,144,.2));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   23) PORTAL HOME — تحديث المرحلة 3: توحيد نصف قطر الحواف + لمسات نهائية
+       (المرحلة 3 من 3)
+   ──────────────────────────────────────────────────────────────────────
+   ملاحظة اتكتشفت أثناء المراجعة النهائية: كروت البوابة (.portal-card)
+   وكارت المفضّلة (.portal-favorites-card) بيستخدموا --r-2xl (26px)، لكن
+   الهيدر العلوي (.portal-hero) وكروت الإحصائيات السريعة (.portal-stat)
+   لسه على --r-lg (18px) من مراحل قديمة (16-A و16-B) — فيبان فيه اختلاف
+   بسيط في "لغة" التدوير بين السطح العلوي والسطح السفلي للصفحة. توحيدهم
+   كلهم على --r-2xl يخلي كل أسطح الصفحة (Hero + إحصائيات + كروت) على نفس
+   مقياس التدوير بالظبط — بدون أي تغيير في المسافات أو الألوان أو المنطق.
+   override فقط (override-only)، مفيش حذف أو إعادة كتابة لأي قاعدة قديمة.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.portal-hero {
+  border-radius: var(--r-2xl);
+}
+
+.portal-stat {
+  border-radius: var(--r-2xl);
+}
+
+/* الشريط اللوني العلوي داخل كل .portal-stat لازم ياخد نفس تدوير الكارت
+   نفسه من فوق، وإلا هيبان زاويتين حادين بارزتين فوق كارت مدوّر أكتر. */
+.portal-stat::before {
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   24) الهيكل الوظيفي — ORG CHART بكروت حقيقية متصلة بخطوط (★ 2026-09-21)
+   ──────────────────────────────────────────────────────────────────────
+   بناءً على طلب صريح: بعد ما عمود "المدير المباشر" اتملى فعليًا في ملف
+   الاستشاري، الشجرة النصية القديمة (org-node / org-tree-children باللي
+   فوق، لسه موجودة وبتخدم فيو "📊 التحليل" مفيش أي تغيير فيها) اتستبدلت
+   في فيو "🗂️ ORG CHART" بشجرة كروت بصرية فعلية — نفس روح تصميم نظام
+   "إدارة الموارد البشرية" المرجعي اللي شاركه المستخدم: كارت لكل شخص فيه
+   دائرة أول حرف من الاسم، نجمة صفراء لو الشخص مدير له مرؤوسين، عنوان
+   وظيفي، اسم، وحالة توظيف بلون مميز — وكل الكروت متصلة ببعض بخطوط شجرة
+   حقيقية (تقنية CSS خالصة، بدون أي مكتبة خارجية)، قابلة للطي/الفتح لكل
+   فرع لوحده (لأن العدد كبير — مئات الموظفين).
+   ★ اتجاه الهيكل نفسه (.orgc-tree/.orgc-children/.orgc-li) متثبّت LTR
+   عمدًا عشان حسابات مواقع خطوط التوصيل (يمين/يسار) تبقى صحيحة 100% في
+   كل المتصفحات، بغض النظر عن اتجاه الصفحة العام (RTL) — ده تأثير هيكلي
+   بحت مالوش علاقة باتجاه النص، والنص نفسه جوه كل كارت (.orgc-card)
+   متثبّت RTL ووسط (text-align:center) عشان يتقرأ صح بالعربي.
+   ══════════════════════════════════════════════════════════════════════ */
+.orgc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.orgc-search-input {
+  flex: 1 1 220px;
+  min-width: 180px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0d2f40;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.orgc-search-input:focus { border-color: #0b6b7e; box-shadow: 0 0 0 3px rgba(11,107,126,.12); }
+.orgc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-inline-start: auto;
+}
+.orgc-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.orgc-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.orgc-forest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 34px 22px;
+  padding: 8px 6px 22px;
+}
+
+/* — الشجرة والخطوط (تقنية CSS classic لخطوط شجرة تنظيمية) — */
+.orgc-tree, .orgc-tree * { box-sizing: border-box; }
+.orgc-tree, .orgc-children, .orgc-li, .orgc-node { direction: ltr; }
+.orgc-root-tree { list-style: none; margin: 0; padding: 0; }
+.orgc-children {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 28px 0 0;
+  position: relative;
+}
+.orgc-children.orgc-collapsed { display: none; }
+.orgc-children::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  width: 0; height: 28px;
+  border-left: 2px solid #cbd5e1;
+}
+.orgc-li {
+  position: relative;
+  padding: 28px 14px 0;
+  text-align: center;
+}
+.orgc-li::before, .orgc-li::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 50%;
+  width: 50%; height: 28px;
+  border-top: 2px solid #cbd5e1;
+}
+.orgc-li::after { right: auto; left: 50%; border-left: 2px solid #cbd5e1; }
+.orgc-li:only-child { padding-top: 0; }
+.orgc-li:only-child::before, .orgc-li:only-child::after { display: none; }
+.orgc-li:first-child::before, .orgc-li:last-child::after { border-color: transparent; }
+.orgc-li:last-child::before { border-right: 2px solid #cbd5e1; border-radius: 0 6px 0 0; }
+.orgc-li:first-child::after { border-radius: 6px 0 0 0; }
+
+.orgc-node { display: inline-block; position: relative; }
+.orgc-toggle {
+  position: absolute;
+  bottom: -13px; left: 50%;
+  transform: translateX(-50%);
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #cbd5e1;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  padding: 0;
+  font-family: inherit;
+}
+.orgc-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
+
+/* — الكارت نفسه (نص عربي، فمتثبّت RTL ووسط بغض النظر عن اتجاه الشجرة) — */
+.orgc-card {
+  direction: rtl;
+  text-align: center;
+  display: inline-block;
+  width: 172px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  border-top-width: 3px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 16px rgba(15,23,42,.06);
+  padding: 13px 10px 11px;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+  position: relative;
+  transition: box-shadow .15s ease, transform .15s ease, opacity .15s ease;
+  vertical-align: top;
+}
+.orgc-card:hover { box-shadow: 0 4px 10px rgba(15,23,42,.09), 0 12px 26px rgba(15,23,42,.1); transform: translateY(-2px); }
+.orgc-card.orgc-has-children { box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 16px rgba(15,23,42,.06), 0 0 0 1px rgba(11,107,126,.12); }
+
+.orgc-card-avatarrow { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 8px; }
+.orgc-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #e0f2f4, #ffffff);
+  border: 1.5px solid #bfe3e8;
+  color: #0b6b7e;
+  font-weight: 800;
+  font-size: 14px;
+}
+.orgc-star {
+  position: absolute;
+  top: -6px; right: calc(50% - 28px);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  color: #fff;
+  font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(180,83,9,.4);
+}
+.orgc-card-title { font-weight: 800; font-size: 11.5px; color: #0f172a; line-height: 1.45; margin-bottom: 3px; min-height: 17px; }
+.orgc-card-name { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; line-height: 1.4; }
+.orgc-card-status {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+}
+.orgc-card-tag { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+.orgc-card.orgc-status-active { border-top-color: #16a34a; }
+.orgc-card.orgc-status-active .orgc-card-status { background: #DCFCE7; color: #15803d; }
+.orgc-card.orgc-status-vacant { border-top-color: #94a3b8; background: #fbfcfe; }
+.orgc-card.orgc-status-vacant .orgc-card-name { color: #94a3b8; font-style: italic; }
+.orgc-card.orgc-status-vacant .orgc-card-status { background: #F1F5F9; color: #64748b; }
+.orgc-card.orgc-status-external { border-top-color: #d4af6a; border-top-style: dashed; background: #FFFBF0; }
+.orgc-card.orgc-status-external .orgc-card-status { background: #FEF3C7; color: #92400E; }
+
+.orgc-card.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.orgc-card.orgc-search-dim { opacity: .22; }
+
+@media (max-width: 640px) {
+  .orgc-legend { margin-inline-start: 0; }
+  .orgc-card { width: 148px; }
+}

@@ -4402,6 +4402,11 @@ let __bgRevalidatedOnce = false;
     // التوصيل الفعلي هيتم تدريجياً في خطوات لاحقة بعد التأكد إنها شغالة صح.
     const NEW_TEMPLATES_URL =
       "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
+    // ★ 2026-09-21: تعريض الرابط على window — عشان __buildBackupSources_
+    // (المُعرّفة في نطاق (scope) تاني تمامًا، بعيد عن الـ closure ده) تقدر
+    // توصله وتضيفه كمصدر جديد في زر النسخة الاحتياطية الكاملة، بطلب صريح
+    // من المستخدم إن النسخة الاحتياطية تشمل كل الملفات الجديدة كمان.
+    window.NEW_TEMPLATES_URL = NEW_TEMPLATES_URL;
     // ★ 2026-09-20: مفتاح كاش IndexedDB لهذا المصدر — عشان لو حصل تعطل مؤقت
     // في الآب سكريبت (زي 404 بسبب Redeploy غلط)، التبويبات المتغذية من هنا
     // (المراسلات، KPI، السيارات، التدريب، الوقود، البوابين، المشرفين،
@@ -4617,20 +4622,48 @@ async function _mainMetaCheckAndMaybeRefresh() {
 
 // ══════════════════════════════════════════════════════════════════
 // 💾 زر النسخة الاحتياطية الكاملة (مخفي في الفوتر) — إضافة مستقلة تمامًا،
-// لا تمسّ أي منطق تحميل أو عرض موجود مسبقًا. تجلب خمسة من مصادر بيانات
+// لا تمسّ أي منطق تحميل أو عرض موجود مسبقًا. تجلب ستة من مصادر بيانات
 // الداشبورد (الرئيسي بشيتاته الـ21 + توريدات التجهيزات + عقود التجهيزات
-// + النشاط البدني + المكيّفات) بالتوازي، وتُنزِّل كل مصدر في ملف إكسل
+// + النشاط البدني + المكيّفات + ★ 2026-09-21: "الملفات الجديدة" بالكامل:
+// العهدة، الهيكل الوظيفي، مدفوعات LS، مدفوعات المقاولين، PPM Maximo،
+// الزيارات، مؤشرات الأداء، السيارات، التدريب، الوقود، البوابين،
+// المشرفين، سجل المراسلات) بالتوازي، وتُنزِّل كل مصدر في ملف إكسل
 // مستقل بذاته — لا يُدمج أي مصدر مع مصدر آخر في ملف واحد — وكل شيت داخل
 // ملفه يحمل اسم الشيت الأصلي على جوجل شيتس. لا تعتمد على أي بيانات
 // محمَّلة مسبقًا في ذاكرة المتصفح (window.RAW*) حتى تعمل بشكل صحيح ولو
 // كان المستخدم لا يزال في الصفحة الرئيسية فقط.
 // 📌 استُبعدت البلاغات والحصر والتكلفة من هذه النسخة الاحتياطية عمدًا
 // (بطلب صريح — بياناتها محفوظة بأمان في مكان آخر)، ولتسريع العملية.
+// هذا القرار اتأكّد صراحةً تاني بتاريخ 2026-09-21 عند إضافة "الملفات
+// الجديدة" — الثلاثة دول (بلاغات/حصر/تكلفة) لسه مستبعدين عمدًا.
 // ══════════════════════════════════════════════════════════════════
 // 🔑 مبنية كدالة (مش const ثابت) عشان الروابط زي TAJHEEZ_SUPPLIES_URL/
 // MOKAYEFAT_URL/... متعرَّفة (const) في مواضع تانية أسفل هذا الملف —
 // استدعاء الدالة دي بيحصل بس عند الضغط على الزر (بعد تنفيذ الملف بالكامل)،
 // فمفيش أي مشكلة توقيت، لكن لازم تفضل دالة (مش مصفوفة جاهزة من الأول).
+// ★ 2026-09-21: مصدر "الملفات الجديدة" (نفس الآب سكريبت اللي بيغذّي العهدة
+// والهيكل الوظيفي وباقي التبويبات المُضافة أخيرًا) — بيرجع كل شيت جوه مفتاح
+// { name, sheets: { "اسم الشيت": [صفوف...] } }، شكل مختلف عن مصادر
+// "multi" العادية (اللي بتفترض إن data[key] مصفوفة مباشرة). خريطة
+// NEW_TEMPLATES_TOP_LABELS بس لتحسين اسم الشيت في ملف الإكسل النهائي —
+// أي مفتاح جديد يُضاف مستقبلاً في استجابة الآب سكريبت (حتى من غير ما
+// يتحدَّث هنا) هيتحمّل تلقائيًا باسم المفتاح نفسه بدل ما يتجاهل بالكامل.
+var NEW_TEMPLATES_TOP_LABELS = {
+  correspondence: "سجل_المراسلات",
+  kpi: "مؤشرات_الأداء",
+  vehicles: "السيارات",
+  training_fuel: "التدريب_والوقود",
+  gatekeepers_supervisors: "البوابين_والمشرفين",
+  org_structure: "الهيكل_الوظيفي",
+  ls_payments: "مدفوعات_LS",
+  contractor_payments: "مدفوعات_المقاولين",
+  ppm_maximo: "PPM_Maximo",
+  visits: "الزيارات",
+  petty_cash: "العهدة",
+};
+var NEW_TEMPLATES_URL_FALLBACK =
+  "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
+
 function __buildBackupSources_() {
   return [
     {
@@ -4700,6 +4733,20 @@ function __buildBackupSources_() {
         zamil: "توريدات المكيفيات شركة الزامل",
       },
     },
+    // ★ 2026-09-21: بناءً على طلب صريح — إضافة كل "الملفات الجديدة" (العهدة،
+    // الهيكل الوظيفي، مدفوعات LS، مدفوعات المقاولين، PPM Maximo، الزيارات،
+    // مؤشرات الأداء، السيارات، التدريب، الوقود، البوابين، المشرفين، سجل
+    // المراسلات) للنسخة الاحتياطية — كلهم بييجوا من نفس الآب سكريبت
+    // (NEW_TEMPLATES_URL) في طلب واحد، فبيتحمّلوا هنا كمصدر واحد فقط
+    // (fetch واحد) وبينزلوا في ملف إكسل واحد بشيتات منفصلة لكل نوع بيانات
+    // — بدون أي طلبات شبكة إضافية. البلاغات/الحصر/التكلفة يفضلوا مستبعدين
+    // عمدًا زي القرار السابق (بياناتهم محفوظة بأمان في مكان تاني).
+    {
+      url: window.NEW_TEMPLATES_URL || NEW_TEMPLATES_URL_FALLBACK,
+      kind: "nested",
+      fileLabel: "الملفات_الجديدة",
+      topLabels: NEW_TEMPLATES_TOP_LABELS,
+    },
   ];
 }
 
@@ -4740,6 +4787,21 @@ function __backupBuildWorkbookForSource_(src, apiResponse) {
     if (src.kind === "multi") {
       Object.keys(src.names).forEach((key) => {
         __backupAddSheet_(wb, usedNames, src.names[key], data[key]);
+      });
+    } else if (src.kind === "nested") {
+      // ★ 2026-09-21: شكل استجابة "الملفات الجديدة" — data[topKey] = { name,
+      // sheets: { "اسم الشيت": [صفوف...] } }. نمر على كل المفاتيح الموجودة
+      // فعليًا في الاستجابة (مش قايمة ثابتة) عشان أي ملف جديد يُضاف مستقبلاً
+      // على نفس الآب سكريبت ينزل تلقائيًا من غير أي تعديل كود هنا.
+      Object.keys(data).forEach((topKey) => {
+        var topLabel = (src.topLabels && src.topLabels[topKey]) || topKey;
+        var sheets = data[topKey] && data[topKey].sheets;
+        if (!sheets || typeof sheets !== "object") return;
+        var sheetKeys = Object.keys(sheets);
+        sheetKeys.forEach((sheetName) => {
+          var label = sheetKeys.length > 1 ? topLabel + "_" + sheetName : topLabel;
+          __backupAddSheet_(wb, usedNames, label, sheets[sheetName]);
+        });
       });
     } else {
       // kind === "auto" — نكتشف الشكل من الاستجابة نفسها
@@ -19518,6 +19580,9 @@ function exportNashatExcel(rows) {
     __fcbSummaryCacheRev = rev;
     return built;
   }
+  // تعريض دالة الملخص على window — يسمح بمراجعة كل ما يعرفه المساعد الذكي
+  // فعليًا من نافذة المتصفح (Console) للتشخيص، ولا يغيّر أي سلوك قائم.
+  window.fcbBuildDashboardSummary = fcbBuildDashboardSummary;
   function fcbBuildDashboardSummaryUncached_() {
     const D = (typeof RAW !== "undefined" && Array.isArray(RAW)) ? RAW : [];
     const total = D.length;
@@ -20408,6 +20473,90 @@ function exportNashatExcel(rows) {
       }
     } catch (e) {
       summary.برامج_التدريب = { تنبيه: "تعذّر تلخيص بيانات برامج التدريب: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 💰 تبويب العهدة (window.RAW_NEW_PETTY_CASH_LAYNADA / _MEER)
+    // أعمدة كل شيت: التاريخ، رقم_السند، المسؤول، النوع، المستلم، المصروف، المتبقي
+    // ★ 2026-09-21: أُضيف لسياق الـ AI بناءً على طلب صريح — لم يكن معروفًا
+    // للمساعد الذكي رغم إضافة التبويب نفسه للداشبورد.
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const pcLaynada = Array.isArray(window.RAW_NEW_PETTY_CASH_LAYNADA) ? window.RAW_NEW_PETTY_CASH_LAYNADA : [];
+      const pcMeer    = Array.isArray(window.RAW_NEW_PETTY_CASH_MEER)    ? window.RAW_NEW_PETTY_CASH_MEER    : [];
+      const pcAll = pcLaynada.map(r => ({ ...r, __sheet: "ليندا" })).concat(pcMeer.map(r => ({ ...r, __sheet: "مير" })));
+      const pcRows = pcAll.filter(r => String(r["رقم_السند"] || "").trim()); // استبعاد صف الإجمالي/الملاحظات
+      if (pcRows.length) {
+        const n_ = v => { const x = parseFloat(String(v ?? "").replace(/,/g, "")); return isNaN(x) ? 0 : x; };
+        const byPerson = {};
+        pcRows.forEach(r => {
+          const person = String(r["المسؤول"] || "").trim() || r.__sheet;
+          if (!byPerson[person]) byPerson[person] = { المستلم: 0, المصروف: 0, آخر_رصيد: 0, آخر_تاريخ: null };
+          byPerson[person].المستلم += n_(r["المستلم"]);
+          byPerson[person].المصروف += n_(r["المصروف"]);
+          const d = r["التاريخ"] ? new Date(r["التاريخ"]) : null;
+          if (d && !isNaN(d.getTime()) && (!byPerson[person].آخر_تاريخ || d > byPerson[person].آخر_تاريخ)) {
+            byPerson[person].آخر_تاريخ = d;
+            byPerson[person].آخر_رصيد = n_(r["المتبقي"]);
+          }
+        });
+        const totalReceived = pcRows.reduce((s, r) => s + n_(r["المستلم"]), 0);
+        const totalSpent    = pcRows.reduce((s, r) => s + n_(r["المصروف"]), 0);
+        summary.العهدة = {
+          مصدر: "تبويب العهدة — شيتا ليندا ومير",
+          إجمالي_المستلم: Math.round(totalReceived),
+          إجمالي_المصروف: Math.round(totalSpent),
+          الرصيد_المتبقي: Math.round(totalReceived - totalSpent),
+          عدد_المسؤولين: Object.keys(byPerson).length,
+          حسب_المسؤول: Object.fromEntries(Object.entries(byPerson).map(([k, v]) => [k, {
+            المستلم: Math.round(v.المستلم), المصروف: Math.round(v.المصروف), آخر_رصيد: Math.round(v.آخر_رصيد),
+            آخر_تاريخ: v.آخر_تاريخ ? v.آخر_تاريخ.toLocaleDateString("ar-SA") : "—",
+          }])),
+        };
+      } else {
+        summary.العهدة = { تنبيه: "لم تُحمَّل بيانات العهدة بعد أو التبويب لم يُفتح بعد." };
+      }
+    } catch (e) {
+      summary.العهدة = { تنبيه: "تعذّر تلخيص بيانات العهدة: " + (e?.message || e) };
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // ✉️ تبويب سجل المراسلات (window.RAW_NEW_CORRESPONDENCE)
+    // أعمدة الشيت: رقم أعمالي، الرقم المرجعي، النوع (صادر/وارد)، التصنيف،
+    // المرسِل، المرسَل إليه، المنطقة (أكواد: JED/MAK/TAF/MAD/WR)،
+    // تاريخ الخطاب، الموضوع، الأولوية، الحالة...
+    // ★ 2026-09-21: أُضيف لسياق الـ AI بناءً على طلب صريح.
+    // ════════════════════════════════════════════════════════════════
+    try {
+      const corrRows = Array.isArray(window.RAW_NEW_CORRESPONDENCE) ? window.RAW_NEW_CORRESPONDENCE : [];
+      if (corrRows.length) {
+        const regionLabels = { JED: "جدة", MAK: "مكة المكرمة", TAF: "الطائف", MAD: "المدينة المنورة", WR: "WR" };
+        const regionLabel = c => regionLabels[String(c || "").trim()] || String(c || "").trim() || "غير محدد";
+        const byType = {}, byRegion = {}, byStatus = {}, byPriority = {};
+        corrRows.forEach(r => {
+          const type = String(r["النوع"] || "غير محدد").trim() || "غير محدد";
+          const region = regionLabel(r["المنطقة"]);
+          const status = String(r["الحالة"] || "غير محدد").trim() || "غير محدد";
+          const priority = String(r["الأولوية"] || "غير محدد").trim() || "غير محدد";
+          byType[type] = (byType[type] || 0) + 1;
+          byRegion[region] = (byRegion[region] || 0) + 1;
+          byStatus[status] = (byStatus[status] || 0) + 1;
+          byPriority[priority] = (byPriority[priority] || 0) + 1;
+        });
+        summary.سجل_المراسلات = {
+          مصدر: "تبويب سجل المراسلات",
+          إجمالي_المراسلات: corrRows.length,
+          صادر: byType["صادر"] || 0,
+          وارد: byType["وارد"] || 0,
+          توزيع_حسب_المنطقة: byRegion,
+          توزيع_حسب_الحالة: byStatus,
+          توزيع_حسب_الأولوية: byPriority,
+        };
+      } else {
+        summary.سجل_المراسلات = { تنبيه: "لم تُحمَّل بيانات سجل المراسلات بعد أو التبويب لم يُفتح بعد." };
+      }
+    } catch (e) {
+      summary.سجل_المراسلات = { تنبيه: "تعذّر تلخيص بيانات سجل المراسلات: " + (e?.message || e) };
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -22269,6 +22418,10 @@ function exportNashatExcel(rows) {
     return {
       بوابين:    /بواب|بوابين|حارس|gatekeeper/i.test(t),
       مشرفين:    /مشرف|مشرفين|مهندس|مهندسين|مسؤول تطوير|supervisor|engineer/i.test(t),
+      // ★ 2026-09-21: أُضيفت بناءً على طلب صريح — عشان المساعد الذكي يتعرّف
+      // على أسئلة العهدة وسجل المراسلات (كانوا مش معروفين له خالص قبل كده).
+      عهدة:      /عهدة|عُهدة|سلفة|مصروف نثري|petty cash/i.test(t),
+      مراسلات:   /مراسل|مراسلات|خطاب|خطابات|صادر|وارد|correspondence/i.test(t),
       عقود:      /عقد|عقود|مستحق|مقاول|contract|مدة|انتهاء|تجديد|fm|صروف/i.test(t),
       بلاغات:    /بلاغ|عطل|إصلاح|sla|حالة البلاغ|متأخر|مفتوح|مغلق|أسرع مقاول|أبطأ مقاول|ترتيب المقاول|تصنيف المقاول|أداء المقاول|أمن\s*(?:و\s*)?(?:ال)?سلامة|حريق|طفاي[ةه]|مضخات الحريق|إنذار مبكر|مخرج.*طوارئ|إخلاء/i.test(t),
       fca:       /fca|حالة فنية|تقييم|حرج|متوسط.*مبنى|أسوأ مدرسة/i.test(t),
@@ -30391,6 +30544,14 @@ function _orgName(r) {
 function _orgManager(r) {
   return _orgNorm(r["المدير المباشر"]);
 }
+// ★ 2026-09-21: مفتاح مطابقة أقوى من _orgNorm العادية (اللي بتتستخدم في
+// أماكن تانية كتير ومحتفظين بسلوكها زي ما هو) — بيدمج أي مسافات متكررة
+// جوه النص لمسافة واحدة، عشان فروق بسيطة زي "اسم  الشخص" (مسافتين) ماتمنعش
+// تطابق عمود "المدير المباشر" مع عمود اسم الموظف. الاستخدام فقط في بناء
+// شجرة الـ ORG CHART (_orgBuildForest) تحت.
+function _orgMatchKey(v) {
+  return _orgNorm(v).replace(/\s+/g, " ");
+}
 
 function _orgApplyFilters() {
   const rows = window.RAW_NEW_ORG_STRUCTURE || [];
@@ -30448,12 +30609,27 @@ function _orgExportCSV() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ORG CHART — شجرة تنظيمية قابلة للطي (details/summary أصلية، بدون أي
-// مكتبة خارجية). فيها مسارين:
-//  1) _orgBuildPersonChart: هيكل حقيقي بالأسماء مبني على "المدير
-//     المباشر" — يشتغل تلقائيًا بمجرد ما العمود ده يتملى ولو جزئيًا.
+// ORG CHART — شجرة تنظيمية حقيقية (كروت متصلة بخطوط، مش قائمة نقطية)
+// فيها مسارين:
+//  1) _orgBuildForestChart: هيكل حقيقي بالأسماء + كروت، مبني على عمود
+//     "المدير المباشر" — يشتغل تلقائيًا بمجرد ما العمود ده يتملى ولو
+//     جزئيًا. ★ 2026-09-21: بعد ما العمود اتملى فعليًا (طلب صريح)،
+//     استُبدلت الشجرة النصية القديمة (_orgBuildPersonChart) بشجرة
+//     كروت بصرية فعلية — أفرع متفرّعة بخطوط توصيل، بنفس روح تصميم
+//     نظام "إدارة الموارد البشرية" المرجعي اللي شاركه المستخدم (كارت
+//     لكل موظف فيه صورة رمزية بأول حرف، المسمى الوظيفي، الاسم، حالة
+//     التوظيف بلون مميز، ونجمة لو الشخص ده مدير ليه مرؤوسين).
 //  2) _orgBuildGroupedChart: عرض احتياطي (نوع الفريق ← المنطقة ←
-//     المسمى الوظيفي) يشتغل دلوقتي طول ما "المدير المباشر" فاضي.
+//     المسمى الوظيفي) يشتغل بس لو عمود "المدير المباشر" فاضي بالكامل.
+//
+//  ⚠️ ملاحظة مهمّة عن جودة البيانات: عمود "المدير المباشر" فيه أسماء
+//  مديرين مكتوبة كنص حر، وبعضها ميطابقش بالحرف أي اسم موظف موجود فعليًا
+//  في نفس الملف (مثال: "عمرو عرفات" بينما اسم الموظف الكامل مكتوب
+//  "عمرو عبدالعظيم محمد عرفات" — ممكن يكونوا نفس الشخص، وممكن لأ).
+//  الكود هنا **عمدًا مايحاولش يخمّن** أي تطابق تقريبي (مطابقة حرفية فقط
+//  بعد توحيد المسافات) تفاديًا لنسب أي حد لمدير غلط. أي قيمة في العمود
+//  ميطابقتش أي اسم موظف بالحرف بتتحول لكارت "مدير خارج نطاق هذا الملف"
+//  منفصل في أعلى فرعه، بدل ما تتجاهل أو تتخمّن. راجع _orgBuildForest.
 // ═══════════════════════════════════════════════════════════════════
 function _orgNodeHtml(cls, label, count, extra) {
   return `<span class="org-node org-node-${cls}"><span class="org-node-arrow">▸</span>${_orgEsc(label)}${
@@ -30461,41 +30637,192 @@ function _orgNodeHtml(cls, label, count, extra) {
   }${extra || ""}</span>`;
 }
 
-function _orgBuildPersonNode(person, byManager, visited) {
-  if (visited.has(person.name)) {
-    // وقاية من حلقة دائرية (لو حصل خطأ بيانات ومدير حد بقى مرؤوسه)
-    return `<li><span class="org-node org-node-person">⚠ ${_orgEsc(person.name)} (حلقة دائرية في البيانات)</span></li>`;
-  }
-  visited.add(person.name);
-  const children = byManager[person.name] || [];
-  const childrenHtml = children.length
-    ? `<ul class="org-tree-children">${children.map((c) => _orgBuildPersonNode(c, byManager, visited)).join("")}</ul>`
-    : "";
-  const nodeInner = `<span class="org-node org-node-person">${children.length ? '<span class="org-node-arrow">▸</span>' : ""}${_orgEsc(person.name)}<span class="org-node-sub">${_orgEsc(_orgTitle(person.row))}</span></span>`;
-  if (children.length) {
-    return `<li><details class="org-node-details" open><summary>${nodeInner}</summary>${childrenHtml}</details></li>`;
-  }
-  return `<li>${nodeInner}</li>`;
+function _orgMarkReachable(node, set) {
+  if (set.has(node.id)) return;
+  set.add(node.id);
+  node.children.forEach((c) => _orgMarkReachable(c, set));
 }
 
-function _orgBuildPersonChart(rows) {
-  const named = rows.filter((r) => _orgName(r));
-  if (!named.length) return null;
-  const byName = {};
-  named.forEach((r) => { byName[_orgName(r)] = r; });
-  const byManager = {};
-  named.forEach((r) => {
-    const mgr = _orgManager(r);
-    if (mgr && byName[mgr] && mgr !== _orgName(r)) {
-      (byManager[mgr] = byManager[mgr] || []).push({ name: _orgName(r), row: r });
-    }
+// يبني "غابة" (forest) من الأشجار: كل صف (موظف بالاسم أو شاغر بدون اسم)
+// بيتحول لعقدة، وبيتربط بمديره المباشر لو الاسم مطابق بالحرف لموظف تاني
+// في نفس الملف. أي قيمة في عمود "المدير المباشر" ميطابقتش حد موجود
+// بتتحول لعقدة "خارجية" واحدة (مش مكررة) بنفس النص المكتوب بالظبط.
+function _orgBuildForest(rows) {
+  let seq = 0;
+  const nodes = [];
+  const byKey = {}; // matchKey(اسم الموظف) → node — لأصحاب الاسم الحقيقي بس
+
+  rows.forEach((r) => {
+    const name = _orgName(r);
+    const node = {
+      id: "n" + seq++,
+      row: r,
+      name: name || "",
+      isNamed: !!name,
+      title: _orgTitle(r),
+      status: _orgNorm(r["حالة التوظيف"]),
+      vacant: _orgIsVacant(r),
+      region: _orgNorm(r["المنطقة"]),
+      team: _orgNorm(r["نوع الفريق"]),
+      mgrRaw: _orgManager(r),
+      mgrKey: _orgMatchKey(_orgManager(r)),
+      isExternal: false,
+      children: [],
+    };
+    nodes.push(node);
+    if (name) byKey[_orgMatchKey(name)] = node;
   });
-  const roots = named
-    .filter((r) => { const mgr = _orgManager(r); return !mgr || !byName[mgr]; })
-    .map((r) => ({ name: _orgName(r), row: r }));
-  if (!roots.length) return null;
-  const html = roots.map((p) => _orgBuildPersonNode(p, byManager, new Set())).join("");
-  return `<ul class="org-chart-root-list">${html}</ul>`;
+
+  const externalByKey = {};
+  function getExternalNode(rawLabel) {
+    const key = _orgMatchKey(rawLabel);
+    if (externalByKey[key]) return externalByKey[key];
+    const node = {
+      id: "ext" + Object.keys(externalByKey).length,
+      row: null,
+      name: _orgNorm(rawLabel),
+      isNamed: true,
+      title: "مدير خارج نطاق هذا الملف",
+      status: "",
+      vacant: false,
+      region: "",
+      team: "",
+      mgrRaw: "",
+      mgrKey: "",
+      isExternal: true,
+      children: [],
+    };
+    externalByKey[key] = node;
+    nodes.push(node);
+    return node;
+  }
+
+  const roots = [];
+  nodes.slice().forEach((n) => {
+    if (n.isExternal) return; // العقد الخارجية بتتضاف كجذور في الآخر
+    if (!n.mgrKey) { roots.push(n); return; }
+    const parent = byKey[n.mgrKey];
+    if (parent && parent !== n) { parent.children.push(n); return; }
+    getExternalNode(n.mgrRaw).children.push(n);
+  });
+  Object.keys(externalByKey).forEach((k) => roots.push(externalByKey[k]));
+
+  // أمان إضافي: لو حصل خطأ بيانات وحصلت "حلقة دائرية" (مدير أ مرؤوس عند
+  // ب، وب مرؤوس عند أ) — العقدتين مش هيظهروا في roots تلقائيًا لأن لكل
+  // واحدة مدير متطابق. نكتشف أي عقدة "ضايعة" كده ونضيفها كجذر بنفسها
+  // بدل ما تختفي بصمت من الشجرة.
+  const reachable = new Set();
+  roots.forEach((r) => _orgMarkReachable(r, reachable));
+  nodes.forEach((n) => { if (!reachable.has(n.id)) roots.push(n); });
+
+  return { roots, allNodes: nodes, externalCount: Object.keys(externalByKey).length };
+}
+
+function _orgCardHtml(node) {
+  const hasChildren = node.children.length > 0;
+  let statusCls = "orgc-status-neutral";
+  let statusLabel = "";
+  let avatarLetter = "—";
+  if (node.isExternal) {
+    statusCls = "orgc-status-external";
+    statusLabel = "خارج نطاق هذا الملف";
+    avatarLetter = "🔗";
+  } else if (node.vacant) {
+    statusCls = "orgc-status-vacant";
+    statusLabel = node.status || "شاغر";
+    avatarLetter = "—";
+  } else if (node.status) {
+    statusCls = "orgc-status-active";
+    statusLabel = node.status;
+    avatarLetter = node.name ? node.name.trim().charAt(0) : "؟";
+  }
+  const nameDisplay = node.name ? _orgEsc(node.name) : node.vacant ? "شاغر" : "—";
+  const searchBlob = _orgMatchKey(
+    [node.name, node.title, node.region, node.team, statusLabel].filter(Boolean).join(" ")
+  ).toLowerCase();
+  return `<div class="orgc-card ${statusCls}${hasChildren ? " orgc-has-children" : ""}" data-orgc-search="${_orgEsc(searchBlob)}">
+    <div class="orgc-card-avatarrow">
+      <span class="orgc-avatar">${_orgEsc(avatarLetter)}</span>
+      ${hasChildren ? '<span class="orgc-star" title="له مرؤوسون في الهيكل">★</span>' : ""}
+    </div>
+    <div class="orgc-card-title">${_orgEsc(node.title) || "&nbsp;"}</div>
+    <div class="orgc-card-name">${nameDisplay}</div>
+    ${statusLabel ? `<div class="orgc-card-status">${_orgEsc(statusLabel)}</div>` : ""}
+    ${node.region ? `<div class="orgc-card-tag">📍 ${_orgEsc(node.region)}</div>` : ""}
+  </div>`;
+}
+
+function _orgRenderNode(node, visited, depth) {
+  if (visited.has(node.id)) {
+    return `<li class="orgc-li"><div class="orgc-node"><div class="orgc-card orgc-status-vacant">⚠ حلقة دائرية بالبيانات: ${_orgEsc(node.name)}</div></div></li>`;
+  }
+  visited.add(node.id);
+  const hasChildren = node.children.length > 0;
+  const card = _orgCardHtml(node);
+  const toggle = hasChildren
+    ? `<button type="button" class="orgc-toggle" onclick="_orgToggleNode('${node.id}')" id="orgc-toggle-${node.id}" title="طي / فتح الفريق">${depth >= 1 ? "+" : "−"}</button>`
+    : "";
+  const childrenHtml = hasChildren
+    ? `<ul class="orgc-children${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
+        .map((c) => _orgRenderNode(c, visited, depth + 1))
+        .join("")}</ul>`
+    : "";
+  return `<li class="orgc-li"><div class="orgc-node" data-node-id="${node.id}">${card}${toggle}</div>${childrenHtml}</li>`;
+}
+
+function _orgToggleNode(id) {
+  const ul = document.getElementById("orgc-children-" + id);
+  const btn = document.getElementById("orgc-toggle-" + id);
+  if (!ul) return;
+  const collapsed = ul.classList.toggle("orgc-collapsed");
+  if (btn) btn.textContent = collapsed ? "+" : "−";
+}
+window._orgToggleNode = _orgToggleNode;
+
+function _orgSetAllCollapsed(collapsed) {
+  document.querySelectorAll("#org-view-chart .orgc-children").forEach((ul) => ul.classList.toggle("orgc-collapsed", collapsed));
+  document.querySelectorAll("#org-view-chart .orgc-toggle").forEach((btn) => { btn.textContent = collapsed ? "+" : "−"; });
+}
+window._orgExpandAllChart = function () { _orgSetAllCollapsed(false); };
+window._orgCollapseAllChart = function () { _orgSetAllCollapsed(true); };
+
+function _orgChartSearch(raw) {
+  const q = _orgMatchKey(raw).toLowerCase();
+  const cards = document.querySelectorAll("#org-view-chart .orgc-card");
+  if (!q) {
+    cards.forEach((c) => c.classList.remove("orgc-search-match", "orgc-search-dim"));
+    return;
+  }
+  let firstMatch = null;
+  cards.forEach((c) => {
+    const hit = (c.getAttribute("data-orgc-search") || "").indexOf(q) !== -1;
+    c.classList.toggle("orgc-search-match", hit);
+    c.classList.toggle("orgc-search-dim", !hit);
+    if (hit && !firstMatch) firstMatch = c;
+  });
+  if (firstMatch) {
+    let li = firstMatch.closest(".orgc-li");
+    while (li) {
+      const parentUl = li.parentElement;
+      if (parentUl && parentUl.classList.contains("orgc-children")) {
+        parentUl.classList.remove("orgc-collapsed");
+        const parentLi = parentUl.closest(".orgc-li");
+        const parentBtn = parentLi ? parentLi.querySelector(":scope > .orgc-node > .orgc-toggle") : null;
+        if (parentBtn) parentBtn.textContent = "−";
+        li = parentLi;
+      } else {
+        li = null;
+      }
+    }
+    firstMatch.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }
+}
+window._orgChartSearch = _orgChartSearch;
+
+function _orgBuildForestChart(rows) {
+  const forest = _orgBuildForest(rows);
+  const rootsHtml = forest.roots.map((root) => `<ul class="orgc-tree orgc-root-tree">${_orgRenderNode(root, new Set(), 0)}</ul>`).join("");
+  return { html: `<div class="orgc-forest">${rootsHtml}</div>`, externalCount: forest.externalCount, totalNodes: forest.allNodes.length };
 }
 
 function _orgBuildGroupedChart(rows) {
@@ -30558,11 +30885,31 @@ function _orgBuildGroupedChart(rows) {
 function _orgBuildChartPanel(rows) {
   const mgrCount = rows.filter((r) => _orgManager(r)).length;
   if (mgrCount > 0) {
-    const personHtml = _orgBuildPersonChart(rows);
-    if (personHtml) {
+    const forest = _orgBuildForestChart(rows);
+    if (forest.totalNodes) {
+      const note = forest.externalCount
+        ? `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString(
+            "ar"
+          )} صف معبّى من ${rows.length.toLocaleString("ar")}). ظهرت ${forest.externalCount.toLocaleString(
+            "ar"
+          )} قيمة في هذا العمود لم تُطابق بالحرف اسم أي موظف موجود في نفس الملف — تم عرضها ككروت "مدير خارج نطاق هذا الملف" في أعلى فرعها بدل تجاهل الرابط. لو أي واحدة منها هي فعليًا نفس شخص موجود بصيغة اسم مختصرة، وضّح لي أيهما بالتحديد وسأربطها يدويًا لتفادي نسب أي موظف لمدير غلط.`
+        : `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString("ar")} صف معبّى من ${rows.length.toLocaleString(
+            "ar"
+          )}).`;
       return (
-        `<div class="org-chart-note">📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString("ar")} صف معبّى من ${rows.length.toLocaleString("ar")}).</div>` +
-        `<div class="org-chart-wrap">${personHtml}</div>`
+        `<div class="org-chart-note">${note}</div>` +
+        `<div class="orgc-toolbar">
+          <button type="button" class="org-view-btn" onclick="_orgExpandAllChart()">توسيع الكل</button>
+          <button type="button" class="org-view-btn" onclick="_orgCollapseAllChart()">طي الكل</button>
+          <input type="text" class="orgc-search-input" placeholder="ابحث بالاسم أو المسمى الوظيفي…" oninput="_orgChartSearch(this.value)">
+          <div class="orgc-legend">
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#16a34a"></span>موظف حالي</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#94a3b8"></span>شاغر</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d4af6a"></span>مدير خارج نطاق الملف</span>
+            <span class="orgc-legend-item">★ له مرؤوسون</span>
+          </div>
+        </div>` +
+        `<div class="org-chart-wrap">${forest.html}</div>`
       );
     }
   }
@@ -32082,6 +32429,21 @@ function renderTrainingTab(_fromDate, _toDate) {
         ],
         charts: ['الاتجاه الشهري للزيارات', 'الزيارات حسب المنطقة'],
         kpis: ['إجمالي الزيارات المكتملة', 'إجمالي الزيارات المسندة', 'نسبة الإنجاز الكلي']
+      },
+      // ★ 2026-09-21: سجل المراسلات — بناءً على طلب صريح ("خلي الذكاء
+      // الاصطناعي يبقى عارف كل شيء") — لم يكن مضافًا هنا رغم وجود التبويب
+      // نفسه في الداشبورد من قبل. "العهدة" مش محتاجة تُضاف هنا لأنها
+      // موجودة بالفعل في TAB_INDEX الأصلي الثابت أعلى الملف.
+      {
+        id: 'correspondence',
+        label: 'سجل المراسلات',
+        keywords: [
+          'مراسلات','مراسلة','correspondence','خطاب','خطابات','letter','letters',
+          'صادر','وارد','outgoing','incoming','رقم مرجعي','reference number',
+          'سجل المراسلات','مراسلات صادرة','مراسلات واردة'
+        ],
+        charts: ['توزيع المراسلات حسب المنطقة', 'توزيع المراسلات حسب الحالة'],
+        kpis: ['إجمالي المراسلات', 'صادر', 'وارد']
       }
     ];
 
@@ -32104,7 +32466,9 @@ function renderTrainingTab(_fromDate, _toDate) {
 - "مدفوعات LS/عقود LS/الاستشاري/ls payments" → تبويب مدفوعات وعقود LS
 - "مدفوعات المقاولين/عقود المقاولين/contractor payments" → تبويب مدفوعات وعقود المقاولين
 - "PPM/Maximo/الصيانة الوقائية/preventive maintenance" → تبويب الصيانة الوقائية (Maximo)
-- "زيارات/visits/زيارات ميدانية" → تبويب الزيارات`;
+- "زيارات/visits/زيارات ميدانية" → تبويب الزيارات
+- "مراسلات/خطاب/خطابات/صادر/وارد/correspondence" → تبويب سجل المراسلات
+- "عهدة/العهدة/مصروفات/مستلم/مصروف/متبقي/petty cash" → تبويب العهدة`;
 
         prompt = prompt.replace(
           '- "خنادق/drainage/صرف" → تبويب خنادق الصرف',
@@ -32120,8 +32484,11 @@ function renderTrainingTab(_fromDate, _toDate) {
         const ppmRows  = window.RAW_NEW_PPM_MAXIMO || [];
         const visMonthlyRows = window.RAW_NEW_VISITS_MONTHLY || [];
         const visRegionRows  = window.RAW_NEW_VISITS_BY_REGION || [];
+        const corrRows = window.RAW_NEW_CORRESPONDENCE || [];
+        const pcLaynadaRows = window.RAW_NEW_PETTY_CASH_LAYNADA || [];
+        const pcMeerRows    = window.RAW_NEW_PETTY_CASH_MEER || [];
 
-        if (vehRows.length || trRows.length || orgRows.length || lspRows.length || ctpRows.length || ppmRows.length || visMonthlyRows.length || visRegionRows.length) {
+        if (vehRows.length || trRows.length || orgRows.length || lspRows.length || ctpRows.length || ppmRows.length || visMonthlyRows.length || visRegionRows.length || corrRows.length || pcLaynadaRows.length || pcMeerRows.length) {
           const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة (الأعمدة: رقم اللوحة، الماركة، سنة الصنع، رقم/اسم المستخدم الفعلي = السائق، تفويض حتى، الحالة)` : '';
           const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
 
@@ -32146,7 +32513,18 @@ function renderTrainingTab(_fromDate, _toDate) {
           const visAssigned  = visMonthlyRows.reduce(function(s,r){ return s + ((typeof _visNum === 'function' ? _visNum(r["مسندة (ASSIGNED)"]) : 0) || 0); }, 0);
           const visData  = (visMonthlyRows.length || visRegionRows.length) ? `\n- بيانات الزيارات: ${visCompleted.toLocaleString()} زيارة مكتملة من أصل ${visAssigned.toLocaleString()} مسندة عبر ${visMonthlyRows.length.toLocaleString()} شهر و${visRegionRows.length.toLocaleString()} منطقة` : '';
 
-          prompt += '\n' + (vehData + trData + orgData + lspData + ctpData + ppmData + visData).trim();
+          // ★ 2026-09-21: سجل المراسلات + العهدة — بناءً على طلب صريح
+          const corrOut = corrRows.filter(function(r){ return String(r["النوع"]||"").trim() === "صادر"; }).length;
+          const corrIn  = corrRows.filter(function(r){ return String(r["النوع"]||"").trim() === "وارد"; }).length;
+          const corrData = corrRows.length ? `\n- بيانات سجل المراسلات: ${corrRows.length.toLocaleString()} مراسلة (${corrOut.toLocaleString()} صادر، ${corrIn.toLocaleString()} وارد)` : '';
+
+          const pcNum_ = function(v){ var x = parseFloat(String(v==null?"":v).replace(/,/g,"")); return isNaN(x)?0:x; };
+          const pcAllRows = pcLaynadaRows.concat(pcMeerRows).filter(function(r){ return String(r["رقم_السند"]||"").trim(); });
+          const pcReceived = pcAllRows.reduce(function(s,r){ return s + pcNum_(r["المستلم"]); }, 0);
+          const pcSpent    = pcAllRows.reduce(function(s,r){ return s + pcNum_(r["المصروف"]); }, 0);
+          const pcData = pcAllRows.length ? `\n- بيانات العهدة: إجمالي المستلم ${Math.round(pcReceived).toLocaleString()} ريال، إجمالي المصروف ${Math.round(pcSpent).toLocaleString()} ريال، الرصيد المتبقي ${Math.round(pcReceived-pcSpent).toLocaleString()} ريال` : '';
+
+          prompt += '\n' + (vehData + trData + orgData + lspData + ctpData + ppmData + visData + corrData + pcData).trim();
         }
 
         return prompt;
@@ -37486,6 +37864,19 @@ setTimeout(function tellUserStillTrying() {
       rawPpmMaximo:          window.RAW_NEW_PPM_MAXIMO          || [],
       rawVisitsMonthly:      window.RAW_NEW_VISITS_MONTHLY      || [],
       rawVisitsByRegion:     window.RAW_NEW_VISITS_BY_REGION    || [],
+      // ★ 2026-09-21: بناءً على طلب صريح ("خلي الذكاء الاصطناعي يبقى عارف
+      // كل شيء") — إضافة كل مصادر "الملفات الجديدة" المتبقية اللي كانت
+      // ناقصة من هنا تمامًا (العهدة وسجل المراسلات ماكانوش موجودين حتى في
+      // أي محرك سياق آخر، والباقي كان مغطّى بس في fcbBuildDashboardSummary
+      // القديمة مش هنا في DashboardContextBuilder).
+      rawPettyCashLaynada: window.RAW_NEW_PETTY_CASH_LAYNADA || [],
+      rawPettyCashMeer:    window.RAW_NEW_PETTY_CASH_MEER    || [],
+      rawCorrespondence:   window.RAW_NEW_CORRESPONDENCE     || [],
+      rawKpiContractor:    window.RAW_NEW_KPI_CONTRACTOR     || [],
+      rawKpiConsultant:    window.RAW_NEW_KPI_CONSULTANT     || [],
+      rawTraining:         window.RAW_NEW_TRAINING           || [],
+      rawGatekeepers:      window.RAW_NEW_GATEKEEPERS        || [],
+      rawSupervisors:      window.RAW_NEW_SUPERVISORS        || [],
     };
 
     /* RAW + FILTERED من DataService أو المتغيرات العامة */
@@ -37548,6 +37939,14 @@ setTimeout(function tellUserStillTrying() {
         ppmMaximo:          collected.rawPpmMaximo,
         visitsMonthly:      collected.rawVisitsMonthly,
         visitsByRegion:     collected.rawVisitsByRegion,
+        pettyCashLaynada:   collected.rawPettyCashLaynada,
+        pettyCashMeer:      collected.rawPettyCashMeer,
+        correspondence:     collected.rawCorrespondence,
+        kpiContractor:      collected.rawKpiContractor,
+        kpiConsultant:      collected.rawKpiConsultant,
+        training:           collected.rawTraining,
+        gatekeepers:        collected.rawGatekeepers,
+        supervisors:        collected.rawSupervisors,
       }
     };
 
@@ -38122,6 +38521,94 @@ setTimeout(function tellUserStillTrying() {
       };
     }
 
+    /* ★ 2026-09-21: بناءً على طلب صريح — إكمال باقي "الملفات الجديدة" اللي
+       كانت ناقصة تمامًا من هذا الـ builder (العهدة وسجل المراسلات لم يكونا
+       معروفين لأي محرك سياق قبل كده، والباقي كان مغطّى بس في المحرك القديم
+       fcbBuildDashboardSummary وليس هنا). */
+
+    /* العهدة */
+    var pcAll = (Array.isArray(sup.pettyCashLaynada) ? sup.pettyCashLaynada.map(function(r){ r.__sheet = "ليندا"; return r; }) : [])
+      .concat(Array.isArray(sup.pettyCashMeer) ? sup.pettyCashMeer.map(function(r){ r.__sheet = "مير"; return r; }) : []);
+    var pcRows = pcAll.filter(function(r){ return String(r["رقم_السند"]||"").trim(); });
+    if (pcRows.length) {
+      var pcNum = function(v){ var x = parseFloat(String(v==null?"":v).replace(/,/g,"")); return isNaN(x)?0:x; };
+      var pcReceived = pcRows.reduce(function(s,r){ return s + pcNum(r["المستلم"]); }, 0);
+      var pcSpent    = pcRows.reduce(function(s,r){ return s + pcNum(r["المصروف"]); }, 0);
+      var pcPersons = {};
+      pcRows.forEach(function(r){ var p = String(r["المسؤول"]||"").trim() || r.__sheet; pcPersons[p] = true; });
+      sec.العهدة = {
+        _source:          "Statistics→PettyCash",
+        إجمالي_المستلم:   Math.round(pcReceived),
+        إجمالي_المصروف:   Math.round(pcSpent),
+        الرصيد_المتبقي:   Math.round(pcReceived - pcSpent),
+        عدد_المسؤولين:    Object.keys(pcPersons).length,
+      };
+    }
+
+    /* سجل المراسلات */
+    var corr = sup.correspondence;
+    if (Array.isArray(corr) && corr.length) {
+      var corrRegionLabels = { JED:"جدة", MAK:"مكة المكرمة", TAF:"الطائف", MAD:"المدينة المنورة", WR:"WR" };
+      var corrByType = {}, corrByStatus = {};
+      corr.forEach(function(r){
+        var type = String(r["النوع"]||"غير محدد").trim() || "غير محدد";
+        var status = String(r["الحالة"]||"غير محدد").trim() || "غير محدد";
+        corrByType[type] = (corrByType[type]||0)+1;
+        corrByStatus[status] = (corrByStatus[status]||0)+1;
+      });
+      sec.سجل_المراسلات = {
+        _source:          "Statistics→Correspondence",
+        إجمالي_المراسلات: corr.length,
+        صادر:             corrByType["صادر"] || 0,
+        وارد:             corrByType["وارد"] || 0,
+        توزيع_حسب_الحالة: corrByStatus,
+      };
+    }
+
+    /* مؤشرات الأداء (المقاول / الاستشاري) */
+    var kpiC = sup.kpiContractor, kpiK = sup.kpiConsultant;
+    if ((Array.isArray(kpiC) && kpiC.length) || (Array.isArray(kpiK) && kpiK.length)) {
+      sec.مؤشرات_الأداء = {
+        _source:                  "Statistics→KPI",
+        عدد_مؤشرات_المقاول:      Array.isArray(kpiC) ? kpiC.length : 0,
+        عدد_مؤشرات_الاستشاري:    Array.isArray(kpiK) ? kpiK.length : 0,
+        ملاحظة: "للتفاصيل الكاملة، راجع تبويب مؤشرات الأداء للمقاول/الاستشاري مباشرة",
+      };
+    }
+
+    /* برامج التدريب */
+    var tr = sup.training;
+    if (Array.isArray(tr) && tr.length) {
+      sec.برامج_التدريب = {
+        _source:         "Statistics→Training",
+        إجمالي_السجلات: tr.length,
+      };
+    }
+
+    /* البوابون */
+    var gk = sup.gatekeepers;
+    if (Array.isArray(gk) && gk.length) {
+      var gkByCity = {};
+      gk.forEach(function(r){ var c = String(r["المدينة"]||"غير محدد").trim() || "غير محدد"; gkByCity[c] = (gkByCity[c]||0)+1; });
+      sec.البوابون = {
+        _source:          "Statistics→Gatekeepers",
+        إجمالي_البوابين:  gk.length,
+        توزيع_حسب_المدينة: gkByCity,
+      };
+    }
+
+    /* المشرفون والمهندسون */
+    var svr = sup.supervisors;
+    if (Array.isArray(svr) && svr.length) {
+      var svrByRegion = {};
+      svr.forEach(function(r){ var rg = String(r["المنطقة"]||"غير محدد").trim() || "غير محدد"; svrByRegion[rg] = (svrByRegion[rg]||0)+1; });
+      sec.المشرفون_والمهندسون = {
+        _source:           "Statistics→Supervisors",
+        إجمالي_السجلات:    svr.length,
+        توزيع_حسب_المنطقة: svrByRegion,
+      };
+    }
+
     return sec;
   }
 
@@ -38145,6 +38632,13 @@ setTimeout(function tellUserStillTrying() {
       بيانات_مدفوعات_المقاولين_متاحة: (Array.isArray(window.RAW_NEW_CONTRACTOR_PAYMENTS) && window.RAW_NEW_CONTRACTOR_PAYMENTS.length) ? "نعم" : "لا",
       بيانات_الصيانة_الوقائية_Maximo_متاحة: (Array.isArray(window.RAW_NEW_PPM_MAXIMO) && window.RAW_NEW_PPM_MAXIMO.length) ? "نعم" : "لا",
       بيانات_الزيارات_متاحة: ((Array.isArray(window.RAW_NEW_VISITS_MONTHLY) && window.RAW_NEW_VISITS_MONTHLY.length) || (Array.isArray(window.RAW_NEW_VISITS_BY_REGION) && window.RAW_NEW_VISITS_BY_REGION.length)) ? "نعم" : "لا",
+      // ★ 2026-09-21: بناءً على طلب صريح — إضافة أعلام توفر باقي "الملفات الجديدة"
+      بيانات_العهدة_متاحة: ((Array.isArray(window.RAW_NEW_PETTY_CASH_LAYNADA) && window.RAW_NEW_PETTY_CASH_LAYNADA.length) || (Array.isArray(window.RAW_NEW_PETTY_CASH_MEER) && window.RAW_NEW_PETTY_CASH_MEER.length)) ? "نعم" : "لا",
+      بيانات_سجل_المراسلات_متاحة: (Array.isArray(window.RAW_NEW_CORRESPONDENCE) && window.RAW_NEW_CORRESPONDENCE.length) ? "نعم" : "لا",
+      بيانات_مؤشرات_الأداء_متاحة: ((Array.isArray(window.RAW_NEW_KPI_CONTRACTOR) && window.RAW_NEW_KPI_CONTRACTOR.length) || (Array.isArray(window.RAW_NEW_KPI_CONSULTANT) && window.RAW_NEW_KPI_CONSULTANT.length)) ? "نعم" : "لا",
+      بيانات_برامج_التدريب_متاحة: (Array.isArray(window.RAW_NEW_TRAINING) && window.RAW_NEW_TRAINING.length) ? "نعم" : "لا",
+      بيانات_البوابين_متاحة: (Array.isArray(window.RAW_NEW_GATEKEEPERS) && window.RAW_NEW_GATEKEEPERS.length) ? "نعم" : "لا",
+      بيانات_المشرفين_متاحة: (Array.isArray(window.RAW_NEW_SUPERVISORS) && window.RAW_NEW_SUPERVISORS.length) ? "نعم" : "لا",
       تحذير_بيانات_غير_كافية:
         "إذا كانت البيانات المطلوبة تظهر 'لا' أعلاه، أبلغ المستخدم: " +
         "'البيانات الحالية لا تكفي لإثبات هذه العلاقة.' ولا تخترع أي نتائج.",

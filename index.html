@@ -332,24 +332,24 @@
         </div>
       </div>
       <div class="portal-hero-meta">
+        <!-- ★ 2026-09-21: بناءً على طلب صريح ("خليه يبقى أحدث حاجة")، الزرّين
+             دول اتحولوا من نص/إيموجي inline-styled لكلاسات CSS موحّدة مع
+             أيقونات SVG (Lucide) بنفس أسلوب أيقونات كروت البوابة — بدون أي
+             تغيير في id/onclick/title، فالمنطق اللي بيعتمد عليهم (تغيير
+             العلامة التجارية + وضع العرض التقديمي) شغّال زي ما هو تمامًا. -->
         <button type="button" id="btnSwitchBrandOuter"
+                class="portal-toolbar-btn"
                 onclick="if (window.__reopenBrandSelect) window.__reopenBrandSelect()"
-                title="تغيير الشعار"
-                style="display:flex;align-items:center;gap:6px;padding:6px 14px;
-                       background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
-                       color:rgba(255,255,255,.85);border-radius:999px;font-size:11px;
-                       font-weight:700;cursor:pointer;transition:.15s;margin-left:10px;
-                       font-family:'IBM Plex Sans Arabic',Tajawal,sans-serif;white-space:nowrap"
-                onmouseover="this.style.background='rgba(255,255,255,.16)';this.style.color='#fff'"
-                onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.color='rgba(255,255,255,.85)'"
-                >⇄ <span>تغيير الشعار</span></button>
+                title="تغيير الشعار">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+          <span>تغيير الشعار</span>
+        </button>
         <button type="button" id="btnPresentationModeOuter"
+                class="portal-toolbar-icon-btn"
                 onclick="togglePresentationMode()"
-                style="display:flex;align-items:center;justify-content:center;
-                       width:26px;height:26px;background:transparent;
-                       border:none;color:#fff;border-radius:8px;
-                       font-size:13px;line-height:1;cursor:pointer;opacity:.35;
-                       transition:.15s;margin-left:10px">👁</button>
+                title="وضع العرض التقديمي">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
         <span class="portal-updated-lbl">آخر تحديث</span>
         <span class="portal-updated-val" id="portalLastUpdate">—</span>
       </div>

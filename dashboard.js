@@ -30715,22 +30715,117 @@ function _orgBuildForest(rows) {
   roots.forEach((r) => _orgMarkReachable(r, reachable));
   nodes.forEach((n) => { if (!reachable.has(n.id)) roots.push(n); });
 
-  return { roots, allNodes: nodes, externalCount: Object.keys(externalByKey).length };
+  // ★ 2026-09-21 (v3 — إعادة هيكلة مستوحاة من الكود الفعلي لنظام "إدارة
+  // الموارد البشرية" المرجعي اللي شارك المستخدم مصدره الحقيقي: app.js/
+  // styles.css). بدل شجرة واحدة موحّدة تحت جذر شركة واحد (v2)، كل
+  // "منطقة" (عمود المنطقة: مكة المكرمة، الطائف، جدة، المدينة المنورة،
+  // المنطقة الغربية...) بقى ليها بانل مستقل تمامًا بهيدر ومؤشرات أداء
+  // (KPI) خاصة بيها وشجرتها الخاصة — بالظبط زي أسلوب renderOrgChart
+  // اللي بيلف على offices في الكود المرجعي. وجوه كل منطقة، لسه بنجمّع
+  // حسب "نوع الفريق" (نفس فكرة v2) عشان الفروع تبقى مقروءة وما تطلعش
+  // عريضة أوي.
+  function effectiveRegion(node, seen) {
+    if (node.region) return node.region;
+    seen = seen || new Set();
+    if (seen.has(node.id)) return "";
+    seen.add(node.id);
+    for (const c of node.children) {
+      const r = effectiveRegion(c, seen);
+      if (r) return r;
+    }
+    return "";
+  }
+  function effectiveTeam(node, seen) {
+    if (node.team) return node.team;
+    seen = seen || new Set();
+    if (seen.has(node.id)) return "";
+    seen.add(node.id);
+    for (const c of node.children) {
+      const t = effectiveTeam(c, seen);
+      if (t) return t;
+    }
+    return "";
+  }
+
+  const FALLBACK_REGION = "غير محدد";
+  const regionBuckets = {};
+  const regionOrder = [];
+  roots.forEach((r) => {
+    const region = effectiveRegion(r) || FALLBACK_REGION;
+    if (!regionBuckets[region]) { regionBuckets[region] = []; regionOrder.push(region); }
+    regionBuckets[region].push(r);
+  });
+
+  const regions = regionOrder.map((region) => {
+    const regionRoots = regionBuckets[region];
+    const teamBuckets = {};
+    const teamOrder = [];
+    regionRoots.forEach((r) => {
+      const team = effectiveTeam(r) || "غير مصنف";
+      if (!teamBuckets[team]) { teamBuckets[team] = []; teamOrder.push(team); }
+      teamBuckets[team].push(r);
+    });
+    const regionKey = _orgMatchKey(region).replace(/\s+/g, "_");
+    const teamNodes = teamOrder.map((team, i) => ({
+      id: "team-" + regionKey + "-" + i,
+      row: null,
+      name: team,
+      isNamed: true,
+      title: "",
+      status: "",
+      vacant: false,
+      region: "",
+      team: "",
+      mgrRaw: "",
+      mgrKey: "",
+      isExternal: false,
+      isGroup: true,
+      children: teamBuckets[team],
+    }));
+    return { name: region, teamNodes };
+  });
+
+  return { regions, allNodes: nodes, externalCount: Object.keys(externalByKey).length };
 }
 
 function _orgCardHtml(node) {
   const hasChildren = node.children.length > 0;
+
+  // ── ١) عقدة تجميعية (مجموعة "نوع الفريق" داخل المنطقة) — بانر مختلف
+  // تمامًا عن كارت الموظف، بلون العلامة التجارية، عشان يوضح إنه مستوى
+  // تنظيم مش شخص حقيقي. رأس المنطقة نفسه بقى جزء من هيدر البانل
+  // (_orgBuildRegionPanels) مش عقدة في الشجرة، فمفيش داعي لمستوى "جذر
+  // رئيسي" منفصل هنا زي v2. ────────────────────────────────────────
+  if (node.isGroup) {
+    const count = _orgCountLeaves(node);
+    return `<div class="orgc-group orgc-group-team" data-orgc-search="">
+      <div class="orgc-group-title">${_orgEsc(node.name)}</div>
+      <div class="orgc-group-count">${count.toLocaleString("ar")} وظيفة</div>
+    </div>`;
+  }
+
+  // ── ٢) عقدة "مدير خارج نطاق هذا الملف" — شكل مضغوط (وسم/Tag) مختلف
+  // عمدًا عن كارت الموظف الكامل، عشان يبان بصريًا إنه مجرد اسم للربط
+  // الهيكلي مش سجل موظف كامل البيانات. ─────────────────────────────
+  if (node.isExternal) {
+    const searchBlob = _orgMatchKey(node.name).toLowerCase();
+    return `<div class="orgc-ext" data-orgc-search="${_orgEsc(searchBlob)}">
+      <span class="orgc-ext-icon">🔗</span>
+      <span class="orgc-ext-name">${_orgEsc(node.name)}</span>
+      <span class="orgc-ext-note">خارج نطاق هذا الملف</span>
+    </div>`;
+  }
+
+  // ── ٣) كارت موظف حقيقي (شاغل الوظيفة أو شاغرة) — الاسم هو أهم عنصر
+  // بصريًا (أكبر خط)، والمسمى الوظيفي وصف مساعد تحته، وحالة التوظيف
+  // نقطة لونية + نص مضغوط في سطر واحد بدل شارة كبيرة. ──────────────
   let statusCls = "orgc-status-neutral";
   let statusLabel = "";
-  let avatarLetter = "—";
-  if (node.isExternal) {
-    statusCls = "orgc-status-external";
-    statusLabel = "خارج نطاق هذا الملف";
-    avatarLetter = "🔗";
-  } else if (node.vacant) {
+  let avatarLetter = "؟";
+  if (node.vacant) {
     statusCls = "orgc-status-vacant";
     statusLabel = node.status || "شاغر";
-    avatarLetter = "—";
+    avatarLetter = "○";
   } else if (node.status) {
     statusCls = "orgc-status-active";
     statusLabel = node.status;
@@ -30741,15 +30836,20 @@ function _orgCardHtml(node) {
     [node.name, node.title, node.region, node.team, statusLabel].filter(Boolean).join(" ")
   ).toLowerCase();
   return `<div class="orgc-card ${statusCls}${hasChildren ? " orgc-has-children" : ""}" data-orgc-search="${_orgEsc(searchBlob)}">
-    <div class="orgc-card-avatarrow">
-      <span class="orgc-avatar">${_orgEsc(avatarLetter)}</span>
-      ${hasChildren ? '<span class="orgc-star" title="له مرؤوسون في الهيكل">★</span>' : ""}
-    </div>
-    <div class="orgc-card-title">${_orgEsc(node.title) || "&nbsp;"}</div>
+    ${hasChildren ? '<span class="orgc-star" title="له مرؤوسون في الهيكل">★</span>' : ""}
+    <span class="orgc-avatar">${_orgEsc(avatarLetter)}</span>
     <div class="orgc-card-name">${nameDisplay}</div>
-    ${statusLabel ? `<div class="orgc-card-status">${_orgEsc(statusLabel)}</div>` : ""}
-    ${node.region ? `<div class="orgc-card-tag">📍 ${_orgEsc(node.region)}</div>` : ""}
+    <div class="orgc-card-title">${_orgEsc(node.title) || "&nbsp;"}</div>
+    <div class="orgc-card-foot">
+      ${statusLabel ? `<span class="orgc-card-status"><span class="orgc-status-dot"></span>${_orgEsc(statusLabel)}</span>` : ""}
+      ${node.region ? `<span class="orgc-card-tag">${_orgEsc(node.region)}</span>` : ""}
+    </div>
   </div>`;
+}
+
+function _orgCountLeaves(node) {
+  if (!node.children.length) return node.isGroup ? 0 : 1;
+  return node.children.reduce((s, c) => s + _orgCountLeaves(c), 0);
 }
 
 function _orgRenderNode(node, visited, depth) {
@@ -30759,13 +30859,24 @@ function _orgRenderNode(node, visited, depth) {
   visited.add(node.id);
   const hasChildren = node.children.length > 0;
   const card = _orgCardHtml(node);
+  // ★ 2026-09-21 (v3): "تكديس الأوراق" (leaf stacking) — مستوحاة من
+  // ul.stack في الكود المرجعي. لو عقدة (زي "مدير خارج نطاق هذا الملف")
+  // ليها عدد كبير من المرؤوسين المباشرين وكلهم أوراق (مفيش حد منهم له
+  // مرؤوسين هو نفسه)، عرضهم أفقيًا بتقنية الشجرة بيدّي فرع عريض جدًا
+  // وصعب القراءة. بدل كده بيتعرضوا كقائمة رأسية مضغوطة بخط جانبي بسيط.
+  const allLeafChildren = hasChildren && node.children.every((c) => c.children.length === 0);
+  const useStack = allLeafChildren && node.children.length >= 5;
   const toggle = hasChildren
     ? `<button type="button" class="orgc-toggle" onclick="_orgToggleNode('${node.id}')" id="orgc-toggle-${node.id}" title="طي / فتح الفريق">${depth >= 1 ? "+" : "−"}</button>`
     : "";
   const childrenHtml = hasChildren
-    ? `<ul class="orgc-children${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
-        .map((c) => _orgRenderNode(c, visited, depth + 1))
-        .join("")}</ul>`
+    ? useStack
+      ? `<ul class="orgc-children orgc-stack${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
+          .map((c) => { visited.add(c.id); return `<li class="orgc-stack-item">${_orgCardHtml(c)}</li>`; })
+          .join("")}</ul>`
+      : `<ul class="orgc-children${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
+          .map((c) => _orgRenderNode(c, visited, depth + 1))
+          .join("")}</ul>`
     : "";
   return `<li class="orgc-li"><div class="orgc-node" data-node-id="${node.id}">${card}${toggle}</div>${childrenHtml}</li>`;
 }
@@ -30788,7 +30899,7 @@ window._orgCollapseAllChart = function () { _orgSetAllCollapsed(true); };
 
 function _orgChartSearch(raw) {
   const q = _orgMatchKey(raw).toLowerCase();
-  const cards = document.querySelectorAll("#org-view-chart .orgc-card");
+  const cards = document.querySelectorAll("#org-view-chart .orgc-card, #org-view-chart .orgc-ext");
   if (!q) {
     cards.forEach((c) => c.classList.remove("orgc-search-match", "orgc-search-dim"));
     return;
@@ -30819,10 +30930,111 @@ function _orgChartSearch(raw) {
 }
 window._orgChartSearch = _orgChartSearch;
 
-function _orgBuildForestChart(rows) {
+// اسم مختصر آمن (ASCII/عربي بلا مسافات) يُستخدم كـ id لعنصر بانل المنطقة،
+// عشان زرار "الانتقال إلى" (jump-nav) يقدر يعمل scrollIntoView له.
+function _orgSlug(s) {
+  return (
+    _orgMatchKey(s)
+      .replace(/[^a-zA-Z0-9؀-ۿ]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "x"
+  );
+}
+
+function _orgJumpTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+window._orgJumpTo = _orgJumpTo;
+
+// مراقبة تمرير خفيفة (IntersectionObserver) — مستوحاة من orgSetupJumpSpy
+// في الكود المرجعي — بتحدّد أي زرار "انتقال" يبقى نشِط بناءً على البانل
+// الظاهر فعليًا في الشاشة، من غير ما تحتاج مكتبة خارجية.
+let _orgJumpObserver = null;
+function _orgSetupJumpSpy() {
+  if (_orgJumpObserver) { _orgJumpObserver.disconnect(); _orgJumpObserver = null; }
+  const panels = document.querySelectorAll("#org-view-chart .orgc-panel");
+  const btns = document.querySelectorAll("#org-view-chart .orgc-jump-btn");
+  if (!panels.length || !btns.length) return;
+  _orgJumpObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        btns.forEach((b) => b.classList.toggle("active", b.getAttribute("data-orgc-jump") === entry.target.id));
+      });
+    },
+    { rootMargin: "-15% 0px -70% 0px", threshold: 0 }
+  );
+  panels.forEach((p) => _orgJumpObserver.observe(p));
+}
+window._orgSetupJumpSpy = _orgSetupJumpSpy;
+
+// ★ 2026-09-21 (v3): يبني بانل مستقل لكل منطقة (بدل شجرة واحدة موحّدة في
+// v2) — كل بانل بهيدر فيه اسم المنطقة + شريط مؤشرات (إجمالي/مشغولة/
+// شاغرة/نسبة الإشغال)، وتحته شجرته الخاصة (فرع لكل "نوع فريق" جنب بعضه).
+// نفس فكرة renderOrgChart(root, entity) في الكود المرجعي اللي بيلف على
+// offices ويبني بانل مستقل لكل واحد فيهم.
+function _orgBuildRegionPanels(rows) {
   const forest = _orgBuildForest(rows);
-  const rootsHtml = forest.roots.map((root) => `<ul class="orgc-tree orgc-root-tree">${_orgRenderNode(root, new Set(), 0)}</ul>`).join("");
-  return { html: `<div class="orgc-forest">${rootsHtml}</div>`, externalCount: forest.externalCount, totalNodes: forest.allNodes.length };
+
+  const regionStats = {};
+  rows.forEach((r) => {
+    const rg = _orgNorm(r["المنطقة"]) || "غير محدد";
+    if (!regionStats[rg]) regionStats[rg] = { total: 0, vacant: 0 };
+    regionStats[rg].total++;
+    if (_orgIsVacant(r)) regionStats[rg].vacant++;
+  });
+
+  // ترتيب المناطق: الأكبر عددًا أولًا، عشان أهم المكاتب تبان فوق.
+  const orderedRegions = forest.regions.slice().sort((a, b) => {
+    const ta = (regionStats[a.name] || { total: 0 }).total;
+    const tb = (regionStats[b.name] || { total: 0 }).total;
+    return tb - ta;
+  });
+
+  const usedSlugs = {};
+  const panelsMeta = orderedRegions.map((rg, i) => {
+    let slug = "orgc-region-" + _orgSlug(rg.name);
+    if (usedSlugs[slug] != null) { usedSlugs[slug]++; slug = slug + "-" + usedSlugs[slug]; } else { usedSlugs[slug] = 0; }
+    const stats = regionStats[rg.name] || { total: 0, vacant: 0 };
+    return { rg, slug, stats };
+  });
+
+  const panelsHtml = panelsMeta
+    .map(({ rg, slug, stats }) => {
+      const total = stats.total;
+      const vacant = stats.vacant;
+      const occupied = total - vacant;
+      const pct = total ? Math.round((occupied / total) * 100) : 0;
+      const treesHtml = rg.teamNodes.map((tn) => `<ul class="orgc-tree">${_orgRenderNode(tn, new Set(), 0)}</ul>`).join("");
+      return `<section class="orgc-panel" id="${slug}">
+        <div class="orgc-panel-head">
+          <div class="orgc-panel-title">${_orgEsc(rg.name)}</div>
+          <div class="orgc-kpi-row">
+            <span class="orgc-kpi orgc-kpi-total"><b>${total.toLocaleString("ar")}</b><small>إجمالي</small></span>
+            <span class="orgc-kpi orgc-kpi-occ"><b>${occupied.toLocaleString("ar")}</b><small>مشغولة</small></span>
+            <span class="orgc-kpi orgc-kpi-vac"><b>${vacant.toLocaleString("ar")}</b><small>شاغرة</small></span>
+            <span class="orgc-kpi orgc-kpi-pct"><b>${pct}%</b><small>نسبة الإشغال</small></span>
+          </div>
+          <div class="orgc-coverage-track"><div class="orgc-coverage-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="orgc-forest">${treesHtml}</div>
+      </section>`;
+    })
+    .join("");
+
+  const jumpNav =
+    panelsMeta.length > 1
+      ? `<div class="orgc-jumpnav">${panelsMeta
+          .map(({ rg, slug }) => `<button type="button" class="orgc-jump-btn" data-orgc-jump="${slug}" onclick="_orgJumpTo('${slug}')">${_orgEsc(rg.name)}</button>`)
+          .join("")}</div>`
+      : "";
+
+  return {
+    html: jumpNav + panelsHtml,
+    externalCount: forest.externalCount,
+    totalNodes: forest.allNodes.length,
+    regionCount: panelsMeta.length,
+  };
 }
 
 function _orgBuildGroupedChart(rows) {
@@ -30885,17 +31097,17 @@ function _orgBuildGroupedChart(rows) {
 function _orgBuildChartPanel(rows) {
   const mgrCount = rows.filter((r) => _orgManager(r)).length;
   if (mgrCount > 0) {
-    const forest = _orgBuildForestChart(rows);
-    if (forest.totalNodes) {
-      const note = forest.externalCount
-        ? `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString(
+    const panels = _orgBuildRegionPanels(rows);
+    if (panels.totalNodes) {
+      const note = panels.externalCount
+        ? `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر"، ومقسّم لبانل مستقل لكل منطقة (${mgrCount.toLocaleString(
             "ar"
-          )} صف معبّى من ${rows.length.toLocaleString("ar")}). ظهرت ${forest.externalCount.toLocaleString(
+          )} صف معبّى من ${rows.length.toLocaleString("ar")}). ظهرت ${panels.externalCount.toLocaleString(
             "ar"
-          )} قيمة في هذا العمود لم تُطابق بالحرف اسم أي موظف موجود في نفس الملف — تم عرضها ككروت "مدير خارج نطاق هذا الملف" في أعلى فرعها بدل تجاهل الرابط. لو أي واحدة منها هي فعليًا نفس شخص موجود بصيغة اسم مختصرة، وضّح لي أيهما بالتحديد وسأربطها يدويًا لتفادي نسب أي موظف لمدير غلط.`
-        : `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر" (${mgrCount.toLocaleString("ar")} صف معبّى من ${rows.length.toLocaleString(
+          )} قيمة في هذا العمود لم تُطابق بالحرف اسم أي موظف موجود في نفس الملف — تم عرضها كوسم "مدير خارج نطاق هذا الملف" في أعلى فرعها بدل تجاهل الرابط. لو أي واحدة منها هي فعليًا نفس شخص موجود بصيغة اسم مختصرة، وضّح لي أيهما بالتحديد وسأربطها يدويًا لتفادي نسب أي موظف لمدير غلط.`
+        : `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر"، ومقسّم لبانل مستقل لكل منطقة (${mgrCount.toLocaleString(
             "ar"
-          )}).`;
+          )} صف معبّى من ${rows.length.toLocaleString("ar")}).`;
       return (
         `<div class="org-chart-note">${note}</div>` +
         `<div class="orgc-toolbar">
@@ -30909,7 +31121,7 @@ function _orgBuildChartPanel(rows) {
             <span class="orgc-legend-item">★ له مرؤوسون</span>
           </div>
         </div>` +
-        `<div class="org-chart-wrap">${forest.html}</div>`
+        `<div class="org-chart-wrap">${panels.html}</div>`
       );
     }
   }
@@ -30924,6 +31136,11 @@ function _orgSwitchView(view) {
   const elChart = document.getElementById("org-view-chart");
   if (elAnalysis) elAnalysis.classList.toggle("active", view === "analysis");
   if (elChart) elChart.classList.toggle("active", view === "chart");
+  if (view === "chart") {
+    requestAnimationFrame(() => {
+      try { if (typeof _orgSetupJumpSpy === "function") _orgSetupJumpSpy(); } catch (e) {}
+    });
+  }
 }
 window._orgSwitchView = _orgSwitchView;
 
@@ -31080,6 +31297,10 @@ function renderOrgStructureTab() {
   ORG._team = "";
   ORG.filtered = rows.slice();
   _orgRenderTable();
+
+  requestAnimationFrame(() => {
+    try { if (typeof _orgSetupJumpSpy === "function") _orgSetupJumpSpy(); } catch (e) {}
+  });
 
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;

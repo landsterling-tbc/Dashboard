@@ -7426,22 +7426,30 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   24) الهيكل الوظيفي — ORG CHART بكروت حقيقية متصلة بخطوط (★ 2026-09-21)
+   24) الهيكل الوظيفي — ORG CHART بكروت حقيقية متصلة بخطوط (★ 2026-09-21،
+   v3: بانل مستقل لكل منطقة — مستوحى من الكود الفعلي لنظام "إدارة الموارد
+   البشرية" المرجعي اللي شارك المستخدم مصدره الحقيقي app.js/styles.css)
    ──────────────────────────────────────────────────────────────────────
-   بناءً على طلب صريح: بعد ما عمود "المدير المباشر" اتملى فعليًا في ملف
-   الاستشاري، الشجرة النصية القديمة (org-node / org-tree-children باللي
-   فوق، لسه موجودة وبتخدم فيو "📊 التحليل" مفيش أي تغيير فيها) اتستبدلت
-   في فيو "🗂️ ORG CHART" بشجرة كروت بصرية فعلية — نفس روح تصميم نظام
-   "إدارة الموارد البشرية" المرجعي اللي شاركه المستخدم: كارت لكل شخص فيه
-   دائرة أول حرف من الاسم، نجمة صفراء لو الشخص مدير له مرؤوسين، عنوان
-   وظيفي، اسم، وحالة توظيف بلون مميز — وكل الكروت متصلة ببعض بخطوط شجرة
-   حقيقية (تقنية CSS خالصة، بدون أي مكتبة خارجية)، قابلة للطي/الفتح لكل
-   فرع لوحده (لأن العدد كبير — مئات الموظفين).
-   ★ اتجاه الهيكل نفسه (.orgc-tree/.orgc-children/.orgc-li) متثبّت LTR
+   بدل شجرة واحدة موحّدة تحت جذر شركة واحد (v2)، كل منطقة (مكة المكرمة،
+   الطائف، جدة، المدينة المنورة، المنطقة الغربية...) بقى ليها بانل مستقل
+   (.orgc-panel) بهيدر خاص وشريط مؤشرات أداء (إجمالي/مشغولة/شاغرة/نسبة
+   إشغال) وشجرة خاصة بيها — بالظبط زي أسلوب renderOrgChart في الكود
+   المرجعي اللي بيلف على offices ويبني بانل مستقل لكل واحد فيهم. وفوق كل
+   البانلات، شريط "انتقال سريع" (.orgc-jumpnav) بينقّلك لأي منطقة بضغطة،
+   ويتحدد فيه المنطقة الظاهرة حاليًا تلقائيًا أثناء الـ scroll.
+   كل كارت فيه دائرة أول حرف من الاسم (مملوءة باللون لو موظف حالي)،
+   نجمة صفراء لو الشخص له مرؤوسين، وخط جانبي ملوّن (border-inline-start)
+   بيوضح حالة التوظيف بنظرة واحدة — فكرة مأخوذة من كارت .onode في الكود
+   المرجعي. الفروع الكبيرة اللي كل عناصرها "أوراق" (مفيش حد منهم له
+   مرؤوسين) بتتعرض كقائمة رأسية مضغوطة (.orgc-stack) بدل تفرّع أفقي عريض.
+   ★ اتجاه شجرة كل بانل (.orgc-tree/.orgc-children/.orgc-li) متثبّت LTR
    عمدًا عشان حسابات مواقع خطوط التوصيل (يمين/يسار) تبقى صحيحة 100% في
    كل المتصفحات، بغض النظر عن اتجاه الصفحة العام (RTL) — ده تأثير هيكلي
    بحت مالوش علاقة باتجاه النص، والنص نفسه جوه كل كارت (.orgc-card)
-   متثبّت RTL ووسط (text-align:center) عشان يتقرأ صح بالعربي.
+   متثبّت RTL ووسط (text-align:center) عشان يتقرأ صح بالعربي. كل بانل
+   (منطقة) بقى له .orgc-forest خاص بيه كحاوية scroll مستقلة — نفس الحل
+   اللي اتأكد إنه بيمنع مشكلة اختفاء المحتوى (إحداثيات سالبة) لما حاوية
+   الـ scroll تفضل RTL وجواها محتوى LTR.
    ══════════════════════════════════════════════════════════════════════ */
 .orgc-toolbar {
   display: flex;
@@ -7479,16 +7487,23 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 
 .orgc-forest {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
-  gap: 34px 22px;
-  padding: 8px 6px 22px;
+  justify-content: center;
+  gap: 30px;
+  padding: 16px 12px 26px;
+  /* ★ 2026-09-21: لازم يبقى هو نفسه حاوية الـ scroll (مش .org-chart-wrap
+     المشتركة مع فيو "التحليل") وباتجاه LTR — لأن شجرة الكروت جواه متثبّتة
+     LTR (لحساب خطوط التوصيل صح)، فلو فضل الاتجاه RTL موروث من الصفحة،
+     نقطة scrollLeft:0 الافتراضية بتبان الحافة الغلط (يمين) وأغلب الشجرة
+     (خصوصًا الفريق الأكبر) بيتولد برّه حدود الشاشة يمين تمامًا. */
+  direction: ltr;
+  overflow-x: auto;
 }
 
 /* — الشجرة والخطوط (تقنية CSS classic لخطوط شجرة تنظيمية) — */
 .orgc-tree, .orgc-tree * { box-sizing: border-box; }
 .orgc-tree, .orgc-children, .orgc-li, .orgc-node { direction: ltr; }
-.orgc-root-tree { list-style: none; margin: 0; padding: 0; }
+.orgc-tree { list-style: none; margin: 0; padding: 0; }
 .orgc-children {
   display: flex;
   list-style: none;
@@ -7547,71 +7562,261 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
 
 /* — الكارت نفسه (نص عربي، فمتثبّت RTL ووسط بغض النظر عن اتجاه الشجرة) — */
+/* ── كارت الموظف (v2 — ★ 2026-09-21 تحديث بناءً على ملاحظة "الشكل
+   والطريقة محتاجين تحسين"): الاسم بقى أهم عنصر بصريًا (أكبر خط)،
+   المسمى الوظيفي وصف مساعد تحته، وحالة التوظيف + المنطقة في سطر واحد
+   مضغوط تحت بدل شارة كبيرة تاخد مساحة. الصورة الرمزية بقت أكبر وبحلقة
+   لونية واضحة بدل الاعتماد على خط علوي رفيع بس. ───────────────────── */
 .orgc-card {
   direction: rtl;
   text-align: center;
   display: inline-block;
-  width: 172px;
+  width: 186px;
   background: #fff;
-  border-radius: 14px;
-  border: 1.5px solid #e2e8f0;
-  border-top-width: 3px;
-  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 16px rgba(15,23,42,.06);
-  padding: 13px 10px 11px;
+  border-radius: 16px;
+  border: 1px solid #e7ecf1;
+  /* ★ v3: خط جانبي ملوّن (border-inline-start) بيوضح حالة التوظيف
+     بنظرة واحدة من غير ما يحتاج المستخدم يقرأ النص — فكرة مأخوذة من
+     كارت .onode في الكود المرجعي (border-inline-start: 4px solid --oc).
+     inline-start بيتبع اتجاه الصفحة تلقائيًا (يمين في RTL) فمحتاجش أي
+     تصحيح يدوي. */
+  border-inline-start: 4px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 18px rgba(15,23,42,.07);
+  padding: 16px 12px 12px;
   font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
   position: relative;
   transition: box-shadow .15s ease, transform .15s ease, opacity .15s ease;
   vertical-align: top;
 }
-.orgc-card:hover { box-shadow: 0 4px 10px rgba(15,23,42,.09), 0 12px 26px rgba(15,23,42,.1); transform: translateY(-2px); }
-.orgc-card.orgc-has-children { box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 16px rgba(15,23,42,.06), 0 0 0 1px rgba(11,107,126,.12); }
+.orgc-card:hover { box-shadow: 0 6px 14px rgba(15,23,42,.1), 0 14px 30px rgba(15,23,42,.12); transform: translateY(-3px); }
+.orgc-card.orgc-has-children { box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 18px rgba(15,23,42,.07), 0 0 0 1px rgba(11,107,126,.14); }
 
-.orgc-card-avatarrow { display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 8px; }
+/* ★ v3: دائرة مملوءة باللون (مش حلقة فاضية بس) للموظف الحالي، بنفس
+   روح avatar المرجعي — بتدّي إحساس أوضح إن الوظيفة مشغولة فعليًا. */
 .orgc-avatar {
-  width: 36px; height: 36px;
+  width: 46px; height: 46px;
+  margin: 0 auto 10px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(160deg, #e0f2f4, #ffffff);
-  border: 1.5px solid #bfe3e8;
+  background: linear-gradient(160deg, #eaf7f8, #ffffff);
+  border: 2.5px solid #bfe3e8;
   color: #0b6b7e;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 17px;
+  box-shadow: 0 2px 6px rgba(11,107,126,.12);
 }
 .orgc-star {
   position: absolute;
-  top: -6px; right: calc(50% - 28px);
-  width: 18px; height: 18px;
+  top: 8px; left: 10px;
+  width: 20px; height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, #F59E0B, #D97706);
   color: #fff;
-  font-size: 10px;
+  font-size: 10.5px;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 1px 3px rgba(180,83,9,.4);
 }
-.orgc-card-title { font-weight: 800; font-size: 11.5px; color: #0f172a; line-height: 1.45; margin-bottom: 3px; min-height: 17px; }
-.orgc-card-name { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; line-height: 1.4; }
-.orgc-card-status {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 10px;
-  border-radius: 999px;
-  margin-bottom: 4px;
+.orgc-card-name { font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.4; margin-bottom: 2px; }
+.orgc-card-title {
+  font-weight: 600; font-size: 10.5px; color: #7c8ea0;
+  line-height: 1.4; margin-bottom: 10px; min-height: 14px;
 }
-.orgc-card-tag { font-size: 10px; color: #64748b; margin-top: 2px; }
+.orgc-card-foot {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 5px 8px;
+  padding-top: 9px;
+  border-top: 1px dashed #eef1f5;
+}
+.orgc-card-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 800;
+}
+.orgc-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.orgc-card-tag {
+  font-size: 9.5px; font-weight: 700; color: #94a3b8;
+  background: #f4f6f8; border-radius: 999px; padding: 2px 8px;
+}
 
-.orgc-card.orgc-status-active { border-top-color: #16a34a; }
-.orgc-card.orgc-status-active .orgc-card-status { background: #DCFCE7; color: #15803d; }
-.orgc-card.orgc-status-vacant { border-top-color: #94a3b8; background: #fbfcfe; }
+.orgc-card.orgc-status-active { border-inline-start-color: #16a34a; }
+.orgc-card.orgc-status-active .orgc-avatar { border-color: #15803d; color: #fff; background: linear-gradient(155deg, #22a35d, #15803d); }
+.orgc-card.orgc-status-active .orgc-card-status { color: #15803d; }
+.orgc-card.orgc-status-active .orgc-status-dot { background: #16a34a; }
+
+.orgc-card.orgc-status-vacant { background: #fbfcfd; border-inline-start-color: #cbd5e1; }
+.orgc-card.orgc-status-vacant .orgc-avatar { border-color: #dbe3ea; color: #94a3b8; background: linear-gradient(160deg,#f4f6f8,#fff); }
 .orgc-card.orgc-status-vacant .orgc-card-name { color: #94a3b8; font-style: italic; }
-.orgc-card.orgc-status-vacant .orgc-card-status { background: #F1F5F9; color: #64748b; }
-.orgc-card.orgc-status-external { border-top-color: #d4af6a; border-top-style: dashed; background: #FFFBF0; }
-.orgc-card.orgc-status-external .orgc-card-status { background: #FEF3C7; color: #92400E; }
+.orgc-card.orgc-status-vacant .orgc-card-status { color: #94a3b8; }
+.orgc-card.orgc-status-vacant .orgc-status-dot { background: #94a3b8; }
 
 .orgc-card.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
 .orgc-card.orgc-search-dim { opacity: .22; }
 
+/* ── "مدير خارج نطاق هذا الملف" — وسم مضغوط، مختلف عمدًا عن كارت
+   الموظف الكامل، عشان يبان إنه مجرد نقطة وصل هيكلية مش سجل موظف. ── */
+.orgc-ext {
+  direction: rtl;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFBF0;
+  border: 1.5px dashed #d4af6a;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+  white-space: nowrap;
+}
+.orgc-ext-icon { font-size: 11px; }
+.orgc-ext-name { font-size: 11.5px; font-weight: 800; color: #92400E; }
+.orgc-ext-note { font-size: 9px; font-weight: 600; color: #b08a4e; }
+.orgc-ext.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.orgc-ext.orgc-search-dim { opacity: .22; }
+
+/* ── عقدة تجميعية (مجموعة "نوع الفريق" داخل بانل المنطقة) — بانر بلون
+   العلامة التجارية، مختلف تمامًا عن كارت الشخص، عشان يوضح إنه مستوى
+   تنظيم في الهيكل مش شخص حقيقي. ─────────────────────────────────── */
+.orgc-group {
+  direction: rtl;
+  text-align: center;
+  display: inline-block;
+  min-width: 190px;
+  border-radius: 16px;
+  padding: 16px 20px;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+  vertical-align: top;
+  box-shadow: 0 4px 14px rgba(8,45,60,.12);
+}
+.orgc-group-team {
+  background: linear-gradient(155deg, var(--teal-3, #0b6b7e), var(--teal, #0d849c));
+  color: #fff;
+  min-width: 160px;
+  padding: 13px 18px;
+}
+.orgc-group-title { font-size: 13.5px; font-weight: 800; margin-bottom: 3px; }
+.orgc-group-name { font-size: 11px; font-weight: 600; opacity: .82; margin-bottom: 6px; }
+.orgc-group-count {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  background: rgba(255,255,255,.16);
+  border-radius: 999px;
+  padding: 3px 11px;
+}
+
+/* ── تكديس الأوراق (leaf stacking) — مستوحى من ul.stack في الكود
+   المرجعي: بدل ما فرع كبير كل عناصره أوراق (زي كل موظفي "مدير خارج
+   نطاق هذا الملف" الواحد) يتفرّع أفقيًا بعرض هائل، بيتعرض كقائمة رأسية
+   مضغوطة بخط جانبي بسيط يوصل كل عنصر بالعقدة الأب. ────────────────── */
+.orgc-children.orgc-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 20px 0 0 0;
+  min-width: 186px;
+}
+.orgc-children.orgc-stack::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  width: 0; height: 20px;
+  border-left: 2px solid #cbd5e1;
+}
+.orgc-stack-item {
+  position: relative;
+  padding-inline-start: 16px;
+  text-align: start;
+}
+.orgc-stack-item::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  width: 12px;
+  height: 0;
+  border-top: 2px solid #cbd5e1;
+}
+.orgc-stack-item .orgc-card,
+.orgc-stack-item .orgc-ext { display: block; width: 100%; }
+
+/* ── بانل المنطقة (v3) — هيدر مستقل + شريط مؤشرات أداء + شجرة خاصة —
+   مستوحى من هيدر كل office في renderOrgChart بالكود المرجعي. ──────── */
+.orgc-panel {
+  border: 1px solid var(--bd-light, #dbe7ee);
+  border-radius: var(--r-lg, 18px);
+  overflow: hidden;
+  margin-bottom: 22px;
+  background: #fff;
+}
+.orgc-panel:last-child { margin-bottom: 0; }
+.orgc-panel-head {
+  direction: rtl;
+  padding: 16px 20px 18px;
+  background: linear-gradient(155deg, var(--navy, #0d2f40), var(--navy-2, #163d52));
+  color: #fff;
+}
+.orgc-panel-title { font-size: 15px; font-weight: 800; margin-bottom: 10px; }
+.orgc-kpi-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.orgc-kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  background: rgba(255,255,255,.12);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+}
+.orgc-kpi b { font-size: 14px; font-weight: 800; }
+.orgc-kpi small { font-size: 10px; font-weight: 600; opacity: .82; }
+.orgc-kpi-occ b { color: #86efac; }
+.orgc-kpi-vac b { color: #fca5a5; }
+.orgc-kpi-pct b { color: #7dd3fc; }
+.orgc-coverage-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  overflow: hidden;
+}
+.orgc-coverage-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a, #4ade80);
+}
+
+/* ── شريط "انتقال سريع" بين بانلات المناطق — مستوحى من org-jump في
+   الكود المرجعي، بدون الاعتماد على أي مكتبة خارجية. ───────────────── */
+.orgc-jumpnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--bd-light, #dbe7ee);
+  border-radius: 999px;
+  position: sticky;
+  top: 6px;
+  z-index: 3;
+}
+.orgc-jump-btn {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.orgc-jump-btn:hover { border-color: #94a3b8; }
+.orgc-jump-btn.active {
+  color: #fff;
+  background: linear-gradient(155deg, var(--teal-3, #0b6b7e), var(--teal, #0d849c));
+  border-color: transparent;
+}
+
 @media (max-width: 640px) {
   .orgc-legend { margin-inline-start: 0; }
-  .orgc-card { width: 148px; }
+  .orgc-card { width: 156px; }
+  .orgc-jumpnav { position: static; }
 }

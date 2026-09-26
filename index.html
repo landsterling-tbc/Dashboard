@@ -47,6 +47,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
@@ -408,7 +409,7 @@
       <div class="portal-card" id="portal-card-safety" data-category="safety" data-wm="📢">
         <div class="portal-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></div>
         <div class="portal-card-title">البلاغات والسلامة</div>
-        <div class="portal-card-desc">البلاغات، بلاغات الأمن والسلامة، ملخص الأمن والسلامة</div>
+        <div class="portal-card-desc">البلاغات، بلاغات الأمن والسلامة، ملخص الأمن والسلامة، NEW SLA</div>
       </div>
 
       <div class="portal-card" id="portal-card-operations" data-category="operations" data-wm="⚙️">
@@ -1186,6 +1187,24 @@
 -->
   <div class="panel" id="tab-security-safety-summary">
     <div id="security-safety-summary-content"></div>
+  </div>
+
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  🆕📐  تبويب: NEW SLA
+║  ID: tab-new-sla
+║  (2026-09-22) — بناءً على طلب صريح: يستخرج بياناته من نفس شيت
+║  البلاغات العام (window.RAW_BALAGH) بعد مطابقتها بخريجة شيت "NEW SLA"
+║  المرجعية (window.RAW_BALAGH_NEW_SLA_MAP) — راجع renderNewSlaTab() في
+║  dashboard.js لشرح المنهجية الكاملة.
+╚════════════════════════════════════════════════════════════════════╝
+-->
+  <div class="panel" id="tab-new-sla">
+    <div id="new-sla-content">
+      <div class="card loading-placeholder">
+        <div class="loading-placeholder-text">جاري التحميل…</div>
+      </div>
+    </div>
   </div>
 
 <!--
@@ -2478,6 +2497,7 @@
 </div>
 
 <script src="dashboard.js" defer></script>
+<script src="report_generator.js" defer></script>
 
 <!-- ══════════════════════════════════════════════════════════════
      Executive AI Assistant — AI Core Orb (Phase 4)

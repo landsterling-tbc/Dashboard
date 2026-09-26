@@ -15,6 +15,33 @@
 window.__BALAGH_AI_PATCH_VERSION = "school-360-unified-profile-2026-08-24";
 console.log("[Dashboard] patch version:", window.__BALAGH_AI_PATCH_VERSION);
 
+// 🔁 (2026-09-22) مساعد عام لإعادة محاولة أي طلب fetch أكثر من مرة قبل
+// الاستسلام — لوحظ إن بعض طلبات Google Apps Script (خصوصًا أول طلب بعد
+// فترة خمول أو بعد إعادة نشر (Redeploy) حديثة) بترجع فشل عابر (خطأ CORS/
+// شبكة، أو حتى 404 مؤقت لحد ما يخلص انتشار النسخة الجديدة) في المحاولة
+// الأولى، بس بتنجح في محاولة تانية بعدها بثوانٍ قليلة — نفس السلوك اللي
+// ظهر فعليًا في الـ Console (فشل [BALAGH] فوري تبعه نجاح). الدالة دي
+// مفيش فيها أي تغيير في منطق قراءة أو تفسير البيانات نفسها — بس تقليل
+// فرص ظهور فشل مؤقت للمستخدم من غير داعي قبل ما يوصل الكود المستدعي
+// لرسالة الخطأ النهائية (لو المشكلة حقيقية ومستمرة هتفضل تظهر بالظبط
+// زي ما كانت بتظهر قبل كده).
+window.__fetchWithRetry__ = async function (url, options, retries = 2, delayMs = 900) {
+  let lastErr, lastResp;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, options);
+      if (resp.ok) return resp;
+      lastResp = resp;
+      lastErr = new Error(`HTTP ${resp.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    if (attempt < retries) await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+  }
+  if (lastResp) return lastResp; // نرجّع آخر استجابة (حتى لو !ok) عشان الكود المستدعي يتعامل مع رسالة الخطأ الحالية زي ما هي بالظبط
+  throw lastErr;
+};
+
 /* ════════════════════════════════════════════════════════════════
    🎨 CSS_TOKENS — مصدر الألوان الموحّد في JS
    ----------------------------------------------------------------
@@ -1069,6 +1096,7 @@ function applyFilters() {
     }
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
     if (activeId === "tab-security-safety-summary") safeRun(renderSecuritySafetySummaryTab, "security-safety-summary");
+    if (activeId === "tab-new-sla") safeRun(renderNewSlaTab, "new-sla");
     if (activeId === "tab-corrections-escalations") safeRun(renderCorrectionsEscalationsTab, "corrections-escalations");
     if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
     if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
@@ -1606,7 +1634,7 @@ function showTab(name, el) {
     // ⚡ 2026-09-03: عند فتح أي تبويب بلاغات (عام/أمن وسلامة) — تحقق فوري
     // (بدون انتظار Tick التايمر الدوري) هل البيانات المعروضة "قديمة" (أقدم
     // من BALAGH_AUTO_INTERVAL_MS)، ولو كذلك اسحب نسخة أحدث من كاش GAS بصمت.
-    (("balagh" === name || "security-safety" === name || "security-safety-summary" === name) &&
+    (("balagh" === name || "security-safety" === name || "security-safety-summary" === name || "new-sla" === name) &&
       "function" === typeof window.__balaghMaybeRefreshOnView &&
       window.__balaghMaybeRefreshOnView()),
     "tajheez" === name && renderTajheezInventoryTab(),
@@ -1632,6 +1660,7 @@ function showTab(name, el) {
     "consultant-kpi" === name && renderConsultantKpiTab(),
     "security-safety" === name && renderSecuritySafetyTab(),
     "security-safety-summary" === name && renderSecuritySafetySummaryTab(),
+    "new-sla" === name && renderNewSlaTab(),
     "corrections-escalations" === name && renderCorrectionsEscalationsTab(),
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
@@ -3431,6 +3460,10 @@ let __bgRevalidatedOnce = false;
       // بيه (مش من CFG.GAS_URL الرئيسي بعد الآن) — شوف TAJINV_URL/loadTajheezInventoryData
       // بالأسفل قرب renderTajheezInventoryTab. سطر window.RAW_TAJHEEZ_INV اتشال من هنا عمدًا.
       (window.RAW_BALAGH           = window.RAW_BALAGH || []),   // يُحمَّل بشكل منفصل — لا نمسح بيانات محمّلة مسبقاً
+      // 🆕 (2026-09-22) خريطة "NEW SLA" (86 صف مرجعي: الفئة الأساسية ← الفئة
+      // الجديدة + الأولوية الجديدة + مستوى الخدمة بالساعة) — تُحمَّل مع البلاغات
+      // نفسها (نفس ملف Apps Script balagh_reports.gs)، راجع loadBalaghSeparate.
+      (window.RAW_BALAGH_NEW_SLA_MAP = window.RAW_BALAGH_NEW_SLA_MAP || []),
       (window.RAW_INVOICES_TRACKER = sa(d.kpiContractor || d.invoicesTracker)),
       (window.RAW_MAG_KPI          = sa(d.kpiContractor)),
       (window.RAW_CONSULTANT_KPI   = sa(d.consultantKpi)),
@@ -4137,6 +4170,10 @@ let __bgRevalidatedOnce = false;
     const BALAGH_URL =
       "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec";
     const BALAGH_CACHE_KEY = "tbc_balagh_cache_v1";
+    // 🆕 (2026-09-22) كاش IndexedDB مستقل لخريطة "NEW SLA" — صغير جداً (86 صف)
+    // فبيتخزّن كامل، ويتحدّث مع كل تحميل ناجح للبلاغات (نفس استجابة GAS بيرجّع
+    // newSlaMapping كحقل شقيق لـ data، راجع doGet في balagh_reports.gs).
+    const BALAGH_NEW_SLA_MAP_CACHE_KEY = "tbc_balagh_new_sla_map_cache_v1";
     // ⚡ 2026-09-03: تحديث "شبه فوري" للبلاغات فقط — بناءً على طلب صريح.
     // الباك إند (balagh_reports.gs) عنده تريجر "عند التعديل" (onBalaghSheetEdit)
     // بيعيد بناء كاش GAS خلال ثوانٍ من أي إضافة/تعديل في شيت البلاغات (بشرط
@@ -4196,6 +4233,12 @@ let __bgRevalidatedOnce = false;
       if (document.getElementById("tab-security-safety-summary")?.classList.contains("active")) {
         try { renderSecuritySafetySummaryTab(); } catch (e) { console.warn("[SEC-SAFETY-SUMMARY render]", e); }
       }
+      // 🆕 (2026-09-22) نفس المبدأ لتبويب "NEW SLA" — بياناته كمان مُشتقة من
+      // window.RAW_BALAGH (+ window.RAW_BALAGH_NEW_SLA_MAP)، فلازم تتحدّث
+      // معاهم بدل ما تفضل واقفة على أول نسخة اتحمّلت.
+      if (document.getElementById("tab-new-sla")?.classList.contains("active")) {
+        try { renderNewSlaTab(); } catch (e) { console.warn("[NEW-SLA render]", e); }
+      }
     }
     window.loadBalaghSeparate = async function(forceNetwork = false) {
       // 1) من الكاش أولاً (يشتغل حتى بعد F5) — عرض فوري بدون انتظار الشبكة
@@ -4208,6 +4251,10 @@ let __bgRevalidatedOnce = false;
             window.RAW_BALAGH = cached;
             window.__BALAGH_LOAD_STATE__ = "loaded";
             _linkBalaghToBuildings();
+            // 🆕 NEW SLA: نجيب خريطتها من نفس الكاش المحلي (بدون انتظار — لا نؤخر عرض البلاغات)
+            _idb.get(BALAGH_NEW_SLA_MAP_CACHE_KEY).then((m) => {
+              if (Array.isArray(m) && m.length) { window.RAW_BALAGH_NEW_SLA_MAP = m; _rerenderSecuritySafetyTabsIfActive(); }
+            }).catch(() => {});
             if (document.getElementById("tab-balagh")?.classList.contains("active")) {
               try { renderBalaghTab(); } catch(e) { console.warn("[BALAGH render]", e); }
             }
@@ -4240,7 +4287,7 @@ let __bgRevalidatedOnce = false;
         if (!BALAGH_URL || BALAGH_URL.indexOf("PASTE_") === 0) {
           throw new Error("لم يتم إدراج رابط ملف Apps Script الخاص بالبلاغات (BALAGH_URL) في dashboard.js بعد");
         }
-        const bResp = await fetch(BALAGH_URL, { cache: "no-store" });
+        const bResp = await window.__fetchWithRetry__(BALAGH_URL, { cache: "no-store" });
         if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
         const bJson = await bResp.json();
         if (bJson.status === "ok" && Array.isArray(bJson.data)) {
@@ -4252,6 +4299,13 @@ let __bgRevalidatedOnce = false;
           // لو مفيش تغيير فعلي.
           window.__BALAGH_DATA_TIMESTAMP__ = bJson.timestamp || null;
           _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
+          // 🆕 NEW SLA: نفس الاستجابة بترجّع خريطة NEW SLA (86 صف مرجعي) كحقل
+          // شقيق لـ data — راجع doGet في balagh_reports.gs. مصفوفة فاضية لو
+          // الشيت غير موجود/الإصدار قديم قبل هذا التحديث (توافق للخلف آمن).
+          if (Array.isArray(bJson.newSlaMapping)) {
+            window.RAW_BALAGH_NEW_SLA_MAP = bJson.newSlaMapping;
+            _idb.set(BALAGH_NEW_SLA_MAP_CACHE_KEY, bJson.newSlaMapping); // بدون await
+          }
           // ربط البلاغات بالمباني بعد التحميل
           _linkBalaghToBuildings();
           console.log(`[BALAGH] تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
@@ -4308,7 +4362,7 @@ let __bgRevalidatedOnce = false;
           throw new Error("لم يتم إدراج رابط ملف Apps Script الخاص بالبلاغات (BALAGH_URL) في dashboard.js بعد");
         }
         const sep = BALAGH_URL.indexOf("?") === -1 ? "?" : "&";
-        const bResp = await fetch(BALAGH_URL + sep + "refresh=1", { cache: "no-store" });
+        const bResp = await window.__fetchWithRetry__(BALAGH_URL + sep + "refresh=1", { cache: "no-store" });
         if (!bResp.ok) throw new Error(`HTTP ${bResp.status}`);
         const bJson = await bResp.json();
         if (bJson.status === "ok" && Array.isArray(bJson.data)) {
@@ -4318,6 +4372,10 @@ let __bgRevalidatedOnce = false;
           window.__BALAGH_LAST_FETCH_TS__ = Date.now();
           window.__BALAGH_DATA_TIMESTAMP__ = bJson.timestamp || null;
           _idb.set(BALAGH_CACHE_KEY, bJson.data); // بدون await — ما نأخّر العرض
+          if (Array.isArray(bJson.newSlaMapping)) {
+            window.RAW_BALAGH_NEW_SLA_MAP = bJson.newSlaMapping;
+            _idb.set(BALAGH_NEW_SLA_MAP_CACHE_KEY, bJson.newSlaMapping); // بدون await
+          }
           _linkBalaghToBuildings();
           console.log(`[BALAGH] تحديث فوري من الشيت: تم تحميل ${window.RAW_BALAGH.length.toLocaleString()} بلاغ`);
           window.__BALAGH_FORCE_REFRESH_STATE__ = "ok";
@@ -4429,6 +4487,13 @@ let __bgRevalidatedOnce = false;
       window.RAW_NEW_GATEKEEPERS    = d.gatekeepers_supervisors?.sheets?.["البوابون"] || [];
       window.RAW_NEW_SUPERVISORS    = d.gatekeepers_supervisors?.sheets?.["المشرفون والمهندسون"] || [];
       window.RAW_NEW_ORG_STRUCTURE  = d.org_structure?.sheets?.["البيانات"] || [];
+      // ★ تطبيق أي تعديلات محفوظة محليًا (من محرر ORG CHART — راجع
+      // _orgAssignIdentityKeysAndApplyLocalEdits) فوق البيانات الطازة
+      // اللي لسه جاية من جوجل شيت، عشان التعديلات تفضل ظاهرة بعد أي
+      // تحديث/Refresh للصفحة لحد ما تتزامن فعليًا مع الشيت نفسه.
+      if (typeof _orgAssignIdentityKeysAndApplyLocalEdits === "function") {
+        try { _orgAssignIdentityKeysAndApplyLocalEdits(window.RAW_NEW_ORG_STRUCTURE); } catch (err) { console.warn("[ORG_EDIT] فشل تطبيق التعديلات المحلية المحفوظة:", err); }
+      }
       // ★ 2026-09-17: الملفات الأربعة الجديدة (نفس الرابط، نفس الآب سكريبت)
       window.RAW_NEW_LS_PAYMENTS = d.ls_payments?.sheets?.["LS Payments and Contracts"] || [];
       // ★ 2026-09-20: بناءً على طلب صريح — استبدال المصدر بالكامل من شيت
@@ -4525,7 +4590,7 @@ let __bgRevalidatedOnce = false;
             }
           } catch (_) {}
         }
-        const resp = await fetch(NEW_TEMPLATES_URL, { cache: "no-store" });
+        const resp = await window.__fetchWithRetry__(NEW_TEMPLATES_URL, { cache: "no-store" });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const json = await resp.json();
         if (window._idb) window._idb.set(NEW_TEMPLATES_CACHE_KEY, json); // بدون await — ما نأخّر عرض البيانات لحفظ الكاش
@@ -6921,7 +6986,7 @@ function renderConsultantKpiTab() {
    ║  تحقيقات) من شيت "بلاغات_أمن_وسلامة" (RAW_SECURITY_SAFETY).
    ║  دلوقتي بيعرض بدل منه بلاغات "الأمن والسلامة" المُستخرجة من
    ║  شيت البلاغات العام نفسه (window.RAW_BALAGH) — عن طريق مطابقة
-   ║  عمود "الفئة الفرعية" بالتساوي التام مع 14 تصنيف
+   ║  عمود "الفئة الفرعية" بالتساوي التام مع 16 تصنيفًا (مقسّمة على 4
    ║  حدّدهم المستخدم (ملف بلاغات الامن والسلامة.xlsx). المصدر
    ║  الموحّد: window.getSecuritySafetyBalaghRows() (مُعرَّضة من IIFE
    ║  تبويب البلاغات العام) — نفس صف normalizeRows بالظبط (نفس
@@ -6969,7 +7034,7 @@ function renderSecuritySafetyTab() {
 
   // 🩺 تشخيص مرئي (2026-08-29) — مُحدَّث ليطابق حقل "الفئة الفرعية" (وليس
   // "الوصف")، بناءً على تصحيح المستخدم: إذا كانت البلاغات محمّلة فعليًا
-  // ولم يتطابق أي منها مع التصنيفات الأربعة عشر، تُعرض هنا أكثر القيم
+  // ولم يتطابق أي منها مع التصنيفات الستة عشر، تُعرض هنا أكثر القيم
   // الفعلية تكرارًا في عمود "الفئة الفرعية" لمراجعتها ومقارنتها يدويًا.
   // كل النصوص المعروضة للمستخدم بالفصحى بناءً على طلبه صراحةً.
   let diagnosticHtml = "";
@@ -6979,7 +7044,7 @@ function renderSecuritySafetyTab() {
     diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:16px">
       <div style="font-size:14px;font-weight:800;color:#991B1B;margin-bottom:6px">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن</div>
       <div style="font-size:12px;color:#7F1D1D;line-height:1.9;margin-bottom:10px">
-        البيانات محمَّلة بالفعل (${fmt2(window.RAW_BALAGH.length)} بلاغًا)، إلا أنه لا توجد قيمة في عمود "الفئة الفرعية" تطابق أيًا من التصنيفات الأربعة عشر المحدَّدة. فيما يلي أكثر القيم تكرارًا في عمود "الفئة الفرعية" حاليًا؛ يُرجى مراجعتها ومقارنتها بالتصنيفات، وإخبارنا بالتصنيف الصحيح في حال وجود اختلاف:
+        البيانات محمَّلة بالفعل (${fmt2(window.RAW_BALAGH.length)} بلاغًا)، إلا أنه لا توجد قيمة في عمود "الفئة الفرعية" تطابق أيًا من التصنيفات الستة عشر المحدَّدة. فيما يلي أكثر القيم تكرارًا في عمود "الفئة الفرعية" حاليًا؛ يُرجى مراجعتها ومقارنتها بالتصنيفات، وإخبارنا بالتصنيف الصحيح في حال وجود اختلاف:
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${topVals.length ? topVals.map(([v, n]) => `
@@ -7046,12 +7111,38 @@ function renderSecuritySafetyTab() {
   const overdueCount = rows.filter((r) => r.isOverdue).length;
   const slaBreachPct = filteredTotal > 0 ? ((overdueCount / filteredTotal) * 100).toFixed(1) : "0.0";
 
-  // ── توزيع حسب التصنيف (الـ14 فئة بالترتيب، حتى اللي عددها صفر) ──
+  // ── توزيع حسب التصنيف (الـ16 فئة بالترتيب، حتى اللي عددها صفر) ──
   const catCounts = {};
   rows.forEach((r) => { catCounts[r.subCategory] = (catCounts[r.subCategory] || 0) + 1; });
   const catEntries = (window.SECURITY_SAFETY_CATEGORIES || [])
     .map((c) => [c, catCounts[c] || 0])
     .sort((a, b) => b[1] - a[1]);
+
+  // 🗂️ (2026-09-22) توزيع حسب القسم (الأقسام الأربعة المسمّاة: المصاعد /
+  // مخارج الطوارئ / اعمال الكهرباء / أنظمة الأمن والسلامة) — بناءً على طلب
+  // صريح بإعادة تنظيم عرض التصنيفات لتظهر مجمَّعة تحت أقسامها بدل قائمة
+  // مسطّحة واحدة فقط.
+  // 🔎 (2026-09-22) توسيع إضافي — بناءً على طلب صريح بجعل تحليل "التوزيع
+  // حسب القسم" أوسع من مجرد عدد إجمالي: كل قسم دلوقتي معاه نفس مقاييس
+  // الأداء المعروضة أعلى التبويب (مفتوحة/مغلقة/نسبة اختراق SLA) محسوبة
+  // لبلاغات القسم ده بس، زائد أكثر فئة فرعية وأكثر محافظة تكرارًا جواه.
+  const secGroups = window.SECURITY_SAFETY_GROUPS || [];
+  const groupStats_ = secGroups.map((g) => {
+    const gRows = rows.filter((r) => g.categories.includes(r.subCategory));
+    const gTotal = gRows.length;
+    const gOpen = gRows.filter((r) => r.isOpen).length;
+    const gClosed = gRows.filter((r) => r.isClosed).length;
+    const gOverdue = gRows.filter((r) => r.isOverdue).length;
+    const gSlaBreachPct = gTotal ? ((gOverdue / gTotal) * 100).toFixed(1) : "0.0";
+    const gCatCounts = {};
+    gRows.forEach((r) => { gCatCounts[r.subCategory] = (gCatCounts[r.subCategory] || 0) + 1; });
+    const topCat = Object.entries(gCatCounts).sort((a, b) => b[1] - a[1])[0] || null;
+    const gRegionCounts = {};
+    gRows.forEach((r) => { const rg = r.location || "غير محدد"; gRegionCounts[rg] = (gRegionCounts[rg] || 0) + 1; });
+    const topRegion = Object.entries(gRegionCounts).sort((a, b) => b[1] - a[1])[0] || null;
+    return { group: g.group, total: gTotal, open: gOpen, closed: gClosed, overdue: gOverdue, slaBreachPct: gSlaBreachPct, topCat, topRegion };
+  });
+  const maxGroupVal = Math.max(1, ...groupStats_.map((g) => g.total));
 
   // ── توزيع حسب الحالة ──
   const statusCounts = {};
@@ -7107,9 +7198,41 @@ function renderSecuritySafetyTab() {
       </div>
     </div>
 
+    <div class="card mb14">
+      <div class="card-title">التوزيع حسب القسم</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;padding:6px 0">
+        ${groupStats_.map((gs) => `
+          <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${esc(gs.group)}</span>
+              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(gs.total)} بلاغ</span>
+            </div>
+            <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
+              <div style="height:100%;width:${(gs.total / maxGroupVal) * 100}%;background:#0891B2;border-radius:5px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:${gs.topCat || gs.topRegion ? "10px" : "0"}">
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(gs.open)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">مفتوحة</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(gs.closed)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">مغلقة</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#0891B2">${gs.slaBreachPct}%</div>
+                <div style="font-size:9px;color:var(--tx-muted)">اختراق SLA</div>
+              </div>
+            </div>
+            ${gs.topCat ? `<div style="font-size:11px;color:var(--tx-muted);line-height:1.7">أكثر فئة تكرارًا: <strong style="color:var(--tx-main)">${esc(gs.topCat[0])}</strong> (${fmt2(gs.topCat[1])})</div>` : ""}
+            ${gs.topRegion ? `<div style="font-size:11px;color:var(--tx-muted);line-height:1.7">أكثر محافظة تكرارًا: <strong style="color:var(--tx-main)">${esc(gs.topRegion[0])}</strong> (${fmt2(gs.topRegion[1])})</div>` : ""}
+          </div>`).join("")}
+      </div>
+    </div>
+
     <div class="g2 mb14">
       <div class="card">
-        <div class="card-title">التوزيع حسب الفئة</div>
+        <div class="card-title">التوزيع حسب الفئة (تفصيلي)</div>
         <div class="chart-box" style="height:340px"><canvas id="ch-sec-category"></canvas></div>
       </div>
       <div class="card">
@@ -7135,7 +7258,10 @@ function renderSecuritySafetyTab() {
           <div class="fg-lbl">الفئة</div>
           <select class="fsel" onchange="window.__SEC_BALAGH_STATE__.category=this.value;window.__SEC_BALAGH_STATE__.page=0;renderSecuritySafetyTab()">
             <option value="">كل الفئات</option>
-            ${catEntries.map(([c, n]) => `<option value="${esc(c)}" ${ST.category === c ? "selected" : ""}>${esc(c)} (${n})</option>`).join("")}
+            ${secGroups.map((g) => `
+              <optgroup label="${esc(g.group)}">
+                ${g.categories.map((c) => `<option value="${esc(c)}" ${ST.category === c ? "selected" : ""}>${esc(c)} (${catCounts[c] || 0})</option>`).join("")}
+              </optgroup>`).join("")}
           </select>
         </div>
         <div class="fg">
@@ -7277,7 +7403,7 @@ function renderSecuritySafetyTab() {
    ║  (2026-08-29) — تمّ استبدال الأرقام الثابتة المُدخلة يدوياً (من
    ║  تقرير Looker Studio خارجي) بأرقام حقيقية محسوبة فعلياً من نفس
    ║  بلاغات "الأمن والسلامة" المُستخرجة من شيت البلاغات العام (بمطابقة
-   ║  تامة لعمود "الفئة الفرعية" مع 14 تصنيف حدّدهم المستخدم) — بنفس المصدر
+   ║  تامة لعمود "الفئة الفرعية" مع 16 تصنيفًا حدّدهم المستخدم، مقسّمة على 4
    ║  الموحّد المستخدم في تبويب "بلاغات الأمن والسلامة":
    ║  window.getSecuritySafetyBalaghRows(). ملحوظة: بعض المفاهيم القديمة
    ║  (التذاكر "المعاد فتحها"، "المقترحة") لا يوجد لها مقابل حقيقي في
@@ -7382,10 +7508,38 @@ function renderSecuritySafetySummaryTab() {
 
   const catCounts = {};
   rows.forEach((r) => { catCounts[r.subCategory] = (catCounts[r.subCategory] || 0) + 1; });
-  const catEntries = (window.SECURITY_SAFETY_CATEGORIES || [])
-    .map((c) => [c, catCounts[c] || 0])
-    .sort((a, b) => b[1] - a[1]);
-  const maxCat = Math.max(1, ...catEntries.map((e) => e[1]));
+  // 🗂️ (2026-09-22) — توزيع حسب الفئة مُجمَّع تحت أقسامه الأربعة المسمّاة
+  // (المصاعد / مخارج الطوارئ / اعمال الكهرباء / أنظمة الأمن والسلامة) بدل
+  // قائمة واحدة مسطّحة لكل الـ16 فئة، بناءً على طلب صريح من المستخدم.
+  const secGroups = window.SECURITY_SAFETY_GROUPS || [];
+  // 🔎 (2026-09-22) — بناءً على طلب صريح بتوسيع تحليل "التوزيع حسب القسم"
+  // (مش بس عدد إجمالي لكل قسم): لكل قسم دلوقتي نفس مقاييس الأداء المعروضة
+  // أعلى الصفحة للتبويب كله (مفتوحة / تم حلها-مغلقة / ملغاة / نسبة
+  // الالتزام بـSLA) بس محسوبة لبلاغات القسم ده بس — عشان تبان الفروق بين
+  // الأقسام الأربعة بدل رقم إجمالي واحد بلا تفاصيل.
+  const groupsBreakdown = secGroups.map((g) => {
+    const gRows = rows.filter((r) => g.categories.includes(r.subCategory));
+    const cats = g.categories.map((c) => [c, catCounts[c] || 0]).sort((a, b) => b[1] - a[1]);
+    const groupTotal = gRows.length;
+    const gClosed = gRows.filter((r) => closedLbl(r) === "مغلق").length;
+    const gResolved = gRows.filter((r) => closedLbl(r) === "تم حله").length;
+    const gCancelled = gRows.filter((r) => closedLbl(r) === "ملغى").length;
+    const gOpen = gRows.filter((r) => r.isOpen).length;
+    const gOverdue = gRows.filter((r) => r.isOverdue).length;
+    const gSlaCompliantPct = groupTotal ? pct2(groupTotal - gOverdue, groupTotal) : "0.0";
+    return {
+      group: g.group,
+      total: groupTotal,
+      open: gOpen,
+      resolvedOrClosed: gClosed + gResolved,
+      cancelled: gCancelled,
+      overdue: gOverdue,
+      slaCompliantPct: gSlaCompliantPct,
+      categories: cats,
+    };
+  });
+  const maxCat = Math.max(1, ...groupsBreakdown.flatMap((g) => g.categories.map((e) => e[1])));
+  const maxGroupTotal = Math.max(1, ...groupsBreakdown.map((g) => g.total));
 
   el.innerHTML = `
     ${bannerHtml}
@@ -7442,21 +7596,453 @@ function renderSecuritySafetySummaryTab() {
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">التوزيع حسب الفئة <span class="sub">${fmt2(total)} بلاغ</span></div>
-      <div style="padding:8px 0">
-        ${catEntries.map(([c, n]) => `
-          <div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--tx-main);margin-bottom:4px">
-              <span>${c}</span><span style="color:var(--tx-muted)">${fmt2(n)}</span>
+    <div class="card mb14">
+      <div class="card-title">التوزيع حسب القسم <span class="sub">${fmt2(total)} بلاغ</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;padding:8px 0">
+        ${groupsBreakdown.map((g) => `
+          <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${g.group}</span>
+              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(g.total)} بلاغ</span>
             </div>
-            <div style="height:8px;background:var(--bg-2);border-radius:5px;overflow:hidden">
-              <div style="height:100%;width:${(n / maxCat) * 100}%;background:#0891B2;border-radius:5px"></div>
+            <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
+              <div style="height:100%;width:${(g.total / maxGroupTotal) * 100}%;background:#0891B2;border-radius:5px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(g.open)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">مفتوحة</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(g.resolvedOrClosed)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">تم حلها/مغلقة</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:var(--tx-sec)">${fmt2(g.cancelled)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">ملغاة</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#0891B2">${g.slaCompliantPct}%</div>
+                <div style="font-size:9px;color:var(--tx-muted)">التزام SLA</div>
+              </div>
             </div>
           </div>`).join("")}
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title">التوزيع حسب الفئة (تفصيلي — مجمّع حسب القسم) <span class="sub">${fmt2(total)} بلاغ</span></div>
+      <div style="padding:8px 0">
+        ${groupsBreakdown.map((g) => `
+          <div style="margin-bottom:18px">
+            <div style="font-size:12px;font-weight:800;color:#0891B2;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--bd-light)">${g.group}</div>
+            ${g.categories.map(([c, n]) => `
+              <div style="margin-bottom:10px;padding-right:8px">
+                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--tx-main);margin-bottom:4px">
+                  <span>${c}</span><span style="color:var(--tx-muted)">${fmt2(n)}</span>
+                </div>
+                <div style="height:8px;background:var(--bg-2);border-radius:5px;overflow:hidden">
+                  <div style="height:100%;width:${(n / maxCat) * 100}%;background:#0891B2;border-radius:5px"></div>
+                </div>
+              </div>`).join("")}
+          </div>`).join("")}
+      </div>
+    </div>
   `;
+}
+
+/* JS تبويب: NEW SLA (tab-new-sla) — السلا الجديد يُحسب فقط للبلاغات
+   المغلقة غير P5، P5 مستبعدة تمامًا من الحساب (قسم مستقل بالأسفل). راجع
+   newSlaMatched/newSlaEvalStatus/newSlaCategory في normalizeRows فوق. */
+function renderNewSlaTab() {
+  const el = document.getElementById("new-sla-content");
+  if (!el) return;
+
+  const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const fmt2 = (n) => (n || 0).toLocaleString("en-US");
+  const pct2 = (n, t) => (t ? ((n / t) * 100).toFixed(1) : "0.0");
+
+  const balaghState = window.__BALAGH_LOAD_STATE__ || "idle";
+  const notLoaded = balaghState !== "loaded" || !Array.isArray(window.RAW_BALAGH) || window.RAW_BALAGH.length === 0;
+  let bannerHtml = "";
+  if (notLoaded) {
+    const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
+    const msg =
+      balaghState === "loading"
+        ? "يجري تحميل بيانات البلاغات في الخلفية، وسيُحدَّث تبويب NEW SLA تلقائيًا فور اكتمال التحميل."
+        : balaghState === "error"
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+      <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
+    </div>`;
+  }
+
+  if (typeof window.__balaghNormalizeRows !== "function") {
+    el.innerHTML = `${bannerHtml}<div class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">تعذّر تحميل وحدة البلاغات</div>
+    </div>`;
+    return;
+  }
+
+  const mapCatalogLen = typeof window.__balaghNewSlaRawMapLen_ === "function" ? window.__balaghNewSlaRawMapLen_() : 0;
+  // ⚠️ لو الخريطة المرجعية لسه فاضية رغم إن البلاغات محمَّلة فعليًا — الأرجح
+  // إن ملف Apps Script (balagh_reports.gs) عنده نسخة قديمة لسه متعرفش تقرأ
+  // شيت "NEW SLA" (تحديث مطلوب — راجع خطوات النشر في تعليمات التسليم).
+  let mapMissingHtml = "";
+  if (!notLoaded && !mapCatalogLen) {
+    mapMissingHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
+      <strong style="color:#991B1B">⚠️ خريطة "NEW SLA" المرجعية غير محمَّلة بعد.</strong>
+      البلاغات نفسها وصلت بنجاح، لكن الاستجابة الحالية من رابط GAS لا تحتوي على خريطة NEW SLA (86 صف). على الأرجح ما زال ملف Apps Script المنشور نسخة قديمة قبل هذا التحديث — يُرجى نشر نسخة جديدة من balagh_reports.gs (Deploy → Manage deployments → Edit → New version) ثم الضغط على "تحديث البلاغات الآن من الشيت" في تبويب البلاغات.
+    </div>`;
+  }
+
+  const allRows = window.__balaghNormalizeRows();
+  const matchedRows = allRows.filter((r) => r.newSlaMatched);
+  const p1to4Rows = matchedRows.filter((r) => !r.newSlaIsP5);
+  const p5Rows = matchedRows.filter((r) => r.newSlaIsP5);
+  const unmatchedRows = allRows.filter((r) => !r.newSlaMatched && r.subCategory);
+
+  // ── حالة الفلاتر (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم) ──
+  const ST = (window.__NEW_SLA_STATE__ = window.__NEW_SLA_STATE__ || {
+    search: "", priority: "", evalStatus: "", page: 0, size: 25,
+  });
+
+  const priorityOrder = { P1: 1, P2: 2, P3: 3, P4: 4, P5: 5 };
+  const evalStatusLabel = (s) => ({
+    compliant: "ملتزم", breach: "غير ملتزم (اختراق)", pending: "قيد التنفيذ — لم يُحدَّد بعد",
+    p5: "P5 — بدون SLA جديد", unmatched: "غير مصنّفة — بدون أولوية",
+  }[s] || s || "—");
+
+  // ── لوحة KPI عامة: على أساس P1-P4 المطابقة فقط (P5 مُستثناة تمامًا هنا) ──
+  const totalP1to4 = p1to4Rows.length;
+  const compliantCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "compliant").length;
+  const breachCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "breach").length;
+  const pendingCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "pending").length;
+  const evaluatedCount = compliantCount + breachCount;
+  const compliancePct = pct2(compliantCount, evaluatedCount);
+
+  // ── تفصيل حسب الأولوية الجديدة (P1..P4) ──
+  const priorityStats = ["P1", "P2", "P3", "P4"].map((p) => {
+    const pRows = p1to4Rows.filter((r) => r.newSlaPriority === p);
+    const pCompliant = pRows.filter((r) => r.newSlaEvalStatus === "compliant").length;
+    const pBreach = pRows.filter((r) => r.newSlaEvalStatus === "breach").length;
+    const pPending = pRows.filter((r) => r.newSlaEvalStatus === "pending").length;
+    const pEvaluated = pCompliant + pBreach;
+    const targetRow = pRows.find((r) => r.newSlaHoursTarget != null);
+    return {
+      priority: p, total: pRows.length, compliant: pCompliant, breach: pBreach, pending: pPending,
+      compliancePct: pct2(pCompliant, pEvaluated), hoursTarget: targetRow ? targetRow.newSlaHoursTarget : null,
+    };
+  });
+  const maxPriorityTotal = Math.max(1, ...priorityStats.map((p) => p.total));
+
+  // ── تفصيل حسب الفئة الجديدة (القيمة الجديدة التي ستتطبق) — بما فيها
+  // فئات موجودة في الخريطة المرجعية ولسه معهاش أي بلاغ حالياً (عدّها صفر)،
+  // بنفس مبدأ عرض التصنيفات الستة عشر كاملة في تبويب الأمن والسلامة. ──
+  const catalogEntries = typeof window.__balaghNewSlaCatalogEntries_ === "function" ? window.__balaghNewSlaCatalogEntries_() : [];
+  const catalogP1to4 = catalogEntries.filter((e) => !e.isP5);
+  const catalogP5 = catalogEntries.filter((e) => e.isP5);
+  const catByNewCategory_ = new Map(); // newCategory -> {priority, hoursTarget}
+  catalogP1to4.forEach((e) => { if (!catByNewCategory_.has(e.newCategory)) catByNewCategory_.set(e.newCategory, e); });
+  const categoryStats = [...catByNewCategory_.entries()].map(([cat, e]) => {
+    const cRows = p1to4Rows.filter((r) => r.newSlaCategory === cat);
+    const cCompliant = cRows.filter((r) => r.newSlaEvalStatus === "compliant").length;
+    const cBreach = cRows.filter((r) => r.newSlaEvalStatus === "breach").length;
+    const cEvaluated = cCompliant + cBreach;
+    return {
+      category: cat, priority: e.priority, hoursTarget: e.hoursTarget, total: cRows.length,
+      compliant: cCompliant, breach: cBreach, compliancePct: pct2(cCompliant, cEvaluated),
+    };
+  }).sort((a, b) => (priorityOrder[a.priority] - priorityOrder[b.priority]) || (b.total - a.total));
+
+  // ── قسم P5: فئة + عدد بلاغات فقط، بلا أي حساب SLA ──
+  const catByNewCategoryP5_ = new Map();
+  catalogP5.forEach((e) => { if (!catByNewCategoryP5_.has(e.newCategory)) catByNewCategoryP5_.set(e.newCategory, e); });
+  const p5Total = p5Rows.length;
+  const p5Stats = [...catByNewCategoryP5_.keys()].map((cat) => {
+    const n = p5Rows.filter((r) => r.newSlaCategory === cat).length;
+    return { category: cat, count: n, pct: pct2(n, p5Total) };
+  }).sort((a, b) => b.count - a.count);
+
+  // ── تحليل حسب الفئة الفرعية (بعد التطبيق) — كل الفئات المطابقة P1-P5 مع بعض ──
+  const catByNewCategoryAll_ = new Map();
+  catalogEntries.forEach((e) => { if (!catByNewCategoryAll_.has(e.newCategory)) catByNewCategoryAll_.set(e.newCategory, e); });
+  const subCategoryAnalysis = [...catByNewCategoryAll_.entries()].map(([cat, e]) => {
+    const n = matchedRows.filter((r) => r.newSlaCategory === cat).length;
+    return { category: cat, priority: e.priority, count: n, pct: pct2(n, matchedRows.length) };
+  }).sort((a, b) => b.count - a.count);
+
+  // ── قسم "غير مصنّفة": فئات فرعية موجودة فعليًا في البلاغات لكن مش موجودة
+  // في خريطة NEW SLA (86 صف) — بدون أولوية/SLA جديد (بدل ما تُخترع)، وبدون
+  // حذفها من الداشبورد. عدد البلاغات + اسم الفئة الأصلي فقط، بنفس أسلوب P5. ──
+  const unclassifiedTotal = unmatchedRows.length;
+  const unclassifiedFreq = {};
+  unmatchedRows.forEach((r) => { unclassifiedFreq[r.subCategory] = (unclassifiedFreq[r.subCategory] || 0) + 1; });
+  const unclassifiedStats = Object.entries(unclassifiedFreq)
+    .map(([cat, n]) => ({ category: cat, count: n, pct: pct2(n, unclassifiedTotal) }))
+    .sort((a, b) => b.count - a.count);
+
+  // ── تطبيق فلاتر السجل التفصيلي (على كل بلاغ له فئة فرعية: P1-P5 + غير مصنّفة) ──
+  let rows = matchedRows.concat(unmatchedRows).filter((r) => {
+    if (ST.priority) {
+      if (ST.priority === "UNCLASSIFIED") { if (r.newSlaMatched) return false; }
+      else if (r.newSlaPriority !== ST.priority) return false;
+    }
+    if (ST.evalStatus && r.newSlaEvalStatus !== ST.evalStatus) return false;
+    if (ST.search) {
+      const s = ST.search.trim().toLowerCase();
+      const hay = [r.recordNo, r.schoolName, r.linkedSchoolName, r.subCategory, r.newSlaCategory, r.contractor].join(" ").toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+    return true;
+  });
+  rows = [...rows].sort((a, b) => (priorityOrder[a.newSlaPriority] || 9) - (priorityOrder[b.newSlaPriority] || 9)
+    || (b.creationDateObj?.getTime() || 0) - (a.creationDateObj?.getTime() || 0));
+  const filteredTotal = rows.length;
+  const pageCount = Math.max(1, Math.ceil(filteredTotal / ST.size));
+  const list = rows.slice(ST.page * ST.size, ST.page * ST.size + ST.size);
+
+  el.innerHTML = `
+    ${bannerHtml}
+    ${mapMissingHtml}
+
+    <div class="card mb14">
+      <div class="card-title">
+        <span>نظرة عامة — P1 إلى P4</span>
+        <span class="sub">${fmt2(totalP1to4)} بلاغ مطابق · ${fmt2(p5Total)} ضمن P5 · ${fmt2(unclassifiedTotal)} غير مصنّفة</span>
+      </div>
+      <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
+        <div class="kpi kc-amber">
+          <div class="kpi-val" style="color:#D97706">${fmt2(totalP1to4)}</div>
+          <div class="kpi-lbl">إجمالي P1-P4 المطابقة</div>
+          <div class="kpi-sub">${fmt2(evaluatedCount)} تم تقييمها (مغلقة)</div>
+        </div>
+        <div class="kpi kc-green">
+          <div class="kpi-val" style="color:#059669">${compliancePct}%</div>
+          <div class="kpi-lbl">نسبة الالتزام (من المُقيَّم)</div>
+          <div class="kpi-sub">${fmt2(compliantCount)} ملتزم</div>
+        </div>
+        <div class="kpi kc-red">
+          <div class="kpi-val" style="color:#991b1b">${fmt2(breachCount)}</div>
+          <div class="kpi-lbl">اختراق SLA الجديد</div>
+          <div class="kpi-sub">${pct2(breachCount, evaluatedCount)}% من المُقيَّم</div>
+        </div>
+        <div class="kpi kc-blue">
+          <div class="kpi-val" style="color:#0891B2">${fmt2(pendingCount)}</div>
+          <div class="kpi-lbl">قيد التنفيذ — لم يُحدَّد بعد</div>
+          <div class="kpi-sub">مفتوحة أو بيانات مدة غير متاحة</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">
+        <span>تحليل حسب الفئة الفرعية (بعد التطبيق)</span>
+        <span class="sub">${fmt2(subCategoryAnalysis.length)} فئة · ${fmt2(matchedRows.length)} بلاغ</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>الفئة الفرعية (الاسم الجديد)</th><th>الأولوية</th><th>عدد البلاغات</th><th>النسبة</th></tr></thead>
+          <tbody>
+            ${subCategoryAnalysis.length ? subCategoryAnalysis.map((c) => `
+              <tr>
+                <td style="max-width:320px">${esc(c.category)}</td>
+                <td style="font-weight:700">${esc(c.priority)}</td>
+                <td>${fmt2(c.count)}</td>
+                <td>${c.pct}%</td>
+              </tr>`).join("") : `<tr><td colspan="4"><div class="empty-msg">لا توجد بيانات</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">التوزيع حسب الأولوية الجديدة (P1-P4)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;padding:6px 0">
+        ${priorityStats.map((p) => `
+          <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${p.priority}${p.hoursTarget != null ? ` <span style="font-size:11px;font-weight:600;color:var(--tx-muted)">(الهدف ${p.hoursTarget} ساعة)</span>` : ""}</span>
+              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(p.total)} بلاغ</span>
+            </div>
+            <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
+              <div style="height:100%;width:${(p.total / maxPriorityTotal) * 100}%;background:#0891B2;border-radius:5px"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(p.compliant)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">ملتزم</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(p.breach)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">اختراق</div>
+              </div>
+              <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
+                <div style="font-size:13px;font-weight:800;color:#0891B2">${fmt2(p.pending)}</div>
+                <div style="font-size:9px;color:var(--tx-muted)">قيد التنفيذ</div>
+              </div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">التوزيع حسب الفئة الجديدة (P1-P4)</div>
+        <div class="chart-box" style="height:340px"><canvas id="ch-newsla-category"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">توزيع حالة الالتزام (P1-P4)</div>
+        <div class="chart-box" style="height:340px"><canvas id="ch-newsla-status"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">
+        <span>تفصيل حسب الفئة الجديدة</span>
+        <span class="sub">${fmt2(categoryStats.length)} فئة</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>الفئة الجديدة</th><th>الأولوية</th><th>الهدف (ساعة)</th><th>الإجمالي</th><th>ملتزم</th><th>اختراق</th><th>نسبة الالتزام</th></tr>
+          </thead>
+          <tbody>
+            ${categoryStats.length ? categoryStats.map((c) => `
+              <tr>
+                <td style="max-width:280px">${esc(c.category)}</td>
+                <td style="font-weight:700">${esc(c.priority)}</td>
+                <td>${c.hoursTarget != null ? c.hoursTarget : "—"}</td>
+                <td>${fmt2(c.total)}</td>
+                <td style="color:#059669;font-weight:700">${fmt2(c.compliant)}</td>
+                <td style="color:#991B1B;font-weight:700">${fmt2(c.breach)}</td>
+                <td>${c.compliant + c.breach ? c.compliancePct + "%" : "—"}</td>
+              </tr>`).join("") : `<tr><td colspan="7"><div class="empty-msg">لا توجد بيانات</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb14" style="border:1px solid #E5E7EB">
+      <div class="card-title">
+        <span>🚫 فئات P5 — بدون SLA جديد</span>
+        <span class="sub">${fmt2(p5Total)} بلاغ</span>
+      </div>
+      <div style="font-size:12px;color:var(--tx-muted);padding:0 14px 10px">لا يُحسب أي التزام/اختراق SLA لهذه الفئات — اسم الفئة وعدد البلاغات فقط.</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>الفئة الجديدة (P5)</th><th>عدد البلاغات</th><th>النسبة من إجمالي P5</th></tr></thead>
+          <tbody>
+            ${p5Stats.length ? p5Stats.map((c) => `
+              <tr><td style="max-width:320px">${esc(c.category)}</td><td>${fmt2(c.count)}</td><td>${c.pct}%</td></tr>`).join("")
+              : `<tr><td colspan="3"><div class="empty-msg">لا توجد بيانات</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb14" style="border:1px solid #E5E7EB">
+      <div class="card-title">
+        <span>◻️ فئات غير مصنّفة — بدون أولوية</span>
+        <span class="sub">${fmt2(unclassifiedTotal)} بلاغ</span>
+      </div>
+      <div style="font-size:12px;color:var(--tx-muted);padding:0 14px 10px">فئات فرعية موجودة في البلاغات الفعلية لكنها غير مدرجة بعد في خريطة NEW SLA المرجعية (${fmt2(mapCatalogLen)} فئة) — بدون أولوية أو SLA جديد حاليًا، واسم الفئة الأصلي وعدد البلاغات فقط.</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>الفئة الفرعية (الاسم الأصلي)</th><th>عدد البلاغات</th><th>النسبة</th></tr></thead>
+          <tbody>
+            ${unclassifiedStats.length ? unclassifiedStats.map((c) => `
+              <tr><td style="max-width:320px">${esc(c.category)}</td><td>${fmt2(c.count)}</td><td>${c.pct}%</td></tr>`).join("")
+              : `<tr><td colspan="3"><div class="empty-msg">لا توجد بيانات</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mb14">
+      <div class="card-title">فلاتر السجل التفصيلي</div>
+      <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px 0">
+        <div class="fg" style="flex:1;min-width:220px">
+          <div class="fg-lbl">بحث</div>
+          <input class="finp" style="width:100%" placeholder="🔍 المدرسة أو رقم البلاغ أو الفئة..." value="${esc(ST.search)}"
+            oninput="window.__NEW_SLA_STATE__.search=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">الأولوية الجديدة</div>
+          <select class="fsel" onchange="window.__NEW_SLA_STATE__.priority=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+            <option value="">الكل</option>
+            ${["P1", "P2", "P3", "P4", "P5"].map((p) => `<option value="${p}" ${ST.priority === p ? "selected" : ""}>${p}</option>`).join("")}
+            <option value="UNCLASSIFIED" ${ST.priority === "UNCLASSIFIED" ? "selected" : ""}>غير مصنّفة</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">حالة الالتزام</div>
+          <select class="fsel" onchange="window.__NEW_SLA_STATE__.evalStatus=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+            <option value="">الكل</option>
+            ${["compliant", "breach", "pending", "p5", "unmatched"].map((s) => `<option value="${s}" ${ST.evalStatus === s ? "selected" : ""}>${evalStatusLabel(s)}</option>`).join("")}
+          </select>
+        </div>
+        <button class="f-clear" onclick="window.__NEW_SLA_STATE__={search:'',priority:'',evalStatus:'',page:0,size:25};renderNewSlaTab()">✕ مسح الفلاتر</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>السجل التفصيلي</span>
+        <span class="sub">${fmt2(filteredTotal)} سجل</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم البلاغ</th><th>تاريخ الإنشاء</th><th>الفئة الأصلية</th><th>الفئة الجديدة</th>
+              <th>الأولوية الجديدة</th><th>الحالة</th><th>مدة الحل (ساعة)</th><th>الهدف (ساعة)</th><th>حالة الالتزام الجديد</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.length ? list.map((r) => `
+              <tr>
+                <td style="font-family:monospace;font-size:11px">${esc(r.recordNo) || "—"}</td>
+                <td style="white-space:nowrap">${esc(r.creationDate) || "—"}</td>
+                <td style="max-width:200px">${esc(r.subCategory) || "—"}</td>
+                <td style="max-width:200px">${esc(r.newSlaCategory) || "—"}</td>
+                <td style="font-weight:700">${esc(r.newSlaPriority) || "—"}</td>
+                <td>${esc(window.balaghStatusLabel(r.status))}</td>
+                <td>${r.slaDurationHours != null ? r.slaDurationHours.toFixed(1) : "—"}</td>
+                <td>${r.newSlaHoursTarget != null ? r.newSlaHoursTarget : "—"}</td>
+                <td style="color:${r.newSlaEvalStatus === "compliant" ? "#059669" : r.newSlaEvalStatus === "breach" ? "#DC2626" : "var(--tx-muted)"};font-weight:700">${evalStatusLabel(r.newSlaEvalStatus)}</td>
+              </tr>`).join("")
+              : `<tr><td colspan="9"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <div class="pag-bar">
+        <div class="pag-info">عرض ${filteredTotal ? ST.page * ST.size + 1 : 0} - ${Math.min(filteredTotal, (ST.page + 1) * ST.size)} من ${fmt2(filteredTotal)} سجل</div>
+        <div class="pag-btns">
+          <button class="pag-btn" ${ST.page <= 0 ? "disabled" : ""} onclick="window.__NEW_SLA_STATE__.page=Math.max(0,window.__NEW_SLA_STATE__.page-1);renderNewSlaTab()">◀ السابق</button>
+          <button class="pag-btn active">${ST.page + 1} / ${pageCount}</button>
+          <button class="pag-btn" ${ST.page >= pageCount - 1 ? "disabled" : ""} onclick="window.__NEW_SLA_STATE__.page=Math.min(${pageCount - 1},window.__NEW_SLA_STATE__.page+1);renderNewSlaTab()">التالي ▶</button>
+        </div>
+      </div>
+    </div>`;
+
+  requestAnimationFrame(() => {
+    if (typeof Chart === "undefined") return;
+    const PAL = CSS_TOKENS.palette();
+
+    if (document.getElementById("ch-newsla-category")) {
+      const nonZero = categoryStats.filter((c) => c.total > 0);
+      const dataEntries = (nonZero.length ? nonZero : categoryStats).slice(0, 20);
+      const colors = dataEntries.map((_, i) => PAL[i % PAL.length] + "DD");
+      makeHBar("ch-newsla-category", dataEntries.map((c) => c.category), dataEntries.map((c) => c.total), colors);
+    }
+
+    if (document.getElementById("ch-newsla-status")) {
+      const statusMap = { "ملتزم": compliantCount, "غير ملتزم (اختراق)": breachCount, "قيد التنفيذ": pendingCount };
+      makeDoughnut("ch-newsla-status", statusMap, {});
+    }
+  });
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -10202,6 +10788,48 @@ function _sysDownloadFile(filename, content, mime) {
       .trim();
   }
 
+  // \u2605 2026-09-22 \u2014 \u062A\u0648\u062D\u064A\u062F \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0645\u0642\u0627\u0648\u0644\u064A\u0646 (\u0628\u0646\u0627\u0621\u064B \u0639\u0644\u0649 \u0637\u0644\u0628 \u0635\u0631\u064A\u062D \u0645\u0646
+  // \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u0639\u062F \u0645\u0627 \u0631\u0627\u062C\u0639\u0646\u0627 \u0645\u0639 \u0628\u0639\u0636 \u0642\u0627\u0626\u0645\u0629 "\u062A\u0631\u062A\u064A\u0628 \u0627\u0644\u0645\u0642\u0627\u0648\u0644\u064A\u0646 \u2014 \u0627\u0644\u0623\u0633\u0631\u0639
+  // \u0623\u0648\u0644\u0627\u064B" \u0627\u0644\u0643\u0627\u0645\u0644\u0629). \u0646\u0641\u0633 \u0627\u0644\u0645\u0642\u0627\u0648\u0644 \u0643\u0627\u0646 \u0628\u064A\u062A\u0643\u062A\u0628 \u0641\u064A \u0639\u0645\u0648\u062F "\u0627\u0644\u0645\u0642\u0627\u0648\u0644" \u0628\u0635\u064A\u063A
+  // \u0645\u062E\u062A\u0644\u0641\u0629 \u0634\u0648\u064A\u0629 (\u062D\u0627\u0644\u0629 \u0627\u0644\u0623\u062D\u0631\u0641\u060C \u0648\u062C\u0648\u062F/\u063A\u064A\u0627\u0628 "Group"\u060C \u0627\u062E\u062A\u0635\u0627\u0631/\u0627\u0633\u0645 \u0643\u0627\u0645\u0644)\u060C
+  // \u0641\u0643\u0627\u0646 \u0628\u064A\u062A\u062D\u0633\u0628 \u0643\u0623\u0643\u062A\u0631 \u0645\u0646 \u0645\u0642\u0627\u0648\u0644 \u0645\u0646\u0641\u0635\u0644 \u0641\u064A \u0627\u0644\u062A\u0631\u062A\u064A\u0628 \u0648\u0627\u0644\u0641\u0644\u0627\u062A\u0631 \u0648\u0646\u062A\u0627\u0626\u062C \u0627\u0644\u0630\u0643\u0627\u0621
+  // \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064A \u2014 \u063A\u064A\u0631 \u0645\u0646\u0637\u0642\u064A \u0644\u0623\u0646\u0647 \u0646\u0641\u0633 \u0627\u0644\u0645\u0642\u0627\u0648\u0644 \u0641\u0639\u0644\u064A\u064B\u0627. \u0627\u0644\u062E\u0631\u064A\u0637\u0629 \u062F\u064A \u0628\u062A\u0648\u062D\u062F\u0647\u0645
+  // \u0644\u0627\u0633\u0645 \u0648\u0627\u062D\u062F \u0642\u064A\u0627\u0633\u064A (canonical) \u0648\u0627\u062D\u062F \u0628\u0633\u060C \u0628\u0646\u0641\u0633 \u0627\u0644\u062A\u0646\u0633\u064A\u0642\u060C \u0641\u064A \u0643\u0644 \u0645\u0643\u0627\u0646
+  // \u0628\u064A\u0633\u062A\u062E\u062F\u0645 \u0639\u0645\u0648\u062F "\u0627\u0644\u0645\u0642\u0627\u0648\u0644" (\u0644\u0623\u0646 \u0643\u0644 \u0627\u0644\u0623\u0645\u0627\u0643\u0646 \u062F\u064A \u0628\u062A\u0642\u0631\u0623 \u0645\u0646 normalizeRows()
+  // \u062A\u062D\u062A \u2014 \u0646\u0642\u0637\u0629 \u0648\u0627\u062D\u062F\u0629 \u0628\u0633). \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A \u0627\u0644\u062A\u0644\u0627\u062A\u0629 \u062F\u064A \u0627\u062A\u0623\u0643\u062F\u062A \u0645\u0639 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0643\u0644
+  // \u0648\u0627\u062D\u062F\u0629 \u0645\u0646\u0647\u0627 \u0641\u0639\u0644\u0627\u064B \u0646\u0641\u0633 \u0627\u0644\u0645\u0642\u0627\u0648\u0644:
+  //   \u2022 Al Majal Al Arabi Group  (\u0643\u0627\u0646 \u0628\u064A\u0638\u0647\u0631 lowercase \u0628\u0640"group" \u0648\u0643\u0645\u0627\u0646
+  //     Title Case \u0645\u0646 \u063A\u064A\u0631 "Group" \u2014 \u0646\u0641\u0633 \u0627\u0644\u0634\u0631\u0643\u0629\u060C \u0648\u0647\u064A \u0628\u0627\u0644\u0641\u0639\u0644 \u0623\u0643\u0628\u0631 \u0645\u0642\u0627\u0648\u0644
+  //     \u0628\u0641\u0627\u0631\u0642 \u0643\u0628\u064A\u0631 \u0628\u0639\u062F \u0627\u0644\u062A\u0648\u062D\u064A\u062F)
+  //   \u2022 Samt Operations and Maintenance Company (\u0643\u0627\u0646 \u0628\u064A\u0638\u0647\u0631 \u0643\u0645\u0627\u0646
+  //     \u0645\u062E\u062A\u0635\u0631 "SAMT Company")
+  //   \u2022 Al Nahda Contracting Establishment (\u0643\u0627\u0646 \u0628\u064A\u0638\u0647\u0631 \u0643\u0645\u0627\u0646 \u0628\u0635\u064A\u063A\u0629
+  //     "AL Nahda General for Contracting ESt.")
+  // \u0623\u064A \u0645\u0642\u0627\u0648\u0644 \u062A\u0627\u0646\u064A \u0645\u0634 \u0645\u0648\u062C\u0648\u062F \u0641\u064A \u0627\u0644\u062E\u0631\u064A\u0637\u0629 \u062F\u064A \u0628\u064A\u0641\u0636\u0644 \u0632\u064A \u0645\u0627 \u0647\u0648 \u0628\u0627\u0644\u0638\u0628\u0637\u060C \u0645\u0646 \u063A\u064A\u0631
+  // \u0623\u064A \u062A\u062E\u0645\u064A\u0646 \u0623\u0648 \u0645\u0637\u0627\u0628\u0642\u0629 \u062A\u0642\u0631\u064A\u0628\u064A\u0629 \u2014 \u0646\u0641\u0633 \u0645\u0628\u062F\u0623 \u0639\u062F\u0645 \u0627\u0644\u062A\u062E\u0645\u064A\u0646 \u0627\u0644\u0645\u062A\u0651\u0628\u0639 \u0641\u064A \u0628\u0627\u0642\u064A
+  // \u0627\u0644\u062F\u0627\u0634\u0628\u0648\u0631\u062F (\u0631\u0627\u062C\u0639 \u0645\u0637\u0627\u0628\u0642\u0629 "\u0627\u0644\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u0628\u0627\u0634\u0631" \u0641\u064A \u062A\u0628\u0648\u064A\u0628 \u0627\u0644\u0647\u064A\u0643\u0644 \u0627\u0644\u0648\u0638\u064A\u0641\u064A).
+  const BALAGH_CONTRACTOR_CANONICAL_MAP = {
+    "almajal alarabi group": "Al Majal Al Arabi Group",
+    "al majal al arabi": "Al Majal Al Arabi Group",
+    "samt company": "Samt Operations and Maintenance Company",
+    "samt operations and maintenance company": "Samt Operations and Maintenance Company",
+    "al nahda contracting establishment": "Al Nahda Contracting Establishment",
+    "al nahda general for contracting est": "Al Nahda Contracting Establishment",
+  };
+  function balaghNormContractorName(v) {
+    const raw = norm(v);
+    // \u2605 \u062E\u0644\u0627\u064A\u0627 \u0641\u0627\u0636\u064A\u0629 \u0641\u0639\u0644\u064A\u064B\u0627 \u0628\u0633 \u0645\u0643\u062A\u0648\u0628\u0629 \u0643\u0640"-"/"\u2014" (\u0634\u0631\u0637\u0629 \u0628\u062F\u0644 \u0645\u0627 \u062A\u062A\u0633\u064A\u0628
+    // \u0641\u0627\u0636\u064A\u0629) \u2014 \u0628\u062A\u062A\u062D\u0633\u0628 "\u0645\u0642\u0627\u0648\u0644" \u0648\u0647\u0645\u064A \u0641\u064A \u0627\u0644\u062A\u0631\u062A\u064A\u0628 \u0644\u0648 \u0633\u0628\u0646\u0627\u0647\u0627 \u0632\u064A \u0645\u0627 \u0647\u064A.
+    // \u0646\u062A\u0639\u0627\u0645\u0644 \u0645\u0639\u0627\u0647\u0627 \u0643\u0642\u064A\u0645\u0629 \u0641\u0627\u0636\u064A\u0629 \u0628\u0627\u0644\u0638\u0628\u0637 \u0632\u064A \u0627\u0644\u062E\u0627\u0646\u0629 \u0627\u0644\u0641\u0627\u0636\u064A\u0629 \u0627\u0644\u062D\u0642\u064A\u0642\u064A\u0629.
+    if (!raw || raw === "-" || raw === "\u2014" || raw === "\u0640") return "";
+    // \u0645\u0641\u062A\u0627\u062D \u0645\u0637\u0627\u0628\u0642\u0629: \u062D\u0631\u0648\u0641 \u0635\u063A\u064A\u0631\u0629 + \u062A\u0648\u062D\u064A\u062F \u0623\u064A \u0645\u0633\u0627\u0641\u0627\u062A \u0645\u062A\u0643\u0631\u0631\u0629 \u0644\u0645\u0633\u0627\u0641\u0629 \u0648\u0627\u062D\u062F\u0629 +
+    // \u0634\u064A\u0644 \u0646\u0642\u0637\u0629 \u0622\u062E\u0631 \u0627\u0644\u0643\u0644\u0645\u0629 \u0644\u0648 \u0645\u0648\u062C\u0648\u062F\u0629 (\u0639\u0634\u0627\u0646 "ESt." \u0648"Est" \u064A\u062A\u0637\u0627\u0628\u0642\u0648\u0627) \u2014
+    // \u0644\u0644\u0645\u0637\u0627\u0628\u0642\u0629 \u0628\u0633\u060C \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0646\u0647\u0627\u0626\u064A \u0627\u0644\u0645\u0631\u062C\u0651\u0639 \u062F\u0627\u064A\u0645\u064B\u0627 \u0645\u0646 \u0627\u0644\u062E\u0631\u064A\u0637\u0629 (\u062A\u0646\u0633\u064A\u0642 \u062B\u0627\u0628\u062A)
+    // \u0623\u0648 \u0627\u0644\u0646\u0635 \u0627\u0644\u0623\u0635\u0644\u064A \u0643\u0627\u0645\u0644 \u0632\u064A \u0645\u0627 \u0647\u0648 \u0644\u0648 \u0645\u0634 \u0645\u0646 \u0636\u0645\u0646 \u0627\u0644\u0645\u062C\u0645\u0648\u0639\u0627\u062A \u0627\u0644\u0645\u0639\u0631\u0648\u0641\u0629 \u062F\u064A.
+    const key = raw.toLowerCase().replace(/\s+/g, " ").replace(/\.\s*$/, "");
+    return BALAGH_CONTRACTOR_CANONICAL_MAP[key] || raw;
+  }
+
   const BALAGH_STATUS_LABELS = {
     Open: "مفتوح",
     New: "جديد",
@@ -10430,12 +11058,58 @@ function _sysDownloadFile(filename, content, mime) {
     return days * 24 + hours + minutes / 60;
   }
 
+  // خريطة "NEW SLA" (window.RAW_BALAGH_NEW_SLA_MAP، من balagh_reports.gs) —
+  // مطابقة بتساوٍ تام (norm) أولاً، وباحتياط تطبيع عربي أقوى (normArForMatch_).
+  function getRawNewSlaMap_() {
+    return Array.isArray(window.RAW_BALAGH_NEW_SLA_MAP) ? window.RAW_BALAGH_NEW_SLA_MAP : [];
+  }
+  let __newSlaLookupCache_ = null;
+  function buildNewSlaLookup_() {
+    const raw = getRawNewSlaMap_();
+    if (__newSlaLookupCache_ && __newSlaLookupCache_.src === raw) return __newSlaLookupCache_.map;
+    const map = new Map();
+    const entries = [];
+    raw.forEach((row) => {
+      const fromVal = norm(row["القيمة الفعلية الأساسية"]);
+      if (!fromVal) return;
+      const toVal = norm(row["القيمة الجديدة التي ستتطبق"]) || fromVal;
+      const priority = norm(row["الأولوية"]);
+      const isP5 = priority === "P5";
+      const hoursRaw = row["مستوى الخدمة (ساعة)"];
+      const hoursNum = typeof hoursRaw === "number" ? hoursRaw : parseFloat(String(hoursRaw ?? "").replace(/[^\d.]/g, ""));
+      const hoursTarget = !isP5 && isFinite(hoursNum) && hoursNum > 0 ? hoursNum : null;
+      const entry = { fromValue: fromVal, newCategory: toVal, priority, hoursTarget, isP5 };
+      entries.push(entry);
+      const exactKey = "EX::" + fromVal;
+      if (!map.has(exactKey)) map.set(exactKey, entry);
+      const normKey = "NM::" + normArForMatch_(fromVal);
+      if (!map.has(normKey)) map.set(normKey, entry);
+    });
+    __newSlaLookupCache_ = { src: raw, map, entries };
+    return map;
+  }
+  // كل صفوف الخريطة المرجعية (86 صف) مُطبَّعة — تُستخدم لعرض "كل الفئات
+  // المعروفة" حتى اللي معهاش أي بلاغ حالياً (نفس مبدأ catEntries في تبويب
+  // الأمن والسلامة)، بدون الحاجة لإعادة قراءة window.RAW_BALAGH_NEW_SLA_MAP مباشرة.
+  function getNewSlaCatalogEntries_() {
+    buildNewSlaLookup_();
+    return __newSlaLookupCache_ ? __newSlaLookupCache_.entries : [];
+  }
+  function lookupNewSla_(subCategoryNormalized) {
+    const sub = String(subCategoryNormalized || "").trim();
+    if (!sub) return null;
+    const map = buildNewSlaLookup_();
+    return map.get("EX::" + sub) || map.get("NM::" + normArForMatch_(sub)) || null;
+  }
+
   function normalizeRows() {
     const rawBalagh = getRaw();
+    const rawNewSlaMap = getRawNewSlaMap_();
     if (
       __balaghNormCache &&
       __balaghNormCache.srcBalagh === rawBalagh &&
-      __balaghNormCache.srcRaw === RAW
+      __balaghNormCache.srcRaw === RAW &&
+      __balaghNormCache.srcNewSlaMap === rawNewSlaMap
     ) {
       return __balaghNormCache.result;
     }
@@ -10477,6 +11151,25 @@ function _sysDownloadFile(filename, content, mime) {
           !openLike && creationDateObj && finishDateObj && finishDateObj.getTime() >= creationDateObj.getTime()
             ? +(((finishDateObj.getTime() - creationDateObj.getTime()) / 86400000).toFixed(2))
             : null;
+        // NEW SLA: مطابقة الفئة الفرعية بخريطة NEW SLA (راجع lookupNewSla_)، P5 بدون حساب SLA
+        const subCategoryVal = norm(r["الفئة الفرعية"]);
+        const newSlaEntry = lookupNewSla_(subCategoryVal);
+        const newSlaMatched = !!newSlaEntry;
+        const newSlaCategory = newSlaEntry ? newSlaEntry.newCategory : "";
+        const newSlaPriority = newSlaEntry ? newSlaEntry.priority : "";
+        const newSlaIsP5 = newSlaEntry ? newSlaEntry.isP5 : false;
+        const newSlaHoursTarget = newSlaEntry ? newSlaEntry.hoursTarget : null;
+        let newSlaEvalStatus;
+        if (!newSlaMatched) newSlaEvalStatus = "unmatched";
+        else if (newSlaIsP5) newSlaEvalStatus = "p5";
+        else if (openLike) newSlaEvalStatus = "pending";
+        else if (slaDurationHours == null) newSlaEvalStatus = "pending"; // مغلق لكن مدة الحل غير قابلة للقراءة — راجع newSlaDataGap
+        else newSlaEvalStatus = slaDurationHours <= newSlaHoursTarget ? "compliant" : "breach";
+        const newSlaCompliant = newSlaEvalStatus === "compliant" ? true : newSlaEvalStatus === "breach" ? false : null;
+        // فجوة بيانات نادرة: بلاغ مغلق ومطابق (وليس P5) لكن SLA DAYS الخام
+        // مش قابل للتحليل (فاضي/صيغة غير معروفة) — نفصح عنها بدل ما نخفيها
+        // ضمن "قيد التنفيذ" بصمت.
+        const newSlaDataGap = newSlaMatched && !newSlaIsP5 && !openLike && slaDurationHours == null;
         return {
           idx: idx + 1,
           recordNo:          norm(r["مُعرّف الحالة"]),
@@ -10493,7 +11186,17 @@ function _sysDownloadFile(filename, content, mime) {
           slaDurationDays:   slaDurationHours == null ? null : +(slaDurationHours / 24).toFixed(2),
           stage:             norm(r["المرحلة"]) || "",        // المرحلة الدراسية للبلاغ
           gender:            norm(r["الجنس"]) || "",          // بنين/بنات
-          contractor:        norm(r["المقاول"]) || "",        // اسم شركة المقاول المسؤول
+          // ⚠️ (2026-09-22 — تصحيح جوهري بناءً على ملاحظة صريحة من المستخدم) عمود
+          // المقاول في الشيت الحقيقي اسمه "Package" (إنجليزي) مش "المقاول" — تم
+          // التأكد منه فعليًا بفحص عيّنة بيانات حقيقية (بلاغات.xlsx، شيت CWO)، وقيمه
+          // فعلاً أسماء شركات المقاولين (Al Majal Al Arabi, Al Yamama Company...)
+          // ومطابقة تمامًا لأسماء BALAGH_CONTRACTOR_CANONICAL_MAP فوق. قبل هذا
+          // التصحيح كان r["المقاول"] بيرجع فاضي دايمًا مع البيانات الحقيقية (العمود
+          // مش موجود بالاسم ده أصلاً)، يعني كل منطق المقاول (فلتر المقاول، ترتيب
+          // المقاولين، تعبئة مقاول النظافة الناقص) كان فعليًا بيشتغل على بيانات
+          // فاضية طول الوقت. بنفضّل "Package" أولاً، وبنسيب "المقاول" كـfallback
+          // احتياطي لو الشيت اتغيّر لاسم عمود عربي في يوم من الأيام.
+          contractor:        balaghNormContractorName(r["Package"] || r["المقاول"]), // اسم شركة المقاول المسؤول — موحّد (راجع BALAGH_CONTRACTOR_CANONICAL_MAP)
           status,
           schoolNumber,
           schoolKey,
@@ -10508,7 +11211,7 @@ function _sysDownloadFile(filename, content, mime) {
           region:            balaghRegionFromSector_(norm(r["المحافظة التابع لها المدرسة"])),
           city:              norm(r["TBC مدينة"]),
           category:          norm(r["الفئة الرئيسية"]),
-          subCategory:       norm(r["الفئة الفرعية"]),
+          subCategory:       subCategoryVal,
           problemDescription: norm(r["الوصف"]),
           resolutionDesc:    norm(r["وصف الحل"]),
           priority:          norm(r["الأولوية"]),
@@ -10517,11 +11220,20 @@ function _sysDownloadFile(filename, content, mime) {
           isOpen:            openLike,
           isClosed:          !openLike,
           isOverdue,
+          // ── 🆕 NEW SLA (راجع الشرح أعلى قسم lookupNewSla_) ──
+          newSlaMatched,                 // هل الفئة الفرعية دي موجودة في خريطة NEW SLA المرجعية؟
+          newSlaCategory,                // "القيمة الجديدة التي ستتطبق" — فاضي لو غير مطابقة
+          newSlaPriority,                // P1..P5 — فاضي لو غير مطابقة
+          newSlaHoursTarget,             // مستوى الخدمة الجديد بالساعة (null لـ P5 أو غير المطابق)
+          newSlaIsP5,                    // true = فئة P5 — لا يوجد لها SLA جديد بناءً على طلب صريح
+          newSlaEvalStatus,              // "compliant" | "breach" | "pending" | "p5" | "unmatched"
+          newSlaCompliant,               // true/false لبس المغلق غير P5 المطابق، وإلا null
+          newSlaDataGap,                 // true لو مغلق ومطابق لكن SLA DAYS الخام غير قابل للتحليل
         };
       })
       .filter((r) => r.recordNo || r.schoolName || r.problemDescription);
 
-    __balaghNormCache = { srcBalagh: rawBalagh, srcRaw: RAW, result };
+    __balaghNormCache = { srcBalagh: rawBalagh, srcRaw: RAW, srcNewSlaMap: rawNewSlaMap, result };
     return result;
   }
 
@@ -10538,22 +11250,69 @@ function _sysDownloadFile(filename, content, mime) {
   // ║  زي ما هو من غير أي تغيير — البلاغات دي بتفضل ظاهرة فيه كمان،   ║
   // ║  إحنا بس بنستخرج نسخة إضافية منها للتبويبين التانيين.           ║
   // ╚══════════════════════════════════════════════════════════════╝
-  const SECURITY_SAFETY_CATEGORIES = [
-    "بلاغات صيانة مضخات الحريق",
-    "بلاغات تعبئة طفايات الحريق",
-    "بلاغات صيانة نظام الإنذار المبكر",
-    "بلاغات انقطاع كلي للكهرباء",
-    "بلاغات صيانة نظام مكافحة الحريق",
-    "بلاغات إنشاء مخرج للطوارئ",
-    "بلاغات صيانة لوحات الإنذار",
-    "بلاغات إعادة تأهيل الممرات والمنحدرات وفق متطلبات الوصول الشامل",
-    "بلاغات صيانة نظام تشغيل المصاعد الميكانيكي",
-    "بلاغات صيانة إنارة ومخارج الطوارئ",
-    "بلاغات صيانة كبائن المصاعد",
-    "بلاغات انحباس داخل المصاعد",
-    "بلاغات اعطال المصاعد",
-    "بلاغات اعطال أنظمة مكافحة الحريق",
+  // 🗂️ (2026-09-22) — بناءً على طلب صريح من المستخدم: التصنيفات الأربعة
+  // عشر الأصلية + تصنيفان جديدان ("بلاغات صيانة لوحات التوزيع للمصاعد"
+  // تحت "المصاعد"، و"بلاغات الالتماسات الكهربائية" تحت "اعمال الكهرباء")،
+  // منظَّمة كلها الآن تحت 4 أقسام مسمّاة بدل قائمة واحدة مسطّحة (16 تصنيفًا
+  // إجمالاً). SECURITY_SAFETY_CATEGORIES تحت فضلت مصفوفة مسطّحة مُشتقة
+  // تلقائيًا من SECURITY_SAFETY_GROUPS عشان أي كود قديم بيستخدمها
+  // (المطابقة، الفلاتر، إلخ) يفضل شغّال زي ما هو من غير أي تعديل إضافي.
+  const SECURITY_SAFETY_GROUPS = [
+    {
+      group: "المصاعد",
+      categories: [
+        "بلاغات صيانة نظام تشغيل المصاعد الميكانيكي",
+        "بلاغات صيانة كبائن المصاعد",
+        "بلاغات انحباس داخل المصاعد",
+        "بلاغات اعطال المصاعد",
+        "بلاغات صيانة لوحات التوزيع للمصاعد",
+      ],
+    },
+    {
+      group: "مخارج الطوارئ",
+      categories: [
+        "بلاغات إنشاء مخرج للطوارئ",
+        "بلاغات إعادة تأهيل الممرات والمنحدرات وفق متطلبات الوصول الشامل",
+        "بلاغات صيانة إنارة ومخارج الطوارئ",
+      ],
+    },
+    {
+      group: "اعمال الكهرباء",
+      categories: [
+        "بلاغات انقطاع كلي للكهرباء",
+        "بلاغات الالتماسات الكهربائية",
+      ],
+    },
+    {
+      group: "أنظمة الأمن والسلامة",
+      categories: [
+        "بلاغات صيانة مضخات الحريق",
+        "بلاغات تعبئة طفايات الحريق",
+        "بلاغات صيانة نظام الإنذار المبكر",
+        "بلاغات صيانة نظام مكافحة الحريق",
+        "بلاغات صيانة لوحات الإنذار",
+        "بلاغات اعطال أنظمة مكافحة الحريق",
+      ],
+    },
   ];
+  const SECURITY_SAFETY_CATEGORIES = SECURITY_SAFETY_GROUPS.flatMap((g) => g.categories);
+  // فئة → اسم القسم اللي بتتبعله (للاستخدام في عرض التوزيع حسب القسم في
+  // الواجهة، ولإثراء سياق مساعد الـ AI).
+  const SECURITY_SAFETY_CATEGORY_GROUP_MAP_ = (() => {
+    const m = {};
+    SECURITY_SAFETY_GROUPS.forEach((g) => g.categories.forEach((c) => { m[c] = g.group; }));
+    return m;
+  })();
+  function securitySafetyCategoryGroup_(catOrSubCategory) {
+    if (!catOrSubCategory) return "أخرى";
+    if (SECURITY_SAFETY_CATEGORY_GROUP_MAP_[catOrSubCategory]) return SECURITY_SAFETY_CATEGORY_GROUP_MAP_[catOrSubCategory];
+    // احتواء (نفس منطق isSecuritySafetyBalaghRow) عشان لو النص فيه زيادة
+    const norm_ = normArForMatch_(catOrSubCategory);
+    for (const c of SECURITY_SAFETY_CATEGORIES) {
+      if (norm_ === normArForMatch_(c) || norm_.includes(normArForMatch_(c))) return SECURITY_SAFETY_CATEGORY_GROUP_MAP_[c];
+    }
+    return "أخرى";
+  }
   // ── تطبيع أقوى مخصوص للمطابقة (2026-08-29 — أُضيف بعد ما ظهرت أصفار في
   // البيانات الفعلية، غالبًا بسبب اختلافات شائعة في النص العربي: تشكيل،
   // تطويل، أشكال الألف/الياء/التاء المربوطة المختلفة، أو نص إضافي ملتصق
@@ -10573,7 +11332,7 @@ function _sysDownloadFile(filename, content, mime) {
 
   // صف مُطبَّع (من normalizeRows) → هل هو بلاغ أمن وسلامة؟ المطابقة على
   // عمود "الفئة الفرعية" (subCategory) — حسب تأكيد المستخدم إن تصنيفات
-  // الأمن والسلامة الأربعة عشر هي قيم من هذا العمود تحديدًا، وليس عمود
+  // الأمن والسلامة الستة عشر (مقسّمة على 4 أقسام: المصاعد/مخارج الطوارئ/
   // "الوصف" (Problem Description) كما افتُرض ابتدائيًا (2026-08-29).
   // تطابق تام، أو احتواء إذا كانت "الفئة الفرعية" تتضمن نصًا إضافيًا حول
   // اسم الفئة نفسه.
@@ -10608,11 +11367,13 @@ function _sysDownloadFile(filename, content, mime) {
     const unmatched = sorted.filter(([v]) => !isSecuritySafetyBalaghRow({ subCategory: v }));
     console.log(`[الأمن والسلامة] إجمالي البلاغات: ${all.length} | عدد القيم المختلفة في "الفئة الفرعية": ${sorted.length}`);
     console.log('[الأمن والسلامة] القيم المطابقة لفئات الأمن والسلامة:', matched);
-    console.log('[الأمن والسلامة] أعلى 40 قيمة غير مطابقة (للمقارنة اليدوية مع التصنيفات الأربعة عشر):', unmatched.slice(0, 40));
+    console.log('[الأمن والسلامة] أعلى 40 قيمة غير مطابقة (للمقارنة اليدوية مع التصنيفات الستة عشر):', unmatched.slice(0, 40));
     return { totalRows: all.length, distinctSubCategories: sorted.length, matched, topUnmatched: unmatched.slice(0, 40) };
   }
 
   window.SECURITY_SAFETY_CATEGORIES = SECURITY_SAFETY_CATEGORIES;
+  window.SECURITY_SAFETY_GROUPS = SECURITY_SAFETY_GROUPS;
+  window.securitySafetyCategoryGroup_ = securitySafetyCategoryGroup_;
   window.isSecuritySafetyBalaghRow = isSecuritySafetyBalaghRow;
   window.getSecuritySafetyBalaghRows = getSecuritySafetyBalaghRows;
   window.debugSecuritySafetyMismatch = debugSecuritySafetyMismatch;
@@ -10835,6 +11596,7 @@ function _sysDownloadFile(filename, content, mime) {
       "رقم المدرسة",
       "اسم المبنى",
       "المحافظة التابع لها المدرسة",
+      "المنطقة الرئيسية",
       "TBC مدينة",
       "الفئة الرئيسية",
       "الفئة الفرعية",
@@ -10857,6 +11619,7 @@ function _sysDownloadFile(filename, content, mime) {
         r.schoolNumber,
         r.schoolName,
         r.location,
+        r.region,
         r.city,
         r.category,
         r.subCategory,
@@ -11287,6 +12050,88 @@ function _sysDownloadFile(filename, content, mime) {
         return a.avgSla - b.avgSla;
       });
 
+    // ╔════════════════════════════════════════════════════════════╗
+    // 🧹 (2026-09-22) ترتيب المقاولين — بند النظافة فقط، بناءً على طلب
+    // صريح من المستخدم. المصدر: كل بلاغات "الفئة الرئيسية" اللي قيمتها
+    // نظافة (بأشكالها الشائعة المعروفة) — من "all" (كل البلاغات، مش
+    // "rows" المفلترة) عشان الترتيب ده يفضل ثابت ومستقل عن أي فلتر تاني
+    // مفعّل حالياً في الشاشة.
+    //
+    // 🎯 المنطق الأهم (حسب تأكيد المستخدم): كل محافظة لها مقاول نظافة
+    // واحد ثابت. فلو بلاغ نظافة معين خانة "المقاول" فيه فاضية، بنستنتج
+    // المقاول الصحيح من نفس المحافظة (من البلاغات التانية للنظافة في
+    // نفس المحافظة اللي فيها اسم مقاول مسجَّل فعلاً) بدل ما نسيبه فاضي أو
+    // "غير محدد" من غير داعي. لو ظهر أكتر من مقاول مختلف مسجَّل لنفس
+    // المحافظة (تعارض بيانات)، بناخد الأكثر تكرارًا كـ"الافتراضي" للتعبئة
+    // بس بنعرض تنبيه صريح بكل المحافظات دي عشان تُراجَع — مفيش أي تخمين
+    // صامت هنا.
+    const CLEANING_CATEGORY_VALUES_ = ["نظافة", "النظافة", "أعمال النظافة", "بند النظافة"];
+    const cleaningRows_ = all.filter((r) => CLEANING_CATEGORY_VALUES_.includes(norm(r.category)));
+
+    const cleaningContractorByLocation_ = new Map(); // location -> Map(contractor -> count)
+    cleaningRows_.forEach((r) => {
+      const loc = r.location || "";
+      const c = r.contractor || "";
+      if (!loc || !c) return;
+      if (!cleaningContractorByLocation_.has(loc)) cleaningContractorByLocation_.set(loc, new Map());
+      const m = cleaningContractorByLocation_.get(loc);
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+
+    const cleaningKnownContractorByLocation_ = new Map();
+    const cleaningConflicts_ = []; // { location, dominant, contractors:[{name,count}] }
+    cleaningContractorByLocation_.forEach((m, loc) => {
+      const entries = [...m.entries()].sort((a, b) => b[1] - a[1]);
+      cleaningKnownContractorByLocation_.set(loc, entries[0][0]);
+      if (entries.length > 1) {
+        cleaningConflicts_.push({
+          location: loc,
+          dominant: entries[0][0],
+          contractors: entries.map(([name, count]) => ({ name, count })),
+        });
+      }
+    });
+
+    let cleaningBackfilledCount_ = 0;
+    let cleaningUndeterminedCount_ = 0;
+    const cleaningContractorCounts_ = new Map();
+    cleaningRows_.forEach((r) => {
+      let c = r.contractor || "";
+      if (!c) {
+        const known = r.location ? cleaningKnownContractorByLocation_.get(r.location) : null;
+        if (known) {
+          c = known;
+          cleaningBackfilledCount_++;
+        } else {
+          c = "غير محدد (لا توجد بيانات كافية لتحديد المقاول)";
+          cleaningUndeterminedCount_++;
+        }
+      }
+      cleaningContractorCounts_.set(c, (cleaningContractorCounts_.get(c) || 0) + 1);
+    });
+    // 🗺️ (2026-09-22) لكل مقاول: كل المحافظات اللي ظهر فيها فعليًا باسمه
+    // صراحةً في بلاغات النظافة (مش بس المحافظة اللي هو "الأكثر تكرارًا"
+    // فيها) — مبنية من نفس cleaningContractorByLocation_ فوق (معكوسة)،
+    // عشان عمود "المحافظة المسؤول عنها" في الجدول يعكس البيانات الفعلية
+    // بالظبط من غير أي تخمين إضافي.
+    const cleaningContractorToLocations_ = new Map(); // contractor -> Set(location)
+    cleaningContractorByLocation_.forEach((m, loc) => {
+      m.forEach((count, contractor) => {
+        if (!cleaningContractorToLocations_.has(contractor)) cleaningContractorToLocations_.set(contractor, new Set());
+        cleaningContractorToLocations_.get(contractor).add(loc);
+      });
+    });
+
+    const cleaningRanking_ = [...cleaningContractorCounts_.entries()]
+      .map(([name, count]) => ({
+        name,
+        count,
+        locations: cleaningContractorToLocations_.has(name) ? [...cleaningContractorToLocations_.get(name)].sort((a, b) => a.localeCompare(b, "ar")) : [],
+      }))
+      .sort((a, b) => b.count - a.count);
+    const cleaningTotal_ = cleaningRows_.length;
+    // ╚════════════════════════════════════════════════════════════╝
+
     const list = rows.slice(STATE.page * STATE.size, STATE.page * STATE.size + STATE.size);
     const totalForBars = Math.max(1, filteredTotal);
 
@@ -11318,6 +12163,13 @@ function _sysDownloadFile(filename, content, mime) {
           <span class="sub">${fmt(filteredTotal)} من ${fmt(total)}</span>
           ${frBtnHtml}
           ${frStatusHtml}
+          ${__currentBrand() === "landsterling" ? `
+          <button type="button" id="balagh-report-btn" onclick="window.__balaghReportButtonClick_ && window.__balaghReportButtonClick_(this)"
+            title="يولّد ملف PowerPoint بنفس تمبلت تقرير متابعة البلاغات، مبني على بيانات الفترة المختارة (بعد إدخال كلمة المرور) من تبويب البلاغات"
+            style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;border:1px solid #7C3AED;background:#F5F3FF;color:#7C3AED;margin-right:8px"
+          >📄 تحميل تقرير PowerPoint</button>
+          <span id="balagh-report-status" style="font-size:11px;font-weight:700"></span>
+          ` : ""}
         </div>
 
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
@@ -11711,6 +12563,62 @@ function _sysDownloadFile(filename, content, mime) {
         }
       </div>
 
+      <div class="card mb14">
+        <div class="card-title" style="flex-wrap:wrap">
+          <span class="card-title-icon" style="background:#F0FDF4;color:#15803D"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3v4a1 1 0 0 0 1 1h4"/><path d="M18 21a2 2 0 0 0 2-2V7l-4-4H8a2 2 0 0 0-2 2v2"/><path d="M4.5 12.5 9 8l4.5 4.5"/><path d="m3 21 4-4"/><path d="M3.5 15.5 8 20"/></svg></span>
+          <span>ترتيب المقاولين — بند النظافة</span>
+          <span class="sub">${fmt(cleaningTotal_)} بلاغ نظافة إجمالاً</span>
+        </div>
+        <div style="padding:0 14px 6px;font-size:11px;color:var(--tx-muted);line-height:1.9">
+          يشمل فقط بلاغات "الفئة الرئيسية" = نظافة، بصرف النظر عن أي فلتر آخر مفعّل حالياً في الشاشة.
+          ${cleaningBackfilledCount_ ? `<span style="color:#0891B2;font-weight:700"> · ${fmt(cleaningBackfilledCount_)} بلاغ كانت خانة "المقاول" فيه فارغة، فتم إسناده تلقائيًا لمقاول النظافة المعروف لنفس المحافظة.</span>` : ""}
+          ${cleaningUndeterminedCount_ ? `<span style="color:#DC2626;font-weight:700"> · ${fmt(cleaningUndeterminedCount_)} بلاغ فضل بلا مقاول محدد (لا توجد أي بيانات مقاول مسجّلة لنفس المحافظة في بند النظافة للاستدلال منها).</span>` : ""}
+        </div>
+        ${
+          cleaningConflicts_.length
+            ? `<div style="margin:10px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px">
+                <div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:6px">⚠️ محافظات مسجَّل لها أكثر من مقاول نظافة مختلف — تستحق المراجعة (تم اعتماد الأكثر تكرارًا للتعبئة التلقائية فقط):</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  ${cleaningConflicts_.map((cf) => `
+                    <div style="font-size:11px;color:#78350F">
+                      <strong>${escText(cf.location)}</strong> — المعتمد: ${escText(cf.dominant)} —
+                      كل المقاولين المسجَّلين: ${cf.contractors.map((x) => `${escText(x.name)} (${fmt(x.count)})`).join("، ")}
+                    </div>`).join("")}
+                </div>
+              </div>`
+            : ""
+        }
+        ${
+          cleaningRanking_.length
+            ? `<div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse">
+                  <thead>
+                    <tr style="text-align:right;font-size:11px;color:var(--tx-sec)">
+                      <th style="padding:8px">المقاول</th>
+                      <th style="padding:8px">المحافظة المسؤول عنها</th>
+                      <th style="padding:8px">عدد البلاغات</th>
+                      <th style="padding:8px">النسبة من إجمالي بلاغات النظافة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${cleaningRanking_
+                      .map(
+                        (c) => `
+                      <tr style="border-top:1px solid var(--bd-light);font-size:12px">
+                        <td style="padding:8px;font-weight:700${c.name.indexOf("غير محدد") === 0 ? ";color:#DC2626" : ""}">${escText(c.name)}</td>
+                        <td style="padding:8px;color:var(--tx-muted)">${c.locations.length ? escText(c.locations.join("، ")) : "—"}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums">${fmt(c.count)}</td>
+                        <td style="padding:8px;font-variant-numeric:tabular-nums;color:var(--tx-muted)">${cleaningTotal_ ? Math.round((c.count / cleaningTotal_) * 100) : 0}%</td>
+                      </tr>`,
+                      )
+                      .join("")}
+                  </tbody>
+                </table>
+              </div>`
+            : '<div class="empty-msg" style="padding:18px">لا توجد بلاغات نظافة ضمن البيانات الحالية</div>'
+        }
+      </div>
+
       ${balaghSecHead(7, "🧾", "السجل التفصيلي", "كل البلاغات مع إمكانية البحث والترتيب والتصدير")}
       <div class="card">
         <div class="card-title">
@@ -11750,6 +12658,7 @@ function _sysDownloadFile(filename, content, mime) {
                 <th>المدرسة</th>
                 <th>الرقم الوزاري</th>
                 <th>الموقع</th>
+                <th>المنطقة الرئيسية</th>
                 <th>الفئة</th>
                 <th>الفئة الفرعية</th>
                 <th>الأولوية</th>
@@ -11775,6 +12684,7 @@ function _sysDownloadFile(filename, content, mime) {
                   <td style="text-align:right;font-weight:700">${escText(r.schoolName)}</td>
                   <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? '#0891B2' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
                   <td>${escText(r.location)}</td>
+                  <td style="font-weight:700;color:#0891B2">${escText(r.region || "—")}</td>
                   <td>${escText(r.category)}</td>
                   <td>${escText(r.subCategory || "—")}</td>
                   <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
@@ -11790,7 +12700,7 @@ function _sysDownloadFile(filename, content, mime) {
                       )
                       .join("")
                   : `
-                <tr><td colspan="16"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
+                <tr><td colspan="17"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>
               `
               }
             </tbody>
@@ -12468,6 +13378,11 @@ function _sysDownloadFile(filename, content, mime) {
   window.__balaghIsHighRiskPriority = isHighRiskPriority;
   window.__balaghPriorityLabel = balaghPriorityLabel;
   window.__balaghMedian = medianOf;
+  // 🆕 (2026-09-22) تعريض أدوات NEW SLA لاستخدامها من renderNewSlaTab
+  // (مُعرَّفة برّه هذا الـ IIFE، زي renderSecuritySafetyTab بالظبط).
+  window.__balaghNewSlaLookup_ = lookupNewSla_;
+  window.__balaghNewSlaCatalogEntries_ = getNewSlaCatalogEntries_;
+  window.__balaghNewSlaRawMapLen_ = function () { return getRawNewSlaMap_().length; };
 })();
 
 
@@ -20338,7 +21253,8 @@ function exportNashatExcel(rows) {
     // 🛡️ تبويبَي "بلاغات الأمن والسلامة" و"ملخص الأمن والسلامة"
     // (2026-08-29) — التبويبان يعرضان بلاغات "أمن وسلامة" مُستخرجة من شيت
     // البلاغات العام (window.RAW_BALAGH) عن طريق مطابقة عمود "الفئة
-    // الفرعية" مع أربعة عشر تصنيفًا محدَّدًا (صيانة مضخات/طفايات حريق،
+    // الفرعية" مع ستة عشر تصنيفًا محدَّدًا، مقسّمة على 4 أقسام (المصاعد،
+    // مخارج الطوارئ، اعمال الكهرباء، أنظمة الأمن والسلامة) — صيانة مضخات/طفايات حريق،
     // أنظمة إنذار ومكافحة حريق، مخارج طوارئ، انقطاع كهرباء كلي، أعطال/
     // صيانة مصاعد...) — عبر window.getSecuritySafetyBalaghRows().
     // ⚠️ ملحوظة مهمة: هذا مختلف تمامًا عن شيت "بلاغات_أمن_وسلامة"
@@ -20364,14 +21280,25 @@ function exportNashatExcel(rows) {
         });
         const topCategory = Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
         const topRegion   = Object.entries(byRegion).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
+        // 🗂️ (2026-09-22) توزيع حسب القسم المسمّى (المصاعد/مخارج الطوارئ/
+        // اعمال الكهرباء/أنظمة الأمن والسلامة) — نفس التجميع المعروض في
+        // الواجهة، متاح هنا لمساعد الـ AI عشان يقدر يجاوب على أسئلة زي
+        // "كام بلاغ في قسم المصاعد؟" برقم حقيقي بدل التخمين.
+        const byGroup = {};
+        ss.forEach(r => {
+          const grp = typeof window.securitySafetyCategoryGroup_ === "function" ? window.securitySafetyCategoryGroup_(r.subCategory) : "أخرى";
+          byGroup[grp] = (byGroup[grp] || 0) + 1;
+        });
+        const topGroup = Object.entries(byGroup).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v);
         summary.بلاغات_الأمن_والسلامة = {
-          مصدر: "بلاغات مُستخرجة من تبويب البلاغات العام عبر عمود 'الفئة الفرعية' (أربعة عشر تصنيفًا للأمن والسلامة) — تُعرض في تبويبَي 'بلاغات الأمن والسلامة' و'ملخص الأمن والسلامة'",
+          مصدر: "بلاغات مُستخرجة من تبويب البلاغات العام عبر عمود 'الفئة الفرعية' (16 تصنيفًا للأمن والسلامة، مقسّمة على 4 أقسام: المصاعد، مخارج الطوارئ، اعمال الكهرباء، أنظمة الأمن والسلامة) — تُعرض في تبويبَي 'بلاغات الأمن والسلامة' و'ملخص الأمن والسلامة'",
           إجمالي_البلاغات: total,
           مفتوحة: open,
           مغلقة_أو_محلولة: closed,
           ملغاة: cancelled,
           متأخرة_SLA: overdue,
           نسبة_الالتزام_بـSLA: slaCompliantPct + "%",
+          البلاغات_حسب_القسم: topGroup,
           البلاغات_حسب_الفئة: topCategory,
           البلاغات_حسب_المحافظة: topRegion,
         };
@@ -21565,7 +22492,7 @@ function exportNashatExcel(rows) {
     q = q || {};
     if (q.status) rows = rows.filter((r) => String(r.status || "").includes(q.status));
     // 🛡️ 2026-09-03: فلتر "أمن وسلامة فقط" — نفس المطابقة المستخدمة في
-    // تبويبَي "بلاغات الأمن والسلامة"/"ملخص الأمن والسلامة" (14 تصنيفًا
+    // تبويبَي "بلاغات الأمن والسلامة"/"ملخص الأمن والسلامة" (16 تصنيفًا،
     // على عمود الفئة الفرعية)، عشان الشات بوت يقدر يرجّع قائمة/تجميع فعلي
     // لبلاغات الأمن والسلامة بس مش مجرد أرقام إجمالية جاهزة.
     if (q.securityOnly) {
@@ -21978,7 +22905,7 @@ function exportNashatExcel(rows) {
     const slaOverdueFilter = /متأخر[ةه]?\s*sla|sla\s*متأخر[ةه]?|تجاوز.*sla|اخترق.*sla|overdue/i.test(t);
 
     // 🛡️ 2026-09-03: اكتشاف سؤال عن بلاغات "الأمن والسلامة" تحديداً — نفس
-    // تصنيفات SECURITY_SAFETY_CATEGORIES (14 تصنيفًا على الفئة الفرعية)،
+    // تصنيفات SECURITY_SAFETY_CATEGORIES (16 تصنيفًا على الفئة الفرعية، مقسّمة على 4 أقسام)،
     // مش قيمة "الفئة الرئيسية" العادية (categoryMatch تحت بيبقى null لها
     // لأنها مش قيمة حرفية موجودة في عمود الفئة الرئيسية).
     const securityFilter = /أمن\s*(?:و\s*)?(?:ال)?سلامة|حريق|طفاي[ةه]|مضخات الحريق|إنذار مبكر|مخرج.*طوارئ|إخلاء/i.test(t);
@@ -22099,7 +23026,7 @@ function exportNashatExcel(rows) {
       // todayFilter اتفعّلوا) أو أرقام الإحصائيات_الإجمالية.بلاغات_اليوم /
       // بلاغات_الأمن_والسلامة الجاهزة دايماً، مش يقول "البيانات غير متاحة".
       + (securityFilter || todayFilter
-          ? " ⚠️ السؤال يخص " + (securityFilter && todayFilter ? "بلاغات الأمن والسلامة اليوم تحديداً" : securityFilter ? "بلاغات الأمن والسلامة" : "بلاغات اليوم") + " — استخدم 'نتيجة_مفلترة' (القائمة الفعلية المطابقة) و'أعلى_مدارس_ضمن_الفلتر' و'توزيع_الفئات_ضمن_الفلتر' مباشرة؛ إجمالي_البلاغات_ضمن_الفلتر هو العدد الحقيقي الكامل (مش عيّنة). بلاغات 'الأمن والسلامة' هنا هي البلاغات المستخرجة من شيت البلاغات العام نفسه عبر عمود الفئة الفرعية (14 تصنيفًا)، وليست شيتًا منفصلًا."
+          ? " ⚠️ السؤال يخص " + (securityFilter && todayFilter ? "بلاغات الأمن والسلامة اليوم تحديداً" : securityFilter ? "بلاغات الأمن والسلامة" : "بلاغات اليوم") + " — استخدم 'نتيجة_مفلترة' (القائمة الفعلية المطابقة) و'أعلى_مدارس_ضمن_الفلتر' و'توزيع_الفئات_ضمن_الفلتر' مباشرة؛ إجمالي_البلاغات_ضمن_الفلتر هو العدد الحقيقي الكامل (مش عيّنة). بلاغات 'الأمن والسلامة' هنا هي البلاغات المستخرجة من شيت البلاغات العام نفسه عبر عمود الفئة الفرعية (16 تصنيفًا مقسّمة على 4 أقسام)، وليست شيتًا منفصلًا."
           : " ولأي سؤال عن بلاغات اليوم أو بلاغات الأمن والسلامة (حتى لو ماذكرش صراحة في نص السؤال الحالي): استخدم الإحصائيات_الإجمالية.بلاغات_اليوم / بلاغات_الأمن_والسلامة_اليوم / بلاغات_الأمن_والسلامة_الإجمالي — أرقام حقيقية جاهزة دايماً محسوبة من كل البلاغات.");
     return {
       status: "ok",
@@ -22118,7 +23045,7 @@ function exportNashatExcel(rows) {
         متأخرة_SLA: overdue,
         // 🛡️📅 2026-09-03: أرقام جاهزة دايماً (بصرف النظر عن أي فلتر مكتشف)
         // لأي سؤال عن "بلاغات اليوم" أو "بلاغات الأمن والسلامة" — بلاغات
-        // الأمن والسلامة هنا مستخرجة من نفس شيت البلاغات العام (14 تصنيفًا
+        // الأمن والسلامة هنا مستخرجة من نفس شيت البلاغات العام (16 تصنيفًا
         // على الفئة الفرعية)، وليست شيتًا منفصلًا.
         بلاغات_اليوم: todayRowsAll.length,
         بلاغات_الأمن_والسلامة_الإجمالي: securityRowsAll.length,
@@ -23703,7 +24630,7 @@ balagh_query لو الإجابة موجودة بالفعل في DATA_RESULT أو
 • التوريدات              → تجهيزات_الأثاث_المدرسية: من ملف الموقف_التنفيذي_للتجهيزات_المدرسية.xlsx (أثاث/مقاعد/رياض أطفال/صالات رياضية) — بيانات جزئية 4 موردين فقط من أصل 7، مستوى منطقة×مورد×صنف (مختلف عن تبويب "المخصص والاحتياج" لمواد التنظيف)
 • مبادرة النشاط البدني   → مبادرة_النشاط_البدني: من ملف الموقف_التنفيذي_للنشاط_البدني.xlsx — بيانات جزئية 5 شركات محددة فقط بالاسم، مستوى شركة×منطقة×صنف، بدون رقم أمر عمل
 • مؤشرات أداء الاستشاري  → مؤشرات_أداء_الاستشاري: نسب شهرية لكل منطقة (مكة/المدينة/جدة/الطائف) — نفس منطق مؤشرات أداء المقاول لكن للاستشاري
-• بلاغات الأمن والسلامة / ملخص الأمن والسلامة → بلاغات_الأمن_والسلامة: بلاغات مستخرجة من تبويب "البلاغات" العام نفسه (فلترة عمود "الفئة الفرعية" على أربعة عشر تصنيفًا للأمن والسلامة: صيانة مضخات/طفايات حريق، أنظمة إنذار ومكافحة حريق، مخارج طوارئ، انقطاع كهرباء كلي، أعطال/صيانة مصاعد...) — وليس شيتًا منفصلًا ولا بيانات ثابتة. تبويب "البلاغات" العام نفسه غير متأثر وما زال يعرض جميع البلاغات.
+• بلاغات الأمن والسلامة / ملخص الأمن والسلامة → بلاغات_الأمن_والسلامة: بلاغات مستخرجة من تبويب "البلاغات" العام نفسه (فلترة عمود "الفئة الفرعية" على 16 تصنيفًا للأمن والسلامة، مقسّمة على 4 أقسام مسمّاة: المصاعد (صيانة/أعطال/انحباس/لوحات توزيع)، مخارج الطوارئ (إنشاء/صيانة/إعادة تأهيل ممرات)، اعمال الكهرباء (انقطاع كلي/التماسات كهربائية)، أنظمة الأمن والسلامة (مضخات/طفايات/إنذار/مكافحة حريق)) — وليس شيتًا منفصلًا ولا بيانات ثابتة. تبويب "البلاغات" العام نفسه غير متأثر وما زال يعرض جميع البلاغات.
 • متابعة الفواتير        → متابعة_الفواتير: إجمالي السجلات، إجمالي القيمة، توزيع حسب الحالة
 
 ══════════════════════════════════════════════════════
@@ -28836,6 +29763,15 @@ window.addEventListener('load', function () {
       charts: ['التوزيع حسب الفئة'],
       kpis: ['نسبة الالتزام بـSLA','بلاغات مفتوحة','قيد التنفيذ','تم حلها / مغلقة','ملغاة','متأخرة SLA']
     },
+    {
+      id: 'new-sla', label: 'NEW SLA',
+      keywords: [
+        'new sla','السلا الجديد','اولوية جديدة','أولوية جديدة','P1','P2','P3','P4','P5',
+        'مستوى الخدمة','التزام جديد','تصنيف جديد','فئة جديدة','SLA hours','ساعات الخدمة'
+      ],
+      charts: ['التوزيع حسب الفئة الجديدة','نسبة الالتزام حسب الأولوية'],
+      kpis: ['نسبة الالتزام الإجمالية','عدد المطابقة','P1-P4 مغلقة ومقيَّمة','بلاغات P5 (بدون SLA جديد)']
+    },
   ];
 
   /* ─────────────────────────────────────────────
@@ -30515,7 +31451,7 @@ function renderCorrespondenceTab() {
    ║  من عرض تجميعي (منطقة ← نوع فريق ← مسمى وظيفي) إلى هيكل
    ║  تنظيمي حقيقي بالأسماء (شوف _orgBuildPersonChart تحت).
    ╚════════════════════════════════════════════════════════════╝ */
-const ORG = { _region: "", _status: "", _team: "", filtered: [] };
+const ORG = { _region: "", _status: "", _team: "", filtered: [], _editMode: false };
 window.ORG = ORG;
 
 function _orgEsc(v) {
@@ -30544,6 +31480,17 @@ function _orgName(r) {
 function _orgManager(r) {
   return _orgNorm(r["المدير المباشر"]);
 }
+// ★ 2026-09-22: توحيد صيغة المذكر/المؤنث ("سعودي"/"سعودية") لغرض تصنيف
+// السعوديين/غير السعوديين فقط في تبويب "📊 التحليل" — بناءً على طلب
+// صريح من المستخدم لمعرفة نسبة السعوديين مقابل غير السعوديين.
+function _orgNationality(r) {
+  const v = _orgNorm(r["الجنسية"]);
+  if (!v) return "";
+  return v === "سعودية" ? "سعودي" : v;
+}
+function _orgIsSaudi(r) {
+  return _orgNationality(r) === "سعودي";
+}
 // ★ 2026-09-21: مفتاح مطابقة أقوى من _orgNorm العادية (اللي بتتستخدم في
 // أماكن تانية كتير ومحتفظين بسلوكها زي ما هو) — بيدمج أي مسافات متكررة
 // جوه النص لمسافة واحدة، عشان فروق بسيطة زي "اسم  الشخص" (مسافتين) ماتمنعش
@@ -30552,6 +31499,332 @@ function _orgManager(r) {
 function _orgMatchKey(v) {
   return _orgNorm(v).replace(/\s+/g, " ");
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// ★ محرر الهيكل الوظيفي داخل ORG CHART — بناءً على طلب صريح من المستخدم
+// إنه يقدر يعدّل موظف/مكان/مدير مباشر من جوّه الشارت نفسه، من غير ما
+// يفتح ملف تاني. وضع التعديل محمي بباسورد (لدخول الوضع)، والحفظ نفسه
+// محمي بباسورد تاني منفصل — نفس فلسفة حماية شعار Land Sterling الموجودة
+// أصلًا في الصفحة (طبقة واجهة بصرية بسيطة، مش تشفير حقيقي، وسهل تغييرها
+// من الثابتين تحت في أي وقت).
+//
+// ⚠️ التعديلات هنا بتتطبّق فورًا على window.RAW_NEW_ORG_STRUCTURE في
+// الذاكرة (فالشارت وجدول "قائمة الوظائف" وكل إحصائيات "📊 التحليل"
+// بتتحدّث فورًا)، وبتتخزّن كمان في localStorage بتاع المتصفح عشان تفضل
+// ظاهرة بعد أي Refresh للصفحة — لأن البيانات الأصلية بتتسحب من جديد من
+// جوجل شيت في كل تحميل. **دي مش مزامنة حقيقية مع جوجل شيت نفسه** — لسه
+// محتاجين نقطة كتابة (doPost) في الآب سكريبت المصدر عشان كده (راجع
+// ملاحظة التسليم). التخزين المحلي هنا بيفضل بس في نفس المتصفح/الجهاز.
+const ORGC_EDIT_ENTER_PASSWORD = "2468";
+const ORGC_EDIT_SAVE_PASSWORD  = "1357";
+const ORGC_LOCAL_EDITS_KEY = "orgc_local_edits_v1";
+// ★ توكن مزامنة جوجل شيت — لازم يبقى نفس القيمة بالظبط بتاع
+// ORG_EDIT_WRITE_TOKEN جوه ملف الآب سكريبت (apps_script_new_templates_v2.gs)
+// المُسلَّم مع هذا التحديث. لو الآب سكريبت لسه مش متحدّث (مفيش __row في
+// بيانات الصفوف)، التعديل بيفضل محفوظ محليًا بس زي الأول من غير أي محاولة
+// شبكة — التزامن الفعلي بيشتغل تلقائيًا أول ما يتعمل Deploy للنسخة الجديدة.
+const ORGC_WRITE_TOKEN = "orgc-sync-7d3f91";
+
+// مفتاح تخزين موحّد لكل صف: لو __row (رقم الصف الحقيقي في شيت جوجل)
+// موجود — استخدمه هو (أدق وأثبت، مفيش احتمال تصادم خالص). لو لسه مش
+// موجود (الآب سكريبت القديم قبل التحديث)، ارجع للبصمة المركّبة
+// (__orgcKey) القديمة كـ fallback.
+function _orgRowStorageKey(row) {
+  return row.__row != null ? "row:" + row.__row : row.__orgcKey;
+}
+
+function _orgLoadLocalEdits() {
+  try {
+    const raw = localStorage.getItem(ORGC_LOCAL_EDITS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function _orgSaveLocalEditsMap(map) {
+  try { localStorage.setItem(ORGC_LOCAL_EDITS_KEY, JSON.stringify(map)); } catch (e) {}
+}
+function _orgLocalEditsCount() {
+  return Object.keys(_orgLoadLocalEdits()).length;
+}
+
+// بيحسب "بصمة هوية" ثابتة لكل صف (منطقة+فريق+مسمى+اسم وقت أول تحميل
+// طازة من الشيت، + رقم تكرار لو فيه أكتر من صف بنفس التركيبة زي شواغر
+// متعددة بنفس المسمى/المنطقة وبدون اسم) — بتتحسب مرة واحدة بس فور وصول
+// البيانات من الشبكة، **قبل** تطبيق أي تعديل محلي، عشان تفضل نفس
+// البصمة في كل تحميل تالي للصفحة (لأن الشيت الأصلي نفسه ما اتغيرش)
+// ونقدر نلاقي "نفس الصف" ونرجّع له تعديلاته المحفوظة.
+// ★ خط دفاع إضافي: لو صف وصل لأي شاشة عرض (_orgBuildForest) من غير ما
+// يمر على مسار السحب من الشبكة أصلًا (نظريًا مايحصلش في المنتج الحقيقي،
+// بس تحسّبًا)، بنحسبله بصمة هنا كـ fallback عشان زرار الحفظ في المحرر
+// (_orgOpenEditForm) ميخزّنش أي تعديل تحت مفتاح فاضي (undefined) بيتضارب
+// مع تعديلات تانية. بنتجاهل أي صف عنده بصمة محسوبة أصلًا (__orgcKey)
+// عشان مانغيّرش بصمة صف اتعدّل فعليًا في نفس الجلسة.
+function _orgEnsureIdentityKeys(rows) {
+  if (rows.every((r) => r.__orgcKey != null)) return;
+  const counts = {};
+  rows.forEach((row) => {
+    if (row.__orgcKey != null) return;
+    const base = [
+      _orgMatchKey(row["المنطقة"]),
+      _orgMatchKey(row["نوع الفريق"]),
+      _orgMatchKey(_orgTitle(row)),
+      _orgMatchKey(_orgName(row)),
+    ].join("|");
+    const n = counts[base] || 0;
+    counts[base] = n + 1;
+    row.__orgcKey = base + "|" + n;
+  });
+}
+function _orgAssignIdentityKeysAndApplyLocalEdits(rows) {
+  _orgEnsureIdentityKeys(rows);
+  const localEdits = _orgLoadLocalEdits();
+  rows.forEach((row) => {
+    const edit = localEdits[_orgRowStorageKey(row)];
+    if (edit) Object.assign(row, edit);
+  });
+}
+
+// اسم عمود المسمى الوظيفي واسم الموظف بيختلفوا حسب مصدر الصف (LS/TBC) —
+// بنعدّل نفس العمود اللي فيه قيمة فعلية أصلًا في هذا الصف بالذات، بدل ما
+// نخمّن أو نضيف عمود جديد.
+function _orgTitleFieldName(row) {
+  return _orgNorm(row["المسمى الوظيفي (LS)"]) ? "المسمى الوظيفي (LS)" : "المسمى الوظيفي (TBC)";
+}
+function _orgNameFieldName(row) {
+  return _orgNorm(row["اسم الموظف\\المرشح"]) || !_orgNorm(row["الاسم (موظف / مرشح)"]) ? "اسم الموظف\\المرشح" : "الاسم (موظف / مرشح)";
+}
+
+const ORGC_KNOWN_REGIONS = ["مكة المكرمة", "الطائف", "جدة", "المدينة المنورة", "المنطقة الغربية"];
+
+function _orgCloseModal() {
+  const overlay = document.getElementById("orgc-modal-overlay");
+  if (overlay) overlay.remove();
+}
+
+// مودال عام بسيط (باسورد أو أي محتوى HTML) — منفصل تمامًا عن مودال
+// كلمة مرور شعار Land Sterling (خاص بشاشة الدخول)، بنفس روح الألوان
+// (تيل #0b6b7e) عشان يبان جزء طبيعي من نفس الصفحة.
+function _orgShowModal(innerHtml) {
+  _orgCloseModal();
+  const overlay = document.createElement("div");
+  overlay.id = "orgc-modal-overlay";
+  overlay.className = "orgc-modal-overlay";
+  overlay.innerHTML = `<div class="orgc-modal-box">${innerHtml}</div>`;
+  overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) _orgCloseModal(); });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function _orgPromptPassword(title, subtitle, expectedPassword, onSuccess) {
+  const overlay = _orgShowModal(`
+    <div class="orgc-modal-title">${_orgEsc(title)}</div>
+    <div class="orgc-modal-sub">${_orgEsc(subtitle)}</div>
+    <form id="orgc-pw-form" autocomplete="off">
+      <input type="password" id="orgc-pw-input" class="orgc-modal-input" placeholder="كلمة المرور" autocomplete="new-password" inputmode="numeric" />
+      <div id="orgc-pw-error" class="orgc-modal-error" style="display:none">كلمة المرور غير صحيحة، حاول مرة أخرى</div>
+      <div class="orgc-modal-actions">
+        <button type="button" class="orgc-modal-btn orgc-modal-btn-secondary" id="orgc-pw-cancel">إلغاء</button>
+        <button type="submit" class="orgc-modal-btn orgc-modal-btn-primary">تأكيد</button>
+      </div>
+    </form>`);
+  const form = overlay.querySelector("#orgc-pw-form");
+  const input = overlay.querySelector("#orgc-pw-input");
+  const errorEl = overlay.querySelector("#orgc-pw-error");
+  overlay.querySelector("#orgc-pw-cancel").addEventListener("click", () => _orgCloseModal());
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (input.value === expectedPassword) {
+      _orgCloseModal();
+      onSuccess();
+    } else {
+      errorEl.style.display = "";
+      input.value = "";
+      input.focus();
+    }
+  });
+  setTimeout(() => input.focus(), 30);
+}
+
+// توست بسيط (رسالة مؤقتة تختفي لوحدها) لعرض نتيجة محاولة المزامنة مع
+// جوجل شيت بعد كل حفظ — من غير ما يحتاج المستخدم يضغط أي حاجة زيادة.
+function _orgShowToast(message, kind) {
+  const existing = document.getElementById("orgc-toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "orgc-toast";
+  el.className = "orgc-toast orgc-toast-" + (kind || "ok");
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("orgc-toast-show"));
+  setTimeout(() => {
+    el.classList.remove("orgc-toast-show");
+    setTimeout(() => el.remove(), 300);
+  }, 6000);
+}
+
+// ★ مزامنة صف اتعدّل مع جوجل شيت فعليًا (doPost في apps_script_new_
+// templates_v2.gs — راجع ملاحظة التسليم). لو الآب سكريبت لسه مش
+// متحدّث (مفيش row.__row لأن __row بيوصل بس من النسخة الجديدة)، بنكتفي
+// بالتخزين المحلي اللي حصل فعلًا قبل النداء ده، ونوضح للمستخدم إن
+// المزامنة التلقائية لسه محتاجة تحديث الآب سكريبت.
+async function _orgSyncRowToSheet(row, changes) {
+  if (row.__row == null) {
+    _orgShowToast("✅ اتحفظ في الداشبورد محليًا. ⚠️ التزامن التلقائي مع جوجل شيت محتاج تحديث الآب سكريبت أولاً.", "warn");
+    return;
+  }
+  const url = window.NEW_TEMPLATES_URL;
+  if (!url) {
+    _orgShowToast("✅ اتحفظ محليًا فقط — رابط المزامنة مش متاح دلوقتي.", "warn");
+    return;
+  }
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      // ★ text/plain عمدًا (مش application/json) عشان نتفادى CORS
+      // preflight (OPTIONS) اللي Apps Script Web Apps مابيردّش عليه —
+      // نفس الملاحظة الموجودة في doPost بالآب سكريبت.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "update_org_structure_row", token: ORGC_WRITE_TOKEN, row: row.__row, changes }),
+    });
+    const json = await resp.json().catch(() => null);
+    if (json && json.ok) {
+      _orgShowToast("✅ اتحفظ في الداشبورد وفي جوجل شيت بنجاح.", "ok");
+    } else {
+      _orgShowToast("⚠️ اتحفظ في الداشبورد بس فشلت المزامنة مع جوجل شيت: " + (json && json.error ? json.error : "خطأ غير معروف"), "warn");
+    }
+  } catch (err) {
+    _orgShowToast("⚠️ اتحفظ في الداشبورد بس فشلت المزامنة مع جوجل شيت (مشكلة شبكة): " + err.message, "warn");
+  }
+}
+
+function _orgUpdateEditModeUI() {
+  const chartEl = document.getElementById("org-view-chart");
+  if (chartEl) chartEl.classList.toggle("orgc-edit-mode", !!ORG._editMode);
+  const btn = document.getElementById("orgc-editmode-btn");
+  if (btn) {
+    btn.textContent = ORG._editMode ? "🔓 وضع التعديل مفعّل (اضغط لإنهاء)" : "✏️ تعديل";
+    btn.classList.toggle("active", !!ORG._editMode);
+  }
+  const badge = document.getElementById("orgc-local-edits-badge");
+  const count = _orgLocalEditsCount();
+  if (badge) {
+    badge.style.display = count ? "" : "none";
+    badge.textContent = `✏️ ${count.toLocaleString("ar")} تعديل محلي غير متزامن مع جوجل شيت`;
+  }
+}
+
+function _orgToggleEditMode() {
+  if (ORG._editMode) {
+    ORG._editMode = false;
+    _orgUpdateEditModeUI();
+    return;
+  }
+  _orgPromptPassword(
+    "دخول وضع التعديل",
+    "أدخل كلمة مرور تعديل الهيكل الوظيفي",
+    ORGC_EDIT_ENTER_PASSWORD,
+    () => {
+      ORG._editMode = true;
+      _orgUpdateEditModeUI();
+    }
+  );
+}
+window._orgToggleEditMode = _orgToggleEditMode;
+
+// عرض فورم تعديل صف واحد (موظف/شاغر) — بيتفتح من زرار ✏️ على أي كارت
+// وقت ما وضع التعديل مفعّل. المديرين "خارج نطاق الملف" ومستويات التجميع
+// مالهمش صف حقيقي (row=null) فمفيش حاجة تتعدل فيهم هنا.
+function _orgOpenEditForm(nodeId) {
+  if (!ORG._editMode) return;
+  const row = (window.__ORGC_NODE_INDEX__ || {})[nodeId];
+  if (!row) { alert("مفيش بيانات صف حقيقية لهذه العقدة (مثلاً: وسم مدير خارج نطاق الملف)."); return; }
+
+  const titleField = _orgTitleFieldName(row);
+  const nameField = _orgNameFieldName(row);
+  const currentTitle = _orgNorm(row[titleField]);
+  const currentName = _orgNorm(row[nameField]);
+  const currentRegion = _orgNorm(row["المنطقة"]);
+  const currentTeam = _orgNorm(row["نوع الفريق"]);
+  const currentStatus = _orgNorm(row["حالة التوظيف"]) || "موظف حالي";
+  const currentNat = _orgNorm(row["الجنسية"]);
+  const currentExp = _orgNorm(row["سنوات الخبرة"]);
+  const currentMgr = _orgManager(row);
+
+  const overlay = _orgShowModal(`
+    <div class="orgc-modal-title">تعديل الوظيفة</div>
+    <div class="orgc-modal-sub">التعديل بيتطبق فورًا على الداشبورد، ومحفوظ محليًا في هذا المتصفح.</div>
+    <form id="orgc-edit-form" class="orgc-edit-form" autocomplete="off">
+      <label>الاسم<input type="text" name="name" value="${_orgEsc(currentName)}" placeholder="اترك فاضي لو الوظيفة شاغرة" /></label>
+      <label>المسمى الوظيفي<input type="text" name="title" value="${_orgEsc(currentTitle)}" required /></label>
+      <label>المنطقة
+        <input type="text" name="region" list="orgc-region-list" value="${_orgEsc(currentRegion)}" required />
+        <datalist id="orgc-region-list">${ORGC_KNOWN_REGIONS.map((r) => `<option value="${_orgEsc(r)}"></option>`).join("")}</datalist>
+      </label>
+      <label>نوع الفريق
+        <input type="text" name="team" list="orgc-team-list" value="${_orgEsc(currentTeam)}" />
+        <datalist id="orgc-team-list"><option value="التجهيزات"></option><option value="الفريق التقني"></option></datalist>
+      </label>
+      <label>المدير المباشر<input type="text" name="manager" value="${_orgEsc(currentMgr)}" placeholder="اسم كامل مطابق لاسم موظف في نفس الملف، أو اسم خارجي" /></label>
+      <label>حالة التوظيف
+        <select name="status">
+          <option value="موظف حالي"${currentStatus === "موظف حالي" ? " selected" : ""}>موظف حالي</option>
+          <option value="شاغر"${currentStatus === "شاغر" ? " selected" : ""}>شاغر</option>
+        </select>
+      </label>
+      <label>الجنسية<input type="text" name="nationality" value="${_orgEsc(currentNat)}" /></label>
+      <label>سنوات الخبرة<input type="text" name="experience" value="${_orgEsc(currentExp)}" /></label>
+      <div class="orgc-modal-note">ℹ️ تواريخ بداية/نهاية العقد للعرض فقط ولسه مش قابلة للتعديل من هنا.</div>
+      <div class="orgc-modal-actions">
+        <button type="button" class="orgc-modal-btn orgc-modal-btn-secondary" id="orgc-edit-cancel">إلغاء</button>
+        <button type="submit" class="orgc-modal-btn orgc-modal-btn-primary">حفظ التعديل</button>
+      </div>
+    </form>`);
+  overlay.querySelector("#orgc-edit-cancel").addEventListener("click", () => _orgCloseModal());
+  overlay.querySelector("#orgc-edit-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const vacant = fd.get("status") === "شاغر";
+    const changes = {
+      [nameField]: vacant ? "" : _orgNorm(fd.get("name")),
+      [titleField]: _orgNorm(fd.get("title")),
+      "المنطقة": _orgNorm(fd.get("region")),
+      "نوع الفريق": _orgNorm(fd.get("team")),
+      "المدير المباشر": _orgNorm(fd.get("manager")),
+      "حالة التوظيف": fd.get("status"),
+      "الجنسية": _orgNorm(fd.get("nationality")),
+      "سنوات الخبرة": _orgNorm(fd.get("experience")),
+    };
+    _orgCloseModal();
+    _orgPromptPassword(
+      "تأكيد الحفظ",
+      "أدخل كلمة مرور تأكيد الحفظ عشان تطبّق التعديل فعليًا",
+      ORGC_EDIT_SAVE_PASSWORD,
+      () => {
+        Object.assign(row, changes);
+        const localEdits = _orgLoadLocalEdits();
+        const storageKey = _orgRowStorageKey(row);
+        localEdits[storageKey] = Object.assign({}, localEdits[storageKey] || {}, changes);
+        _orgSaveLocalEditsMap(localEdits);
+        if (typeof renderOrgStructureTab === "function") renderOrgStructureTab();
+        ORG._editMode = true;
+        requestAnimationFrame(() => {
+          _orgUpdateEditModeUI();
+          try { if (typeof _orgSwitchView === "function") _orgSwitchView("chart"); } catch (err) {}
+        });
+        _orgSyncRowToSheet(row, changes);
+      }
+    );
+  });
+  setTimeout(() => overlay.querySelector('[name="title"]')?.focus(), 30);
+}
+window._orgOpenEditForm = _orgOpenEditForm;
+
+function _orgClearAllLocalEdits() {
+  if (!confirm("هتمسح كل التعديلات المحلية غير المتزامنة مع جوجل شيت في هذا المتصفح. متأكد؟")) return;
+  try { localStorage.removeItem(ORGC_LOCAL_EDITS_KEY); } catch (e) {}
+  alert("اتمسحت. لو عاوز البيانات ترجع لآخر نسخة من جوجل شيت، حدّث الصفحة (Refresh) دلوقتي.");
+  _orgUpdateEditModeUI();
+}
+window._orgClearAllLocalEdits = _orgClearAllLocalEdits;
 
 function _orgApplyFilters() {
   const rows = window.RAW_NEW_ORG_STRUCTURE || [];
@@ -30572,6 +31845,7 @@ function _orgRowHtml(r) {
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["نوع الفريق"]) || "—"}</td>
     <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgTitle(r))}</td>
     <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgName(r)) || "—"}</td>
+    <td style="padding:6px 10px;font-size:11px">${_orgEsc(_orgManager(r)) || "—"}</td>
     <td style="padding:6px 10px;text-align:center"><span style="background:${CSS_TOKENS.α(statusColor,0.12)};color:${statusColor};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${_orgEsc(r["حالة التوظيف"]) || "—"}</span></td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["الجنسية"]) || "—"}</td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_orgEsc(r["سنوات الخبرة"]) || "—"}</td>
@@ -30585,7 +31859,7 @@ function _orgRenderTable() {
   if (!tbody) return;
   tbody.innerHTML =
     ORG.filtered.map((r) => _orgRowHtml(r)).join("") ||
-    `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+    `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("org-count");
   if (countEl) countEl.textContent = ORG.filtered.length.toLocaleString("ar");
 }
@@ -30593,10 +31867,11 @@ function _orgRenderTable() {
 function _orgExportCSV() {
   const src = ORG.filtered.length ? ORG.filtered : window.RAW_NEW_ORG_STRUCTURE || [];
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["المنطقة", "نوع الفريق", "المسمى الوظيفي", "الاسم", "حالة التوظيف", "الجنسية", "سنوات الخبرة", "تاريخ بداية العقد", "تاريخ نهاية العقد"];
+  const headers = ["المنطقة", "نوع الفريق", "المسمى الوظيفي", "الاسم", "المدير المباشر", "حالة التوظيف", "الجنسية", "سنوات الخبرة", "تاريخ بداية العقد", "تاريخ نهاية العقد"];
   const getVal = (r, h) => {
     if (h === "المسمى الوظيفي") return _orgTitle(r);
     if (h === "الاسم") return _orgName(r);
+    if (h === "المدير المباشر") return _orgManager(r);
     if (h === "تاريخ بداية العقد" || h === "تاريخ نهاية العقد") return _orgFmtDate(r[h]);
     return r[h];
   };
@@ -30648,6 +31923,9 @@ function _orgMarkReachable(node, set) {
 // في نفس الملف. أي قيمة في عمود "المدير المباشر" ميطابقتش حد موجود
 // بتتحول لعقدة "خارجية" واحدة (مش مكررة) بنفس النص المكتوب بالظبط.
 function _orgBuildForest(rows) {
+  // ★ خط دفاع: يضمن إن كل صف عنده بصمة هوية ثابتة (__orgcKey) قبل أي
+  // استخدام لمحرر التعديل — راجع الشرح فوق _orgEnsureIdentityKeys.
+  if (typeof _orgEnsureIdentityKeys === "function") _orgEnsureIdentityKeys(rows);
   let seq = 0;
   const nodes = [];
   const byKey = {}; // matchKey(اسم الموظف) → node — لأصحاب الاسم الحقيقي بس
@@ -30715,15 +31993,16 @@ function _orgBuildForest(rows) {
   roots.forEach((r) => _orgMarkReachable(r, reachable));
   nodes.forEach((n) => { if (!reachable.has(n.id)) roots.push(n); });
 
-  // ★ 2026-09-21 (v3 — إعادة هيكلة مستوحاة من الكود الفعلي لنظام "إدارة
-  // الموارد البشرية" المرجعي اللي شارك المستخدم مصدره الحقيقي: app.js/
-  // styles.css). بدل شجرة واحدة موحّدة تحت جذر شركة واحد (v2)، كل
-  // "منطقة" (عمود المنطقة: مكة المكرمة، الطائف، جدة، المدينة المنورة،
-  // المنطقة الغربية...) بقى ليها بانل مستقل تمامًا بهيدر ومؤشرات أداء
-  // (KPI) خاصة بيها وشجرتها الخاصة — بالظبط زي أسلوب renderOrgChart
-  // اللي بيلف على offices في الكود المرجعي. وجوه كل منطقة، لسه بنجمّع
-  // حسب "نوع الفريق" (نفس فكرة v2) عشان الفروع تبقى مقروءة وما تطلعش
-  // عريضة أوي.
+  // ★ 2026-09-21/22 (v4 — بناءً على ملاحظة صريحة تانية من المستخدم: "عاوز
+  // المدير المباشر هوا اللي يبقي الرأس في ORG CHART وليس الفريق"). لغاية
+  // v3، كل منطقة كانت بتتقسّم لبانرات "نوع الفريق" وهي اللي بتبان كرأس
+  // فوق كل فرع. اتشال ده بالكامل: دلوقتي رأس كل فرع هو "المدير المباشر"
+  // الحقيقي نفسه (سواء موظف حقيقي مفيش له مدير متطابق، أو عقدة "مدير
+  // خارج نطاق هذا الملف")، ونوع الفريق بقى مجرد وسم صغير على كارت كل
+  // موظف (راجع _orgCardHtml) بدل ما يكون مستوى تنظيمي في الشجرة نفسه.
+  // التجميع الوحيد المتبقي فوق مستوى الأشخاص هو المنطقة (عشان بانل
+  // renderOrgChart-style لكل مكتب)، وده مش عقدة في الشجرة — ده هيدر
+  // البانل نفسه (_orgBuildRegionPanels) زي ما هو من v3.
   function effectiveRegion(node, seen) {
     if (node.region) return node.region;
     seen = seen || new Set();
@@ -30735,16 +32014,10 @@ function _orgBuildForest(rows) {
     }
     return "";
   }
-  function effectiveTeam(node, seen) {
-    if (node.team) return node.team;
-    seen = seen || new Set();
-    if (seen.has(node.id)) return "";
-    seen.add(node.id);
-    for (const c of node.children) {
-      const t = effectiveTeam(c, seen);
-      if (t) return t;
-    }
-    return "";
+  function countDescendants(node) {
+    let c = node.isGroup ? 0 : 1;
+    node.children.forEach((ch) => { c += countDescendants(ch); });
+    return c;
   }
 
   const FALLBACK_REGION = "غير محدد";
@@ -30757,33 +32030,18 @@ function _orgBuildForest(rows) {
   });
 
   const regions = regionOrder.map((region) => {
-    const regionRoots = regionBuckets[region];
-    const teamBuckets = {};
-    const teamOrder = [];
-    regionRoots.forEach((r) => {
-      const team = effectiveTeam(r) || "غير مصنف";
-      if (!teamBuckets[team]) { teamBuckets[team] = []; teamOrder.push(team); }
-      teamBuckets[team].push(r);
-    });
-    const regionKey = _orgMatchKey(region).replace(/\s+/g, "_");
-    const teamNodes = teamOrder.map((team, i) => ({
-      id: "team-" + regionKey + "-" + i,
-      row: null,
-      name: team,
-      isNamed: true,
-      title: "",
-      status: "",
-      vacant: false,
-      region: "",
-      team: "",
-      mgrRaw: "",
-      mgrKey: "",
-      isExternal: false,
-      isGroup: true,
-      children: teamBuckets[team],
-    }));
-    return { name: region, teamNodes };
+    // ترتيب جذور كل منطقة: الفرع الأكبر (أكتر عدد مرؤوسين) أولًا، عشان
+    // العين تروح على أهم فرع في المنطقة الأول.
+    const regionRoots = regionBuckets[region].slice().sort((a, b) => countDescendants(b) - countDescendants(a));
+    return { name: region, roots: regionRoots };
   });
+
+  // ★ فهرس id → صف حقيقي (row)، عشان محرر التعديل داخل الشارت (راجع
+  // _orgOpenEditForm) يقدر يلاقي بيانات أي كارت اتضغط عليها فورًا، من
+  // غير ما يعيد بناء الغابة تاني. بيتظبط من جديد في كل _orgBuildForest
+  // (أي إعادة رسم)، فدايمًا بيعكس آخر نسخة من الصفوف المعروضة فعليًا.
+  window.__ORGC_NODE_INDEX__ = {};
+  nodes.forEach((n) => { window.__ORGC_NODE_INDEX__[n.id] = n.row; });
 
   return { regions, allNodes: nodes, externalCount: Object.keys(externalByKey).length };
 }
@@ -30798,7 +32056,7 @@ function _orgCardHtml(node) {
   // رئيسي" منفصل هنا زي v2. ────────────────────────────────────────
   if (node.isGroup) {
     const count = _orgCountLeaves(node);
-    return `<div class="orgc-group orgc-group-team" data-orgc-search="">
+    return `<div class="orgc-group orgc-group-team" data-node-id="${node.id}" data-orgc-search="">
       <div class="orgc-group-title">${_orgEsc(node.name)}</div>
       <div class="orgc-group-count">${count.toLocaleString("ar")} وظيفة</div>
     </div>`;
@@ -30809,7 +32067,7 @@ function _orgCardHtml(node) {
   // الهيكلي مش سجل موظف كامل البيانات. ─────────────────────────────
   if (node.isExternal) {
     const searchBlob = _orgMatchKey(node.name).toLowerCase();
-    return `<div class="orgc-ext" data-orgc-search="${_orgEsc(searchBlob)}">
+    return `<div class="orgc-ext" data-node-id="${node.id}" data-orgc-search="${_orgEsc(searchBlob)}">
       <span class="orgc-ext-icon">🔗</span>
       <span class="orgc-ext-name">${_orgEsc(node.name)}</span>
       <span class="orgc-ext-note">خارج نطاق هذا الملف</span>
@@ -30835,15 +32093,16 @@ function _orgCardHtml(node) {
   const searchBlob = _orgMatchKey(
     [node.name, node.title, node.region, node.team, statusLabel].filter(Boolean).join(" ")
   ).toLowerCase();
-  return `<div class="orgc-card ${statusCls}${hasChildren ? " orgc-has-children" : ""}" data-orgc-search="${_orgEsc(searchBlob)}">
+  return `<div class="orgc-card ${statusCls}${hasChildren ? " orgc-has-children" : ""}" data-node-id="${node.id}" data-orgc-search="${_orgEsc(searchBlob)}">
     ${hasChildren ? '<span class="orgc-star" title="له مرؤوسون في الهيكل">★</span>' : ""}
     <span class="orgc-avatar">${_orgEsc(avatarLetter)}</span>
     <div class="orgc-card-name">${nameDisplay}</div>
     <div class="orgc-card-title">${_orgEsc(node.title) || "&nbsp;"}</div>
     <div class="orgc-card-foot">
       ${statusLabel ? `<span class="orgc-card-status"><span class="orgc-status-dot"></span>${_orgEsc(statusLabel)}</span>` : ""}
-      ${node.region ? `<span class="orgc-card-tag">${_orgEsc(node.region)}</span>` : ""}
+      ${node.team ? `<span class="orgc-card-tag">${_orgEsc(node.team)}</span>` : ""}
     </div>
+    <button type="button" class="orgc-edit-btn" data-node-edit-id="${node.id}" onclick="event.stopPropagation();_orgOpenEditForm('${node.id}')" title="تعديل هذه الوظيفة">✏️</button>
   </div>`;
 }
 
@@ -30896,6 +32155,105 @@ function _orgSetAllCollapsed(collapsed) {
 }
 window._orgExpandAllChart = function () { _orgSetAllCollapsed(false); };
 window._orgCollapseAllChart = function () { _orgSetAllCollapsed(true); };
+
+// ★ ملء الشاشة لـ ORG CHART — بناءً على طلب صريح، تكبير منطقة الشارت
+// كاملة (الشريط العلوي + شريط الانتقال السريع + كل بانلات المناطق) لتملأ
+// الشاشة عن طريق Fullscreen API القياسي، مع رجوع طبيعي عند الخروج. عند أي
+// تغيّر في وضع ملء الشاشة بيُعاد ضبط "احتواء الكل في الشاشة" تلقائيًا لكل
+// بانل لأن المساحة المتاحة بتتغيّر.
+function _orgOnFullscreenChange() {
+  const el = document.getElementById("org-view-chart");
+  const btn = document.getElementById("orgc-fullscreen-btn");
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement || null;
+  const isThisFs = !!el && fsEl === el;
+  if (el) el.classList.toggle("orgc-fullscreen-active", isThisFs);
+  if (btn) btn.textContent = isThisFs ? "⛶ إنهاء ملء الشاشة" : "⛶ ملء الشاشة";
+  requestAnimationFrame(() => {
+    try { if (typeof _orgZoomFitAllPanels === "function") _orgZoomFitAllPanels(); } catch (e) {}
+  });
+}
+document.addEventListener("fullscreenchange", _orgOnFullscreenChange);
+document.addEventListener("webkitfullscreenchange", _orgOnFullscreenChange);
+
+function _orgToggleFullscreen() {
+  const el = document.getElementById("org-view-chart");
+  if (!el) return;
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement || null;
+  if (fsEl === el) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) { const p = exit.call(document); if (p && p.catch) p.catch(() => {}); }
+  } else {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) { const p = req.call(el); if (p && p.catch) p.catch(() => {}); }
+  }
+}
+window._orgToggleFullscreen = _orgToggleFullscreen;
+
+// ★ "أقدر أتحرك بحرّيتي جوّه التشارت" — بناءً على طلب صريح: سحب بالماوس
+// (drag-to-pan) جوّه أي بانل منطقة، بدل الاعتماد على شريط التمرير بس.
+// السحب الأفقي بيحرّك تمرير البانل نفسه (.orgc-forest، عنده overflow-x
+// مستقل زي ما هو مشروح فوق)، والسحب الرأسي بيحرّك تمرير الصفحة نفسها
+// (أو حاوية ملء الشاشة #org-view-chart لو مفعّل) — عشان يقدر يتنقّل بين
+// البانلات وهو مكبّر جوه بانل واحد. مربوط بـ delegation على document
+// مرة واحدة بس (guard بـ __ORGC_PAN_BOUND__) عشان يشتغل مع أي إعادة رسم
+// للتبويب من غير تكرار الربط، وبيتجاهل أي ضغطة على زرار/إنبوت/رابط
+// جوّه البانل (زوم، طي/فتح فرع، بحث...) عشان مايبوظش وظائفهم.
+(function () {
+  if (window.__ORGC_PAN_BOUND__) return;
+  window.__ORGC_PAN_BOUND__ = true;
+  const DRAG_THRESHOLD = 4;
+  let armed = false;
+  let dragging = false;
+  let startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
+  let forestEl = null;
+  let vScroller = null;
+
+  function verticalScroller() {
+    const chartEl = document.getElementById("org-view-chart");
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement || null;
+    if (chartEl && fsEl === chartEl) return chartEl;
+    return document.scrollingElement || document.documentElement;
+  }
+
+  document.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const forest = e.target.closest(".orgc-forest");
+    if (!forest) return;
+    if (e.target.closest("button, input, textarea, select, a, .orgc-toggle")) return;
+    armed = true;
+    dragging = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    forestEl = forest;
+    startScrollLeft = forest.scrollLeft;
+    vScroller = verticalScroller();
+    startScrollTop = vScroller.scrollTop;
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (!armed || !forestEl) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!dragging) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      dragging = true;
+      forestEl.classList.add("orgc-panning");
+    }
+    forestEl.scrollLeft = startScrollLeft - dx;
+    if (vScroller) vScroller.scrollTop = startScrollTop - dy;
+    e.preventDefault();
+  });
+
+  function _orgEndPan() {
+    if (forestEl) forestEl.classList.remove("orgc-panning");
+    armed = false;
+    dragging = false;
+    forestEl = null;
+    vScroller = null;
+  }
+  document.addEventListener("pointerup", _orgEndPan);
+  document.addEventListener("pointercancel", _orgEndPan);
+})();
 
 function _orgChartSearch(raw) {
   const q = _orgMatchKey(raw).toLowerCase();
@@ -30968,11 +32326,105 @@ function _orgSetupJumpSpy() {
 }
 window._orgSetupJumpSpy = _orgSetupJumpSpy;
 
+// ★ 2026-09-22: تحكّم بالتكبير/التصغير لكل بانل منطقة على حدة (مستوحى من
+// orgZoom/orgZoomFit في الكود المرجعي) — ردًا على ملاحظة صريحة إن
+// المستخدم "مش عارف يدخل يمين أو يسار للآخر" في الشجرة. الحل: أي بانل
+// أعرض من عرض الشاشة المتاحة بيتصغّر تلقائيًا (زوم "احتواء") فور
+// العرض عشان الفرع كله يبان من غير أي تمرير أصلًا، وبيفضل للمستخدم
+// أزرار +/- واضحة لو حب يكبّر بعدين، بدل ما يعتمد على تمرير غير واضح
+// الاتجاه.
+const ORGC_ZOOM_MIN = 0.32;
+const ORGC_ZOOM_MAX = 1.5;
+function _orgApplyZoom(slug, scale) {
+  const forest = document.getElementById("orgc-forest-" + slug);
+  const inner = document.getElementById("orgc-inner-" + slug);
+  const label = document.getElementById("orgc-zoom-label-" + slug);
+  if (!inner) return;
+  scale = Math.max(ORGC_ZOOM_MIN, Math.min(ORGC_ZOOM_MAX, scale));
+  inner.style.transform = "scale(" + scale.toFixed(2) + ")";
+  inner.dataset.zoom = String(scale);
+  // ★ transform:scale() مايأثرش على ارتفاع صندوق العنصر في تدفّق الصفحة
+  // (scrollHeight فاضل زي ما هو بارتفاعه الطبيعي الكامل)، فلو سبنا حاوية
+  // الـ scroll (.orgc-forest) على ارتفاعها الافتراضي (auto) هيفضل فراغ
+  // أبيض كبير تحت الشجرة المصغّرة بارتفاع الفرق. الحل: نظبط ارتفاع
+  // الحاوية يدويًا = الارتفاع الطبيعي × نسبة التصغير الحالية.
+  if (forest) forest.style.height = Math.max(60, Math.ceil(inner.scrollHeight * scale) + 12) + "px";
+  if (label) label.textContent = Math.round(scale * 100) + "%";
+  _orgUpdateScrollHint(slug);
+}
+function _orgUpdateScrollHint(slug) {
+  const forest = document.getElementById("orgc-forest-" + slug);
+  const hint = document.getElementById("orgc-scrollhint-" + slug);
+  if (!forest) return;
+  const hasOverflow = forest.scrollWidth > forest.clientWidth + 4;
+  forest.classList.toggle("orgc-has-overflow", hasOverflow);
+  if (hint) hint.style.display = hasOverflow ? "" : "none";
+}
+function _orgZoomStep(slug, dir) {
+  const inner = document.getElementById("orgc-inner-" + slug);
+  if (!inner) return;
+  const current = parseFloat(inner.dataset.zoom || "1");
+  _orgApplyZoom(slug, current + dir * 0.1);
+}
+window._orgZoomStep = _orgZoomStep;
+// يحسب أصغر زوم يخلّي الفرع كله يبان من غير تمرير (لو ده ممكن أصلًا في
+// حدود ORGC_ZOOM_MIN)، وبيرجّع لـ 100% لو الفرع أصلًا بياخد مساحة أصغر
+// من المتاح.
+function _orgZoomFit(slug) {
+  const forest = document.getElementById("orgc-forest-" + slug);
+  const inner = document.getElementById("orgc-inner-" + slug);
+  if (!forest || !inner) return;
+  // ★ scrollWidth/scrollHeight بتوع العنصر نفسه بيفضلوا يعكسوا حجمه
+  // الطبيعي الكامل (زي ما هو في تدفّق الصفحة) بغض النظر عن أي transform
+  // مطبّق عليه هو نفسه — فمحتاجين نصفّر الزوم الأول عشان نقيس، ده أصلًا
+  // مضمون بحكم الـ spec، فبنقيس على طول من غير أي reset.
+  const naturalWidth = inner.scrollWidth;
+  const available = forest.clientWidth - 4;
+  if (naturalWidth > available && available > 0) {
+    _orgApplyZoom(slug, available / naturalWidth);
+  } else {
+    _orgApplyZoom(slug, 1);
+  }
+}
+window._orgZoomFit = _orgZoomFit;
+
+// ★ بناءً على طلب صريح: ضغطة "⤢ احتواء الكل في الشاشة" في أي بانل مش
+// بس بتظبط الزوم — كمان بتدخل مباشرة في وضع ملء الشاشة (نفس وضع زرار
+// "⛶ ملء الشاشة" في الشريط العلوي)، عشان المستخدم يدخل "جوّه" الشارت
+// بضغطة واحدة بدل اتنين. الخروج من ملء الشاشة بره من نفس الزرار العلوي
+// (بيتحول نصه لـ"إنهاء ملء الشاشة") أو Esc العادي في المتصفح.
+function _orgZoomFitAndEnterFullscreen(slug) {
+  _orgZoomFit(slug);
+  const el = document.getElementById("org-view-chart");
+  if (!el) return;
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement || null;
+  if (fsEl !== el) {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) { const p = req.call(el); if (p && p.catch) p.catch(() => {}); }
+  }
+}
+window._orgZoomFitAndEnterFullscreen = _orgZoomFitAndEnterFullscreen;
+
+function _orgZoomFitAllPanels() {
+  document.querySelectorAll("#org-view-chart .orgc-panel").forEach((p) => _orgZoomFit(p.id));
+}
+window._orgZoomFitAllPanels = _orgZoomFitAllPanels;
+
 // ★ 2026-09-21 (v3): يبني بانل مستقل لكل منطقة (بدل شجرة واحدة موحّدة في
 // v2) — كل بانل بهيدر فيه اسم المنطقة + شريط مؤشرات (إجمالي/مشغولة/
-// شاغرة/نسبة الإشغال)، وتحته شجرته الخاصة (فرع لكل "نوع فريق" جنب بعضه).
-// نفس فكرة renderOrgChart(root, entity) في الكود المرجعي اللي بيلف على
-// offices ويبني بانل مستقل لكل واحد فيهم.
+// شاغرة/نسبة الإشغال)، وتحته شجرته الخاصة. نفس فكرة renderOrgChart(root,
+// entity) في الكود المرجعي اللي بيلف على offices ويبني بانل مستقل لكل
+// واحد فيهم. ★ 2026-09-22 (v4): رأس شجرة كل منطقة بقى "المدير المباشر"
+// الحقيقي نفسه (راجع _orgBuildForest) مش بانر "نوع الفريق" — فروع
+// المنطقة بتتعرض جنب بعضها مباشرة، الأكبر أولًا.
+// اسم العرض داخل ORG CHART فقط (عنوان البانل + زر الانتقال السريع) — بناءً
+// على طلب صريح من المستخدم أن "المنطقة الغربية" تظهر باسم "WR" هنا فقط.
+// الاسم الكامل بالعربي يفضل زي ما هو في كل مكان تاني (الفلاتر، الجدول،
+// تصدير CSV، حسابات المطابقة)، ما بيتأثرش بالتغيير دا خالص.
+function _orgRegionDisplayLabel(name) {
+  return name === "المنطقة الغربية" ? "WR" : name;
+}
+
 function _orgBuildRegionPanels(rows) {
   const forest = _orgBuildForest(rows);
 
@@ -30984,8 +32436,14 @@ function _orgBuildRegionPanels(rows) {
     if (_orgIsVacant(r)) regionStats[rg].vacant++;
   });
 
-  // ترتيب المناطق: الأكبر عددًا أولًا، عشان أهم المكاتب تبان فوق.
+  // ترتيب المناطق: "المنطقة الغربية" (WR) دايمًا أول واحدة بناءً على طلب
+  // صريح من المستخدم، وبعدها الباقي الأكبر عددًا أولًا.
+  const PRIORITY_REGION_NAME = "المنطقة الغربية";
   const orderedRegions = forest.regions.slice().sort((a, b) => {
+    const aPriority = a.name === PRIORITY_REGION_NAME;
+    const bPriority = b.name === PRIORITY_REGION_NAME;
+    if (aPriority && !bPriority) return -1;
+    if (bPriority && !aPriority) return 1;
     const ta = (regionStats[a.name] || { total: 0 }).total;
     const tb = (regionStats[b.name] || { total: 0 }).total;
     return tb - ta;
@@ -31005,10 +32463,10 @@ function _orgBuildRegionPanels(rows) {
       const vacant = stats.vacant;
       const occupied = total - vacant;
       const pct = total ? Math.round((occupied / total) * 100) : 0;
-      const treesHtml = rg.teamNodes.map((tn) => `<ul class="orgc-tree">${_orgRenderNode(tn, new Set(), 0)}</ul>`).join("");
+      const treesHtml = rg.roots.map((r) => `<ul class="orgc-tree">${_orgRenderNode(r, new Set(), 0)}</ul>`).join("");
       return `<section class="orgc-panel" id="${slug}">
         <div class="orgc-panel-head">
-          <div class="orgc-panel-title">${_orgEsc(rg.name)}</div>
+          <div class="orgc-panel-title">${_orgEsc(_orgRegionDisplayLabel(rg.name))}</div>
           <div class="orgc-kpi-row">
             <span class="orgc-kpi orgc-kpi-total"><b>${total.toLocaleString("ar")}</b><small>إجمالي</small></span>
             <span class="orgc-kpi orgc-kpi-occ"><b>${occupied.toLocaleString("ar")}</b><small>مشغولة</small></span>
@@ -31017,7 +32475,16 @@ function _orgBuildRegionPanels(rows) {
           </div>
           <div class="orgc-coverage-track"><div class="orgc-coverage-fill" style="width:${pct}%"></div></div>
         </div>
-        <div class="orgc-forest">${treesHtml}</div>
+        <div class="orgc-zoom-row">
+          <button type="button" class="orgc-zoom-btn" onclick="_orgZoomStep('${slug}',-1)" title="تصغير">−</button>
+          <span class="orgc-zoom-label" id="orgc-zoom-label-${slug}">100%</span>
+          <button type="button" class="orgc-zoom-btn" onclick="_orgZoomStep('${slug}',1)" title="تكبير">+</button>
+          <button type="button" class="orgc-zoom-fit-btn" onclick="_orgZoomFitAndEnterFullscreen('${slug}')">⤢ احتواء الكل في الشاشة</button>
+          <span class="orgc-scrollhint" id="orgc-scrollhint-${slug}" style="display:none">↔ مرّر يمين/يسار جوه الإطار لعرض باقي الفرع</span>
+        </div>
+        <div class="orgc-forest" id="orgc-forest-${slug}">
+          <div class="orgc-forest-inner" id="orgc-inner-${slug}" data-zoom="1">${treesHtml}</div>
+        </div>
       </section>`;
     })
     .join("");
@@ -31025,7 +32492,7 @@ function _orgBuildRegionPanels(rows) {
   const jumpNav =
     panelsMeta.length > 1
       ? `<div class="orgc-jumpnav">${panelsMeta
-          .map(({ rg, slug }) => `<button type="button" class="orgc-jump-btn" data-orgc-jump="${slug}" onclick="_orgJumpTo('${slug}')">${_orgEsc(rg.name)}</button>`)
+          .map(({ rg, slug }) => `<button type="button" class="orgc-jump-btn" data-orgc-jump="${slug}" onclick="_orgJumpTo('${slug}')">${_orgEsc(_orgRegionDisplayLabel(rg.name))}</button>`)
           .join("")}</div>`
       : "";
 
@@ -31099,20 +32566,10 @@ function _orgBuildChartPanel(rows) {
   if (mgrCount > 0) {
     const panels = _orgBuildRegionPanels(rows);
     if (panels.totalNodes) {
-      const note = panels.externalCount
-        ? `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر"، ومقسّم لبانل مستقل لكل منطقة (${mgrCount.toLocaleString(
-            "ar"
-          )} صف معبّى من ${rows.length.toLocaleString("ar")}). ظهرت ${panels.externalCount.toLocaleString(
-            "ar"
-          )} قيمة في هذا العمود لم تُطابق بالحرف اسم أي موظف موجود في نفس الملف — تم عرضها كوسم "مدير خارج نطاق هذا الملف" في أعلى فرعها بدل تجاهل الرابط. لو أي واحدة منها هي فعليًا نفس شخص موجود بصيغة اسم مختصرة، وضّح لي أيهما بالتحديد وسأربطها يدويًا لتفادي نسب أي موظف لمدير غلط.`
-        : `📌 هذا الهيكل مبني فعليًا على عمود "المدير المباشر"، ومقسّم لبانل مستقل لكل منطقة (${mgrCount.toLocaleString(
-            "ar"
-          )} صف معبّى من ${rows.length.toLocaleString("ar")}).`;
       return (
-        `<div class="org-chart-note">${note}</div>` +
         `<div class="orgc-toolbar">
-          <button type="button" class="org-view-btn" onclick="_orgExpandAllChart()">توسيع الكل</button>
-          <button type="button" class="org-view-btn" onclick="_orgCollapseAllChart()">طي الكل</button>
+          <button type="button" class="org-view-btn" id="orgc-fullscreen-btn" onclick="_orgToggleFullscreen()">⛶ ملء الشاشة</button>
+          <button type="button" class="org-view-btn" id="orgc-editmode-btn" onclick="_orgToggleEditMode()">✏️ تعديل</button>
           <input type="text" class="orgc-search-input" placeholder="ابحث بالاسم أو المسمى الوظيفي…" oninput="_orgChartSearch(this.value)">
           <div class="orgc-legend">
             <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#16a34a"></span>موظف حالي</span>
@@ -31120,6 +32577,10 @@ function _orgBuildChartPanel(rows) {
             <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d4af6a"></span>مدير خارج نطاق الملف</span>
             <span class="orgc-legend-item">★ له مرؤوسون</span>
           </div>
+        </div>` +
+        `<div class="orgc-local-edits-row">
+          <span id="orgc-local-edits-badge" class="orgc-local-edits-badge" style="display:none"></span>
+          <button type="button" class="orgc-local-edits-clear" onclick="_orgClearAllLocalEdits()">🗑️ مسح كل التعديلات المحلية</button>
         </div>` +
         `<div class="org-chart-wrap">${panels.html}</div>`
       );
@@ -31139,6 +32600,7 @@ function _orgSwitchView(view) {
   if (view === "chart") {
     requestAnimationFrame(() => {
       try { if (typeof _orgSetupJumpSpy === "function") _orgSetupJumpSpy(); } catch (e) {}
+      try { if (typeof _orgZoomFitAllPanels === "function") _orgZoomFitAllPanels(); } catch (e) {}
     });
   }
 }
@@ -31175,12 +32637,30 @@ function renderOrgStructureTab() {
 
   // توزيع حسب المسمى الوظيفي
   const byTitle = {};
+  // ★ 2026-09-22: نسبة السعوديين لكل مسمى وظيفي — عمود إضافي بناءً على
+  // طلب صريح، بيتحسب من الوظائف المشغولة اللي ليها جنسية مسجّلة بس لنفس
+  // المسمى (natBase)، نفس منطق استبعاد الشواغر المتبع في توزيع الجنسيات
+  // العام تحت.
   rows.forEach((r) => {
     const t = _orgTitle(r);
-    if (!byTitle[t]) byTitle[t] = { مشغولة: 0, شاغرة: 0 };
+    if (!byTitle[t]) byTitle[t] = { مشغولة: 0, شاغرة: 0, natBase: 0, saudi: 0 };
     byTitle[t][_orgIsVacant(r) ? "شاغرة" : "مشغولة"]++;
+    if (!_orgIsVacant(r) && _orgNorm(r["الجنسية"])) {
+      byTitle[t].natBase++;
+      if (_orgIsSaudi(r)) byTitle[t].saudi++;
+    }
   });
   const titleEntries = Object.entries(byTitle).sort((a, b) => (b[1].مشغولة + b[1].شاغرة) - (a[1].مشغولة + a[1].شاغرة));
+
+  // ★ 2026-09-22: توزيع الجنسيات (سعودي / غير سعودي) — بناءً على طلب صريح.
+  // الوظائف الشاغرة مالهاش جنسية أصلًا (العمود فاضي)، فبنحسب النسبة من
+  // الوظائف المشغولة فقط اللي فيها جنسية مسجّلة، مش من إجمالي كل الوظائف.
+  // ★ تحديث بناءً على طلب صريح تاني: أي جنسية غير سعودية تتصنّف "غير
+  // سعودي" فقط — من غير تفصيل الجنسيات الفردية (مصري/سوداني/يمني...).
+  const nationalityRows = rows.filter((r) => !_orgIsVacant(r) && _orgNorm(r["الجنسية"]));
+  const saudiCount = nationalityRows.filter(_orgIsSaudi).length;
+  const nonSaudiCount = nationalityRows.length - saudiCount;
+  const nationalityBase = nationalityRows.length;
 
   const chartPanelHtml = _orgBuildChartPanel(rows);
 
@@ -31226,7 +32706,7 @@ function renderOrgStructureTab() {
   </div>
 
   <div class="card mb14">
-    <div class="card-title">الشواغر حسب المسمى الوظيفي (الأكثر من حيث العدد)</div>
+    <div class="card-title">جميع المسميات الوظيفية — مشغولة وشاغرة</div>
     <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
@@ -31234,6 +32714,7 @@ function renderOrgStructureTab() {
           <th style="padding:8px 10px;text-align:center">مشغولة</th>
           <th style="padding:8px 10px;text-align:center">شاغرة</th>
           <th style="padding:8px 10px;text-align:center">الإجمالي</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السعوديين</th>
         </tr></thead>
         <tbody>
           ${titleEntries
@@ -31242,10 +32723,45 @@ function renderOrgStructureTab() {
                 <td style="padding:6px 10px;text-align:center">${v.مشغولة.toLocaleString("ar")}</td>
                 <td style="padding:6px 10px;text-align:center${v.شاغرة ? ";color:" + CSS_TOKENS.danger() + ";font-weight:700" : ""}">${v.شاغرة.toLocaleString("ar")}</td>
                 <td style="padding:6px 10px;text-align:center;font-weight:700">${(v.مشغولة + v.شاغرة).toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${v.natBase ? Math.round((v.saudi / v.natBase) * 100) + "%" : "—"}</td>
               </tr>`)
             .join("")}
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">توزيع الجنسيات — سعودي مقابل غير سعودي</div>
+      <div class="chart-box" style="height:220px"><canvas id="ch-org-nationality"></canvas></div>
+      <div style="text-align:center;font-size:11px;color:var(--tx-muted);margin-top:6px">
+        من ${nationalityBase.toLocaleString("ar")} وظيفة مشغولة ولها جنسية مسجّلة (الشواغر ${vacantCount.toLocaleString("ar")} مستبعدة لعدم وجود جنسية لها أصلًا)
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">سعودي مقابل غير سعودي</div>
+      <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--bg2)">
+            <th style="padding:6px 10px;text-align:right">التصنيف</th>
+            <th style="padding:6px 10px;text-align:center">العدد</th>
+            <th style="padding:6px 10px;text-align:center">النسبة</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--brd)">
+              <td style="padding:6px 10px;font-weight:800">سعودي</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:800">${saudiCount.toLocaleString("ar")}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:800;color:${CSS_TOKENS.positive()}">${nationalityBase ? ((saudiCount / nationalityBase) * 100).toFixed(1) : 0}%</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 10px;font-weight:800">غير سعودي</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:800">${nonSaudiCount.toLocaleString("ar")}</td>
+              <td style="padding:6px 10px;text-align:center;font-weight:800;color:${CSS_TOKENS.info()}">${nationalityBase ? ((nonSaudiCount / nationalityBase) * 100).toFixed(1) : 0}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -31276,6 +32792,7 @@ function renderOrgStructureTab() {
           <th style="padding:8px 10px;text-align:right">نوع الفريق</th>
           <th style="padding:8px 10px;text-align:right">المسمى الوظيفي</th>
           <th style="padding:8px 10px;text-align:right">الاسم</th>
+          <th style="padding:8px 10px;text-align:right">المدير المباشر</th>
           <th style="padding:8px 10px;text-align:center">حالة التوظيف</th>
           <th style="padding:8px 10px;text-align:right">الجنسية</th>
           <th style="padding:8px 10px;text-align:right">سنوات الخبرة</th>
@@ -31297,6 +32814,11 @@ function renderOrgStructureTab() {
   ORG._team = "";
   ORG.filtered = rows.slice();
   _orgRenderTable();
+  // ★ الشارت بيتبني هنا من جديد بالكامل (HTML جديد)، فلازم نزامن حالة
+  // وضع التعديل (وعداد التعديلات المحلية) على العناصر الجديدة دي — سواء
+  // كان إعادة الرسم دي بعد حفظ تعديل، أو تحديث بيانات عادي، أو أول فتح
+  // للتبويب (يبدأ دايمًا بوضع التعديل مقفول).
+  if (typeof _orgUpdateEditModeUI === "function") _orgUpdateEditModeUI();
 
   requestAnimationFrame(() => {
     try { if (typeof _orgSetupJumpSpy === "function") _orgSetupJumpSpy(); } catch (e) {}
@@ -31319,6 +32841,11 @@ function renderOrgStructureTab() {
       },
     ]);
     makeDoughnut("ch-org-status", { مشغولة: occupiedCount, شاغرة: vacantCount }, { مشغولة: CSS_TOKENS.positive(), شاغرة: CSS_TOKENS.danger() });
+    makeDoughnut(
+      "ch-org-nationality",
+      { سعودي: saudiCount, "غير سعودي": nonSaudiCount },
+      { سعودي: CSS_TOKENS.positive(), "غير سعودي": CSS_TOKENS.info() }
+    );
   });
 }
 
@@ -36120,7 +37647,8 @@ var PORTAL_CATEGORIES = {
     tabs: [
       { name: "balagh",                  label: "البلاغات" },
       { name: "security-safety",         label: "بلاغات الأمن والسلامة" },
-      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" }
+      { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
+      { name: "new-sla",                 label: "NEW SLA" }
     ]
   },
   // 6) الموارد البشرية والتشغيل

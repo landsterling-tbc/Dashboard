@@ -23947,6 +23947,9 @@ function exportNashatExcel(rows) {
       }
     }
 
+    // ★ Nav v5 (2026-09-26): خريطة التبويبات + كتالوج كل البيانات + المصادر اللي كانت ناقصة
+    try { if (typeof window.__fcbExtraKnowledge === "function") extraContext += window.__fcbExtraKnowledge(userText); } catch (_) {}
+
     const systemPrompt = `أنت مستشار ذكاء اصطناعي تنفيذي متخصص في إدارة مرافق المدارس، تعمل داخل لوحة بيانات إدارة المرافق التعليمية (Educational Facilities Management Dashboard).
 دورك ليس الإجابة المباشرة فحسب — بل تحليل البيانات كمستشار إداري رفيع يُعدّ تقارير لقيادة وزارة التعليم.
 
@@ -38379,7 +38382,8 @@ function __initPortalSearch() {
     var q = __portalSearchNormalize(input.value);
     if (!q) return close();
     var list = __portalSearchIndex().filter(function (m) {
-      var tabHit = __portalSearchNormalize(m.label).indexOf(q) !== -1 || __portalSearchNormalize(m.catTitle).indexOf(q) !== -1;
+      var tabHit = __portalSearchNormalize(m.label).indexOf(q) !== -1 || __portalSearchNormalize(m.catTitle).indexOf(q) !== -1 ||
+        (m.kind === "tab" && !!m.keys && __portalSearchNormalize(m.keys).indexOf(q) !== -1); /* ★ Nav v5: مرادفات + وصف */
       var schoolHit = m.kind === "school" && (
         __portalSearchNormalize(m.name).indexOf(q) !== -1 ||
         __portalSearchNormalize(m.minId).indexOf(q) !== -1 ||
@@ -40709,3 +40713,989 @@ if (document.readyState === "loading") {
 }
 setTimeout(mokInit, 1200);
 /* ══ نهاية القسم المؤقت (توريد المكيفات) ══ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Portal Home v4 — تحسينات الواجهة الرئيسية (★ 2026-09-26، طلب صريح: "أحدث
+   وأقوى وأجمل وأرتب"). إضافة مستقلة تمامًا — مفيش أي تعديل على منطق التنقل:
+   الكروت بتفضل بنفس id/data-category ونفس مستمع الضغط الأصلي (navigateToCategory).
+   • سطر ترحيب + تاريخ اليوم تحت عنوان الهيدر (#portalSub كان فاضي دايمًا)
+   • (المرحلة 2) كل تبويب ظاهر جوه الكارت بقى زرار بيفتح التبويب ده مباشرة (نفس
+     openFavoriteTab المستخدمة في الاختصارات والبحث) — ضغطة على أي مكان تاني في
+     الكارت بتفتح القسم زي الأول بالظبط
+   • (المرحلة 2) الكروت بقت تتفتح بالكيبورد (Tab ثم Enter/Space) + اختصار "/" أو
+     Ctrl+K للبحث + ترتيب ظهور تدريجي هادي للكروت
+   الشكل كله في بلوك "PORTAL HOME v4" آخر dashboard.css.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  function setGreeting() {
+    try {
+      var sub = document.getElementById("portalSub");
+      if (!sub || sub.getAttribute("data-v4") === "1") return;
+      var now = new Date();
+      var h = now.getHours();
+      var greet = h < 12 ? "صباح الخير" : "مساء الخير";
+      var dateTxt = now.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      sub.textContent = greet + " — " + dateTxt;
+      sub.setAttribute("data-v4", "1");
+    } catch (e) { /* السطر اختياري — لو فشل يفضل فاضي ومخفي */ }
+  }
+
+  // أقسام بتفتح صفحة/نافذة خاصة بدل التبويبات العادية — الشيبس فيها بتفضل للعرض
+  // بس (الضغط عليها = نفس ضغطة الكارت) عشان مانفتحش تبويب قديم ورا النافذة.
+  var NO_DEEPLINK = { digital: true, raci: true };
+
+  function bindTabChips() {
+    try {
+      if (typeof PORTAL_CATEGORIES === "undefined") return;
+      document.querySelectorAll("#portal-home .portal-card[data-category]").forEach(function (card) {
+        var cat = card.getAttribute("data-category");
+        var def = PORTAL_CATEGORIES[cat];
+        if (!def || NO_DEEPLINK[cat]) return;
+        // نفس الفلترة اللي __fillPortalCardTabsList بتبني بيها الشيبس → نفس الترتيب بالظبط
+        var tabs = (def.tabs || []).filter(function (t) {
+          return typeof __isPresentationHiddenTab !== "function" || !__isPresentationHiddenTab(t.name);
+        });
+        var chips = card.querySelectorAll(".portal-card-tab-item");
+        if (chips.length !== tabs.length) return; // احتياط: لو في أي اختلاف مانربطش حاجة غلط
+        chips.forEach(function (chip, i) {
+          var t = tabs[i];
+          chip.setAttribute("data-tab", t.name);
+          chip.setAttribute("role", "link");
+          chip.setAttribute("tabindex", "0");
+          chip.setAttribute("title", "فتح: " + t.label);
+          if (chip.__v4Bound) return;
+          chip.__v4Bound = true;
+          var open = function (e) {
+            e.preventDefault();
+            e.stopPropagation(); // ما نشغّلش ضغطة الكارت (اللي بتفتح أول تبويب)
+            if (typeof openFavoriteTab === "function") openFavoriteTab(cat, chip.getAttribute("data-tab"));
+          };
+          chip.addEventListener("click", open);
+          chip.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") open(e);
+          });
+        });
+        card.classList.add("portal-card-deeplinks");
+      });
+    } catch (e) { console.warn("[portal v4][chips]", e); }
+  }
+
+  // نفس ترتيب العرض في CSS (بلوك PORTAL HOME v4) — بيُستخدم لتدرّج ظهور الكروت بس
+  var VISUAL_ORDER = [
+    "overview", "fca", "otherAssessments", "digital",
+    "systemsMaintenance", "kpi", "safety", "raci",
+    "equipment", "contracts", "operations", "geo",
+  ];
+
+  function makeCardsAccessible() {
+    document.querySelectorAll("#portal-home .portal-card[data-category]").forEach(function (card) {
+      var idx = VISUAL_ORDER.indexOf(card.getAttribute("data-category"));
+      card.style.setProperty("--ph-i", String(idx === -1 ? 12 : idx));
+      if (card.__v4Kb) return;
+      card.__v4Kb = true;
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("role", "link");
+      var title = card.querySelector(".portal-card-title");
+      if (title) card.setAttribute("aria-label", "فتح قسم " + title.textContent.trim());
+      card.addEventListener("keydown", function (e) {
+        if (e.target !== card) return; // الشيبس ليها معالج خاص
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); }
+      });
+    });
+  }
+
+  function bindSearchShortcut() {
+    var wrap0 = document.querySelector("#portal-home .portal-search-wrap");
+    if (wrap0 && !wrap0.querySelector(".portal-search-kbd")) {
+      var kbd0 = document.createElement("kbd");
+      kbd0.className = "portal-search-kbd";
+      kbd0.textContent = "/";
+      kbd0.title = "اضغط / للبحث — أو Ctrl+K لدليل كل التبويبات";
+      wrap0.appendChild(kbd0);
+    }
+    if (window.__portalV4SearchKey) return;
+    window.__portalV4SearchKey = true;
+    document.addEventListener("keydown", function (e) {
+      var home = document.getElementById("portal-home");
+      if (!home || home.style.display === "none") return;
+      var input = document.getElementById("portalSearchInput");
+      if (!input) return;
+      var tag = (e.target && e.target.tagName) || "";
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (e.target && e.target.isContentEditable);
+      var isSlash = (e.key === "/" || e.code === "Slash") && !typing && !e.ctrlKey && !e.metaKey && !e.altKey;
+      /* Ctrl+K بقى بيفتح "دليل التبويبات" العام من أي صفحة (Nav v5 تحت) */
+      if (isSlash) {
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+  }
+
+  function enhancePortalCards() {
+    try {
+      var cards = document.querySelectorAll("#portal-home .portal-card[data-category]");
+      // (مراجعة 2026-09-26) سطر "فتح القسم" + شارة عدد التبويبات اتشالوا عشان الكروت
+      // تبقى أقصر وكلها تبان مع بعض — السهم بقى أيقونة صغيرة بتظهر مع الـhover (CSS).
+      bindTabChips();
+      makeCardsAccessible();
+      bindSearchShortcut();
+      setGreeting();
+    } catch (e) { console.warn("[portal v4]", e); }
+  }
+
+  // الشارات لازم تتحدّث كل ما قائمة التبويبات جوه الكروت تتبني من جديد (تغيير
+  // الشعار / وضع العرض التقديمي) — بنغلّف الدالة الأصلية من غير ما نغيّر جسمها.
+  if (typeof window.__fillPortalCardTabsList === "function" && !window.__fillPortalCardTabsList.__v4Wrapped) {
+    var origFill = window.__fillPortalCardTabsList;
+    var wrappedFill = function () {
+      var r = origFill.apply(this, arguments);
+      bindTabChips(); // الشيبس اتبنت من جديد (عناصر جديدة) → نربطها تاني
+      return r;
+    };
+    wrappedFill.__v4Wrapped = true;
+    window.__fillPortalCardTabsList = wrappedFill;
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", enhancePortalCards);
+  else enhancePortalCards();
+  document.addEventListener("core-data-ready", enhancePortalCards);
+  window.__portalV4Enhance = enhancePortalCards;
+})();
+/* ══ نهاية Portal Home v4 ══ */
+
+/* ══════════════════════════════════════════════════════════════════════
+   Nav v5 — دليل التبويبات + البحث الشامل + شريط القسم + معرفة الشات بوت
+   ★ 2026-09-26 بناءً على طلب صريح: "خلي البحث عن التبويب اسهل لاني حاسس
+   اني متلخبط" + "خلي التشات بوت يعرف كل الداتا".
+   ──────────────────────────────────────────────────────────────────────
+   • TAB_GUIDE: وصف + مرادفات + مصدر بيانات لكل تبويب (مصدر واحد مشترك
+     بين البحث والدليل والشات بوت).
+   • لوحة بحث عامة (Ctrl+K من أي صفحة) فيها دليل كل التبويبات + المدارس.
+   • شريط أعلى كل قسم: الرئيسية ‹ القسم ▾ ‹ التبويب + كل تبويبات القسم ظاهرة.
+   • القائمة الجانبية: زر بحث + وصف مختصر لكل تبويب + "كل الأقسام".
+   • __fcbExtraKnowledge: خريطة التبويبات + كتالوج البيانات + البيانات اللي
+     كانت ناقصة عن الشات بوت (التوظيف/التصعيدات/سجل زيارات الأنظمة/الخنادق/
+     خريطة NEW SLA/توريد المكيفات).
+   لا تعديل على أي منطق أصلي — كله تغليف/إضافة.
+   ══════════════════════════════════════════════════════════════════════ */
+(function () {
+  "use strict";
+
+  var TAB_GUIDE = {
+    "overview": { d: "الصورة العامة: توزيع درجات FCA والبيئة المدرسية، أسوأ وأفضل 20 مدرسة، حجم المدرسة والملكية ونوع الارتباط", s: ["ملخص", "عام", "مؤشرات عامة", "اسوا المدارس", "افضل المدارس", "حكومي", "مستاجر", "مشترك"], data: ["RAW"] },
+    "stages": { d: "توزيع المدارس حسب المرحلة والجنس، مقارنة FCA بنين/بنات، عدد الفصول ووحدات التكييف", s: ["ابتدائي", "متوسط", "ثانوي", "رياض اطفال", "بنين", "بنات", "فصول", "مراحل دراسية"], data: ["RAW"] },
+    "students": { d: "إجمالي ومتوسط الطلاب، أعمار المباني، أكبر المدارس وأقدم المباني حسب المرحلة والحي", s: ["طلاب", "طالب", "عمر المبنى", "اقدم مبنى", "كثافة"], data: ["RAW"] },
+    "fca": { d: "تحليل تقييم حالة المرافق FCA: التوزيع على الفئات (حرج/متوسط/جيد/جيد جداً) حسب المنطقة والمحافظة", s: ["تقييم حالة المرافق", "درجة المبنى", "حالة المباني", "حرج", "fca"], data: ["RAW", "RAW_FCA_HISTORY"] },
+    "stage-compare": { d: "مقارنة متوسط FCA بين مراحل التقييم وتطوره عبر الشهور", s: ["مراحل التقييم", "تطور fca", "المرحلة الاولى", "المرحلة الثانية", "مقارنة المراحل"], data: ["RAW_FCA_HISTORY", "RAW_SYSTEMS_NORM"] },
+    "fca-ref": { d: "آخر تقييم FCA فعلي لكل مدرسة (من المراحل أو زيارات الأنظمة، أيهما أحدث) مع التصنيف", s: ["اخر تقييم", "المرجعي", "احدث تقييم"], data: ["RAW_FCA_HISTORY", "RAW_SYSTEMS_NORM"] },
+    "sys-main": { d: "تقييم الأنظمة الرئيسية للمباني (1–5) والدرجة الموزونة لكل مبنى حسب المدينة", s: ["انظمة رئيسية", "كهرباء", "ميكانيكا", "مدني", "معماري", "الدرجة الموزونة"], data: ["RAW_ALL_SYSTEMS"] },
+    "sys-detail": { d: "تقييم الأنظمة الفرعية التفصيلية لكل مدرسة مع الفلترة بالنظام", s: ["انظمة فرعية", "تفصيلي", "مكونات"], data: ["RAW_ALL_SYSTEMS"] },
+    "asol": { d: "تقييم منصة أصول: المباني الحرجة وغير الحرجة حسب المدينة والمرحلة وقائمة المباني الحرجة", s: ["اصول", "مباني حرجة", "منصة اصول"], data: ["RAW"] },
+    "ayen": { d: "تقييم عاين: متوسط التقييم وتوزيع المدارس على فئات الحالة", s: ["عاين", "تقييم عاين"], data: ["RAW"] },
+    "env": { d: "البيئة المدرسية: التوزيع، مقارنتها مع FCA، المتوسط حسب الحي، أفضل وأسوأ 10 مدارس", s: ["بيئة", "البيئه المدرسيه", "بيئة مدرسية"], data: ["RAW"] },
+    "elevators": { d: "حصر المصاعد: العدد بالمبنى، النوع، سنة التركيب، حالة التوريد والتركيب", s: ["مصعد", "مصاعد", "اسانسير", "توريد مصاعد", "تركيب"], data: ["RAW_ELEVATORS"] },
+    "elevator-status": { d: "حالة تشغيل المصاعد (عامل/صيانة/متوقف) ونسبة الجاهزية حسب المنطقة", s: ["مصعد معطل", "جاهزية المصاعد", "صيانة المصاعد", "مصعد متوقف"], data: ["RAW_ELEVATOR_STATUS"] },
+    "khanadeq": { d: "خنادق الصرف لكل مدينة وعدد المدارس ومتوسط الخنادق لكل مدرسة", s: ["خندق", "خنادق", "صرف", "صرف صحي"], data: ["RAW_KHANADEQ_CITY_DATA"] },
+    "spare": { d: "قطع الغيار: الكميات والقيم لكل مدرسة وصنف وحسب المرحلة والحي", s: ["قطع غيار", "اصناف", "سعر الوحدة"], data: ["RAW_SPARE_PARTS"] },
+    "ppm-maximo": { d: "الصيانة الوقائية PPM من ماكسيمو: المستهدف والمنجز ونسب الإنجاز لكل منطقة", s: ["صيانة وقائية", "ppm", "ماكسيمو", "maximo", "مهام الصيانة"], data: ["RAW_NEW_PPM_MAXIMO"] },
+    "balagh": { d: "البلاغات: الإجمالي والمفتوح والمغلق والمتأخر عن SLA، مقارنات يومية وأسبوعية، وتحميل تقرير PowerPoint", s: ["بلاغ", "بلاغات", "شكاوى", "تذاكر", "اعطال", "sla", "تقرير البلاغات", "باوربوينت", "تقرير اسبوعي"], data: ["RAW_BALAGH"] },
+    "security-safety": { d: "بلاغات الأمن والسلامة المصنّفة (16 تصنيفاً) بالتفاصيل والفلاتر", s: ["امن", "سلامة", "حريق", "انذار", "طفايات", "حوادث"], data: ["RAW_BALAGH"] },
+    "security-safety-summary": { d: "ملخص تنفيذي لبلاغات الأمن والسلامة حسب الفئة والمنطقة والفترة", s: ["ملخص السلامة", "ملخص الامن"], data: ["RAW_BALAGH"] },
+    "new-sla": { d: "مستوى الخدمة الجديد NEW SLA: الفئات والأولويات الجديدة والالتزام بالساعات", s: ["sla جديد", "مستوى الخدمة", "الاولوية الجديدة", "زمن الاستجابة"], data: ["RAW_BALAGH", "RAW_BALAGH_NEW_SLA_MAP"] },
+    "gatekeepers": { d: "البوابون: الأسماء والجوالات والمدارس المغطاة حسب المدينة", s: ["بواب", "بوابين", "حارس", "حراس"], data: ["RAW_NEW_GATEKEEPERS"] },
+    "supervisors": { d: "المشرفون الميدانيون والمهندسون ومسؤولو التطوير لكل مدرسة", s: ["مشرف", "مشرفين", "مهندس", "مسؤول تطوير", "اشراف"], data: ["RAW_NEW_SUPERVISORS"] },
+    "training": { d: "برامج التدريب: دورة النظافة وبرنامج المشرفين، المتدربون والوحدات المكتملة", s: ["تدريب", "دورات", "متدربين", "دورة النظافة"], data: ["RAW_NEW_TRAINING"] },
+    "vehicles": { d: "السيارات والمركبات: الأنواع والحالة والتوزيع حسب المنطقة", s: ["سيارة", "مركبات", "مركبة", "اسطول"], data: ["RAW_NEW_VEHICLES"] },
+    "correspondence": { d: "سجل المراسلات الصادرة والواردة حسب المنطقة والنوع والحالة", s: ["مراسلات", "خطابات", "صادر", "وارد"], data: ["RAW_NEW_CORRESPONDENCE"] },
+    "org-structure": { d: "الهيكل الوظيفي: الوظائف المشغولة والشاغرة ونسبة السعودة حسب المنطقة والمسمى", s: ["هيكل", "وظائف", "شواغر", "سعودة", "موظفين", "توظيف"], data: ["RAW_NEW_ORG_STRUCTURE"] },
+    "visits": { d: "الزيارات المسندة والمكتملة شهرياً ونسبة الإنجاز حسب المنطقة", s: ["زيارة", "زيارات", "زيارات ميدانية", "جولات"], data: ["RAW_NEW_VISITS_MONTHLY", "RAW_NEW_VISITS_BY_REGION"] },
+    "tajheez-contracts": { d: "عقود التجهيزات: الموردون وقيم العقود والمصروف وحالة الإنجاز وأوامر الإيقاف", s: ["تجهيزات", "عقود التوريد", "موردين", "اوامر عمل"], data: ["TAJCON"] },
+    "tajheez": { d: "المخصص مقابل الاحتياج من التجهيزات والفائض/العجز حسب القسم والصنف والمدينة", s: ["مخصص", "احتياج", "عجز", "فائض", "اثاث"], data: ["RAW_TAJHEEZ_INV"] },
+    "tajheez-supplies": { d: "التوريدات الفعلية: التعاقد والمخصص والمورَّد لكل صنف ومورد ومنطقة", s: ["توريد", "توريدات", "اصناف موردة"], data: ["TAJSUP"] },
+    "nashat-badani": { d: "مبادرة النشاط البدني: الأصناف والكميات والقيم المخصصة والموردة حسب الشركة والمنطقة", s: ["نشاط بدني", "رياضة", "ادوات رياضية"], data: ["NASHAT"] },
+    "hasr": { d: "حصر الأصول: أعداد الأصول لكل مدرسة ونظام وحالتها (ممتاز/جيد/سيئ/متهالك) وإعادة التقييم", s: ["حصر", "اصول", "اجهزة", "حاسب", "جرد", "تكييف"], data: ["HASR"] },
+    "cost": { d: "التكلفة والمدفوعات: التكاليف التقديرية والفواتير وتقدم الصرف لكل عقد", s: ["تكلفة", "تكاليف", "فواتير", "صرف", "ميزانية"], data: ["RAW_PAYMENTS", "RAW_COST_STATE"] },
+    "ls-payments": { d: "عقود ومدفوعات الاستشاري LS: القيمة والمدفوع والمتبقي حسب المنطقة", s: ["لاند سترلينج", "استشاري", "مدفوعات الاستشاري", "ls"], data: ["RAW_NEW_LS_PAYMENTS"] },
+    "contractor-payments": { d: "عقود ومدفوعات المقاولين (المجال العربي وباقي المقاولين): القيم والمدد والمدفوع", s: ["مقاول", "مقاولين", "المجال العربي", "مستخلصات", "ifm"], data: ["RAW_NEW_CONTRACTOR_PAYMENTS"] },
+    "petty-cash": { d: "العهدة: المستلم والمصروف والرصيد لكل مسؤول ومقارنة شهرية", s: ["عهدة", "نثرية", "مصروفات", "رصيد"], data: ["RAW_NEW_PETTY_CASH_LAYNADA", "RAW_NEW_PETTY_CASH_MEER"] },
+    "map": { d: "الخريطة التفاعلية للمدارس ملوّنة حسب FCA أو البيئة أو الجنس أو الملكية أو البلاغات", s: ["خريطة", "موقع", "مواقع", "جغرافي", "قمر صناعي"], data: ["RAW"] },
+    "table": { d: "الجدول التفصيلي لكل المدارس مع الترتيب والبحث والتصدير CSV/Excel", s: ["جدول", "كل المدارس", "تصدير", "اكسل", "قائمة المدارس"], data: ["RAW"] },
+    "mag-kpi": { d: "مؤشرات أداء المقاول KPI ونسب الالتزام والبنود التي تحتاج متابعة", s: ["kpi", "مؤشرات المقاول", "اداء المقاول"], data: ["RAW_NEW_KPI_CONTRACTOR"] },
+    "consultant-kpi": { d: "مؤشرات أداء الاستشاري KPI والبنود التي تحتاج متابعة", s: ["مؤشرات الاستشاري", "اداء الاستشاري"], data: ["RAW_NEW_KPI_CONSULTANT"] }
+  };
+  window.TAB_GUIDE = TAB_GUIDE;
+
+  /* نفس ترتيب كروت الرئيسية — عشان الدليل يبان بنفس الترتيب اللي المستخدم متعود عليه */
+  var SECTION_ORDER = ["overview", "fca", "otherAssessments", "digital", "systemsMaintenance", "kpi", "safety", "raci", "equipment", "contracts", "operations", "geo"];
+  var SPECIAL_SECTIONS = {
+    digital: { title: "الأنظمة الرقمية", d: "مبادرة التحول الرقمي: ماكسيمو، تكامل، TFMP، يوني فاير، فارس، متابعة المركبات، الموارد البشرية" },
+    raci: { title: "مصفوفة المسؤوليات RACI", d: "من المسؤول والمحاسَب والمستشار والمُبلَّغ لكل نشاط تشغيلي", s: ["raci", "مسؤوليات", "صلاحيات", "مصفوفة"] }
+  };
+
+  function norm(s) {
+    return (typeof __portalSearchNormalize === "function" ? __portalSearchNormalize(s) : String(s || "").toLowerCase().trim());
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function catIcon(k) {
+    try { return typeof __catIconSvg === "function" ? __catIconSvg(k) : ""; } catch (_) { return ""; }
+  }
+  function hidden(name) {
+    try { return typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(name); } catch (_) { return false; }
+  }
+  function cats() { return typeof PORTAL_CATEGORIES !== "undefined" ? PORTAL_CATEGORIES : {}; }
+  function sectionTitle(k) {
+    var c = cats()[k];
+    return (c && c.title) || (SPECIAL_SECTIONS[k] && SPECIAL_SECTIONS[k].title) || k;
+  }
+  function digitalData() { return typeof DIGITAL_SYSTEMS_DATA !== "undefined" && Array.isArray(DIGITAL_SYSTEMS_DATA) ? DIGITAL_SYSTEMS_DATA : []; }
+  function digiIdOf(tabName) { return String(tabName || "").replace(/^sys-/, ""); }
+
+  /* وصف تبويب (يشمل الأنظمة الرقمية من بياناتها الأصلية) */
+  function tabDesc(cat, name) {
+    if (TAB_GUIDE[name]) return TAB_GUIDE[name].d;
+    if (cat === "digital") {
+      var id = digiIdOf(name);
+      var sys = digitalData().filter(function (x) { return x.id === id; })[0];
+      if (sys) return String(sys.desc || sys.description || sys.brief || sys.category || "").slice(0, 150);
+    }
+    return "";
+  }
+
+  /* قائمة كل التبويبات المرئية (بعد فلتر الشعار/العرض) */
+  function allTabs() {
+    var out = [];
+    var C = cats();
+    SECTION_ORDER.concat(Object.keys(C).filter(function (k) { return SECTION_ORDER.indexOf(k) === -1; })).forEach(function (k) {
+      var c = C[k];
+      if (!c) return;
+      (c.tabs || []).forEach(function (t) {
+        if (hidden(t.name)) return;
+        var g = TAB_GUIDE[t.name] || {};
+        out.push({ kind: "tab", cat: k, catTitle: c.title, name: t.name, label: t.label, desc: tabDesc(k, t.name), syn: (g.s || []).join(" ") });
+      });
+    });
+    return out;
+  }
+
+  /* فتح أي تبويب بالاسم (يعرف القسم لوحده، ويتعامل مع الصفحات الخاصة) */
+  function catOfTab(name) {
+    var C = cats();
+    for (var k in C) {
+      if ((C[k].tabs || []).some(function (t) { return t.name === name; })) return k;
+    }
+    return null;
+  }
+  function openTab(name, cat) {
+    cat = cat || catOfTab(name);
+    if (!cat) return false;
+    if (cat === "digital") {
+      if (typeof navigateToCategory === "function") navigateToCategory("digital");
+      var id = digiIdOf(name);
+      setTimeout(function () { if (typeof __scrollToDigiSys === "function") __scrollToDigiSys(id); }, 260);
+      return true;
+    }
+    if (cat === "raci") { if (typeof navigateToCategory === "function") navigateToCategory("raci"); return true; }
+    if (typeof openFavoriteTab === "function") openFavoriteTab(cat, name);
+    return true;
+  }
+  window.__navOpenTab = openTab;
+  window.__navCatOfTab = catOfTab;
+
+  /* ── آخر التبويبات المفتوحة ── */
+  var RECENT_KEY = "fm_recent_tabs";
+  function getRecent() {
+    try { var v = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+  }
+  var recentTimer = null;
+  function noteRecent(name) {
+    clearTimeout(recentTimer);
+    recentTimer = setTimeout(function () {
+      var cat = window.CURRENT_PORTAL_CATEGORY || catOfTab(name);
+      if (!cat || !name) return;
+      var list = getRecent().filter(function (r) { return r && r.name !== name; });
+      list.unshift({ cat: cat, name: name });
+      try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 8))); } catch (_) {}
+    }, 500);
+  }
+
+  /* ══════════════════════════ لوحة البحث العامة (Ctrl+K) ══════════════════════════ */
+  var pal = null, palInput = null, palList = null, palItems = [], palActive = 0, palLastFocus = null;
+
+  var schoolCache = { len: -1, list: [] };
+  function schoolIndex() {
+    var raw = Array.isArray(window.RAW) ? window.RAW : [];
+    if (schoolCache.len === raw.length) return schoolCache.list;
+    var seen = Object.create(null), list = [];
+    raw.forEach(function (r) {
+      var name = String((r && (r.name || r.buildingName)) || "").trim();
+      var minId = String((r && (r.minId || r.schoolSeq || r.buildingSeq)) || "").trim();
+      if (!name && !minId) return;
+      var key = minId || name;
+      if (seen[key]) return;
+      seen[key] = 1;
+      list.push({ kind: "school", name: name, minId: minId, city: String((r && (r.city || r.sector)) || "").trim(), row: r, n: norm(name) + " " + minId + " " + norm(r && (r.city || r.sector)) });
+    });
+    schoolCache = { len: raw.length, list: list };
+    return list;
+  }
+
+  function specialEntries() {
+    var out = [];
+    var digi = digitalData();
+    if (cats().digital) {
+      out.push({ kind: "section", cat: "digital", label: SPECIAL_SECTIONS.digital.title, desc: SPECIAL_SECTIONS.digital.d, syn: "تحول رقمي انظمة رقمية منصات" });
+    }
+    out.push({ kind: "section", cat: "raci", label: SPECIAL_SECTIONS.raci.title, desc: SPECIAL_SECTIONS.raci.d, syn: SPECIAL_SECTIONS.raci.s.join(" ") });
+    if (typeof openMokModal === "function" && document.getElementById("mok-modal")) {
+      out.push({ kind: "action", id: "mok", label: "توريد المكيفات (مؤقت)", catTitle: "الرئيسية", desc: "المخطط والمورَّد والمتبقي من وحدات التكييف المؤقتة لكل مدرسة وشركة", syn: "مكيفات تكييف مؤقت الزامل الاساسية اسبليت شباك" });
+    }
+    void digi;
+    return out;
+  }
+
+  function scoreEntry(e, toks, q) {
+    var L = norm(e.label), S = norm(e.syn || ""), D = norm(e.desc || ""), C = norm(e.catTitle || "");
+    var total = 0;
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i], sc = 0;
+      if (L.indexOf(t) === 0) sc = 100;
+      else if (L.indexOf(t) !== -1) sc = 80;
+      else if (S.indexOf(t) !== -1) sc = 60;
+      else if (C.indexOf(t) !== -1) sc = 40;
+      else if (D.indexOf(t) !== -1) sc = 28;
+      else if (e.name && e.name.indexOf(t) !== -1) sc = 20;
+      if (!sc) return 0;
+      total += sc;
+    }
+    if (L === q) total += 60;
+    if (e.kind === "section") total += 5;
+    return total;
+  }
+
+  function hl(text, toks) {
+    var s = esc(text);
+    toks.forEach(function (t) {
+      if (!t || t.length < 2) return;
+      try {
+        var re = new RegExp("(" + t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "i");
+        s = s.replace(re, "<mark>$1</mark>");
+      } catch (_) {}
+    });
+    return s;
+  }
+
+  function itemHtml(e, i, toks) {
+    var icon = e.kind === "school" ? '<span class="navp-ico navp-ico-school">🏫</span>'
+      : e.kind === "ai" ? '<span class="navp-ico navp-ico-ai">✦</span>'
+      : e.kind === "action" ? '<span class="navp-ico">❄️</span>'
+      : '<span class="navp-ico">' + catIcon(e.cat) + '</span>';
+    var sub = e.kind === "school" ? ((e.minId ? "الرقم الوزاري " + e.minId : "") + (e.city ? " · " + e.city : ""))
+      : e.kind === "ai" ? "اسأل المساعد الذكي — بيجاوب من بيانات اللوحة كلها"
+      : (e.desc || "");
+    var tag = e.kind === "school" ? "مدرسة" : e.kind === "ai" ? "مساعد" : e.kind === "section" ? "قسم" : (e.catTitle || "");
+    return '<button type="button" class="navp-item navp-k-' + e.kind + (i === palActive ? " is-active" : "") + '" data-i="' + i + '" role="option" aria-selected="' + (i === palActive) + '">' +
+      icon +
+      '<span class="navp-txt"><span class="navp-lbl">' + hl(e.label, toks) + '</span>' + (sub ? '<span class="navp-sub">' + esc(sub) + '</span>' : '') + '</span>' +
+      '<span class="navp-tag">' + esc(tag) + '</span>' +
+      '<span class="navp-enter" aria-hidden="true">↵</span>' +
+      '</button>';
+  }
+
+  function renderDirectory() {
+    palItems = [];
+    var html = "";
+    var rec = getRecent().filter(function (r) { return r && cats()[r.cat] && !hidden(r.name) && (cats()[r.cat].tabs || []).some(function (t) { return t.name === r.name; }); }).slice(0, 6);
+    if (rec.length) {
+      html += '<div class="navp-group"><div class="navp-group-h">🕘 آخر ما فتحته</div><div class="navp-recent">';
+      rec.forEach(function (r) {
+        var t = (cats()[r.cat].tabs || []).filter(function (x) { return x.name === r.name; })[0];
+        var idx = palItems.length;
+        palItems.push({ kind: "tab", cat: r.cat, name: r.name, label: t.label, catTitle: cats()[r.cat].title });
+        html += '<button type="button" class="navp-chip" data-i="' + idx + '"><span class="navp-chip-ico">' + catIcon(r.cat) + '</span>' + esc(t.label) + '<small>' + esc(cats()[r.cat].title) + '</small></button>';
+      });
+      html += '</div></div>';
+    }
+    html += '<div class="navp-group"><div class="navp-group-h">📚 دليل كل التبويبات <small>— اضغط على أي تبويب لفتحه مباشرة</small></div><div class="navp-dir">';
+    var byCat = {};
+    allTabs().forEach(function (t) { (byCat[t.cat] = byCat[t.cat] || []).push(t); });
+    SECTION_ORDER.forEach(function (k) {
+      var list = byCat[k];
+      var special = k === "raci" || (k === "digital");
+      if (!list && !special) return;
+      if (!cats()[k] && k !== "raci") return;
+      html += '<section class="navp-sec"><button type="button" class="navp-sec-h" data-i="' + palItems.length + '">' + catIcon(k) + '<span>' + esc(sectionTitle(k)) + '</span></button>';
+      palItems.push({ kind: "section", cat: k, label: sectionTitle(k) });
+      if (k === "raci") {
+        html += '<p class="navp-sec-note">' + esc(SPECIAL_SECTIONS.raci.d) + '</p>';
+      } else {
+        html += '<ul>';
+        (list || []).forEach(function (t) {
+          var idx = palItems.length;
+          palItems.push(t);
+          html += '<li><button type="button" class="navp-dir-item" data-i="' + idx + '" title="' + esc(t.desc) + '"><span>' + esc(t.label) + '</span>' + (t.desc ? '<small>' + esc(t.desc) + '</small>' : '') + '</button></li>';
+        });
+        html += '</ul>';
+      }
+      html += '</section>';
+    });
+    html += '</div></div>';
+    palList.innerHTML = html;
+    palActive = -1;
+  }
+
+  function renderResults(qRaw) {
+    var q = norm(qRaw);
+    var toks = q.split(" ").filter(Boolean);
+    var tabs = allTabs().concat(specialEntries());
+    var scored = [];
+    tabs.forEach(function (e) { var sc = scoreEntry(e, toks, q); if (sc) scored.push({ e: e, sc: sc }); });
+    scored.sort(function (a, b) { return b.sc - a.sc; });
+    var res = scored.slice(0, 9).map(function (x) { return x.e; });
+    if (q.length >= 2) {
+      var schools = schoolIndex().filter(function (s) { return toks.every(function (t) { return s.n.indexOf(t) !== -1; }); }).slice(0, 6);
+      schools.forEach(function (s) { res.push({ kind: "school", label: s.name || ("مدرسة " + s.minId), minId: s.minId, city: s.city, row: s.row }); });
+    }
+    res.push({ kind: "ai", label: "اسأل المساعد: «" + String(qRaw).trim() + "»", q: String(qRaw).trim() });
+    palItems = res;
+    palActive = 0;
+    var html = "";
+    if (res.length === 1) html += '<div class="navp-empty">مفيش تبويب أو مدرسة بالاسم ده — جرّب كلمة تانية، أو اسأل المساعد الذكي 👇</div>';
+    html += '<div class="navp-results" role="listbox">' + res.map(function (e, i) { return itemHtml(e, i, toks); }).join("") + '</div>';
+    palList.innerHTML = html;
+  }
+
+  function setActive(i) {
+    var els = palList.querySelectorAll("[data-i]");
+    if (!els.length) return;
+    palActive = Math.max(0, Math.min(palItems.length - 1, i));
+    els.forEach(function (el) {
+      var on = +el.getAttribute("data-i") === palActive;
+      el.classList.toggle("is-active", on);
+      if (el.hasAttribute("aria-selected")) el.setAttribute("aria-selected", on ? "true" : "false");
+      if (on && el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function askAI(q) {
+    if (!window.AICore || typeof window.AICore.open !== "function") return;
+    window.AICore.open();
+    setTimeout(function () {
+      var inp = document.getElementById("ac-input");
+      var btn = document.getElementById("ac-send-btn");
+      if (!inp) return;
+      inp.value = q;
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      if (q && btn) btn.click(); else inp.focus();
+    }, 350);
+  }
+  window.__navAskAI = askAI;
+
+  function runItem(e) {
+    if (!e) return;
+    closePalette(true);
+    if (e.kind === "school") { if (typeof window.__IXOpenSchool === "function" && e.row) window.__IXOpenSchool(e.row); return; }
+    if (e.kind === "ai") { askAI(e.q); return; }
+    if (e.kind === "action" && e.id === "mok") { if (typeof goToPortalHome === "function") goToPortalHome(); if (typeof openMokModal === "function") openMokModal(); return; }
+    if (e.kind === "section") { if (typeof navigateToCategory === "function") navigateToCategory(e.cat); return; }
+    openTab(e.name, e.cat);
+  }
+
+  function buildPalette() {
+    if (pal) return;
+    pal = document.createElement("div");
+    pal.id = "navPalette";
+    pal.className = "navp";
+    pal.setAttribute("role", "dialog");
+    pal.setAttribute("aria-modal", "true");
+    pal.setAttribute("aria-label", "البحث عن تبويب");
+    pal.innerHTML =
+      '<div class="navp-backdrop" data-close="1"></div>' +
+      '<div class="navp-box">' +
+      '  <div class="navp-head">' +
+      '    <span class="navp-search-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>' +
+      '    <input type="text" class="navp-input" id="navPaletteInput" autocomplete="off" spellcheck="false" placeholder="اكتب اسم تبويب أو موضوع أو مدرسة… مثلاً: مصاعد، عهدة، SLA" aria-label="ابحث عن تبويب">' +
+      '    <button type="button" class="navp-close" data-close="1" aria-label="إغلاق">Esc</button>' +
+      '  </div>' +
+      '  <div class="navp-body" id="navPaletteList"></div>' +
+      '  <div class="navp-foot"><span><kbd>↑</kbd><kbd>↓</kbd> للتنقل</span><span><kbd>Enter</kbd> للفتح</span><span><kbd>Esc</kbd> للإغلاق</span><span class="navp-foot-tip">افتحها من أي صفحة بـ <kbd>Ctrl</kbd>+<kbd>K</kbd></span></div>' +
+      '</div>';
+    document.body.appendChild(pal);
+    palInput = pal.querySelector(".navp-input");
+    palList = pal.querySelector(".navp-body");
+
+    pal.addEventListener("click", function (ev) {
+      if (ev.target.closest && ev.target.closest("[data-close]")) { closePalette(); return; }
+      var it = ev.target.closest ? ev.target.closest("[data-i]") : null;
+      if (it) runItem(palItems[+it.getAttribute("data-i")]);
+    });
+    palInput.addEventListener("input", function () {
+      if (palInput.value.trim()) renderResults(palInput.value); else renderDirectory();
+    });
+    palInput.addEventListener("keydown", function (ev) {
+      if (ev.key === "ArrowDown") { ev.preventDefault(); setActive(palActive + 1); }
+      else if (ev.key === "ArrowUp") { ev.preventDefault(); setActive(palActive - 1); }
+      else if (ev.key === "Enter") {
+        ev.preventDefault();
+        if (palActive >= 0) runItem(palItems[palActive]);
+        else if (palInput.value.trim()) runItem(palItems[0]);
+      }
+    });
+    pal.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); closePalette(); }
+      else if (ev.key === "Tab") {
+        var f = [].slice.call(pal.querySelectorAll("input, button"));
+        if (!f.length) return;
+        var i = f.indexOf(document.activeElement);
+        if (ev.shiftKey && i <= 0) { ev.preventDefault(); f[f.length - 1].focus(); }
+        else if (!ev.shiftKey && i === f.length - 1) { ev.preventDefault(); f[0].focus(); }
+      }
+    });
+  }
+
+  function openPalette(prefill) {
+    buildPalette();
+    palLastFocus = document.activeElement;
+    pal.classList.add("is-open");
+    document.documentElement.classList.add("navp-lock");
+    palInput.value = prefill || "";
+    if (palInput.value) renderResults(palInput.value); else renderDirectory();
+    setTimeout(function () { palInput.focus(); palInput.select(); }, 20);
+  }
+  function closePalette(skipRefocus) {
+    if (!pal || !pal.classList.contains("is-open")) return;
+    pal.classList.remove("is-open");
+    document.documentElement.classList.remove("navp-lock");
+    if (!skipRefocus && palLastFocus && palLastFocus.focus) { try { palLastFocus.focus(); } catch (_) {} }
+  }
+  window.openTabFinder = openPalette;
+  window.closeTabFinder = closePalette;
+
+  document.addEventListener("keydown", function (e) {
+    var isK = (e.ctrlKey || e.metaKey) && !e.altKey && (e.code === "KeyK" || e.key === "k" || e.key === "K");
+    if (isK) {
+      e.preventDefault();
+      if (pal && pal.classList.contains("is-open")) closePalette(); else openPalette();
+      return;
+    }
+    // "/" برا الرئيسية (في الرئيسية بيركّز على البحث الموجود هناك)
+    var home = document.getElementById("portal-home");
+    var onHome = home && home.style.display !== "none";
+    if (onHome) return;
+    var tag = (e.target && e.target.tagName) || "";
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (e.target && e.target.isContentEditable);
+    if (!typing && (e.key === "/" || e.code === "Slash") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (pal && pal.classList.contains("is-open")) return;
+      if (document.getElementById("aicore-root") && document.getElementById("aicore-root").classList.contains("ac-open")) return;
+      e.preventDefault();
+      openPalette();
+    }
+  });
+
+  /* ══════════════════════════ زر البحث في الشريط العلوي ══════════════════════════ */
+  function addTopbarButton() {
+    var right = document.querySelector(".topbar .tb-right");
+    if (!right || document.getElementById("btnTabFinder")) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.id = "btnTabFinder";
+    b.className = "tb-btn tb-finder";
+    b.title = "ابحث عن أي تبويب أو مدرسة (Ctrl+K)";
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="tb-finder-txt">ابحث عن تبويب</span><kbd>Ctrl K</kbd>';
+    b.addEventListener("click", function () { openPalette(); });
+    var reload = document.getElementById("btnReload");
+    right.insertBefore(b, reload || right.firstChild);
+  }
+
+  /* زر "دليل كل التبويبات" جنب بحث الرئيسية */
+  function addHomeDirectoryButton() {
+    var wrap = document.querySelector("#portal-home .portal-search-wrap");
+    if (!wrap || wrap.querySelector(".portal-dir-btn")) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "portal-dir-btn";
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>كل التبويبات</span>';
+    b.title = "دليل كل التبويبات مع وصف كل واحد (Ctrl+K)";
+    b.addEventListener("click", function (e) { e.stopPropagation(); openPalette(); });
+    wrap.appendChild(b);
+    wrap.classList.add("has-dir-btn");
+  }
+
+  /* ══════════════════════════ شريط القسم (أعلى كل قسم) ══════════════════════════ */
+  function renderSectionBar(catKey) {
+    /* ⚠️ اللوحات (.panel) فعليًا أبناء مباشرين لـ .cat-layout مش .cat-main،
+       فالشريط بيتحط فوق الـ layout كله بعرض الصفحة */
+    var main = document.getElementById("legacyDashboardArea");
+    var cat = cats()[catKey];
+    if (!main || !cat) return;
+    var bar = document.getElementById("secNav");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "secNav";
+      bar.className = "secnav";
+      main.insertBefore(bar, main.firstChild);
+      bar.addEventListener("click", onSecNavClick);
+      document.addEventListener("click", function (e) {
+        var m = document.getElementById("secNavMenu");
+        if (m && m.classList.contains("is-open") && !(e.target.closest && e.target.closest(".secnav-sec, #secNavMenu"))) m.classList.remove("is-open");
+      });
+    }
+    var tabs = (cat.tabs || []).filter(function (t) { return !hidden(t.name); });
+    var cur = window.__ACTIVE_TAB__;
+    var curTab = tabs.filter(function (t) { return t.name === cur; })[0] || tabs[0];
+    var menu = SECTION_ORDER.filter(function (k) { return cats()[k] || k === "raci"; }).map(function (k) {
+      return '<button type="button" class="secnav-menu-item' + (k === catKey ? " is-current" : "") + '" data-sec="' + k + '">' + catIcon(k) + '<span>' + esc(sectionTitle(k)) + '</span></button>';
+    }).join("");
+    bar.innerHTML =
+      '<div class="secnav-top">' +
+      '  <nav class="secnav-crumbs" aria-label="مكانك الحالي">' +
+      '    <button type="button" class="secnav-home" data-act="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>الرئيسية</span></button>' +
+      '    <span class="secnav-sep" aria-hidden="true">‹</span>' +
+      '    <span class="secnav-sec-wrap"><button type="button" class="secnav-sec" data-act="menu" aria-haspopup="true" title="التنقل لقسم آخر">' + catIcon(catKey) + '<span>' + esc(cat.title) + '</span><i aria-hidden="true">▾</i></button>' +
+      '    <div class="secnav-menu" id="secNavMenu" role="menu">' + menu + '</div></span>' +
+      '    <span class="secnav-sep" aria-hidden="true">‹</span>' +
+      '    <span class="secnav-cur" id="secNavCur">' + esc(curTab ? curTab.label : "") + '</span>' +
+      '  </nav>' +
+      '  <button type="button" class="secnav-find" data-act="find" title="ابحث في كل التبويبات (Ctrl+K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>ابحث عن أي تبويب</span><kbd>Ctrl K</kbd></button>' +
+      '</div>' +
+      '<div class="secnav-tabs" role="tablist" aria-label="تبويبات ' + esc(cat.title) + '">' +
+      tabs.map(function (t) {
+        var on = curTab && t.name === curTab.name;
+        return '<button type="button" role="tab" class="secnav-tab' + (on ? " is-active" : "") + '" data-tab="' + t.name + '" aria-selected="' + (on ? "true" : "false") + '" title="' + esc(tabDesc(catKey, t.name)) + '">' + esc(t.label) + '</button>';
+      }).join("") +
+      '</div>' +
+      '<div class="secnav-desc" id="secNavDesc">' + esc(curTab ? tabDesc(catKey, curTab.name) : "") + '</div>';
+  }
+
+  function onSecNavClick(e) {
+    var t = e.target.closest ? e.target.closest("[data-act], [data-tab], [data-sec]") : null;
+    if (!t) return;
+    if (t.hasAttribute("data-tab")) { if (typeof goToSubTab === "function") goToSubTab(t.getAttribute("data-tab")); return; }
+    if (t.hasAttribute("data-sec")) {
+      document.getElementById("secNavMenu").classList.remove("is-open");
+      if (typeof navigateToCategory === "function") navigateToCategory(t.getAttribute("data-sec"));
+      return;
+    }
+    var act = t.getAttribute("data-act");
+    if (act === "home" && typeof goToPortalHome === "function") { goToPortalHome(); window.scrollTo(0, 0); }
+    else if (act === "find") openPalette();
+    else if (act === "menu") document.getElementById("secNavMenu").classList.toggle("is-open");
+  }
+
+  function syncSectionBar(name) {
+    var bar = document.getElementById("secNav");
+    if (!bar) return;
+    var found = null;
+    bar.querySelectorAll(".secnav-tab").forEach(function (b) {
+      var on = b.getAttribute("data-tab") === name;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      if (on) found = b;
+    });
+    if (!found) return;
+    var cur = document.getElementById("secNavCur");
+    if (cur) cur.textContent = found.textContent;
+    var d = document.getElementById("secNavDesc");
+    if (d) d.textContent = tabDesc(window.CURRENT_PORTAL_CATEGORY, name);
+    try {
+      var strip = found.parentNode;
+      if (strip.scrollWidth > strip.clientWidth) found.scrollIntoView({ block: "nearest", inline: "center" });
+    } catch (_) {}
+  }
+
+  /* ══════════════════════════ تحسين القائمة الجانبية ══════════════════════════ */
+  function enhanceSidebar(catKey) {
+    var sb = document.getElementById("categorySidebar");
+    if (!sb) return;
+    var head = sb.querySelector(".cat-sidebar-head");
+    if (head && !sb.querySelector(".cat-sidebar-find")) {
+      var f = document.createElement("button");
+      f.type = "button";
+      f.className = "cat-sidebar-find";
+      f.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>ابحث عن تبويب…</span><kbd>Ctrl K</kbd>';
+      f.addEventListener("click", function () { openPalette(); });
+      head.parentNode.insertBefore(f, head.nextSibling);
+    }
+    sb.querySelectorAll(".cat-sidebar-item:not(.cat-sidebar-fav-item)").forEach(function (it) {
+      if (it.querySelector(".cat-sidebar-desc")) return;
+      var name = it.getAttribute("data-subtab");
+      var d = tabDesc(catKey, name);
+      if (!d) return;
+      it.title = d;
+      var s = document.createElement("small");
+      s.className = "cat-sidebar-desc";
+      s.textContent = d;
+      it.appendChild(s);
+    });
+    if (!sb.querySelector(".cat-sidebar-allsecs")) {
+      var det = document.createElement("details");
+      det.className = "cat-sidebar-allsecs";
+      det.innerHTML = '<summary>كل الأقسام</summary><div class="cat-sidebar-allsecs-list">' +
+        SECTION_ORDER.filter(function (k) { return (cats()[k] || k === "raci") && k !== catKey; }).map(function (k) {
+          return '<button type="button" class="cat-sidebar-sec-item" data-sec="' + k + '">' + catIcon(k) + '<span>' + esc(sectionTitle(k)) + '</span></button>';
+        }).join("") + '</div>';
+      det.addEventListener("click", function (e) {
+        var b = e.target.closest ? e.target.closest("[data-sec]") : null;
+        if (b && typeof navigateToCategory === "function") navigateToCategory(b.getAttribute("data-sec"));
+      });
+      sb.appendChild(det);
+    }
+  }
+
+  /* ══════════════════════════ الربط (تغليف فقط) ══════════════════════════ */
+  function wrapNav() {
+    if (typeof window.renderCategorySidebar === "function" && !window.renderCategorySidebar.__navV5) {
+      var origR = window.renderCategorySidebar;
+      var wr = function (catKey) {
+        var r = origR.apply(this, arguments);
+        try { enhanceSidebar(catKey); renderSectionBar(catKey); } catch (e) { console.warn("[nav v5]", e); }
+        return r;
+      };
+      wr.__navV5 = true;
+      window.renderCategorySidebar = wr;
+    }
+    if (typeof window.highlightSidebarActive === "function" && !window.highlightSidebarActive.__navV5) {
+      var origH = window.highlightSidebarActive;
+      var wh = function (name) {
+        var r = origH.apply(this, arguments);
+        try { syncSectionBar(name); noteRecent(name); } catch (e) { console.warn("[nav v5]", e); }
+        return r;
+      };
+      wh.__navV5 = true;
+      window.highlightSidebarActive = wh;
+    }
+    /* بحث الرئيسية: يلاقي بالمرادفات والوصف كمان (مش بالاسم بس) */
+    if (typeof window.__portalSearchIndex === "function" && !window.__portalSearchIndex.__navV5) {
+      var origI = window.__portalSearchIndex;
+      var wi = function () {
+        var list = origI.apply(this, arguments);
+        list.forEach(function (m) {
+          if (m.kind !== "tab") return;
+          var g = TAB_GUIDE[m.name];
+          m.keys = (g ? g.s.join(" ") + " " + g.d : "") + " " + m.name;
+        });
+        return list;
+      };
+      wi.__navV5 = true;
+      window.__portalSearchIndex = wi;
+    }
+  }
+
+  function init() {
+    try { wrapNav(); addTopbarButton(); addHomeDirectoryButton(); } catch (e) { console.warn("[nav v5] init", e); }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+  document.addEventListener("core-data-ready", init);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     معرفة الشات بوت — خريطة التبويبات + كتالوج البيانات + البيانات الناقصة
+     تُستدعى من fcbAskOpenAI (سطر واحد مضاف قبل بناء systemPrompt).
+     ══════════════════════════════════════════════════════════════════════ */
+  var DATASETS = [
+    { key: "RAW", label: "بيانات المدارس والمباني الأساسية (FCA/البيئة/عاين/أصول/الطلاب/الموقع)" },
+    { key: "RAW_BALAGH", label: "البلاغات (لها محرك استعلام خاص)" },
+    { key: "RAW_BALAGH_NEW_SLA_MAP", label: "خريطة NEW SLA المرجعية (الفئة ← الفئة/الأولوية الجديدة + ساعات مستوى الخدمة)", profile: true, fullOn: /sla|مستوى الخدمه|مستوي الخدمه|اولويه|الاولويات|زمن الاستجابه/ },
+    { key: "RAW_ALL_SYSTEMS", label: "تقييم الأنظمة الرئيسية والفرعية" },
+    { key: "RAW_SYSTEMS_NORM", label: "سجل زيارات تقييم الأنظمة (كل الزيارات تاريخياً)", profile: true, rowsOn: /زيار|سجل التقييم|سجل الانظمه|تاريخ التقييم|اخر تقييم/, schoolRows: true },
+    { key: "RAW_FCA_HISTORY", label: "تاريخ تقييمات FCA (المراحل)" },
+    { key: "RAW_ELEVATORS", label: "حصر المصاعد" },
+    { key: "RAW_ELEVATOR_STATUS", label: "حالة المصاعد" },
+    { key: "RAW_SPARE_PARTS", label: "قطع الغيار" },
+    { key: "RAW_KHANADEQ_CITY_DATA", label: "خنادق الصرف لكل مدينة", profile: true, full: true },
+    { key: "RAW_TAJHEEZ_INV", label: "المخصص والاحتياج (التجهيزات)" },
+    { key: "TAJCON.contracts", get: function () { return window.TAJCON && window.TAJCON.contracts; }, label: "عقود التجهيزات" },
+    { key: "TAJSUP.rows", get: function () { return window.TAJSUP && window.TAJSUP.rows; }, label: "التوريدات" },
+    { key: "NASHAT.rows", get: function () { return window.NASHAT && window.NASHAT.rows; }, label: "مبادرة النشاط البدني" },
+    { key: "MOKAYEFAT.rows", get: function () { return window.MOKAYEFAT && window.MOKAYEFAT.rows; }, label: "توريد المكيفات المؤقتة (لكل مدرسة×شركة×نوع وحدة)", profile: true, rowsOn: /مكيف|تكييف مؤقت|الزامل|اسبليت|شباك|توريد الوحدات|وحدات التكييف/, schoolRows: true },
+    { key: "HASR.schools", get: function () { return window.HASR && window.HASR.data && window.HASR.data.schools; }, label: "حصر الأصول" },
+    { key: "RAW_PAYMENTS", label: "المدفوعات والفواتير" },
+    { key: "RAW_FM_CONTRACTS", label: "عقود FM" },
+    { key: "RAW_NEW_LS_PAYMENTS", label: "عقود ومدفوعات الاستشاري LS" },
+    { key: "RAW_NEW_CONTRACTOR_PAYMENTS", label: "عقود ومدفوعات المقاولين" },
+    { key: "RAW_NEW_PETTY_CASH_LAYNADA", label: "العهدة (1)" },
+    { key: "RAW_NEW_PETTY_CASH_MEER", label: "العهدة (2)" },
+    { key: "RAW_NEW_GATEKEEPERS", label: "البوابون" },
+    { key: "RAW_NEW_SUPERVISORS", label: "المشرفون والمهندسون" },
+    { key: "RAW_NEW_TRAINING", label: "التدريب" },
+    { key: "RAW_NEW_VEHICLES", label: "المركبات" },
+    { key: "RAW_NEW_FUEL", label: "استهلاك الوقود" },
+    { key: "RAW_NEW_CORRESPONDENCE", label: "المراسلات" },
+    { key: "RAW_NEW_ORG_STRUCTURE", label: "الهيكل الوظيفي" },
+    { key: "RAW_NEW_VISITS_MONTHLY", label: "الزيارات الشهرية" },
+    { key: "RAW_NEW_VISITS_BY_REGION", label: "الزيارات حسب المنطقة" },
+    { key: "RAW_NEW_PPM_MAXIMO", label: "الصيانة الوقائية PPM" },
+    { key: "RAW_NEW_KPI_CONTRACTOR", label: "مؤشرات أداء المقاول" },
+    { key: "RAW_NEW_KPI_CONSULTANT", label: "مؤشرات أداء الاستشاري" },
+    { key: "RAW_RECRUITMENT", label: "التوظيف (طلبات/مرشحين)", profile: true, rowsOn: /توظيف|تعيين|مرشح|وظيف|شاغر|recruit/ },
+    { key: "RAW_CORRECTIONS_ESCALATIONS", label: "التصحيحات والتصعيدات", profile: true, rowsOn: /تصعيد|تصحيح|escalat|correction/ },
+    { key: "RAW_SECURITY_SAFETY", label: "الأمن والسلامة (شيت)" },
+    { key: "RAW_EMP_KPI", label: "مؤشرات الموظفين" },
+    { key: "RAW_SAFETY_KPI", label: "مؤشرات فريق السلامة" }
+  ];
+
+  function dsRows(ds) {
+    try { var v = ds.get ? ds.get() : window[ds.key]; return Array.isArray(v) ? v : null; } catch (_) { return null; }
+  }
+  function tabsForData(key) {
+    var base = key.split(".")[0];
+    return Object.keys(TAB_GUIDE).filter(function (n) { return (TAB_GUIDE[n].data || []).indexOf(base) !== -1 && !hidden(n); });
+  }
+  function cellStr(v) {
+    if (v == null) return "";
+    if (typeof v === "object") { try { return JSON.stringify(v).slice(0, 60); } catch (_) { return ""; } }
+    return String(v).trim();
+  }
+  function numOf(v) {
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    var s = String(v == null ? "" : v).replace(/[,٬\s%٪]/g, "").replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); });
+    if (!s || !/^-?\d+(\.\d+)?$/.test(s)) return null;
+    return parseFloat(s);
+  }
+  var ID_COL = /رقم|وزاري|كود|code|id$|^id|جوال|هاتف|phone|هويه|هوية|تاريخ|date|سنة|year|شهر|month/i;
+
+  var profCache = {};
+  function profile(rows, key) {
+    var c = profCache[key];
+    if (c && c.ref === rows && c.len === rows.length) return c.val;
+    var sample = rows.length > 20000 ? rows.slice(0, 20000) : rows;
+    var cols = [];
+    var first = sample.filter(function (r) { return r && typeof r === "object"; });
+    first.slice(0, 50).forEach(function (r) { Object.keys(r).forEach(function (k) { if (cols.indexOf(k) === -1 && cols.length < 24) cols.push(k); }); });
+    var out = { عدد_الصفوف: rows.length, الأعمدة: cols };
+    var stats = {};
+    cols.forEach(function (k) {
+      var vals = [], nums = [], counts = Object.create(null), distinct = 0;
+      for (var i = 0; i < first.length; i++) {
+        var s = cellStr(first[i][k]);
+        if (!s || s === "-" || s === "—" || /^nan$/i.test(s)) continue;
+        vals.push(s);
+        var n = numOf(first[i][k]);
+        if (n !== null) nums.push(n);
+        if (!counts[s]) { counts[s] = 0; distinct++; }
+        counts[s]++;
+      }
+      if (!vals.length) return;
+      if (nums.length / vals.length >= 0.8 && !ID_COL.test(k)) {
+        var sum = nums.reduce(function (a, b) { return a + b; }, 0);
+        stats[k] = { مجموع: Math.round(sum * 100) / 100, متوسط: Math.round(sum / nums.length * 100) / 100, أقل: Math.min.apply(null, nums), أعلى: Math.max.apply(null, nums), قيم: nums.length };
+      } else if (distinct <= 30 && distinct < vals.length) {
+        var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 10);
+        var o = {}; top.forEach(function (t) { o[t.slice(0, 50)] = counts[t]; });
+        stats[k] = { توزيع: o, قيم_مختلفة: distinct };
+      } else {
+        stats[k] = { قيم_مختلفة: distinct, مثال: vals[0].slice(0, 40) };
+      }
+    });
+    out.ملخص_الأعمدة = stats;
+    profCache[key] = { ref: rows, len: rows.length, val: out };
+    return out;
+  }
+
+  function rowsText(rows, cols, max) {
+    var lines = [cols.join("|")];
+    for (var i = 0; i < rows.length && i < max; i++) {
+      lines.push(cols.map(function (k) { return cellStr(rows[i][k]).replace(/[|\n\r]+/g, " ").slice(0, 60); }).join("|"));
+    }
+    return lines.join("\n");
+  }
+  function colsOf(rows) {
+    var cols = [];
+    rows.slice(0, 30).forEach(function (r) { if (r && typeof r === "object") Object.keys(r).forEach(function (k) { if (cols.indexOf(k) === -1 && cols.length < 16) cols.push(k); }); });
+    return cols;
+  }
+
+  function schoolFilter(rows) {
+    var ctx = window.AI_CONTEXT && window.AI_CONTEXT.school;
+    if (!ctx || (Date.now() - (window.AI_CONTEXT.timestamp || 0)) > 10 * 60 * 1000) return null;
+    var id = String(ctx.minId || "").replace(/\D/g, "");
+    var nm = norm(ctx.name || "");
+    var hits = rows.filter(function (r) {
+      if (!r || typeof r !== "object") return false;
+      for (var k in r) {
+        var s = cellStr(r[k]);
+        if (!s) continue;
+        if (id && s.replace(/\D/g, "") === id) return true;
+        if (nm && nm.length > 5 && norm(s) === nm) return true;
+      }
+      return false;
+    });
+    return { name: ctx.name, rows: hits };
+  }
+
+  function tabMapText() {
+    var lines = [];
+    var C = cats();
+    SECTION_ORDER.forEach(function (k) {
+      var c = C[k];
+      if (k === "raci") { lines.push("● مصفوفة RACI → [[tab:raci]] — " + SPECIAL_SECTIONS.raci.d); return; }
+      if (!c) return;
+      lines.push("● " + c.title + ":");
+      (c.tabs || []).forEach(function (t) {
+        if (hidden(t.name)) return;
+        var d = tabDesc(k, t.name);
+        lines.push("  - " + t.name + " = «" + t.label + "»" + (d ? " — " + d.slice(0, 110) : ""));
+      });
+    });
+    return lines.join("\n");
+  }
+
+  window.__fcbExtraKnowledge = function (userText) {
+    var q = norm(userText || "");
+    var out = "";
+    try {
+      out += "\n\n══════════════════════════════════════════════════════\n" +
+        "خريطة تبويبات اللوحة (أسماء التبويبات الحقيقية — استخدمها لتوجيه المستخدم)\n" +
+        "══════════════════════════════════════════════════════\n" + tabMapText() +
+        "\n\n🔘 قاعدة زر \"افتح التبويب\": لو إجابتك ليها تبويب في اللوحة بيعرض تفاصيلها، أو المستخدم سأل «فين ألاقي…/أوصل لـ…/أي تبويب…»، اكتب في آخر ردك سطر مستقل فيه وسم التبويب بالصيغة الحرفية [[tab:اسم_التبويب]] (الاسم الإنجليزي من الخريطة فوق بالظبط، مثال: [[tab:elevator-status]])، بحد أقصى وسمين في الرد. الواجهة بتحوّل الوسم تلقائياً لزرار يفتح التبويب — ما تشرحش الوسم ولا تكتب اسم غير موجود في الخريطة، ولا تحطه جوه جدول أو كود.";
+
+      var cat = [];
+      DATASETS.forEach(function (ds) {
+        var rows = dsRows(ds);
+        var tabs = tabsForData(ds.key);
+        cat.push(ds.label + " [" + ds.key + "]: " + (rows ? rows.length + " صف" : "غير محمّل حالياً") + (tabs.length ? " → التبويب: " + tabs.join("، ") : ""));
+      });
+      out += "\n\n══════════════════════════════════════════════════════\n" +
+        "كتالوج كل مصادر بيانات اللوحة (عدد الصفوف الحالي + التبويب اللي بيعرضها)\n" +
+        "══════════════════════════════════════════════════════\n" + cat.join("\n");
+
+      var extra = [];
+      var budget = 16000;
+      DATASETS.forEach(function (ds) {
+        if (!ds.profile) return;
+        var rows = dsRows(ds);
+        if (!rows || !rows.length) return;
+        var block = "▸ " + ds.label + " [" + ds.key + "]:\n";
+        if (ds.full || (ds.fullOn && ds.fullOn.test(q))) {
+          block += rowsText(rows, colsOf(rows), ds.full ? 60 : 120);
+        } else {
+          block += JSON.stringify(profile(rows, ds.key));
+          if (ds.rowsOn && ds.rowsOn.test(q)) {
+            block += "\nالصفوف (أول " + Math.min(rows.length, 150) + " من " + rows.length + "):\n" + rowsText(rows, colsOf(rows), 150);
+          }
+          if (ds.schoolRows) {
+            var sf = schoolFilter(rows);
+            if (sf && sf.rows.length) block += "\nصفوف خاصة بمدرسة «" + sf.name + "» (" + sf.rows.length + "):\n" + rowsText(sf.rows, colsOf(sf.rows), 40);
+          }
+        }
+        if (block.length > budget) block = block.slice(0, budget) + "\n…[مقتطع]";
+        budget -= block.length;
+        if (budget > 0) extra.push(block);
+      });
+      if (extra.length) {
+        out += "\n\n══════════════════════════════════════════════════════\n" +
+          "بيانات إضافية (مصادر ماكانتش ظاهرة في الملخص فوق — محسوبة من البيانات الحية)\n" +
+          "══════════════════════════════════════════════════════\n" + extra.join("\n\n");
+      }
+      var curTab = window.__ACTIVE_TAB__;
+      var home = document.getElementById("portal-home");
+      var onHome = home && home.style.display !== "none";
+      out += "\n\n📍 المستخدم دلوقتي في: " + (onHome ? "الصفحة الرئيسية" : (curTab ? (sectionTitle(window.CURRENT_PORTAL_CATEGORY) + " ‹ " + curTab) : "غير معروف"));
+    } catch (e) {
+      console.warn("[fcb extra knowledge]", e);
+    }
+    return out;
+  };
+})();
+/* ══ نهاية Nav v5 ══ */

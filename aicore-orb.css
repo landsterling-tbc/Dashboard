@@ -1216,3 +1216,234 @@
   #aicore-panel .ac-msg-actions { opacity: 1; transform: none; }
   #aicore-panel .ac-msg-row { max-width: 96%; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   AI CORE — LOOK v4 (★ 2026-09-26 بناءً على طلب صريح: "شكله يبقى أحدث وأقوى")
+   نفس البنية بالظبط — تغيير شكل فقط: هيدر داكن قوي، سطح أبيض نظيف،
+   فقاعات أوضح، أزرار "افتح التبويب"، ووضع محادثة بياخد مساحة النافذة كلها.
+   ════════════════════════════════════════════════════════════════════ */
+#aicore-root #aicore-panel {
+  --acx-navy: #0d2f40;
+  --acx-teal: #0d849c;
+  --acx-teal-2: #16a4bf;
+  --acx-ink: #0c2330;
+  --acx-muted: #5f7784;
+  --acx-line: #e1e9ef;
+  --acx-surface: #f5f8fb;
+  background: var(--acx-surface);
+  border: 1px solid rgba(13, 47, 64, .12);
+  border-radius: 26px;
+  box-shadow: 0 40px 100px -24px rgba(8, 26, 36, .55), 0 12px 30px -12px rgba(8, 26, 36, .25);
+}
+#aicore-root #aicore-panel .ac-orb-watermark { display: none; }
+
+/* ── الهيدر ── */
+#aicore-root #aicore-panel .ac-hero {
+  padding: 18px 20px 16px;
+  border-bottom: 0;
+  color: #fff;
+  background:
+    radial-gradient(90% 140% at 100% 0%, rgba(22, 164, 191, .45) 0%, rgba(22, 164, 191, 0) 55%),
+    radial-gradient(70% 120% at 0% 100%, rgba(176, 138, 78, .22) 0%, rgba(176, 138, 78, 0) 60%),
+    linear-gradient(160deg, #123e52 0%, #0d2f40 55%, #0a2331 100%);
+  box-shadow: 0 10px 24px -16px rgba(8, 26, 36, .7);
+}
+#aicore-root #aicore-panel .ac-hero-top { gap: 14px; }
+#aicore-root #aicore-panel .ac-orb { width: 62px; height: 62px; }
+#aicore-root #aicore-panel .ac-hero-title h2 { color: #fff; font-size: 19px; font-weight: 800; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#aicore-root #aicore-panel .ac-hero-title .ac-sub { color: rgba(255, 255, 255, .68); font-size: 12.5px; }
+#aicore-root #aicore-panel .ac-close,
+#aicore-root #aicore-panel .ac-clear-chat-btn-top {
+  color: rgba(255, 255, 255, .78);
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .12);
+  width: 34px; height: 34px; border-radius: 11px;
+}
+#aicore-root #aicore-panel .ac-close:hover,
+#aicore-root #aicore-panel .ac-clear-chat-btn-top:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+#aicore-root #aicore-panel #ac-clear-chat-btn:hover { background: rgba(239, 68, 68, .25); color: #fff; }
+#aicore-root #aicore-panel .ac-status-strip { gap: 8px; margin-top: 14px; }
+#aicore-root #aicore-panel .ac-status-item {
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 12px; padding: 8px 10px;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+#aicore-root #aicore-panel .ac-status-item:hover { background: rgba(255, 255, 255, .12); }
+#aicore-root #aicore-panel .ac-si-label { color: rgba(255, 255, 255, .6); font-size: 9.5px; letter-spacing: .3px; }
+#aicore-root #aicore-panel .ac-si-value { color: #fff; font-size: 13.5px; font-weight: 800; }
+#aicore-root #aicore-panel .ac-si-value svg { opacity: .7; }
+#aicore-root #aicore-panel .ac-status-item.ac-live .ac-si-value { color: #6ee7c8; }
+#aicore-root #aicore-panel .ac-si-dot { background: #6ee7c8; }
+#aicore-root #aicore-panel .ac-presence { color: rgba(255, 255, 255, .72); margin-top: 10px; }
+#aicore-root #aicore-panel .ac-presence svg { opacity: .8; }
+
+/* ── الجسم والكروت ── */
+#aicore-root #aicore-panel .ac-body { padding: 16px 20px 20px; gap: 16px; background: var(--acx-surface); }
+#aicore-root #aicore-panel .ac-section-label { color: var(--acx-muted); font-size: 11px; letter-spacing: .2px; }
+#aicore-root #aicore-panel .ac-card,
+#aicore-root #aicore-panel .ac-exec-item,
+#aicore-root #aicore-panel .ac-cost-item,
+#aicore-root #aicore-panel .ac-rec {
+  background: #fff;
+  border: 1px solid var(--acx-line);
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .04), 0 8px 20px -16px rgba(15, 37, 51, .3);
+}
+#aicore-root #aicore-panel .ac-card:hover,
+#aicore-root #aicore-panel .ac-exec-item:hover { background: #fff; border-color: rgba(13, 132, 156, .3); }
+#aicore-root #aicore-panel .ac-empty-state { padding: 10px 8px; }
+#aicore-root #aicore-panel .ac-es-icon { font-size: 20px; margin-bottom: 4px; }
+
+/* ── زر إظهار/إخفاء الملخص في وضع المحادثة ── */
+#aicore-root #aicore-panel .ac-insights-toggle {
+  display: none; align-self: center; align-items: center; gap: 7px;
+  font: 700 12px/1 inherit; font-family: inherit; color: var(--acx-teal);
+  background: #fff; border: 1px solid var(--acx-line); border-radius: 999px; padding: 8px 14px; cursor: pointer;
+  box-shadow: 0 4px 12px -8px rgba(15, 37, 51, .4);
+}
+#aicore-root #aicore-panel .ac-insights-toggle svg { width: 13px; height: 13px; }
+#aicore-root #aicore-panel .ac-insights-toggle:hover { border-color: rgba(13, 132, 156, .45); }
+#aicore-root #aicore-panel .ac-insights-toggle .ac-it-hide { display: none; }
+#aicore-root #aicore-panel.ac-has-chat .ac-insights-toggle { display: inline-flex; }
+#aicore-root #aicore-panel.ac-has-chat.ac-show-insights .ac-insights-toggle .ac-it-show { display: none; }
+#aicore-root #aicore-panel.ac-has-chat.ac-show-insights .ac-insights-toggle .ac-it-hide { display: inline; }
+#aicore-root #aicore-panel.ac-has-chat:not(.ac-show-insights) .ac-body > .ac-section-label,
+#aicore-root #aicore-panel.ac-has-chat:not(.ac-show-insights) #ac-exec-section,
+#aicore-root #aicore-panel.ac-has-chat:not(.ac-show-insights) #ac-risk-section,
+#aicore-root #aicore-panel.ac-has-chat:not(.ac-show-insights) #ac-cost-grid,
+#aicore-root #aicore-panel.ac-has-chat:not(.ac-show-insights) #ac-rec-list { display: none !important; }
+#aicore-root #aicore-panel.ac-has-chat .ac-chat-thread {
+  max-height: none; overflow: visible;
+  -webkit-mask-image: none; mask-image: none;
+}
+#aicore-root #aicore-panel.ac-has-chat .ac-body { min-height: min(520px, 60vh); }
+
+/* ── الرسائل ── */
+#aicore-root #aicore-panel .ac-chat-thread { gap: 16px; }
+#aicore-root #aicore-panel .ac-msg-avatar { width: 32px; height: 32px; border-radius: 11px; }
+#aicore-root #aicore-panel .ac-msg-bot .ac-msg-avatar {
+  background: linear-gradient(145deg, #0d849c, #0d2f40); color: #fff;
+  box-shadow: 0 6px 14px -6px rgba(13, 132, 156, .7);
+}
+#aicore-root #aicore-panel .ac-msg-user .ac-msg-avatar { background: #e3eef3; color: var(--acx-navy); font-size: 10px; }
+#aicore-root #aicore-panel .ac-msg-user .ac-msg-bubble {
+  background: linear-gradient(145deg, #125268, #0d2f40);
+  color: #fff; border: 0;
+  box-shadow: 0 10px 22px -14px rgba(8, 26, 36, .8);
+  border-radius: 18px 18px 18px 6px;
+}
+#aicore-root #aicore-panel .ac-msg-user .ac-msg-content,
+#aicore-root #aicore-panel .ac-msg-user .ac-msg-content strong { color: #fff; }
+#aicore-root #aicore-panel .ac-msg-user .ac-num { color: #bff3ff; }
+#aicore-root #aicore-panel .ac-msg-bot .ac-msg-bubble {
+  background: #fff; border: 1px solid var(--acx-line);
+  border-inline-start: 1px solid var(--acx-line);
+  border-radius: 18px 18px 6px 18px;
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .05), 0 14px 30px -20px rgba(15, 37, 51, .45);
+  position: relative; overflow: hidden;
+}
+#aicore-root #aicore-panel .ac-msg-bot .ac-msg-bubble::before {
+  content: ""; position: absolute; top: 0; right: 0; left: 0; height: 3px;
+  background: linear-gradient(90deg, #b08a4e, #16a4bf 45%, #0d849c);
+  opacity: .85;
+}
+#aicore-root #aicore-panel .ac-msg-typing .ac-msg-bubble::before { display: none; }
+#aicore-root #aicore-panel .ac-msg-content { font-size: 14px; line-height: 1.85; }
+#aicore-root #aicore-panel .ac-md-h { color: var(--acx-navy); }
+#aicore-root #aicore-panel .ac-table-wrap { border-radius: 12px; border: 1px solid var(--acx-line); background: #fff; }
+#aicore-root #aicore-panel .ac-md-table tbody tr:nth-child(even) td { background: #f7fafc; }
+#aicore-root #aicore-panel .ac-msg-act { background: #fff; border: 1px solid var(--acx-line); border-radius: 9px; }
+
+/* ── زر "افتح التبويب" داخل الرد ── */
+#aicore-root #aicore-panel .ac-tab-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--acx-line);
+}
+#aicore-root #aicore-panel .ac-tab-link {
+  display: inline-flex; align-items: center; gap: 10px; cursor: pointer; text-align: right;
+  padding: 8px 12px 8px 10px; border-radius: 14px;
+  border: 1px solid rgba(13, 132, 156, .28);
+  background: linear-gradient(180deg, #f1fafc, #e4f4f8);
+  color: var(--acx-navy); font-family: inherit;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+#aicore-root #aicore-panel .ac-tab-link:hover { transform: translateY(-1px); border-color: rgba(13, 132, 156, .55); box-shadow: 0 10px 20px -12px rgba(13, 132, 156, .7); }
+#aicore-root #aicore-panel .ac-tab-link:focus-visible { outline: 3px solid rgba(22, 164, 191, .45); outline-offset: 2px; }
+#aicore-root #aicore-panel .ac-tab-link-ico {
+  width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, #16a4bf, #0d849c); color: #fff;
+}
+#aicore-root #aicore-panel .ac-tab-link-ico svg { width: 15px; height: 15px; }
+#aicore-root #aicore-panel .ac-tab-link-txt { display: flex; flex-direction: column; line-height: 1.25; }
+#aicore-root #aicore-panel .ac-tab-link-txt small { font-size: 10.5px; color: var(--acx-muted); font-weight: 600; }
+#aicore-root #aicore-panel .ac-tab-link-txt b { font-size: 13.5px; font-weight: 800; }
+#aicore-root #aicore-panel .ac-tab-link-sec {
+  font-size: 10.5px; font-weight: 700; color: var(--acx-teal);
+  background: #fff; border: 1px solid rgba(13, 132, 156, .2); border-radius: 999px; padding: 3px 8px;
+}
+
+/* ── الاقتراحات السريعة ── */
+#aicore-root #aicore-panel .ac-quick-replies {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+}
+#aicore-root #aicore-panel .ac-qr-pill {
+  display: flex; align-items: center; gap: 8px; text-align: right;
+  background: #fff; color: var(--acx-ink); border: 1px solid var(--acx-line);
+  border-radius: 14px; padding: 11px 14px; font-size: 12.5px; font-weight: 600; line-height: 1.5;
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .04);
+}
+#aicore-root #aicore-panel .ac-qr-pill::before {
+  content: "✦"; flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #e6f4f8; color: var(--acx-teal); font-size: 11px;
+}
+#aicore-root #aicore-panel .ac-qr-pill:hover { background: #fff; border-color: rgba(13, 132, 156, .45); color: var(--acx-navy); box-shadow: 0 8px 18px -12px rgba(13, 132, 156, .6); }
+
+/* ── صندوق الكتابة ── */
+#aicore-root #aicore-panel .ac-footer {
+  background: #fff; border-top: 1px solid var(--acx-line); padding: 12px 18px 14px;
+}
+#aicore-root #aicore-panel .ac-input-shell {
+  background: var(--acx-surface); border: 1.5px solid var(--acx-line); border-radius: 18px;
+  padding: 6px 6px 6px 14px;
+}
+#aicore-root #aicore-panel .ac-input-shell:focus-within {
+  background: #fff; border-color: rgba(22, 164, 191, .6);
+  box-shadow: 0 0 0 4px rgba(22, 164, 191, .12);
+}
+#aicore-root #aicore-panel .ac-input { font-size: 14.5px; }
+#aicore-root #aicore-panel .ac-send {
+  width: 42px; height: 42px; border-radius: 14px;
+  background: linear-gradient(145deg, #16a4bf, #0d849c 45%, #0d2f40);
+  box-shadow: 0 8px 18px -8px rgba(13, 132, 156, .8);
+}
+#aicore-root #aicore-panel .ac-send svg { width: 16px; height: 16px; }
+#aicore-root #aicore-panel .ac-send.ac-send-is-stop { background: #9c2a3a; }
+#aicore-root #aicore-panel .ac-footer-note { opacity: .75; margin-top: 7px; }
+
+/* ── موبايل: النافذة بكامل الشاشة وهيدر مضغوط ── */
+@media (max-width: 520px) {
+  #aicore-root #aicore-panel { left: 0; right: 0; bottom: 0; top: 0; width: auto; max-height: none; height: 100dvh; border-radius: 0; border: 0; }
+  #aicore-root #aicore-panel .ac-hero { padding: 12px 14px 12px; }
+  #aicore-root #aicore-panel .ac-orb { width: 44px; height: 44px; }
+  #aicore-root #aicore-panel .ac-hero-top { gap: 10px; }
+  #aicore-root #aicore-panel .ac-hero-title h2 { font-size: 16px; }
+  #aicore-root #aicore-panel .ac-hero-title .ac-sub { display: none; }
+  #aicore-root #aicore-panel .ac-close,
+  #aicore-root #aicore-panel .ac-clear-chat-btn-top { width: 32px; height: 32px; }
+  #aicore-root #aicore-panel #ac-expand-btn { display: none; }
+  #aicore-root #aicore-panel .ac-status-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+  #aicore-root #aicore-panel .ac-status-item { padding: 6px 6px; }
+  #aicore-root #aicore-panel .ac-si-value { font-size: 12px; }
+  #aicore-root #aicore-panel .ac-presence { display: none; }
+  #aicore-root #aicore-panel .ac-body { padding: 12px 12px 14px; }
+  #aicore-root #aicore-panel .ac-quick-replies { grid-template-columns: 1fr; }
+  #aicore-root #aicore-panel .ac-footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  #aicore-root #aicore-panel .ac-footer-note { display: none; }
+  #aicore-root #aicore-panel .ac-tab-link { width: 100%; }
+  #aicore-root #aicore-panel .ac-tab-link-sec { margin-inline-start: auto; }
+}
+/* ══ نهاية AI CORE — LOOK v4 ══ */
+
+#aicore-root #aicore-panel .ac-input:focus-visible { outline: none; box-shadow: none; }

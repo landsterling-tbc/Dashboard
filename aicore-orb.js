@@ -390,6 +390,8 @@
         '<button type="button" class="ac-qr-pill">كم عدد المدارس حسب المحافظة؟</button>' +
         '<button type="button" class="ac-qr-pill">ما متوسط درجة البيئة المدرسية؟</button>' +
         '<button type="button" class="ac-qr-pill">لخّص أهم المؤشرات في العرض الحالي</button>' +
+        '<button type="button" class="ac-qr-pill">فين ألاقي بيانات العهدة والمصروفات؟</button>' +
+        '<button type="button" class="ac-qr-pill">إيه البيانات المتاحة في اللوحة كلها؟</button>' +
       '</div>';
     body.appendChild(chatWrap);
 
@@ -399,7 +401,7 @@
     footer.innerHTML =
       '<div class="ac-input-shell">' +
         '<textarea class="ac-input" id="ac-input" rows="1" maxlength="' + AC_MAX_CHARS + '" ' +
-          'placeholder="اسأل…" aria-label="اكتب سؤالك"></textarea>' +
+          'placeholder="اسأل عن أي بيانات في اللوحة… مثلاً: كم بلاغ مفتوح في جدة؟" aria-label="اكتب سؤالك"></textarea>' +
         '<span class="ac-char-count" id="ac-char-count" aria-hidden="true"></span>' +
         '<button class="ac-send" type="button" id="ac-send-btn" aria-label="إرسال">' + svg('send') + '</button>' +
       '</div>' +
@@ -1178,6 +1180,7 @@
           '<div class="ac-msg-time">' + acTimeNow() + '</div>' +
         '</div>';
       threadEl.appendChild(row);
+      panel.classList.add('ac-has-chat');
       acScrollToBottom(who === 'user');
       acMountPendingCharts();
 
@@ -1215,10 +1218,33 @@
         if (hist.length) acHideQuickReplies();
         hist.forEach(function(m) {
           var isUser = m.role === 'user';
-          acAppendMsg(isUser ? acInlineMd(m.content) : acRenderMarkdown(m.content), isUser ? 'user' : 'bot', m.content);
+          acAppendMsg(isUser ? acInlineMd(m.content) : acRenderMarkdown(m.content), isUser ? 'user' : 'bot', isUser ? m.content : acStripTabMarkers(m.content));
         });
       } catch(e) { console.warn('[AICore] history restore error', e); }
     }
+
+    /* ★ زر "افتح التبويب" داخل الردود — يقفل النافذة ويفتح التبويب نفسه */
+    if (threadEl) threadEl.addEventListener('click', function(e) {
+      var b = e.target.closest ? e.target.closest('.ac-tab-link') : null;
+      if (!b) return;
+      var name = b.getAttribute('data-tab');
+      close();
+      setTimeout(function() {
+        if (name === 'raci' && typeof window.navigateToCategory === 'function') { window.navigateToCategory('raci'); return; }
+        if (typeof window.__navOpenTab === 'function') window.__navOpenTab(name);
+      }, 120);
+    });
+
+    /* ★ وضع المحادثة: أول ما تبدأ محادثة، الملخص التنفيذي/المخاطر/التكلفة
+       بيتلمّوا ورا زرار واحد عشان المحادثة تاخد مساحة النافذة كلها */
+    (function acInsightsToggle() {
+      if (!body || body.querySelector('.ac-insights-toggle')) return;
+      var tg = el('button', 'ac-insights-toggle', '');
+      tg.type = 'button';
+      tg.innerHTML = svg('layers') + '<span class="ac-it-show">عرض الملخص التنفيذي والمخاطر</span><span class="ac-it-hide">إخفاء الملخص التنفيذي</span>';
+      tg.addEventListener('click', function() { panel.classList.toggle('ac-show-insights'); });
+      body.insertBefore(tg, body.firstChild);
+    })();
 
     if (quickRepliesEl) {
       quickRepliesEl.querySelectorAll('.ac-qr-pill').forEach(function(btn) {
@@ -1235,6 +1261,7 @@
         if (acGenerating) acStopGenerating();
         if (typeof window.fcbForgetAll === 'function') window.fcbForgetAll();
         threadEl.innerHTML = '';
+        panel.classList.remove('ac-has-chat', 'ac-show-insights');
         acHistoryRestored = true; // منع أي محاولة استعادة سجل بعد الحذف
         if (quickRepliesEl) quickRepliesEl.style.display = '';
       });
@@ -1312,7 +1339,7 @@
       acStreamAbort = false;
       acSetSendMode('stop');
       setState('generating');
-      var row = acAppendMsg('<span class="ac-caret"></span>', 'bot', rawReply);
+      var row = acAppendMsg('<span class="ac-caret"></span>', 'bot', acStripTabMarkers(rawReply));
       // 🔧 2026-08-25: acAppendMsg بتعمل سكرول "ذكي" بس (force=false) لأي
       // رسالة بوت، عشان ما تقاطعش القارئ لو راجع يقرأ محادثة قديمة. لكن
       // هنا تحديدًا هي بداية ردّ فعلي على رسالة المستخدم اللي هو لسه واقف
@@ -1336,7 +1363,7 @@
         if (acStreamAbort) { finish(); return; }
         var burst = 2; // words per tick
         for (var k = 0; k < burst && idx < chunks.length; k++, idx++) shown += chunks[idx];
-        contentEl.innerHTML = acInlineMd(shown) + '<span class="ac-caret"></span>';
+        contentEl.innerHTML = acInlineMd(acStripTabMarkers(shown)) + '<span class="ac-caret"></span>';
         acScrollToBottom(false);
         if (idx < chunks.length) {
           acStreamTimer = setTimeout(step, 26);
@@ -1446,6 +1473,48 @@
     /* ════════════════════════════════════════════════════════════
        MARKDOWN RENDERER — نفس المحرك، نفس الصيغة، ألوان أنظف
        ════════════════════════════════════════════════════════════ */
+    /* ★ 2026-09-26: وسوم [[tab:اسم]] في رد المساعد ← أزرار "افتح التبويب" */
+    var AC_TAB_RE = /\[\[\s*tab\s*:\s*([a-z0-9-]+)\s*\]\]/gi;
+    function acStripTabMarkers(s) {
+      return String(s == null ? '' : s)
+        .replace(AC_TAB_RE, '')
+        .replace(/\[\[\s*t(?:a(?:b(?:\s*:[^\]\n]*)?)?)?\]?$/i, '')
+        .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+    }
+    function acTabInfo(name) {
+      if (name === 'raci') return { name: 'raci', label: 'مصفوفة المسؤوليات RACI', section: '' };
+      var C = window.PORTAL_CATEGORIES || (typeof PORTAL_CATEGORIES !== 'undefined' ? PORTAL_CATEGORIES : null);
+      if (!C) return null;
+      for (var k in C) {
+        var t = (C[k].tabs || []).filter(function(x) { return x.name === name; })[0];
+        if (t) {
+          try { if (typeof window.__isPresentationHiddenTab === 'function' && window.__isPresentationHiddenTab(name)) return null; } catch (_) {}
+          return { name: name, label: t.label, section: C[k].title };
+        }
+      }
+      return null;
+    }
+    function acTabButtonsHtml(raw) {
+      var seen = {}, out = [], m;
+      AC_TAB_RE.lastIndex = 0;
+      while ((m = AC_TAB_RE.exec(String(raw == null ? '' : raw))) && out.length < 3) {
+        var n = m[1].toLowerCase();
+        if (seen[n]) continue;
+        seen[n] = 1;
+        var info = acTabInfo(n);
+        if (info) out.push(info);
+      }
+      AC_TAB_RE.lastIndex = 0;
+      if (!out.length) return '';
+      return '<div class="ac-tab-actions">' + out.map(function(t) {
+        return '<button type="button" class="ac-tab-link" data-tab="' + acEscHtml(t.name) + '">' +
+          '<span class="ac-tab-link-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></span>' +
+          '<span class="ac-tab-link-txt"><small>افتح التبويب</small><b>' + acEscHtml(t.label) + '</b></span>' +
+          (t.section ? '<span class="ac-tab-link-sec">' + acEscHtml(t.section) + '</span>' : '') +
+        '</button>';
+      }).join('') + '</div>';
+    }
+
     function acEscHtml(str) {
       return String(str == null ? '' : str)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1577,7 +1646,8 @@
 
     function acRenderMarkdown(raw) {
       if (raw == null) return '';
-      var text = String(raw);
+      var acTabBtns = acTabButtonsHtml(raw);
+      var text = acStripTabMarkers(raw);
       var lines = text.replace(/```chart\s*([\s\S]*?)```/g, function(m, json) {
         return '\x00CHART\x00' + json.trim() + '\x00/CHART\x00';
       }).split(/\r?\n/);
@@ -1721,7 +1791,8 @@
         i++;
       }
       var joined = htmlParts.join('');
-      return joined.trim() ? joined : '<p class="ac-empty-note">تعذّر توليد محتوى لهذا الرد.</p>';
+      if (!joined.trim() && acTabBtns) return acTabBtns;
+      return (joined.trim() ? joined : '<p class="ac-empty-note">تعذّر توليد محتوى لهذا الرد.</p>') + acTabBtns;
     }
 
     /* ════════════════════════════════════════════════════════════

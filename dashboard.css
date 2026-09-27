@@ -7425,6 +7425,24 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   border-radius: var(--r-2xl) var(--r-2xl) 0 0;
 }
 
+/* ★ 2026-09-22 — تصحيح اكتُشف أثناء إعادة التحقق من المرحلة 3 بناءً على
+   سؤال المستخدم: ".portal-stat" فوق مالوش أي وجود فعلي في HTML/JS —
+   كروت الإحصائيات السريعة الحقيقية على البوابة (شريط "عدد المدارس/
+   إجمالي الأصول/إجمالي البلاغات/متوسط FCA") بتتبني ديناميكيًا جوه
+   #portalQuickStats وبتستخدم كلاس .kpi/.kc-* العام نفسه المستخدم جوه كل
+   تبويبات الداشبورد (راجع initPortalWallScreen في dashboard.js) — يعني
+   الـ override فوق كان بيستهدف كلاس ميت من غير أي تأثير بصري حقيقي،
+   والـ Hero فضل فعليًا مختلف شكل عن شريط الإحصائيات تحته. التصحيح هنا
+   *مقصور على البوابة الرئيسية بس* (بادئة #portalQuickStats) عشان ميغيّرش
+   شكل كروت الـ KPI في باقي التبويبات (لسه --r-xl زي ما هي فيهم، غير
+   مطلوب تغييرها) — إضافة فقط، مفيش حذف لأي قاعدة قديمة. */
+#portalQuickStats .kpi {
+  border-radius: var(--r-2xl);
+}
+#portalQuickStats .kpi::before {
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    24) الهيكل الوظيفي — ORG CHART بكروت حقيقية متصلة بخطوط (★ 2026-09-21،
    v3: بانل مستقل لكل منطقة — مستوحى من الكود الفعلي لنظام "إدارة الموارد
@@ -7486,11 +7504,6 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
 .orgc-forest {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 30px;
-  padding: 16px 12px 26px;
   /* ★ 2026-09-21: لازم يبقى هو نفسه حاوية الـ scroll (مش .org-chart-wrap
      المشتركة مع فيو "التحليل") وباتجاه LTR — لأن شجرة الكروت جواه متثبّتة
      LTR (لحساب خطوط التوصيل صح)، فلو فضل الاتجاه RTL موروث من الصفحة،
@@ -7498,6 +7511,49 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
      (خصوصًا الفريق الأكبر) بيتولد برّه حدود الشاشة يمين تمامًا. */
   direction: ltr;
   overflow-x: auto;
+  overflow-y: hidden;
+  background: #fbfcfd;
+  /* ★ 2026-09-22: سكرول بار واضح ومصبوغ (بدل الرمادي الافتراضي الخفي)،
+     عشان لو الفرع محتاج تمرير فعلًا (بعد "احتواء الكل") يبان ده واضح
+     بصريًا، مش مجرد حس غامض إن فيه حاجة ناقصة. */
+  scrollbar-width: thin;
+  scrollbar-color: #94c9d3 #eef2f5;
+  /* ★ "أقدر أتحرك بحرّيتي" — سحب بالماوس (drag-to-pan) بدل الاعتماد على
+     شريط التمرير بس؛ الشكل بيبقى "يد مفتوحة" وهو واقف، و"يد قابضة" وهو
+     بيسحب فعلًا (راجع .orgc-panning تحت). */
+  cursor: grab;
+}
+.orgc-forest::-webkit-scrollbar { height: 10px; }
+.orgc-forest::-webkit-scrollbar-track { background: #eef2f5; }
+.orgc-forest::-webkit-scrollbar-thumb { background: #94c9d3; border-radius: 999px; }
+.orgc-forest::-webkit-scrollbar-thumb:hover { background: #6fb3c0; }
+.orgc-forest.orgc-panning {
+  cursor: grabbing;
+  user-select: none;
+  scroll-behavior: auto;
+}
+
+/* ★ 2026-09-22: محتوى الشجرة الفعلي بقى جوه ".orgc-forest-inner" مستقل
+   عن حاوية الـ scroll نفسها، عشان نقدر نطبّق عليه transform:scale()
+   للتكبير/التصغير/الاحتواء التلقائي (_orgZoomFit) من غير ما نأثر على
+   سلوك الـ scroll نفسه. */
+.orgc-forest-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 30px;
+  padding: 16px 12px 26px;
+  width: max-content;
+  min-width: 100%;
+  /* ★ 2026-09-22: لازم "left top" (زاوية البداية بالظبط) مش "center" —
+     لو التصغير بيحصل من نقطة المنتصف، المحتوى المصغّر بيتحرك بصريًا
+     لنص المساحة الأصلية العريضة، وده برّه نافذة الـ scroll الافتراضية
+     (scrollLeft:0 بتوريك أول 0..clientWidth بكسل بس)، فيبان فاضي
+     تمامًا لحد ما تمرّر يدويًا لمنتصف المساحة — بالظبط المشكلة اللي
+     المستخدم اشتكى منها. التصغير من "left top" بيخلّي المحتوى المصغّر
+     ملاصق لنفس الزاوية اللي scrollLeft:0/scrollTop:0 بتوريها افتراضيًا. */
+  transform-origin: left top;
+  transition: transform .15s ease;
 }
 
 /* — الشجرة والخطوط (تقنية CSS classic لخطوط شجرة تنظيمية) — */
@@ -7815,8 +7871,1215 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   border-color: transparent;
 }
 
+/* ── شريط التكبير/التصغير/الاحتواء لكل بانل منطقة — ردًا على ملاحظة
+   "مش عارف ادخل يمين أو يسار للآخر": بيدّي المستخدم تحكّم واضح بدل ما
+   يعتمد على تمرير غامض الاتجاه، والفرع بيتظبط تلقائيًا (احتواء) فور
+   العرض عشان يبان كامل من غير أي تمرير أصلًا في أغلب الحالات. ────── */
+.orgc-zoom-row {
+  direction: rtl;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--bd-light, #dbe7ee);
+}
+.orgc-zoom-btn {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+  padding: 0;
+}
+.orgc-zoom-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+.orgc-zoom-label {
+  font-size: 11px; font-weight: 700; color: #64748b;
+  min-width: 38px; text-align: center;
+}
+.orgc-zoom-fit-btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--teal-3, #0b6b7e);
+  background: #eaf7f8;
+  border: 1px solid #bfe3e8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.orgc-zoom-fit-btn:hover { background: #d9f0f2; }
+.orgc-scrollhint {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #b08a4e;
+  margin-inline-start: auto;
+}
+
 @media (max-width: 640px) {
   .orgc-legend { margin-inline-start: 0; }
   .orgc-card { width: 156px; }
   .orgc-jumpnav { position: static; }
+  .orgc-zoom-row { padding: 8px 12px; }
 }
+
+/* ── ملء الشاشة لـ ORG CHART — بناءً على طلب صريح إن المستخدم يقدر يكبّر
+   الشارت بالشاشة كلها. #org-view-chart نفسه هو عنصر الـ Fullscreen API؛
+   .orgc-fullscreen-active بتتحط عليه من JS كـ fallback (فوق :fullscreen)
+   للمتصفحات اللي مش بتدعم الـ pseudo-class بشكل كامل. ───────────────── */
+#org-view-chart:fullscreen,
+#org-view-chart:-webkit-full-screen,
+#org-view-chart.orgc-fullscreen-active {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+  padding: 18px 22px 28px;
+}
+#org-view-chart:fullscreen .orgc-jumpnav,
+#org-view-chart:-webkit-full-screen .orgc-jumpnav,
+#org-view-chart.orgc-fullscreen-active .orgc-jumpnav {
+  top: 0;
+}
+#org-view-chart:fullscreen #orgc-fullscreen-btn,
+#org-view-chart:-webkit-full-screen #orgc-fullscreen-btn,
+#org-view-chart.orgc-fullscreen-active #orgc-fullscreen-btn {
+  background: #0b6b7e;
+  border-color: #0b6b7e;
+  color: #fff;
+}
+
+/* ── محرر الهيكل الوظيفي داخل ORG CHART — بناءً على طلب صريح. زرار
+   "✏️ تعديل" في الشريط العلوي، وزرار ✏️ صغير على كل كارت (يبان بس
+   لما وضع التعديل مفعّل)، ومودال عام للباسورد/الفورم. ───────────── */
+#orgc-editmode-btn.active {
+  background: #b45309;
+  border-color: #b45309;
+  color: #fff;
+}
+.orgc-edit-btn {
+  display: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid #e7ecf1;
+  background: #fff;
+  font-size: 11px;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15,23,42,.12);
+  padding: 0;
+  z-index: 2;
+}
+.orgc-edit-btn:hover { background: #eaf7f8; border-color: #0b6b7e; }
+#org-view-chart.orgc-edit-mode .orgc-card { outline: 1.5px dashed rgba(180,83,9,.35); outline-offset: 2px; }
+#org-view-chart.orgc-edit-mode .orgc-edit-btn { display: flex; }
+
+.orgc-local-edits-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -6px 0 14px;
+  flex-wrap: wrap;
+}
+.orgc-local-edits-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+.orgc-local-edits-clear {
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  background: none;
+  border: 1px dashed #cbd5e1;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.orgc-local-edits-clear:hover { color: #b91c1c; border-color: #b91c1c; }
+
+/* ── مودالات عامة (باسورد / فورم تعديل صف) — مستقلة عن مودال باسورد
+   شعار Land Sterling (خاص بشاشة الدخول)، بنفس روح ألوان الصفحة. ──── */
+.orgc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+.orgc-modal-box {
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow: auto;
+  direction: rtl;
+  box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+}
+.orgc-modal-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+.orgc-modal-sub { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
+.orgc-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  outline: none;
+  margin-bottom: 6px;
+}
+.orgc-modal-input:focus { border-color: #0b6b7e; box-shadow: 0 0 0 3px rgba(11,107,126,.12); }
+.orgc-modal-error { font-size: 11.5px; color: #b91c1c; font-weight: 700; margin-bottom: 8px; }
+.orgc-modal-note { font-size: 11px; color: #94a3b8; margin: 4px 0 12px; line-height: 1.6; }
+.orgc-modal-actions { display: flex; gap: 10px; margin-top: 12px; }
+.orgc-modal-btn {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.orgc-modal-btn-primary { background: #0b6b7e; color: #fff; }
+.orgc-modal-btn-primary:hover { background: #095a6a; }
+.orgc-modal-btn-secondary { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.orgc-modal-btn-secondary:hover { background: #e2e8f0; }
+
+.orgc-edit-form { display: flex; flex-direction: column; gap: 10px; }
+.orgc-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+}
+.orgc-edit-form input[type="text"],
+.orgc-edit-form select {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+}
+.orgc-edit-form input[type="text"]:focus,
+.orgc-edit-form select:focus { border-color: #0b6b7e; box-shadow: 0 0 0 3px rgba(11,107,126,.12); }
+
+/* ── توست نتيجة مزامنة جوجل شيت — رسالة مؤقتة تظهر أسفل الشاشة بعد كل
+   حفظ وتختفي لوحدها بعد شوية. ──────────────────────────────────── */
+.orgc-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 12px);
+  max-width: min(90vw, 520px);
+  background: #0f172a;
+  color: #fff;
+  font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.7;
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity .25s ease, transform .25s ease;
+  direction: rtl;
+  text-align: center;
+}
+.orgc-toast.orgc-toast-show { opacity: 1; transform: translate(-50%, 0); }
+.orgc-toast-ok { background: #0b6b7e; }
+.orgc-toast-warn { background: #b45309; }
+
+/* ═══ PORTAL HOME v4 — START ═══
+   ★ 2026-09-26 — إعادة تصميم الواجهة الرئيسية (الصفحة اللي فيها كل الكروت) بناءً على
+   طلب صريح: "أحدث وأقوى وأجمل وأرتب". كل القواعد هنا مسبوقة بـ #portal-home عشان:
+   (1) تغلب القواعد القديمة المتراكمة فوق من غير ما نمسح ولا سطر منها،
+   (2) ما تأثرش على أي تبويب تاني في الداشبورد.
+   لإلغاء التصميم الجديد بالكامل: احذف البلوك ده من START لـ END (والسلوك يرجع زي ما كان).
+   ────────────────────────────────────────────────────────────────────────────── */
+
+/* ── 0) الحاوية + ترتيب الأقسام عموديًا (من غير تغيير ترتيب الـHTML) ── */
+#portal-home {
+  --ph-ink: #0f2533;
+  --ph-sub: #5b7080;
+  --ph-muted: #8697a3;
+  --ph-line: rgba(15, 37, 51, .08);
+  --ph-line-2: rgba(15, 37, 51, .12);
+  --ph-radius: 20px;
+  --ph-ease: cubic-bezier(.22, .8, .3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 22px 28px 48px;
+  box-sizing: border-box;
+}
+#portal-home > * { order: 5; }
+#portal-home > .portal-hero { order: 1; }
+#portal-home > .portal-search-wrap { order: 2; }
+#portal-home > #portalQuickStats { order: 3; }
+#portal-home > #mok-banner { order: 4; }
+#portal-home > .portal-cards-grid { order: 6; }
+
+/* ── 1) الهيدر (Hero) ── */
+#portal-home .portal-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  padding: 24px 32px 62px;
+  min-height: 0;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, .06);
+  background:
+    radial-gradient(760px 300px at 100% -30%, rgba(34, 170, 196, .30), transparent 62%),
+    radial-gradient(620px 300px at -5% 130%, rgba(22, 164, 191, .16), transparent 62%),
+    linear-gradient(135deg, #0a2637 0%, #0f3a51 52%, #0b2f44 100%);
+  background-size: auto;
+  box-shadow: 0 1px 2px rgba(8, 30, 43, .18), 0 22px 44px -18px rgba(8, 30, 43, .55);
+  animation: none;
+}
+#portal-home .portal-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, .075) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 5%, #000 45%, #000 70%, transparent 95%);
+          mask-image: linear-gradient(100deg, transparent 5%, #000 45%, #000 70%, transparent 95%);
+  opacity: .9;
+}
+#portal-home .portal-hero::after { content: none; }
+#portal-home .portal-hero > * { position: relative; z-index: 1; }
+
+#portal-home .portal-hero-brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  min-width: 0;
+  flex: 1 1 420px;
+}
+#portal-home .portal-logo { height: 24px; width: auto; opacity: .95; }
+#portal-home .portal-logo-tbc { height: 28px; }
+#portal-home .portal-hero-divider { width: 1px; height: 22px; background: rgba(255, 255, 255, .22); }
+#portal-home .portal-hero-text { flex-basis: 100%; min-width: 0; margin-top: 8px; }
+#portal-home .portal-title {
+  font-family: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: none;
+}
+#portal-home .portal-sub {
+  margin-top: 8px;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, .72);
+  letter-spacing: 0;
+}
+#portal-home .portal-sub:empty { display: none; }
+
+/* شريط الأدوات (يسار الهيدر): الساعة، تغيير الشعار، وضع العرض، آخر تحديث */
+#portal-home .portal-hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 1 auto;
+}
+#portal-home .portal-live-clock,
+#portal-home .portal-toolbar-btn,
+#portal-home .portal-toolbar-icon-btn,
+#portal-home .portal-updated-lbl,
+#portal-home .portal-updated-val {
+  height: 36px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  -webkit-backdrop-filter: blur(6px);
+          backdrop-filter: blur(6px);
+}
+#portal-home .portal-live-clock {
+  padding: 0 14px;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+#portal-home .portal-toolbar-btn { padding: 0 14px; cursor: pointer; }
+#portal-home .portal-toolbar-icon-btn { width: 36px; padding: 0; justify-content: center; cursor: pointer; }
+#portal-home .portal-toolbar-btn:hover,
+#portal-home .portal-toolbar-icon-btn:hover {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .28);
+  transform: none;
+}
+/* "آخر تحديث" + القيمة = كبسولة واحدة ملتصقة */
+#portal-home .portal-updated-lbl {
+  padding: 0 12px 0 10px;
+  border-radius: 0 999px 999px 0;
+  border-left: none;
+  color: rgba(255, 255, 255, .66);
+  font-weight: 500;
+}
+#portal-home .portal-updated-val {
+  padding: 0 10px 0 14px;
+  margin-inline-start: -8px;
+  border-radius: 999px 0 0 999px;
+  border-right: none;
+  background: rgba(255, 255, 255, .14);
+  font-family: 'Tajawal', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 2) البحث: كارت عائم فوق الحافة السفلية للهيدر ── */
+#portal-home .portal-search-wrap {
+  position: relative;
+  z-index: 20;
+  width: min(660px, calc(100% - 48px));
+  max-width: 660px !important;
+  margin: -32px auto 0;
+}
+#portal-home .portal-search-input {
+  height: 58px;
+  padding: 0 54px 0 20px;
+  border-radius: 18px;
+  border: 1px solid var(--ph-line-2);
+  background: #fff;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ph-ink);
+  box-shadow: 0 2px 4px rgba(15, 37, 51, .05), 0 18px 40px -14px rgba(15, 37, 51, .30);
+}
+#portal-home .portal-search-input::placeholder { color: #8fa2ae; font-weight: 500; }
+#portal-home .portal-search-input:focus {
+  border-color: rgba(22, 164, 191, .55);
+  box-shadow: 0 2px 4px rgba(15, 37, 51, .05), 0 18px 40px -14px rgba(15, 37, 51, .30), 0 0 0 4px rgba(22, 164, 191, .14);
+}
+#portal-home .portal-search-icon {
+  right: 20px;
+  width: 20px;
+  height: 20px;
+  font-size: 0;
+  color: transparent;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%235b7080' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+#portal-home .portal-search-results { top: calc(100% + 10px); border-radius: 16px; }
+
+/* ── 3) الإحصائيات السريعة: 4 مربعات بأيقونة ── */
+#portal-home #portalQuickStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 22px 0 0;
+  animation: none;
+}
+#portal-home #portalQuickStats .kpi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 82px;
+  padding: 14px 80px 14px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--ph-line) !important;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .04), 0 8px 22px -12px rgba(15, 37, 51, .18);
+}
+#portal-home #portalQuickStats .kpi::before { content: none; }
+#portal-home #portalQuickStats .kpi::after {
+  content: "";
+  position: absolute;
+  inset: 50% 20px auto auto;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  opacity: 1;
+  background-color: var(--st-soft);
+  background-image: var(--st-icon);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 24px 24px;
+  border: 1px solid var(--st-bd);
+}
+#portal-home #portalQuickStats .kpi:nth-child(1) { --st-soft: rgba(13,132,156,.10); --st-bd: rgba(13,132,156,.22); --st-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230d849c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 22v-4a2 2 0 1 0-4 0v4'/%3E%3Cpath d='m18 10 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.382a1 1 0 0 1 .553-.894L6 10'/%3E%3Cpath d='M18 5v17'/%3E%3Cpath d='m4 6 7.106-3.553a2 2 0 0 1 1.788 0L20 6'/%3E%3Cpath d='M6 5v17'/%3E%3Ccircle cx='12' cy='9' r='2'/%3E%3C/svg%3E"); }
+#portal-home #portalQuickStats .kpi:nth-child(2) { --st-soft: rgba(11,107,126,.10); --st-bd: rgba(11,107,126,.22); --st-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230b6b7e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpolyline points='3.29 7 12 12 20.71 7'/%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3C/svg%3E"); }
+#portal-home #portalQuickStats .kpi:nth-child(3) { --st-soft: rgba(192,122,20,.11); --st-bd: rgba(192,122,20,.25); --st-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23b45309' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/%3E%3Cpath d='M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14'/%3E%3Cpath d='M8 6v8'/%3E%3C/svg%3E"); }
+#portal-home #portalQuickStats .kpi:nth-child(4) { --st-soft: rgba(6,106,82,.10);   --st-bd: rgba(6,106,82,.22);   --st-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23066a52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 14 4-4'/%3E%3Cpath d='M3.34 19a10 10 0 1 1 17.32 0'/%3E%3C/svg%3E"); }
+#portal-home #portalQuickStats .kpi-val {
+  font-family: 'Tajawal', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -.01em;
+}
+#portal-home #portalQuickStats .kpi-lbl {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ph-sub);
+}
+
+/* ── 4) بانر "توريد المكيفات" المؤقت: أنحف وأهدى ── */
+#portal-home #mok-banner {
+  margin: 18px 0 0;
+  padding: 12px 18px;
+  border-radius: 16px;
+  gap: 12px;
+}
+#portal-home #mok-banner-icon-wrap { width: 42px; height: 42px; border-radius: 12px; }
+#portal-home #mok-banner-icon { font-size: 20px; }
+
+/* ── 5) شبكة الأقسام: 12 كارت جنب بعض (4 × 3) بنفس الأماكن المتعوّد عليها ──
+   ★ 2026-09-26 (مراجعة بعد رأي المستخدم): التقسيم لـ3 مجموعات بعناوين صعّب
+   الوصول للكارت بدل ما يسهّله، فرجعنا لشبكة واحدة متلاصقة، وكل كارت في نفس
+   مكانه القديم تقريبًا (الأعمدة 1-3 زي ما هي بالظبط، والعمود 4 = الأنظمة
+   الرقمية/RACI/الخرائط)، والكروت بقت أقصر عشان الـ12 يبانوا في شاشة واحدة. */
+#portal-home .portal-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 18px;
+}
+#portal-home .portal-group-head { display: none; }
+#portal-home #portalFavoritesCard            { order: 0; }
+#portal-home #portal-card-overview           { order: 1; }
+#portal-home #portal-card-fca                { order: 2; }
+#portal-home #portal-card-otherAssessments   { order: 3; }
+#portal-home #portal-card-digital            { order: 4; }
+#portal-home #portal-card-systemsMaintenance { order: 5; }
+#portal-home #portal-card-kpi                { order: 6; }
+#portal-home #portal-card-safety             { order: 7; }
+#portal-home #portal-card-raci               { order: 8; }
+#portal-home #portal-card-equipment          { order: 9; }
+#portal-home #portal-card-contracts          { order: 10; }
+#portal-home #portal-card-operations         { order: 11; }
+#portal-home #portal-card-geo                { order: 12; }
+#portal-home .portal-cards-grid > *          { grid-column: auto; grid-row: auto; }
+#portal-home .portal-cards-grid > #portalFavoritesCard { grid-column: 1 / -1; }
+
+/* ── 6) كارت القسم (مدمج) ── */
+#portal-home .portal-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "icon title"
+    "desc desc";
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 12px;
+  min-height: 0;
+  height: auto;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--ph-line);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .04), 0 10px 24px -16px rgba(15, 37, 51, .22);
+  text-align: right;
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  contain: layout style;
+  will-change: auto;
+  transform: none;
+  animation: none;
+  transition: transform .2s var(--ph-ease), box-shadow .2s var(--ph-ease), border-color .2s ease;
+}
+#portal-home .portal-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  opacity: .85;
+  border-radius: 18px 18px 0 0;
+  background: var(--cat-accent, #0b6b7e);
+  background: linear-gradient(90deg, var(--cat-accent, #0b6b7e), color-mix(in srgb, var(--cat-accent, #0b6b7e) 55%, #fff));
+}
+/* سهم صغير في الركن بيظهر مع الـhover (بدل سطر "فتح القسم" اللي كان بيطوّل الكارت) */
+#portal-home .portal-card::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  opacity: 0;
+  transform: translateX(4px);
+  background: var(--cat-soft, rgba(11,107,126,.1)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230f3a51' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5'/%3E%3Cpath d='m12 19-7-7 7-7'/%3E%3C/svg%3E") center / 15px 15px no-repeat;
+  transition: opacity .18s ease, transform .18s var(--ph-ease);
+  pointer-events: none;
+}
+#portal-home .portal-card:hover::after,
+#portal-home .portal-card:focus-visible::after { opacity: 1; transform: none; }
+#portal-home .portal-card > * { position: relative; z-index: 1; }
+
+#portal-home .portal-card-icon {
+  grid-area: icon;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cat-accent, #0b6b7e);
+  background: var(--cat-soft, rgba(11,107,126,.1));
+  border: 1px solid var(--cat-bd, rgba(11,107,126,.25));
+  box-shadow: none;
+  animation: none;
+  transition: background .2s ease, color .2s ease;
+}
+#portal-home .portal-card-icon svg { width: 21px; height: 21px; }
+#portal-home .portal-card-title {
+  grid-area: title;
+  margin: 0;
+  padding-left: 30px;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--ph-ink);
+  transition: color .2s ease;
+}
+#portal-home .portal-card-title::after { content: none; }
+#portal-home .portal-card-desc {
+  grid-area: desc;
+  align-self: start;
+  margin: 0;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ph-sub);
+}
+#portal-home .portal-card-tabs-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+}
+#portal-home .portal-card-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: #f3f6f8;
+  border: 1px solid rgba(15, 37, 51, .06);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #3b5364;
+  white-space: normal;
+}
+#portal-home .portal-card-tab-dot { display: none; }
+#portal-home .portal-card-go,
+#portal-home .portal-card-badge { display: none; }
+
+#portal-home .portal-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--cat-bd, rgba(11,107,126,.3));
+  box-shadow: 0 2px 4px rgba(15, 37, 51, .05), 0 20px 36px -18px rgba(15, 37, 51, .35);
+}
+#portal-home .portal-card:hover .portal-card-icon {
+  background: var(--cat-accent, #0b6b7e);
+  color: #fff;
+  border-color: transparent;
+}
+#portal-home .portal-card:hover .portal-card-title { color: var(--cat-accent, #0b6b7e); }
+#portal-home .portal-card:active { transform: translateY(-1px); }
+
+/* ── 7) كارت الاختصارات: شريط بعرض الصفحة ── */
+#portal-home .portal-favorites-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1.5px dashed rgba(13, 132, 156, .30);
+  background: linear-gradient(270deg, rgba(13, 132, 156, .05), #fff 70%);
+  box-shadow: none;
+}
+#portal-home .portal-favorites-card:has(.portal-favorites-chips) {
+  border-style: solid;
+  border-color: var(--ph-line-2);
+  background: #fff;
+}
+#portal-home .portal-favorites-card:hover { border-color: rgba(13, 132, 156, .5); box-shadow: none; }
+#portal-home .portal-favorites-empty {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: right;
+  gap: 14px;
+  padding: 0;
+  min-height: 0;
+  background: none;
+}
+#portal-home .portal-favorites-empty:hover { background: none; }
+#portal-home .portal-favorites-empty::before {
+  content: "";
+  flex: none;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  border-radius: 13px;
+  font-size: 0;
+  animation: none;
+  background: rgba(13, 132, 156, .10) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%230d849c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z'/%3E%3C/svg%3E") center / 21px 21px no-repeat;
+  border: 1px solid rgba(13, 132, 156, .24);
+}
+#portal-home .portal-favorites-empty-text {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ph-sub);
+}
+#portal-home .portal-favorites-cta-btn,
+#portal-home .portal-favorites-edit-btn {
+  flex: none;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: #0f3a51;
+  font-size: 12.5px;
+}
+#portal-home .portal-favorites-cta-btn:hover,
+#portal-home .portal-favorites-edit-btn:hover { background: #0b6b7e; }
+#portal-home .portal-favorites-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+#portal-home .portal-favorites-title { font-size: 15px; }
+#portal-home .portal-favorites-chips { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+#portal-home .portal-favorites-chip {
+  width: auto;
+  padding: 7px 14px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+/* ── 8) الشاشات المتوسطة والموبايل ── */
+@media (max-width: 1199px) {
+  #portal-home .portal-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  #portal-home { padding: 14px 14px 36px; }
+  #portal-home .portal-hero { padding: 22px 20px 64px; border-radius: 22px; }
+  #portal-home .portal-title { font-size: 24px; }
+  #portal-home .portal-hero-meta { justify-content: flex-start; }
+  #portal-home #portalQuickStats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+@media (max-width: 640px) {
+  #portal-home .portal-cards-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  #portal-home .portal-hero { padding: 20px 16px 62px; }
+  #portal-home .portal-title { font-size: 21px; }
+  #portal-home .portal-sub { font-size: 12.5px; }
+  #portal-home .portal-toolbar-btn span { display: none; }
+  #portal-home .portal-toolbar-btn { width: 36px; padding: 0; justify-content: center; }
+  #portal-home .portal-search-wrap { width: calc(100% - 24px); }
+  #portal-home .portal-search-input { height: 52px; font-size: 14px; }
+  #portal-home #portalQuickStats .kpi { min-height: 84px; padding: 14px 64px 14px 12px; }
+  #portal-home #portalQuickStats .kpi::after { width: 40px; height: 40px; right: 12px; border-radius: 12px; background-size: 20px 20px; }
+  #portal-home #portalQuickStats .kpi-val { font-size: 22px; }
+  #portal-home #portalQuickStats .kpi-lbl { font-size: 11.5px; }
+  #portal-home .portal-card { padding: 18px 16px 14px; row-gap: 14px; }
+  #portal-home .portal-favorites-empty { flex-wrap: wrap; }
+  #portal-home .portal-favorites-empty-text { flex-basis: calc(100% - 60px); }
+}
+/* ══ المرحلة 2 — لمسات نهائية ══ */
+
+/* 9) الشيبس بقت روابط مباشرة للتبويب (الأقسام اللي بتدعم ده بس) */
+#portal-home .portal-card-deeplinks .portal-card-tab-item {
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s var(--ph-ease);
+}
+#portal-home .portal-card-deeplinks .portal-card-tab-item:hover {
+  background: var(--cat-soft, rgba(11,107,126,.1));
+  border-color: var(--cat-bd, rgba(11,107,126,.3));
+  color: var(--cat-accent, #0b6b7e);
+  transform: translateY(-1px);
+}
+
+/* 10) تركيز الكيبورد واضح (من غير ما يظهر مع الماوس) */
+#portal-home .portal-card:focus { outline: none; }
+#portal-home .portal-card:focus-visible {
+  outline: none;
+  border-color: var(--cat-accent, #0b6b7e);
+  box-shadow: 0 0 0 4px var(--cat-soft, rgba(11,107,126,.18)), 0 22px 40px -18px rgba(15, 37, 51, .35);
+}
+#portal-home .portal-card-tab-item:focus-visible {
+  outline: 2px solid var(--cat-accent, #0b6b7e);
+  outline-offset: 1px;
+}
+#portal-home .portal-toolbar-btn:focus-visible,
+#portal-home .portal-toolbar-icon-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, .8);
+  outline-offset: 2px;
+}
+
+/* 11) علامة اختصار البحث "/" */
+#portal-home .portal-search-kbd {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--ph-line-2);
+  border-bottom-width: 2px;
+  background: #f6f8fa;
+  color: var(--ph-muted);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+#portal-home .portal-search-wrap:focus-within .portal-search-kbd { opacity: 0; }
+#portal-home .portal-search-input { padding-left: 54px; }
+
+/* 12) ظهور تدريجي هادي (بيتلغي تلقائي لو الجهاز مفعّل تقليل الحركة) */
+@keyframes phFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  #portal-home .portal-hero { animation: phFadeUp .45s var(--ph-ease) both; }
+  #portal-home .portal-search-wrap { animation: phFadeUp .45s var(--ph-ease) .06s both; }
+  #portal-home #portalQuickStats .kpi { animation: phFadeUp .4s var(--ph-ease) both; }
+  #portal-home #portalQuickStats .kpi:nth-child(1) { animation-delay: .10s; }
+  #portal-home #portalQuickStats .kpi:nth-child(2) { animation-delay: .14s; }
+  #portal-home #portalQuickStats .kpi:nth-child(3) { animation-delay: .18s; }
+  #portal-home #portalQuickStats .kpi:nth-child(4) { animation-delay: .22s; }
+  #portal-home .portal-card {
+    animation: phFadeUp .42s var(--ph-ease) both;
+    animation-delay: calc(.2s + var(--ph-i, 0) * .035s);
+  }
+  #portal-home .portal-group-head,
+  #portal-home .portal-favorites-card { animation: phFadeUp .4s var(--ph-ease) .18s both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #portal-home *,
+  #portal-home *::before,
+  #portal-home *::after { animation: none !important; transition: none !important; }
+}
+
+/* 13) الإحصائيات: تفاعل خفيف */
+#portal-home #portalQuickStats .kpi { transition: transform .22s var(--ph-ease), box-shadow .22s var(--ph-ease); }
+#portal-home #portalQuickStats .kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(15, 37, 51, .05), 0 16px 30px -16px rgba(15, 37, 51, .3);
+}
+
+/* 14) الموبايل: "آخر تحديث" + القيمة كبسولة واحدة ما تتكسرش على سطرين */
+@media (max-width: 640px) {
+  #portal-home .portal-updated-lbl { display: none; }
+  #portal-home .portal-updated-val {
+    margin-inline-start: 0;
+    padding: 0 12px;
+    border-radius: 999px;
+    border-right: 1px solid rgba(255, 255, 255, .16);
+  }
+  #portal-home .portal-updated-val::before {
+    content: "آخر تحديث";
+    margin-inline-end: 6px;
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: .7;
+  }
+  #portal-home .portal-search-kbd { display: none; }
+  #portal-home .portal-search-input { padding-left: 16px; }
+}
+
+/* ── إصلاح عام (مش خاص بالواجهة الرئيسية): اللوحات الجانبية المقفولة (بطاقة المدرسة،
+   مصدر البيانات، لوحتين الحصر) بتكون مزقوقة برة الشاشة ناحية الشمال، بس ظلها
+   (box-shadow بعرض 40-50px) كان بيبان كشريط رمادي على طول الحافة الشمال في كل صفحات
+   الداشبورد. الظل بيرجع طبيعي أول ما اللوحة تتفتح. ── */
+.ix-school-panel:not(.ix-open),
+.ix-source-panel:not(.ix-open),
+#hasr-sp:not(.hasr-open),
+#hasr-dp:not(.hasr-open) { box-shadow: none !important; }
+/* ═══ PORTAL HOME v4 — END ═══ */
+
+/* ═══ NAV v5 — START ═══ (دليل التبويبات + البحث العام + شريط القسم — 2026-09-26) */
+:root {
+  --nv-navy: #0d2f40;
+  --nv-navy-2: #163d52;
+  --nv-teal: #0d849c;
+  --nv-teal-2: #16a4bf;
+  --nv-ink: #0c2330;
+  --nv-muted: #5f7784;
+  --nv-line: #dbe5ec;
+  --nv-soft: #f3f7fa;
+  --nv-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ── زر البحث في الشريط العلوي ── */
+.topbar .tb-btn.tb-finder {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px 6px 8px;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #fff; font-weight: 700;
+}
+.topbar .tb-btn.tb-finder:hover { background: rgba(255, 255, 255, .2); }
+.topbar .tb-btn.tb-finder svg { width: 14px; height: 14px; flex-shrink: 0; }
+.topbar .tb-btn.tb-finder kbd {
+  font: 700 10px/1 ui-monospace, Consolas, monospace; direction: ltr;
+  padding: 3px 5px; border-radius: 5px;
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .22); color: rgba(255, 255, 255, .85);
+}
+
+/* ── زر "كل التبويبات" جنب بحث الرئيسية ── */
+#portal-home .portal-search-wrap .portal-dir-btn {
+  position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+  height: 40px; padding: 0 14px; border-radius: 12px;
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid rgba(13, 132, 156, .25);
+  background: linear-gradient(180deg, #f2fafc, #e6f4f8);
+  color: var(--nv-teal); font: 700 13px/1 inherit; font-family: inherit; cursor: pointer;
+  transition: background .15s, box-shadow .15s, transform .15s;
+  z-index: 2;
+}
+#portal-home .portal-search-wrap .portal-dir-btn:hover { background: #dff1f6; box-shadow: 0 4px 12px -4px rgba(13, 132, 156, .45); }
+#portal-home .portal-search-wrap .portal-dir-btn:active { transform: translateY(-50%) scale(.97); }
+#portal-home .portal-search-wrap .portal-dir-btn:focus-visible { outline: 3px solid rgba(22, 164, 191, .45); outline-offset: 2px; }
+#portal-home .portal-search-wrap .portal-dir-btn svg { width: 16px; height: 16px; }
+#portal-home .portal-search-wrap.has-dir-btn .portal-search-kbd { left: 158px; }
+#portal-home .portal-search-wrap.has-dir-btn .portal-search-input { padding-left: 196px; }
+
+/* ══════════ لوحة البحث العامة ══════════ */
+html.navp-lock { overflow: hidden; }
+.navp { position: fixed; inset: 0; z-index: 9800; display: none; direction: rtl; font-family: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif; }
+.navp.is-open { display: block; }
+.navp-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(8, 26, 36, .52);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: navpFade .18s ease both;
+}
+.navp-box {
+  position: relative; margin: 8vh auto 0;
+  width: min(820px, calc(100vw - 32px));
+  max-height: min(78vh, 760px);
+  display: flex; flex-direction: column;
+  background: #fff; border-radius: 22px;
+  box-shadow: 0 40px 100px -20px rgba(8, 26, 36, .55), 0 0 0 1px rgba(13, 47, 64, .08);
+  overflow: hidden;
+  animation: navpIn .22s var(--nv-ease) both;
+}
+.navp-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; border-bottom: 1px solid var(--nv-line);
+  background: linear-gradient(180deg, #fbfdfe, #fff);
+}
+.navp-search-ico { width: 22px; height: 22px; color: var(--nv-teal); flex-shrink: 0; }
+.navp-search-ico svg { width: 100%; height: 100%; }
+.navp-input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+  font: 600 17px/1.4 inherit; font-family: inherit; color: var(--nv-ink);
+  padding: 6px 0;
+}
+.navp-input::placeholder { color: #9aabb5; font-weight: 500; }
+.navp-close {
+  flex-shrink: 0; border: 1px solid var(--nv-line); background: var(--nv-soft); color: var(--nv-muted);
+  border-radius: 8px; padding: 5px 9px; font: 700 11px/1 ui-monospace, Consolas, monospace; cursor: pointer;
+}
+.navp-close:hover { background: #e8eef2; color: var(--nv-ink); }
+.navp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 16px; scrollbar-width: thin; }
+.navp-foot {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center;
+  padding: 10px 18px; border-top: 1px solid var(--nv-line); background: var(--nv-soft);
+  font-size: 11.5px; color: var(--nv-muted);
+}
+.navp-foot-tip { margin-inline-start: auto; }
+.navp kbd {
+  display: inline-block; min-width: 18px; text-align: center; direction: ltr;
+  font: 700 10.5px/1 ui-monospace, Consolas, monospace;
+  padding: 3px 5px; margin: 0 2px; border-radius: 5px;
+  background: #fff; border: 1px solid var(--nv-line); border-bottom-width: 2px; color: var(--nv-ink);
+}
+.navp-group { margin-top: 8px; }
+.navp-group + .navp-group { margin-top: 18px; }
+.navp-group-h { font-size: 12.5px; font-weight: 800; color: var(--nv-navy); margin: 4px 6px 10px; }
+.navp-group-h small { font-weight: 500; color: var(--nv-muted); }
+.navp-recent { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
+.navp-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 12px 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--nv-line); background: #fff; color: var(--nv-ink);
+  font: 700 13px/1.2 inherit; font-family: inherit;
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.navp-chip small { font-weight: 500; color: var(--nv-muted); font-size: 11px; }
+.navp-chip-ico svg, .navp-sec-h svg, .navp-ico svg, .secnav svg.cat-ico-svg, .secnav-menu-item svg, .cat-sidebar-sec-item svg { width: 16px; height: 16px; }
+.navp-chip:hover, .navp-chip.is-active { border-color: rgba(13, 132, 156, .45); background: #f0f9fb; }
+
+.navp-dir { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.navp-sec { border: 1px solid var(--nv-line); border-radius: 16px; padding: 10px 10px 8px; background: #fff; min-width: 0; }
+.navp-sec-h {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: 0; background: transparent; cursor: pointer; text-align: right;
+  font: 800 13.5px/1.3 inherit; font-family: inherit; color: var(--nv-navy);
+  padding: 4px 6px 8px; border-bottom: 1px dashed var(--nv-line); margin-bottom: 6px;
+}
+.navp-sec-h:hover, .navp-sec-h.is-active { color: var(--nv-teal); }
+.navp-sec-note { margin: 4px 6px; font-size: 12px; color: var(--nv-muted); line-height: 1.6; }
+.navp-sec ul { list-style: none; margin: 0; padding: 0; }
+.navp-dir-item {
+  display: block; width: 100%; text-align: right; cursor: pointer;
+  border: 0; background: transparent; border-radius: 10px; padding: 7px 8px;
+  font-family: inherit; color: var(--nv-ink);
+  transition: background .12s;
+}
+.navp-dir-item span { display: block; font-weight: 700; font-size: 13px; }
+.navp-dir-item small {
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 11px; color: var(--nv-muted); margin-top: 1px; line-height: 1.5;
+}
+.navp-dir-item:hover, .navp-dir-item.is-active { background: #eef7fa; }
+.navp-dir-item:hover span, .navp-dir-item.is-active span { color: var(--nv-teal); }
+
+.navp-results { display: flex; flex-direction: column; gap: 3px; }
+.navp-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: right;
+  border: 1px solid transparent; background: transparent; border-radius: 14px; padding: 10px 12px;
+  font-family: inherit; color: var(--nv-ink); cursor: pointer;
+}
+.navp-item.is-active { background: #eef7fa; border-color: rgba(13, 132, 156, .25); }
+.navp-ico {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #e8f3f6; color: var(--nv-teal); font-size: 17px;
+}
+.navp-ico svg { width: 19px; height: 19px; }
+.navp-ico-ai { background: linear-gradient(135deg, #0d2f40, #0d849c); color: #fff; font-size: 16px; }
+.navp-ico-school { background: #f5efe4; }
+.navp-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.navp-lbl { font-weight: 800; font-size: 14.5px; }
+.navp-lbl mark { background: rgba(22, 164, 191, .18); color: inherit; border-radius: 4px; padding: 0 2px; }
+.navp-sub { font-size: 12px; color: var(--nv-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.navp-tag {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--nv-muted);
+  background: var(--nv-soft); border: 1px solid var(--nv-line); border-radius: 999px; padding: 3px 9px;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.navp-enter { flex-shrink: 0; color: var(--nv-teal); font-weight: 800; opacity: 0; }
+.navp-item.is-active .navp-enter { opacity: 1; }
+.navp-k-ai .navp-lbl { color: var(--nv-navy); }
+.navp-empty { padding: 18px 10px 8px; color: var(--nv-muted); font-size: 13px; text-align: center; }
+@keyframes navpFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes navpIn { from { opacity: 0; transform: translateY(-10px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* ══════════ شريط القسم ══════════ */
+.secnav {
+  position: relative; z-index: 30;
+  background: #fff; border: 1px solid var(--nv-line); border-radius: 18px;
+  padding: 12px 14px 10px; margin: 0 0 16px;
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .04), 0 10px 26px -18px rgba(15, 37, 51, .35);
+  direction: rtl;
+}
+.secnav-top { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.secnav-crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; font-size: 13px; }
+.secnav-sep { color: #a6b5be; font-weight: 700; }
+.secnav-home, .secnav-sec {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid transparent; background: transparent; border-radius: 10px; padding: 5px 8px;
+  font: 700 13px/1.2 inherit; font-family: inherit; color: var(--nv-muted);
+}
+.secnav-home svg { width: 16px; height: 16px; }
+.secnav-home:hover { background: var(--nv-soft); color: var(--nv-ink); }
+.secnav-sec { color: var(--nv-navy); font-weight: 800; background: var(--nv-soft); border-color: var(--nv-line); }
+.secnav-sec i { font-style: normal; font-size: 10px; color: var(--nv-muted); }
+.secnav-sec:hover { border-color: rgba(13, 132, 156, .4); }
+.secnav-sec svg { width: 16px; height: 16px; }
+.secnav-cur { font-weight: 800; color: var(--nv-teal); }
+.secnav-sec-wrap { position: relative; }
+.secnav-menu {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  width: 280px; max-height: 60vh; overflow-y: auto;
+  background: #fff; border: 1px solid var(--nv-line); border-radius: 14px; padding: 6px;
+  box-shadow: 0 24px 50px -16px rgba(8, 26, 36, .4);
+}
+.secnav-menu.is-open { display: block; animation: navpIn .16s var(--nv-ease) both; }
+.secnav-menu-item, .cat-sidebar-sec-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: right;
+  border: 0; background: transparent; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+  font: 700 13px/1.3 inherit; font-family: inherit; color: var(--nv-ink);
+}
+.secnav-menu-item:hover, .cat-sidebar-sec-item:hover { background: #eef7fa; color: var(--nv-teal); }
+.secnav-menu-item.is-current { background: var(--nv-navy); color: #fff; }
+.secnav-find {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--nv-line); background: var(--nv-soft); color: var(--nv-muted);
+  border-radius: 12px; padding: 7px 10px 7px 8px; min-width: 250px;
+  font: 600 13px/1.2 inherit; font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.secnav-find span { flex: 1; text-align: right; }
+.secnav-find svg { width: 15px; height: 15px; color: var(--nv-teal); }
+.secnav-find:hover { border-color: rgba(13, 132, 156, .45); background: #fff; color: var(--nv-ink); }
+.secnav-find kbd, .cat-sidebar-find kbd {
+  font: 700 10px/1 ui-monospace, Consolas, monospace; direction: ltr;
+  padding: 3px 5px; border-radius: 5px; background: #fff; border: 1px solid var(--nv-line); color: var(--nv-muted);
+}
+.secnav-tabs {
+  display: flex; gap: 6px; margin-top: 10px; padding: 4px; overflow-x: auto;
+  background: var(--nv-soft); border-radius: 14px; scrollbar-width: none;
+}
+.secnav-tabs::-webkit-scrollbar { display: none; }
+.secnav-tab {
+  flex-shrink: 0; cursor: pointer; white-space: nowrap;
+  border: 1px solid transparent; background: transparent; color: var(--nv-muted);
+  border-radius: 10px; padding: 8px 14px;
+  font: 700 13px/1.2 inherit; font-family: inherit;
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.secnav-tab:hover { background: #fff; color: var(--nv-ink); }
+.secnav-tab.is-active {
+  background: #fff; color: var(--nv-navy); border-color: var(--nv-line);
+  box-shadow: 0 1px 2px rgba(15, 37, 51, .06), 0 4px 10px -6px rgba(15, 37, 51, .35);
+}
+.secnav-tab.is-active::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--nv-teal); margin-inline-end: 7px; vertical-align: middle; }
+.secnav-desc { margin: 8px 4px 0; font-size: 12.5px; color: var(--nv-muted); line-height: 1.6; }
+.secnav-desc:empty { display: none; }
+.secnav button:focus-visible, .navp button:focus-visible, .cat-sidebar-find:focus-visible { outline: 3px solid rgba(22, 164, 191, .45); outline-offset: 2px; }
+
+/* ══════════ القائمة الجانبية ══════════ */
+.cat-sidebar .cat-sidebar-find {
+  display: flex; align-items: center; gap: 8px; width: calc(100% - 4px); margin: 4px 2px 10px;
+  border: 1px solid var(--nv-line); background: var(--nv-soft); color: var(--nv-muted);
+  border-radius: 11px; padding: 8px 10px; cursor: pointer;
+  font: 600 12.5px/1.2 inherit; font-family: inherit;
+}
+.cat-sidebar .cat-sidebar-find span { flex: 1; text-align: right; }
+.cat-sidebar .cat-sidebar-find svg { width: 14px; height: 14px; color: var(--nv-teal); }
+.cat-sidebar .cat-sidebar-find:hover { border-color: rgba(13, 132, 156, .45); background: #fff; }
+.cat-sidebar.collapsed .cat-sidebar-find, .cat-sidebar.collapsed .cat-sidebar-allsecs { display: none; }
+.cat-sidebar .cat-sidebar-item .cat-sidebar-desc {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 10.5px; font-weight: 500; line-height: 1.45; opacity: .72; margin-top: 2px; white-space: normal;
+}
+.cat-sidebar .cat-sidebar-item { white-space: normal; }
+.cat-sidebar .cat-sidebar-allsecs { margin: 12px 2px 2px; border-top: 1px solid var(--nv-line); padding-top: 8px; }
+.cat-sidebar .cat-sidebar-allsecs summary {
+  cursor: pointer; list-style: none; font-size: 12px; font-weight: 800; color: var(--nv-muted); padding: 6px 8px; border-radius: 8px;
+}
+.cat-sidebar .cat-sidebar-allsecs summary::-webkit-details-marker { display: none; }
+.cat-sidebar .cat-sidebar-allsecs summary::before { content: "▸"; display: inline-block; margin-inline-end: 6px; transition: transform .15s; }
+.cat-sidebar .cat-sidebar-allsecs[open] summary::before { transform: rotate(90deg); }
+.cat-sidebar .cat-sidebar-allsecs summary:hover { background: var(--nv-soft); color: var(--nv-ink); }
+.cat-sidebar .cat-sidebar-sec-item { font-size: 12.5px; padding: 7px 8px; }
+
+/* ══════════ موبايل / تابلت ══════════ */
+@media (max-width: 1100px) {
+  .topbar .tb-btn.tb-finder .tb-finder-txt, .topbar .tb-btn.tb-finder kbd { display: none; }
+}
+@media (max-width: 900px) {
+  .navp-dir { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .secnav-find { min-width: 0; }
+  .secnav-find kbd { display: none; }
+}
+@media (max-width: 600px) {
+  .navp-box { margin: 0; width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  .navp-dir { grid-template-columns: 1fr; }
+  .navp-foot { display: none; }
+  .navp-tag { display: none; }
+  .navp-input { font-size: 16px; }
+  .secnav { padding: 10px 10px 8px; border-radius: 16px; }
+  .secnav-top { flex-wrap: nowrap; }
+  .secnav-find { padding: 8px; }
+  .secnav-find span { display: none; }
+  .secnav-home span { display: none; }
+  .secnav-crumbs { flex-wrap: nowrap; overflow: hidden; }
+  .secnav-crumbs .secnav-sep:last-of-type, .secnav-cur { display: none; }
+  .secnav-sec span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .secnav-menu { position: fixed; top: auto; bottom: 12px; right: 12px; left: 12px; width: auto; max-height: 70vh; }
+  .secnav-desc { font-size: 12px; }
+  #portal-home .portal-search-wrap .portal-dir-btn { padding: 0 11px; }
+  #portal-home .portal-search-wrap .portal-dir-btn span { display: none; }
+  #portal-home .portal-search-wrap.has-dir-btn .portal-search-input { padding-left: 62px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .navp-backdrop, .navp-box, .secnav-menu.is-open { animation: none !important; }
+}
+/* ═══ NAV v5 — END ═══ */

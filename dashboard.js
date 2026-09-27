@@ -15,6 +15,30 @@
 window.__BALAGH_AI_PATCH_VERSION = "school-360-unified-profile-2026-08-24";
 console.log("[Dashboard] patch version:", window.__BALAGH_AI_PATCH_VERSION);
 
+// 🛡️ (2026-09-27 — إصلاح جذري) بديل آمن لـ Math.max(...arr)/Math.min(...arr)
+// (أو Math.max.apply(null, arr)) لأي مصفوفة أرقام. المشكلة: نشر القيم
+// كوسائط لاستدعاء دالة (سواء عبر "..." أو .apply) له حد أقصى لعدد الوسائط
+// في محرك JS (V8 في Chrome يرفض وسائط أكثر من ~120 ألف تقريبًا برسالة
+// "Maximum call stack size exceeded")، فأي مصفوفة تكبر عن كده (زي شيت
+// البلاغات اللي بقى فيه أكتر من 100 ألف صف فعليًا) بتكسر أي دالة بتستخدم
+// هذا النمط بالكامل بدل ما ترجع نتيجة غلط بس — وده بالظبط سبب كارت "حصل
+// خطأ أثناء عرض بيانات البلاغات" اللي ظهر للمستخدم في تبويب البلاغات (أول
+// دالة اتكسرت: حساب أحدث/أقدم تاريخ إنشاء عبر Math.max/min(...validDates)).
+// الحل: حلقة for عادية — بأداء أفضل كمان، وبدون أي حد أقصى لحجم المصفوفة.
+// نفس دلالات Math.max/Math.min بالظبط لمصفوفة فاضية (-Infinity/Infinity).
+function safeArrMax_(arr) {
+  let m = -Infinity;
+  if (arr) for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (v > m) m = v; }
+  return m;
+}
+function safeArrMin_(arr) {
+  let m = Infinity;
+  if (arr) for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (v < m) m = v; }
+  return m;
+}
+window.safeArrMax_ = safeArrMax_;
+window.safeArrMin_ = safeArrMin_;
+
 // 🔁 (2026-09-22) مساعد عام لإعادة محاولة أي طلب fetch أكثر من مرة قبل
 // الاستسلام — لوحظ إن بعض طلبات Google Apps Script (خصوصًا أول طلب بعد
 // فترة خمول أو بعد إعادة نشر (Redeploy) حديثة) بترجع فشل عابر (خطأ CORS/
@@ -2561,7 +2585,11 @@ function renderStageCompareTab() {
     const stage1Rows = allRows.filter((r) => r.date && monthKey(r.date) === anchorMonthKey);
     stage1Rows.forEach((r) => { r.stage = "1"; }); // توحيد اسم المرحلة رسميًا بغض النظر عن شكل عمود "المرحلة" الأصلي
     allRows.length = 0;
-    allRows.push(...stage1Rows);
+    // ⚠️ (2026-09-27) allRows.push(...stage1Rows) بدل حلقة for — نفس فئة
+    // مشكلة Math.max(...arr) (راجع safeArrMax_ أعلى الملف): نشر مصفوفة
+    // كبيرة كوسائط push بيتكسر لو عدد الصفوف كبير جدًا. عدد مدارس هذا الشيت
+    // غير محتمل يقرب من الحد ده حاليًا، لكن حلقة for آمنة دائمًا وبنفس الأداء.
+    for (let i = 0; i < stage1Rows.length; i++) allRows.push(stage1Rows[i]);
 
     // 2) كل زيارات شيت الأنظمة بعد شهر المرحلة 1 (مايو فصاعدًا) — مجمّعة
     //    بـ(مدرسة+شهر)، آخر زيارة في الشهر بس — مرقّمة تسلسليًا بترتيبها
@@ -6188,10 +6216,12 @@ function renderStudentsTab() {
                 : ageBinData[6]++;
   });
   const studNums = withStudents.map((r) => r.students),
-    studBins =
-      (Math.min(...studNums),
-      Math.max(...studNums),
-      ["1–200", "201–400", "401–600", "601–800", "801–1000", "1001–1500", "1500+"]),
+    // ⚠️ (2026-09-27) كان هنا Math.min(...studNums)/Math.max(...studNums) قبل
+    // مصفوفة العناوين مباشرة، مفصولين بعامل الفاصلة (,) — نتيجتهما بترمي
+    // فورًا وملهاش أي استخدام (studBins بتاخد بس القيمة الأخيرة في السلسلة).
+    // كود ميت فعليًا، وبرضه عرضة لنفس مشكلة Math.max(...arr) مع مصفوفة كبيرة
+    // (راجع safeArrMax_/safeArrMin_ أعلى الملف) — بلا أي فايدة تقابل الخطر. اتشال.
+    studBins = ["1–200", "201–400", "401–600", "601–800", "801–1000", "1001–1500", "1500+"],
     studBinData = [0, 0, 0, 0, 0, 0, 0];
   (withStudents.forEach((r) => {
     const s = r.students;
@@ -8264,7 +8294,7 @@ function renderSpareTab() {
     avgUnit = withUnit.length
       ? withUnit.reduce((s, r) => s + r.unitValue, 0) / withUnit.length
       : null,
-    maxUnit = withUnit.length ? Math.max(...withUnit.map((r) => r.unitValue)) : null,
+    maxUnit = withUnit.length ? safeArrMax_(withUnit.map((r) => r.unitValue)) : null,
     byStage = (withUnit.sort((a, b) => b.unitValue - a.unitValue)[0], {});
   rows.forEach((r) => {
     r.stage &&
@@ -11853,15 +11883,18 @@ function _sysDownloadFile(filename, content, mime) {
 
     // أحدث تاريخ إنشاء
     const validDates = rows.map(r => r.creationDateObj).filter(Boolean);
+    // ⚠️ (2026-09-27) كانت هنا Math.max(...arr) — بتكسر مع أكتر من ~120 ألف
+    // تاريخ (راجع safeArrMax_/safeArrMin_ أعلى الملف لشرح كامل السبب).
+    const validDateTimes = validDates.map(d => d.getTime());
     const latestDate = validDates.length
-      ? new Date(Math.max(...validDates.map(d => d.getTime())))
+      ? new Date(safeArrMax_(validDateTimes))
       : null;
     const latestDateStr = latestDate
       ? latestDate.toLocaleDateString("ar-SA", { year:"numeric", month:"short", day:"numeric" })
       : "—";
     // أقدم تاريخ
     const oldestDate = validDates.length
-      ? new Date(Math.min(...validDates.map(d => d.getTime())))
+      ? new Date(safeArrMin_(validDateTimes))
       : null;
     const oldestDateStr = oldestDate
       ? oldestDate.toLocaleDateString("ar-SA", { year:"numeric", month:"short", day:"numeric" })
@@ -26210,7 +26243,7 @@ ${(() => {
         })
         .sort(function (a, b) { return b.tt - a.tt; });
 
-      var maxRegionTotal = Math.max.apply(null, regionCards.map(function (c) { return c.tt; }).concat([1]));
+      var maxRegionTotal = safeArrMax_(regionCards.map(function (c) { return c.tt; }).concat([1]));
 
       var regionCardsHtml = regionCards
         .map(function (c) {
@@ -26539,7 +26572,7 @@ ${(() => {
 
         // نطاق المحور الأفقي وتقسيمه إلى 10 شرائح
         var xs = pts.map(function (p) { return p.x; });
-        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        var minX = safeArrMin_(xs), maxX = safeArrMax_(xs);
         if (minX === maxX) return config;
         var BINS = 10, step = (maxX - minX) / BINS;
         var sums = new Array(BINS).fill(0), cnts = new Array(BINS).fill(0);
@@ -28442,8 +28475,8 @@ ${panelHTML}
       if (scores.length){
         summary = `<div class="ix-profile-mini-kpis">
           <div><b>${scores.length.toLocaleString()}</b><span>تقييم</span></div>
-          <div><b>${Math.min(...scores).toFixed(1)}%</b><span>الأقل</span></div>
-          <div><b>${Math.max(...scores).toFixed(1)}%</b><span>الأعلى</span></div>
+          <div><b>${safeArrMin_(scores).toFixed(1)}%</b><span>الأقل</span></div>
+          <div><b>${safeArrMax_(scores).toFixed(1)}%</b><span>الأعلى</span></div>
         </div>`;
       }
     } else if (def.key === "RAW_ALL_SYSTEMS"){
@@ -29812,8 +29845,8 @@ window.addEventListener('load', function () {
         const withFca = raw.filter(r => r.fca != null);
         if (withFca.length) {
           snap.avgFca = (withFca.reduce((s,r)=>s+r.fca,0)/withFca.length).toFixed(1);
-          snap.minFca = Math.min(...withFca.map(r=>r.fca)).toFixed(1);
-          snap.maxFca = Math.max(...withFca.map(r=>r.fca)).toFixed(1);
+          snap.minFca = safeArrMin_(withFca.map(r=>r.fca)).toFixed(1);
+          snap.maxFca = safeArrMax_(withFca.map(r=>r.fca)).toFixed(1);
           snap.fcaBelow50 = withFca.filter(r=>r.fca<50).length;
         }
         const cities = [...new Set(raw.map(r=>r.city).filter(Boolean))];
@@ -31921,10 +31954,118 @@ function _orgMarkReachable(node, set) {
   node.children.forEach((c) => _orgMarkReachable(c, set));
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ★ 2026-09-27 (v5): مطابقة أذكى لعمود "المدير المباشر" — بناءً على
+// مراجعة كاملة لملف "البيانات" الحقيقي (256 صف) اللي بعتته المستخدمة
+// (نفس ملف الجوجل شيت اللي بيتغذى منه هذا التبويب فعليًا)، مع ملف
+// "قالب الهيكل الوظيفي للاستشاري" (pptx) اللي بعتته بجانبه — اتاخد من
+// الـ pptx الشكل البصري بس (راجع _orgCardHtml/_orgRegionDisplayLabel)،
+// من غير أي اسم أو رقم منه، بالظبط زي ما طلبت.
+// تبيّن من المراجعة إن أغلب قيم "المدير المباشر" (أكتر من 200 من 256
+// صف) مكتوبة بصيغة "اسم مختصر" (مثلاً "خالد الغامدي" بدل "خالد
+// عبدالقادر الغامدي" اللي هو الاسم الكامل في عمود "اسم الموظف\المرشح")
+// مش الاسم الكامل بالحرف — فالمطابقة الحرفية القديمة (v1-v4، لسه أول
+// محاولة تحت وميتشالتش) كانت بتفشل في أغلب الحالات وبتحوّل كل واحد
+// منهم لعقدة "خارج نطاق الملف" منفصلة حتى لو مديره الحقيقي موجود فعليًا
+// كموظف في نفس الملف. الطبقات دي بتتجرّب بالترتيب **بعد** فشل المطابقة
+// الحرفية القديمة، وقبل ما نستسلم ونعتبره "مدير خارج نطاق الملف" زي
+// الأول بالظبط (فمفيش أي رجوع للخلف في الحالات اللي كانت شغالة صح):
+//  1) alias يدوي مؤكّد من المستخدمة نفسها لحالة واحدة راجعناها سوا قبل
+//     التنفيذ (باسم نبيه حلمي داوود = باسم نبيه حلمى ابراهيم، مدير
+//     مشروع الطائف — نفس الشخص باسمين مختلفين شوية في العمودين).
+//  2) تجاهل قيم "شكلية" مش أسماء أشخاص أصلًا (زي "التجهيزات" أو
+//     "Administrative Support" — نصوص Template/نوع فريق اتكتبت غلط في
+//     خانة المدير) — كانت بتتحول غلط لعقدة "مدير" وهمية باسم غير حقيقي؛
+//     دلوقتي بتتعامل تمامًا كأن الخانة فاضية (الصف بيبقى رأس فرعه).
+//  3) شيل بادئة لقب ("د.") أو بادئة اسم منطقة ملصقة غلط في نفس الخلية
+//     (خطأ إدخال بيانات موجود فعلًا في الشيت الأصلي، زي "مكة فارس
+//     زراد")، ثم مطابقة "مرنة" بالتوكنز الأساسية للاسم (تجاهل "بن/ابن"
+//     وأل التعريف): لو رجّعت شخص واحد بالظبط (أو واحد بعد ترجيح نفس
+//     المنطقة لو فيه أكتر من مرشح بنفس الاسم المختصر) بيتربط بيه؛ ولو
+//     رجّعت الشخص نفسه (يكتب اسمه المختصر في خانة مديره هو نفسه — حالة
+//     "مدير مشروع" مكة والمدينة المنورة فعليًا في البيانات) بيتعامل زي
+//     خانة فاضية (هو رأس فرعه، مش إنه مدير نفسه). أي حالة لسه غامضة
+//     (أكتر من مرشح حتى بعد ترجيح المنطقة، أو مفيش مرشح خالص) بترجع
+//     بالظبط لنفس سلوك "مدير خارج نطاق الملف" القديم — **مفيش أي تخمين
+//     إضافي** على أي اسم شخص حقيقي غير مؤكد، فمفيش بيانات بتتخفي أو
+//     بتتنسب غلط، وأي حالة كده لسه ممكن تتصحح يدويًا من محرر التعديل.
+// ═══════════════════════════════════════════════════════════════════
+const ORGC_MANAGER_NAME_ALIASES = {
+  // ★ مؤكَّد من المستخدمة (2026-09-27) عبر سؤال مباشر قبل التنفيذ: نفس
+  // شخص "مدير مشروع" الطائف مكتوب باسمين مختلفين شوية في العمودين.
+  "باسم نبيه حلمي داوود": "باسم نبيه حلمى ابراهيم",
+};
+const ORGC_PLACEHOLDER_MANAGER_VALUES = new Set(
+  [
+    "التجهيزات",
+    "Administrative Support",
+    "Administrative  Support",
+    "Administrator",
+    "Facility Engineer",
+    "Technical Support Team",
+    "Facility / Project Manager",
+    "Operations Team",
+    "Op Team",
+  ].map((v) => _orgMatchKey(v).toLowerCase())
+);
+const ORGC_TITLE_PREFIXES = ["د.", "دكتور", "أ.", "م.", "الأستاذ", "استاذ"];
+// أسماء مناطق (وصيغها المختصرة) بتتكتب أحيانًا كبادئة ملصقة غلط باسم
+// المدير في نفس الخلية (خطأ إدخال بيانات موجود فعلًا في الشيت الأصلي).
+const ORGC_REGION_PREFIX_ALIASES = ["مكة المكرمة", "مكة", "المدينة المنورة", "المدينة", "المنطقة الغربية", "الطائف", "جدة"];
+
+function _orgStripTitlePrefix(s) {
+  for (const p of ORGC_TITLE_PREFIXES) {
+    if (s.indexOf(p) === 0) return s.slice(p.length).trim();
+  }
+  return s;
+}
+function _orgStripRegionPrefix(s) {
+  for (const rg of ORGC_REGION_PREFIX_ALIASES) {
+    if (s.indexOf(rg + " ") === 0) return s.slice(rg.length + 1).trim();
+  }
+  return s;
+}
+// نص المدير بعد كل التطبيع (alias يدوي مؤكّد → شيل لقب → شيل بادئة
+// منطقة ملصقة غلط) — ده اللي بنحاول نطابقه فعليًا، مش النص الخام زي ما
+// هو، عشان أعلى فرصة مطابقة صحيحة من غير أي تخمين على هوية شخص.
+function _orgCleanManagerRaw(mgrRaw) {
+  const raw = _orgNorm(mgrRaw);
+  const aliased = ORGC_MANAGER_NAME_ALIASES[raw] || raw;
+  return _orgStripRegionPrefix(_orgStripTitlePrefix(aliased));
+}
+function _orgIsPlaceholderManager(mgrRaw) {
+  return ORGC_PLACEHOLDER_MANAGER_VALUES.has(_orgMatchKey(mgrRaw).toLowerCase());
+}
+// "توكنز أساسية" لاسم بالعربي: بتشيل "بن/ابن/بنت" وبتشيل "أل" التعريف
+// من أول أي كلمة — عشان "خالد الغامدي" (اسم مختصر) تتطابق مع "خالد
+// عبدالقادر الغامدي" (الاسم الكامل لنفس الشخص)، من غير ما تتطابق غلط مع
+// شخص تاني مختلف تمامًا اتفق بس في كلمة واحدة عادية.
+function _orgCoreTokens(s) {
+  return _orgMatchKey(s)
+    .split(" ")
+    .filter(Boolean)
+    .filter((t) => t !== "بن" && t !== "ابن" && t !== "بنت")
+    .map((t) => (t.indexOf("ال") === 0 && t.length > 2 ? t.slice(2) : t));
+}
+// هل كل توكنز المدير موجودين جوه توكنز اسم الموظف (بدون اعتبار للترتيب،
+// وبدون استخدام نفس الكلمة مرتين)؟ لازم توكنين على الأقل عشان نتفادى
+// تطابقات وهمية بكلمة عربية شائعة واحدة بس (زي "محمد" لوحدها).
+function _orgCoreTokensSubset(mgrTokens, nameTokens) {
+  if (mgrTokens.length < 2) return false;
+  const pool = nameTokens.slice();
+  for (const t of mgrTokens) {
+    const i = pool.indexOf(t);
+    if (i === -1) return false;
+    pool.splice(i, 1);
+  }
+  return true;
+}
+
 // يبني "غابة" (forest) من الأشجار: كل صف (موظف بالاسم أو شاغر بدون اسم)
-// بيتحول لعقدة، وبيتربط بمديره المباشر لو الاسم مطابق بالحرف لموظف تاني
-// في نفس الملف. أي قيمة في عمود "المدير المباشر" ميطابقتش حد موجود
-// بتتحول لعقدة "خارجية" واحدة (مش مكررة) بنفس النص المكتوب بالظبط.
+// بيتحول لعقدة، وبيتربط بمديره المباشر لو الاسم مطابق (حرفيًا، أو بعد
+// التطبيع/المطابقة المرنة فوق) لموظف تاني في نفس الملف. أي قيمة في عمود
+// "المدير المباشر" لسه ميطابقتش حد موجود (حتى بعد كل المحاولات فوق)
+// بتتحول لعقدة "خارجية" واحدة (مش مكررة) بنفس النص بعد التطبيع.
 function _orgBuildForest(rows) {
   // ★ خط دفاع: يضمن إن كل صف عنده بصمة هوية ثابتة (__orgcKey) قبل أي
   // استخدام لمحرر التعديل — راجع الشرح فوق _orgEnsureIdentityKeys.
@@ -31950,6 +32091,10 @@ function _orgBuildForest(rows) {
       isExternal: false,
       children: [],
     };
+    // ★ v5: توكنز أساسية جاهزة لكل موظف بالاسم — مستخدمة في المطابقة
+    // المرنة تحت (_orgCoreTokensSubset)، محسوبة مرة واحدة هنا بدل ما
+    // تتحسب من جديد لكل محاولة مطابقة.
+    node.coreTokens = name ? _orgCoreTokens(name) : [];
     nodes.push(node);
     if (name) byKey[_orgMatchKey(name)] = node;
   });
@@ -31982,9 +32127,40 @@ function _orgBuildForest(rows) {
   nodes.slice().forEach((n) => {
     if (n.isExternal) return; // العقد الخارجية بتتضاف كجذور في الآخر
     if (!n.mgrKey) { roots.push(n); return; }
-    const parent = byKey[n.mgrKey];
-    if (parent && parent !== n) { parent.children.push(n); return; }
-    getExternalNode(n.mgrRaw).children.push(n);
+    // ★ v5: قيمة "شكلية" (اسم نوع فريق/قالب مكتوب غلط في خانة المدير)
+    // — بتتعامل كخانة فاضية، مش كمدير وهمي باسم غير حقيقي.
+    if (_orgIsPlaceholderManager(n.mgrRaw)) { roots.push(n); return; }
+
+    // 1) مطابقة حرفية (زي v1-v4 بالظبط) — بعد alias يدوي مؤكّد لو وجد
+    // وبعد شيل بادئة لقب/منطقة ملصقة غلط (راجع _orgCleanManagerRaw فوق).
+    const cleaned = _orgCleanManagerRaw(n.mgrRaw);
+    let parent = byKey[_orgMatchKey(cleaned)] || byKey[n.mgrKey];
+    if (parent === n) parent = null; // مايبقاش هو مديره هو نفسه
+
+    // 2) لو المطابقة الحرفية فشلت، جرّب مطابقة مرنة بالتوكنز الأساسية
+    // (راجع _orgCoreTokensSubset) — بترجع لنفس سلوك "خارج نطاق الملف"
+    // القديم بالظبط لو النتيجة غامضة (أكتر من مرشح) أو مفيش مرشح خالص.
+    if (!parent) {
+      const mgrTokens = _orgCoreTokens(cleaned);
+      const candidates = nodes.filter(
+        (c) => c !== n && !c.isExternal && c.isNamed && _orgCoreTokensSubset(mgrTokens, c.coreTokens)
+      );
+      if (candidates.length === 1) {
+        parent = candidates[0];
+      } else if (candidates.length > 1) {
+        // أكتر من شخص بنفس الاسم المختصر — رجّح اللي في نفس منطقة الصف.
+        const sameRegion = candidates.filter((c) => c.region && c.region === n.region);
+        if (sameRegion.length === 1) parent = sameRegion[0];
+      } else if (_orgCoreTokensSubset(mgrTokens, n.coreTokens)) {
+        // الترشيح الوحيد المنطقي كان الصف نفسه (كاتب اسمه المختصر في
+        // خانة مديره هو) — ده معناه إنه رأس فرعه، مش إنه مدير نفسه.
+        roots.push(n);
+        return;
+      }
+    }
+
+    if (parent) { parent.children.push(n); return; }
+    getExternalNode(cleaned || n.mgrRaw).children.push(n);
   });
   Object.keys(externalByKey).forEach((k) => roots.push(externalByKey[k]));
 
@@ -32006,16 +32182,32 @@ function _orgBuildForest(rows) {
   // التجميع الوحيد المتبقي فوق مستوى الأشخاص هو المنطقة (عشان بانل
   // renderOrgChart-style لكل مكتب)، وده مش عقدة في الشجرة — ده هيدر
   // البانل نفسه (_orgBuildRegionPanels) زي ما هو من v3.
-  function effectiveRegion(node, seen) {
-    if (node.region) return node.region;
-    seen = seen || new Set();
-    if (seen.has(node.id)) return "";
+  // ★ v5: بدل ما ناخد أول منطقة نلاقيها في أول فرع بس (كان بيخلي أي
+  // "مدير خارج نطاق الملف" ليه مرؤوسين في أكتر من منطقة يتحط بالغلط
+  // تحت بانل منطقة واحد بس منهم لو حصل واحد منهم بالصدفة أول واحد في
+  // ترتيب صفوف الشيت — وده فعلًا بيحصل مع مدير إدارة المرافق نفسه في
+  // البيانات الحقيقية: 25 من الـ 26 اللي بيديروا له في WR، وواحد بس
+  // مسجّل بمنطقة تانية بالغلط في عمود المنطقة، وكان بيظهر هو وفرعه كله
+  // (شامل مدير إدارة المرافق ومدراء المشاريع تحته) تحت المنطقة التانية
+  // بدل WR بالكامل) — دلوقتي بناخد **أغلب** منطقة موجودة فعليًا بين كل
+  // نسله (مش بس أول واحد بيتلاقى)، فالفرع بيتحط تحت المنطقة اللي فيها
+  // غالبية مرؤوسيه الفعليين، مش تحت أول واحد اتصادف يبقى قدامهم.
+  function _orgCollectRegionCounts(node, counts, seen) {
+    if (seen.has(node.id)) return;
     seen.add(node.id);
-    for (const c of node.children) {
-      const r = effectiveRegion(c, seen);
-      if (r) return r;
-    }
-    return "";
+    if (node.region) counts[node.region] = (counts[node.region] || 0) + 1;
+    node.children.forEach((c) => _orgCollectRegionCounts(c, counts, seen));
+  }
+  function effectiveRegion(node) {
+    if (node.region) return node.region;
+    const counts = {};
+    _orgCollectRegionCounts(node, counts, new Set());
+    let best = "";
+    let bestCount = 0;
+    Object.keys(counts).forEach((rg) => {
+      if (counts[rg] > bestCount) { best = rg; bestCount = counts[rg]; }
+    });
+    return best;
   }
   function countDescendants(node) {
     let c = node.isGroup ? 0 : 1;
@@ -32121,26 +32313,53 @@ function _orgRenderNode(node, visited, depth) {
   visited.add(node.id);
   const hasChildren = node.children.length > 0;
   const card = _orgCardHtml(node);
-  // ★ 2026-09-21 (v3): "تكديس الأوراق" (leaf stacking) — مستوحاة من
-  // ul.stack في الكود المرجعي. لو عقدة (زي "مدير خارج نطاق هذا الملف")
-  // ليها عدد كبير من المرؤوسين المباشرين وكلهم أوراق (مفيش حد منهم له
-  // مرؤوسين هو نفسه)، عرضهم أفقيًا بتقنية الشجرة بيدّي فرع عريض جدًا
-  // وصعب القراءة. بدل كده بيتعرضوا كقائمة رأسية مضغوطة بخط جانبي بسيط.
-  const allLeafChildren = hasChildren && node.children.every((c) => c.children.length === 0);
-  const useStack = allLeafChildren && node.children.length >= 5;
+  // ★ 2026-09-27 (v6): "تجميع الأوراق في شبكة" — بناءً على ملاحظة صريحة
+  // من المستخدمة إنها عاوزة الشكل يبقى "زي اللي في الأورجانيزيشن" فعليًا:
+  // صفوف فوق بعض مرتبة، مش صف أفقي واحد طويل محتاج سكرول لما مدير يكون
+  // ليه مرؤوسين كتير (زي مدير إدارة المرافق في WR ليه 26 مرؤوس مباشر).
+  // الحل: نقسّم أبناء العقدة لمجموعتين — "فروع" (ليها هي نفسها مرؤوسين،
+  // زي مدراء المشاريع) بتتعرض كأغصان شجرة عادية جنب بعض بالظبط زي الأول
+  // (فروع قليلة عادةً، فصف واحد مناسب ليها)، و"أوراق" (مفيش عندهم
+  // مرؤوسين، زي الموظفين العاديين) — لو عددهم كبير (٤ فأكتر) بيتجمعوا في
+  // شبكة واحدة (Grid) بعدد أعمدة ثابت، فبيبانوا صفوف فوق بعض مرتبة تحت
+  // خط وصل واحد بدل ما كل واحد ياخد فرع مستقل. ده أقرب لشكل شارت تنظيمي
+  // حقيقي (زي "قالب الهيكل الوظيفي للاستشاري" اللي بعتته) من الصف الأفقي
+  // الطويل القديم. لو الأوراق قليلة (أقل من ٤)، بتفضل جنب الفروع في نفس
+  // الصف بالظبط زي الأول (مفيش داعي لصندوق شبكة منفصل لعنصرين مثلًا).
+  const leafChildren = node.children.filter((c) => c.children.length === 0);
+  const branchChildren = node.children.filter((c) => c.children.length > 0);
+  const useLeafGrid = leafChildren.length >= 4;
   const toggle = hasChildren
     ? `<button type="button" class="orgc-toggle" onclick="_orgToggleNode('${node.id}')" id="orgc-toggle-${node.id}" title="طي / فتح الفريق">${depth >= 1 ? "+" : "−"}</button>`
     : "";
+  let childrenInnerHtml = "";
+  if (hasChildren) {
+    if (useLeafGrid) {
+      // الفروع (لو فيه) بترجع تتعرض عادي فرع فرع، وبعدها صندوق شبكة واحد
+      // يجمع كل الأوراق — الترتيب ده (فروع الأول) بيخلي العين تروح على
+      // أهم الأشخاص (اللي ليهم مرؤوسين) قبل قائمة الموظفين العادية.
+      childrenInnerHtml += branchChildren.map((c) => _orgRenderNode(c, visited, depth + 1)).join("");
+      leafChildren.forEach((c) => visited.add(c.id));
+      childrenInnerHtml += `<li class="orgc-li orgc-li-grid"><div class="orgc-leafgrid">${leafChildren
+        .map((c) => `<div class="orgc-leafgrid-item">${_orgCardHtml(c)}</div>`)
+        .join("")}</div></li>`;
+    } else {
+      // عدد قليل من الأوراق (أو مفيش أوراق خالص) — نفس السلوك القديم
+      // بالظبط: كل عقدة (فرع أو ورقة) بتاخد مكانها في الصف بترتيبها
+      // الأصلي، من غير أي تجميع أو إعادة ترتيب.
+      childrenInnerHtml = node.children.map((c) => _orgRenderNode(c, visited, depth + 1)).join("");
+    }
+  }
   const childrenHtml = hasChildren
-    ? useStack
-      ? `<ul class="orgc-children orgc-stack${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
-          .map((c) => { visited.add(c.id); return `<li class="orgc-stack-item">${_orgCardHtml(c)}</li>`; })
-          .join("")}</ul>`
-      : `<ul class="orgc-children${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${node.children
-          .map((c) => _orgRenderNode(c, visited, depth + 1))
-          .join("")}</ul>`
+    ? `<ul class="orgc-children${depth >= 1 ? " orgc-collapsed" : ""}" id="orgc-children-${node.id}">${childrenInnerHtml}</ul>`
     : "";
-  return `<li class="orgc-li"><div class="orgc-node" data-node-id="${node.id}">${card}${toggle}</div>${childrenHtml}</li>`;
+  // ★ v5: راجع "قالب الهيكل الوظيفي للاستشاري" (pptx) اللي بعتته
+  // المستخدمة — استُعير منه الشكل البصري بس (بدون أي اسم/بيانات منه):
+  // رأس كل فرع منطقة (العقدة اللي في القمة، depth=0) بيبان بصريًا مميز
+  // عن باقي الكروت (لون داكن مميز)، بالظبط زي الصندوق الداكن العلوي في
+  // شارت الـ pptx للمدير/مدير المشروع الأعلى في كل منطقة.
+  const rootCls = depth === 0 ? " orgc-root-node" : "";
+  return `<li class="orgc-li"><div class="orgc-node${rootCls}" data-node-id="${node.id}">${card}${toggle}</div>${childrenHtml}</li>`;
 }
 
 function _orgToggleNode(id) {
@@ -33576,6 +33795,50 @@ function _visFmtMonth(v) {
 const VIS = { _region: "", _monthFrom: "", _monthTo: "" };
 window.VIS = VIS;
 
+// ★ 2026-09-27: أحدث شهر متاح فعليًا في "الملخص الشهري" — بيتحسب من
+// window.RAW_NEW_VISITS_MONTHLY (صيغة الشهر "YYYY-MM" قابلة للترتيب
+// نصيًا مباشرة، فآخر عنصر بعد الترتيب التصاعدي هو الأحدث).
+function _visLatestMonth() {
+  const monthly = window.RAW_NEW_VISITS_MONTHLY || [];
+  const opts = monthly.map((r) => String(r["الشهر"] || "").trim()).filter(Boolean).sort();
+  return opts[opts.length - 1] || "";
+}
+// ★ بناءً على طلب صريح: التبويب دايمًا بيفتح على "آخر شهر" بس (كروت
+// KPI + الشارت الشهري)، مع تبديلة واضحة (زرارين) لو عاوزة كل الفترة
+// من البداية للنهاية بدل كده. راجع _visSetRangeMode/renderVisitsTab تحت.
+function _visSetRangeMode(mode) {
+  if (mode === "last") {
+    const last = _visLatestMonth();
+    VIS._monthFrom = last;
+    VIS._monthTo = last;
+  } else {
+    VIS._monthFrom = "";
+    VIS._monthTo = "";
+  }
+  const fromEl = document.getElementById("vis-filter-month-from");
+  const toEl = document.getElementById("vis-filter-month-to");
+  if (fromEl) fromEl.value = VIS._monthFrom;
+  if (toEl) toEl.value = VIS._monthTo;
+  _visUpdateRangeToggleUI();
+  _visRenderKpiSection();
+  _visRenderMonthlySection();
+}
+window._visSetRangeMode = _visSetRangeMode;
+// بيحدّد أي زرار من التبديلة (آخر شهر / كل الفترة) لازم يبان "نشط" —
+// بناءً على القيم الفعلية في VIS._monthFrom/_monthTo دلوقتي (مش بس
+// وقت الفتح)، عشان لو المستخدمة اختارت مدى مخصّص يدويًا من "من/إلى"
+// الاتنين يبانوا مش نشطين (مفيش زرار بيمثّل اختيارها بالظبط).
+function _visUpdateRangeToggleUI() {
+  const last = _visLatestMonth();
+  const isLastMonth = !!last && VIS._monthFrom === last && VIS._monthTo === last;
+  const isAll = !VIS._monthFrom && !VIS._monthTo;
+  document.querySelectorAll("[data-vis-range]").forEach((btn) => {
+    const mode = btn.getAttribute("data-vis-range");
+    btn.classList.toggle("active", (mode === "last" && isLastMonth) || (mode === "all" && isAll));
+  });
+}
+window._visUpdateRangeToggleUI = _visUpdateRangeToggleUI;
+
 function _visRenderRegionSection() {
   const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
   const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
@@ -33637,6 +33900,60 @@ function _visRenderMonthlySection() {
 }
 function _visApplyMonthFilter() {
   _visRenderMonthlySection();
+  _visRenderKpiSection();
+  _visUpdateRangeToggleUI();
+}
+
+// ★ 2026-09-27: كروت الـKPI العلوية بقت بتتحسب من نفس مدى الشهور
+// المختار (VIS._monthFrom/_monthTo) بدل ما تفضل ثابتة على إجمالي كل
+// الفترة دايمًا — بناءً على طلب صريح إن "الكروت وكل حاجه" تعرض آخر
+// شهر بالتحديد لما التبديلة على "آخر شهر" (الوضع الافتراضي عند فتح
+// التبويب). قسم "حسب المنطقة" استثناء واحد فقط: مصدره (شيت "الزيارات
+// حسب المنطقة") مفيهوش عمود شهر أصلًا، فمينفعش يتفلتر شهريًا — بيفضل
+// دايمًا يعرض إجمالي كل الفترة، وده موضّح بالنص جنبه في الواجهة.
+function _visRenderKpiSection() {
+  const container = document.getElementById("vis-kpi-grid");
+  if (!container) return;
+  const monthly = window.RAW_NEW_VISITS_MONTHLY || [];
+  let monthlySorted = monthly.slice().sort((a, b) => String(a["الشهر"] || "").localeCompare(String(b["الشهر"] || "")));
+  if (VIS._monthFrom) monthlySorted = monthlySorted.filter((r) => String(r["الشهر"] || "") >= VIS._monthFrom);
+  if (VIS._monthTo) monthlySorted = monthlySorted.filter((r) => String(r["الشهر"] || "") <= VIS._monthTo);
+
+  const totalCompleted = monthlySorted.reduce((s, r) => s + (_visNum(r["مكتملة (COMPLETED)"]) || 0), 0);
+  const totalAssigned = monthlySorted.reduce((s, r) => s + (_visNum(r["مسندة (ASSIGNED)"]) || 0), 0);
+  const overallPct = totalAssigned ? (totalCompleted / totalAssigned) * 100 : 0;
+
+  const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
+  const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
+  const totalCompletedByRegion = regionsSorted.reduce((s, r) => s + (_visNum(r["عدد الزيارات المكتملة"]) || 0), 0);
+
+  const rangeLabel = monthlySorted.length === 1
+    ? _visFmtMonth(monthlySorted[0]["الشهر"])
+    : monthlySorted.length
+    ? `عبر ${monthlySorted.length.toLocaleString("ar")} شهر`
+    : "لا توجد بيانات لهذا المدى";
+
+  container.innerHTML = `
+    <div class="kpi kc-green">
+      <div class="kpi-val">${totalCompleted.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي الزيارات المكتملة</div>
+      <div class="kpi-sub">${_visEsc(rangeLabel)}</div>
+    </div>
+    <div class="kpi kc-blue">
+      <div class="kpi-val">${totalAssigned.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي الزيارات المسندة</div>
+      <div class="kpi-sub">${_visEsc(rangeLabel)}</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${overallPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة الإنجاز</div>
+      <div class="kpi-sub">مكتملة ÷ مسندة</div>
+    </div>
+    <div class="kpi kc-purple">
+      <div class="kpi-val">${regionsSorted.length.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">عدد المناطق المسجّلة</div>
+      <div class="kpi-sub">${totalCompletedByRegion.toLocaleString("ar")} زيارة مكتملة (كل الفترة)</div>
+    </div>`;
 }
 
 function renderVisitsTab() {
@@ -33654,43 +33971,31 @@ function renderVisitsTab() {
   }
 
   VIS._region = "";
-  VIS._monthFrom = "";
-  VIS._monthTo = "";
+  // ★ 2026-09-27: بناءً على طلب صريح — التبويب بيفتح دايمًا على "آخر
+  // شهر" بس بشكل افتراضي (كروت الـKPI + الشارت الشهري)، مش كل الفترة.
+  // راجع _visSetRangeMode فوق لتبديلة "كل الفترة".
+  const _visLast = _visLatestMonth();
+  VIS._monthFrom = _visLast;
+  VIS._monthTo = _visLast;
 
   // ── ترتيب زمني تصاعدي حسب "الشهر" (صيغة YYYY-MM قابلة للترتيب نصيًا مباشرة) ──
   const monthlySorted = monthly.slice().sort((a, b) => String(a["الشهر"] || "").localeCompare(String(b["الشهر"] || "")));
-  const totalCompleted = monthlySorted.reduce((s, r) => s + (_visNum(r["مكتملة (COMPLETED)"]) || 0), 0);
-  const totalAssigned = monthlySorted.reduce((s, r) => s + (_visNum(r["مسندة (ASSIGNED)"]) || 0), 0);
-  const overallPct = totalAssigned ? (totalCompleted / totalAssigned) * 100 : 0;
-
   const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
   const regionsPresent = [...new Set(regionsSorted.map((r) => String(r["المنطقة"] || "").trim()))].filter(Boolean);
-  const totalCompletedByRegion = regionsSorted.reduce((s, r) => s + (_visNum(r["عدد الزيارات المكتملة"]) || 0), 0);
   const monthOptions = monthlySorted.map((r) => String(r["الشهر"] || "")).filter(Boolean);
 
   el.innerHTML = `
-  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi kc-green">
-      <div class="kpi-val">${totalCompleted.toLocaleString("ar")}</div>
-      <div class="kpi-lbl">إجمالي الزيارات المكتملة</div>
-      <div class="kpi-sub">عبر ${monthlySorted.length} شهر</div>
-    </div>
-    <div class="kpi kc-blue">
-      <div class="kpi-val">${totalAssigned.toLocaleString("ar")}</div>
-      <div class="kpi-lbl">إجمالي الزيارات المسندة</div>
-      <div class="kpi-sub">حسب الملخص الشهري</div>
-    </div>
-    <div class="kpi kc-amber">
-      <div class="kpi-val">${overallPct.toFixed(1)}%</div>
-      <div class="kpi-lbl">نسبة الإنجاز الكلي</div>
-      <div class="kpi-sub">مكتملة ÷ مسندة</div>
-    </div>
-    <div class="kpi kc-purple">
-      <div class="kpi-val">${regionsSorted.length.toLocaleString("ar")}</div>
-      <div class="kpi-lbl">عدد المناطق المسجّلة</div>
-      <div class="kpi-sub">${totalCompletedByRegion.toLocaleString("ar")} زيارة مكتملة إجمالاً</div>
+  <div class="card mb14" style="padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--tx-muted)">الفترة المعروضة:</span>
+      <div class="orgc-toolbar" style="margin:0;gap:6px">
+        <button type="button" class="org-view-btn" data-vis-range="last" onclick="_visSetRangeMode('last')">📅 آخر شهر (${_visEsc(_visFmtMonth(_visLast)) || "—"})</button>
+        <button type="button" class="org-view-btn" data-vis-range="all" onclick="_visSetRangeMode('all')">🗂️ كل الفترة (من البداية للنهاية)</button>
+      </div>
     </div>
   </div>
+
+  <div class="kpi-grid" id="vis-kpi-grid" style="grid-template-columns:repeat(4,1fr)"></div>
 
   <div class="card mb14">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
@@ -33699,12 +34004,12 @@ function renderVisitsTab() {
         <span style="font-size:11px;color:var(--tx-muted)">من</span>
         <select class="fsel" id="vis-filter-month-from" onchange="VIS._monthFrom=this.value;_visApplyMonthFilter()" style="font-size:11px">
           <option value="">— البداية —</option>
-          ${monthOptions.map((m) => `<option value="${_visEsc(m)}">${_visEsc(_visFmtMonth(m))}</option>`).join("")}
+          ${monthOptions.map((m) => `<option value="${_visEsc(m)}"${m === VIS._monthFrom ? " selected" : ""}>${_visEsc(_visFmtMonth(m))}</option>`).join("")}
         </select>
         <span style="font-size:11px;color:var(--tx-muted)">إلى</span>
         <select class="fsel" id="vis-filter-month-to" onchange="VIS._monthTo=this.value;_visApplyMonthFilter()" style="font-size:11px">
           <option value="">— النهاية —</option>
-          ${monthOptions.map((m) => `<option value="${_visEsc(m)}">${_visEsc(_visFmtMonth(m))}</option>`).join("")}
+          ${monthOptions.map((m) => `<option value="${_visEsc(m)}"${m === VIS._monthTo ? " selected" : ""}>${_visEsc(_visFmtMonth(m))}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -33722,6 +34027,7 @@ function renderVisitsTab() {
         </select>
       </div>
     </div>
+    <div style="font-size:11px;color:var(--tx-muted);margin-bottom:8px">ℹ️ هذا القسم يعرض إجمالي كل الفترة دائمًا (مصدره لا يحتوي على تقسيم شهري)، بغض النظر عن اختيار "الفترة المعروضة" بالأعلى.</div>
     <div class="chart-box" style="height:260px;margin-bottom:14px"><canvas id="ch-vis-region"></canvas></div>
     <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -33735,8 +34041,10 @@ function renderVisitsTab() {
     </div>
   </div>`;
 
+  _visRenderKpiSection();
   _visRenderMonthlySection();
   _visRenderRegionSection();
+  _visUpdateRangeToggleUI();
 }
 
 /* ╔════════════════════════════════════════════════════════════╗
@@ -41579,7 +41887,7 @@ setTimeout(mokInit, 1200);
       if (!vals.length) return;
       if (nums.length / vals.length >= 0.8 && !ID_COL.test(k)) {
         var sum = nums.reduce(function (a, b) { return a + b; }, 0);
-        stats[k] = { مجموع: Math.round(sum * 100) / 100, متوسط: Math.round(sum / nums.length * 100) / 100, أقل: Math.min.apply(null, nums), أعلى: Math.max.apply(null, nums), قيم: nums.length };
+        stats[k] = { مجموع: Math.round(sum * 100) / 100, متوسط: Math.round(sum / nums.length * 100) / 100, أقل: safeArrMin_(nums), أعلى: safeArrMax_(nums), قيم: nums.length };
       } else if (distinct <= 30 && distinct < vals.length) {
         var top = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).slice(0, 10);
         var o = {}; top.forEach(function (t) { o[t.slice(0, 50)] = counts[t]; });

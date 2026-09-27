@@ -32,7 +32,9 @@
     download:    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
     trash:       '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
     expand:      '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
-    collapse:    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
+    collapse:    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
+    comment:     '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    trash2:      '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
   };
 
   function svg(name, extra) {
@@ -304,6 +306,10 @@
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', 'مركز الذكاء التنفيذي');
+    // ★ 2026-09-27: زرار "تكبير/تصغير النافذة" اتشال (تبسيط الشريط
+    // العلوي بناءً على طلب صريح) — الحجم الأكبر (ac-expanded) كان أصلًا
+    // هو الافتراضي من أول فتح دايمًا، فبيتثبّت هنا نهائيًا بلا تبديلة.
+    panel.classList.add('ac-expanded');
 
     /* Ambient field */
     var field = el('div', 'ac-field');
@@ -331,9 +337,6 @@
           '<h2>مساعد إدارة المرافق الذكي</h2>' +
           '<div class="ac-sub">محلل المرافق التعليمية التنفيذي</div>' +
         '</div>' +
-        '<button class="ac-clear-chat-btn-top" type="button" id="ac-clear-chat-btn" title="حذف المحادثة">' + svg('trash') + '</button>' +
-        '<button class="ac-clear-chat-btn-top" type="button" id="ac-expand-btn" title="تكبير النافذة">' + svg('expand') + '</button>' +
-        '<button class="ac-close" type="button" aria-label="إغلاق">' + svg('x') + '</button>' +
       '</div>' +
       '<div class="ac-status-strip">' +
         '<div class="ac-status-item ac-live"><div class="ac-si-label">الحالة</div><div class="ac-si-value"><span class="ac-si-dot"></span>متصل</div></div>' +
@@ -386,12 +389,12 @@
       '<div class="ac-section-label">' + svg('brain') + ' المحادثة</div>' +
       '<div class="ac-chat-thread" id="ac-chat-thread"></div>' +
       '<div class="ac-quick-replies" id="ac-quick-replies">' +
-        '<button type="button" class="ac-qr-pill">أعطني أسوأ 10 مدارس في FCA</button>' +
+        '<button type="button" class="ac-qr-pill">اعرض أسوأ عشر مدارس في FCA</button>' +
         '<button type="button" class="ac-qr-pill">كم عدد المدارس حسب المحافظة؟</button>' +
         '<button type="button" class="ac-qr-pill">ما متوسط درجة البيئة المدرسية؟</button>' +
         '<button type="button" class="ac-qr-pill">لخّص أهم المؤشرات في العرض الحالي</button>' +
-        '<button type="button" class="ac-qr-pill">فين ألاقي بيانات العهدة والمصروفات؟</button>' +
-        '<button type="button" class="ac-qr-pill">إيه البيانات المتاحة في اللوحة كلها؟</button>' +
+        '<button type="button" class="ac-qr-pill">أين تُوجد بيانات العهدة والمصروفات؟</button>' +
+        '<button type="button" class="ac-qr-pill">ما هي البيانات المتاحة في اللوحة كاملةً؟</button>' +
       '</div>';
     body.appendChild(chatWrap);
 
@@ -924,7 +927,10 @@
     } catch (e) {}
 
     trigger.addEventListener('click', function() { root.classList.contains('ac-open') ? close() : open(); });
-    panel.querySelector('.ac-close').addEventListener('click', close);
+    // ★ 2026-09-27: زرار "✕ إغلاق" المستقل اتشال بناءً على طلب صريح
+    // (تبسيط الشريط العلوي) — الإغلاق لسه شغال بنفس الكفاءة عن طريق:
+    // الضغط على فقاعة "AI" العائمة تاني، الضغط برّه اللوحة (backdrop
+    // تحت)، أو Esc (تحت كمان).
     backdrop.addEventListener('click', close);
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && root.classList.contains('ac-open')) close(); });
 
@@ -1154,6 +1160,71 @@
       }, { passive: true });
     });
 
+    /* ── ★ تعليق المستخدم على رد الشات بوت ──
+       المستخدم يقدر يكتب تعليقًا/ملاحظة (مثلاً تصحيح) على أي رد، ويتحفظ
+       محليًا (localStorage) ويظهر كملاحظة مثبّتة تحت الرد نفسه، حتى بعد
+       إعادة فتح النافذة. كل رسالة بوت بتاخد مفتاح تسلسلي ثابت (data-msg-key)
+       بنفس ترتيب ظهورها، سواء وقت الإنشاء الحي أو وقت استرجاع السجل — طالما
+       ترتيب الرسائل المحفوظة ثابت، المفتاح بيفضل ثابت هو الآخر. */
+    var AC_COMMENTS_KEY = 'ac_msg_comments_v1';
+    var acBotMsgSeq = 0;
+    function acLoadCommentsMap() {
+      try { return JSON.parse(localStorage.getItem(AC_COMMENTS_KEY) || '{}') || {}; }
+      catch (_) { return {}; }
+    }
+    function acSaveCommentsMap(map) {
+      try { localStorage.setItem(AC_COMMENTS_KEY, JSON.stringify(map)); } catch (_) {}
+    }
+    function acRenderMsgNote(row, key) {
+      var wrap = row.querySelector('.ac-msg-note-wrap');
+      if (!wrap) return;
+      var map = acLoadCommentsMap();
+      var entry = map[key];
+      if (!entry || !entry.text) { wrap.innerHTML = ''; return; }
+      wrap.innerHTML =
+        '<div class="ac-msg-note">' +
+          '<div class="ac-msg-note-label">' + svg('comment') + '<span>تعليقك</span></div>' +
+          '<div class="ac-msg-note-text"></div>' +
+          '<div class="ac-msg-note-tools">' +
+            '<button type="button" class="ac-msg-note-edit">تعديل</button>' +
+            '<button type="button" class="ac-msg-note-del">حذف</button>' +
+          '</div>' +
+        '</div>';
+      wrap.querySelector('.ac-msg-note-text').textContent = entry.text; // نص خام، بدون أي HTML
+      wrap.querySelector('.ac-msg-note-edit').addEventListener('click', function() { acOpenCommentEditor(row, key); });
+      wrap.querySelector('.ac-msg-note-del').addEventListener('click', function() {
+        var m = acLoadCommentsMap();
+        delete m[key];
+        acSaveCommentsMap(m);
+        acRenderMsgNote(row, key);
+      });
+    }
+    function acOpenCommentEditor(row, key) {
+      var wrap = row.querySelector('.ac-msg-note-wrap');
+      if (!wrap) return;
+      var map = acLoadCommentsMap();
+      var existing = (map[key] && map[key].text) || '';
+      wrap.innerHTML =
+        '<div class="ac-msg-note-editor">' +
+          '<textarea class="ac-msg-note-input" rows="2" placeholder="أضف تعليقًا أو ملاحظة على هذا الرد…"></textarea>' +
+          '<div class="ac-msg-note-tools">' +
+            '<button type="button" class="ac-msg-note-save">حفظ</button>' +
+            '<button type="button" class="ac-msg-note-cancel">إلغاء</button>' +
+          '</div>' +
+        '</div>';
+      var ta = wrap.querySelector('.ac-msg-note-input');
+      ta.value = existing;
+      ta.focus();
+      wrap.querySelector('.ac-msg-note-save').addEventListener('click', function() {
+        var val = ta.value.trim();
+        var m = acLoadCommentsMap();
+        if (val) m[key] = { text: val, ts: Date.now() }; else delete m[key];
+        acSaveCommentsMap(m);
+        acRenderMsgNote(row, key);
+      });
+      wrap.querySelector('.ac-msg-note-cancel').addEventListener('click', function() { acRenderMsgNote(row, key); });
+    }
+
     function acAppendMsg(html, who, rawText) {
       var safeHtml = (html != null && String(html).trim() !== '')
         ? html
@@ -1161,12 +1232,15 @@
       var row = el('div', 'ac-msg-row ac-msg-' + who);
       if (rawText != null) row.setAttribute('data-raw', rawText);
       var actionsHtml = '';
+      var msgKey = null;
       if (who === 'bot') {
         acClearRegenerateButtons();
+        msgKey = 'm' + (acBotMsgSeq++);
         actionsHtml = '<div class="ac-msg-actions">' +
           '<button type="button" class="ac-msg-act ac-msg-copy" aria-label="نسخ الرد">' + svg('copy') + '</button>' +
           '<button type="button" class="ac-msg-act ac-msg-regen" aria-label="إعادة توليد الرد">' + svg('redo') + '</button>' +
           '<button type="button" class="ac-msg-act ac-msg-pdf" aria-label="تحميل PDF">' + svg('download') + '</button>' +
+          '<button type="button" class="ac-msg-act ac-msg-comment" aria-label="إضافة تعليق">' + svg('comment') + '</button>' +
         '</div>';
       }
       var avatarHtml = who === 'user'
@@ -1177,6 +1251,7 @@
         '<div class="ac-msg-col">' +
           '<div class="ac-msg-bubble"><div class="ac-msg-content">' + safeHtml + '</div></div>' +
           actionsHtml +
+          (who === 'bot' ? '<div class="ac-msg-note-wrap"></div>' : '') +
           '<div class="ac-msg-time">' + acTimeNow() + '</div>' +
         '</div>';
       threadEl.appendChild(row);
@@ -1185,15 +1260,19 @@
       acMountPendingCharts();
 
       if (who === 'bot') {
-        var copyBtn  = row.querySelector('.ac-msg-copy');
-        var regenBtn = row.querySelector('.ac-msg-regen');
-        var pdfBtn   = row.querySelector('.ac-msg-pdf');
+        if (msgKey) row.setAttribute('data-msg-key', msgKey);
+        var copyBtn    = row.querySelector('.ac-msg-copy');
+        var regenBtn   = row.querySelector('.ac-msg-regen');
+        var pdfBtn     = row.querySelector('.ac-msg-pdf');
+        var commentBtn = row.querySelector('.ac-msg-comment');
         if (copyBtn)  copyBtn.addEventListener('click', function() { acCopyText(rawText != null ? rawText : row.querySelector('.ac-msg-content').textContent, copyBtn); });
         if (regenBtn) regenBtn.addEventListener('click', function() {
           var prompt = acLastUserPrompt();
           if (prompt) sendToAI(prompt, { regenerate: true });
         });
         if (pdfBtn) pdfBtn.addEventListener('click', function() { acDownloadPdf(row, pdfBtn); });
+        if (commentBtn && msgKey) commentBtn.addEventListener('click', function() { acOpenCommentEditor(row, msgKey); });
+        if (msgKey) acRenderMsgNote(row, msgKey);
       }
       return row;
     }
@@ -1252,44 +1331,9 @@
       });
     }
 
-    /* ── حذف المحادثة: يمسح السجل المحفوظ (history) والشاشة، مع تأكيد قبل الحذف ── */
-    var clearChatBtn = panel.querySelector('#ac-clear-chat-btn');
-    if (clearChatBtn) {
-      clearChatBtn.addEventListener('click', function() {
-        if (!threadEl || !threadEl.children.length) return; // مفيش محادثة أصلاً
-        if (!window.confirm('هل تريد حذف هذه المحادثة نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.')) return;
-        if (acGenerating) acStopGenerating();
-        if (typeof window.fcbForgetAll === 'function') window.fcbForgetAll();
-        threadEl.innerHTML = '';
-        panel.classList.remove('ac-has-chat', 'ac-show-insights');
-        acHistoryRestored = true; // منع أي محاولة استعادة سجل بعد الحذف
-        if (quickRepliesEl) quickRepliesEl.style.display = '';
-      });
-    }
-
-    /* ── تكبير/تصغير نافذة الشات — تبديل + حفظ التفضيل محلياً ── */
-    var EXPAND_STORAGE_KEY = 'ac_panel_expanded_v1';
-    var expandBtn = panel.querySelector('#ac-expand-btn');
-    function applyExpandState(expanded) {
-      panel.classList.toggle('ac-expanded', expanded);
-      if (expandBtn) {
-        expandBtn.innerHTML = svg(expanded ? 'collapse' : 'expand');
-        expandBtn.title = expanded ? 'تصغير النافذة' : 'تكبير النافذة';
-      }
-    }
-    if (expandBtn) {
-      var savedExpanded = true; // الافتراضي: النافذة موسّعة من أول فتح
-      try {
-        var savedRaw = localStorage.getItem(EXPAND_STORAGE_KEY);
-        if (savedRaw !== null) savedExpanded = savedRaw === '1'; // احترم اختيار المستخدم لو غيّره قبل كده
-      } catch (_) {}
-      applyExpandState(savedExpanded);
-      expandBtn.addEventListener('click', function() {
-        var next = !panel.classList.contains('ac-expanded');
-        applyExpandState(next);
-        try { localStorage.setItem(EXPAND_STORAGE_KEY, next ? '1' : '0'); } catch (_) {}
-      });
-    }
+    // ★ 2026-09-27: زرارا "حذف المحادثة" و"تكبير/تصغير النافذة" اتشالوا
+    // من الشريط العلوي (تبسيط بناءً على طلب صريح)، وبالتالي كودهم
+    // اتشال من هنا كمان بدل ما يفضل كود ميت بيدور على عناصر مش موجودة.
 
     if (sendBtn) sendBtn.addEventListener('click', function() {
       if (acGenerating) { acStopGenerating(); return; }

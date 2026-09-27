@@ -499,16 +499,8 @@
   color: var(--ac-ink); letter-spacing: -.3px;
 }
 #aicore-panel .ac-hero-title .ac-sub { font-size: 13px; color: var(--ac-ink-faint); margin-top: 3px; font-weight: 400; }
-#aicore-panel .ac-close {
-  position: relative; width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-  background: transparent; border: none;
-  color: var(--ac-ink-faint); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .2s, color .2s, transform .2s var(--ac-spring);
-}
-#aicore-panel .ac-close:hover { background: rgba(13,47,64,.06); color: var(--ac-ink); }
-#aicore-panel .ac-close:active { transform: scale(.9); }
-#aicore-panel .ac-close:focus-visible,
+/* ★ 2026-09-27: أزرار "إغلاق" و"حذف المحادثة" (الشريط العلوي) اتشالت
+   من الـ HTML ضمن تبسيط الشريط العلوي — استايلاتها القديمة اتشالت من هنا. */
 #aicore-panel .ac-send:focus-visible,
 #aicore-panel .ac-msg-act:focus-visible,
 #aicore-panel .ac-retry-btn:focus-visible,
@@ -516,19 +508,6 @@
 #aicore-panel .ac-input:focus-visible {
   outline: 2px solid var(--ac-teal); outline-offset: 2px;
 }
-#aicore-panel .ac-close svg { width: 14px; height: 14px; }
-
-/* ── Delete-conversation icon button (top header, next to close) ── */
-#aicore-panel .ac-clear-chat-btn-top {
-  position: relative; width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-  background: transparent; border: none; padding: 0;
-  color: var(--ac-ink-faint); cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .2s, color .2s, transform .2s var(--ac-spring);
-}
-#aicore-panel .ac-clear-chat-btn-top svg { width: 14px; height: 14px; }
-#aicore-panel .ac-clear-chat-btn-top:hover { background: rgba(220,38,38,.08); color: #DC2626; }
-#aicore-panel .ac-clear-chat-btn-top:active { transform: scale(.9); }
 
 /* ── Status strip — quieter, less boxy ── */
 #aicore-panel .ac-status-strip {
@@ -846,6 +825,42 @@
 #aicore-panel .ac-msg-act.ac-copied { color: var(--ac-good); }
 #aicore-panel .ac-msg-act.ac-pdf-busy { opacity: .55; cursor: wait; animation: ac-pdf-spin 1s linear infinite; }
 @keyframes ac-pdf-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* تعليق المستخدم على رد الشات بوت */
+#aicore-panel .ac-msg-note-wrap { width: 100%; max-width: 100%; }
+#aicore-panel .ac-msg-note {
+  margin-top: 6px; padding: 8px 10px; border-radius: 12px;
+  background: rgba(212,160,23,.09); border: 1px solid rgba(212,160,23,.28);
+  font-size: 12px; line-height: 1.6; max-width: 100%;
+}
+#aicore-panel .ac-msg-note-label {
+  display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700;
+  color: #8a6a10; margin-bottom: 3px;
+}
+#aicore-panel .ac-msg-note-label svg { width: 11px; height: 11px; }
+#aicore-panel .ac-msg-note-text { color: var(--ac-ink); white-space: pre-wrap; word-break: break-word; }
+#aicore-panel .ac-msg-note-tools { display: flex; gap: 10px; margin-top: 6px; }
+#aicore-panel .ac-msg-note-tools button {
+  border: none; background: none; padding: 0; font-size: 11px; cursor: pointer;
+  color: var(--ac-teal); font-family: inherit;
+}
+#aicore-panel .ac-msg-note-tools button.ac-msg-note-del { color: #9a3b3b; }
+#aicore-panel .ac-msg-note-tools button:hover { text-decoration: underline; }
+#aicore-panel .ac-msg-note-editor {
+  margin-top: 6px; padding: 8px; border-radius: 12px;
+  background: rgba(13,47,64,.03); border: 1px solid rgba(13,47,64,.12); max-width: 100%;
+}
+#aicore-panel .ac-msg-note-input {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 40px;
+  border: 1px solid rgba(13,47,64,.15); border-radius: 8px; padding: 6px 8px;
+  font-family: inherit; font-size: 12.5px; color: var(--ac-ink); background: #fff;
+}
+#aicore-panel .ac-msg-note-input:focus { outline: none; border-color: var(--ac-teal); }
+#aicore-panel .ac-msg-note-editor .ac-msg-note-tools { margin-top: 6px; }
+#aicore-panel .ac-msg-note-editor button.ac-msg-note-save {
+  font-weight: 700; color: var(--ac-teal);
+}
+#aicore-panel .ac-msg-note-editor button.ac-msg-note-cancel { color: var(--ac-ink-faint); }
 
 /* Error */
 #aicore-panel .ac-msg-error .ac-msg-bubble {
@@ -1252,16 +1267,6 @@
 #aicore-root #aicore-panel .ac-orb { width: 62px; height: 62px; }
 #aicore-root #aicore-panel .ac-hero-title h2 { color: #fff; font-size: 19px; font-weight: 800; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #aicore-root #aicore-panel .ac-hero-title .ac-sub { color: rgba(255, 255, 255, .68); font-size: 12.5px; }
-#aicore-root #aicore-panel .ac-close,
-#aicore-root #aicore-panel .ac-clear-chat-btn-top {
-  color: rgba(255, 255, 255, .78);
-  background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .12);
-  width: 34px; height: 34px; border-radius: 11px;
-}
-#aicore-root #aicore-panel .ac-close:hover,
-#aicore-root #aicore-panel .ac-clear-chat-btn-top:hover { background: rgba(255, 255, 255, .18); color: #fff; }
-#aicore-root #aicore-panel #ac-clear-chat-btn:hover { background: rgba(239, 68, 68, .25); color: #fff; }
 #aicore-root #aicore-panel .ac-status-strip { gap: 8px; margin-top: 14px; }
 #aicore-root #aicore-panel .ac-status-item {
   background: rgba(255, 255, 255, .07);
@@ -1430,9 +1435,6 @@
   #aicore-root #aicore-panel .ac-hero-top { gap: 10px; }
   #aicore-root #aicore-panel .ac-hero-title h2 { font-size: 16px; }
   #aicore-root #aicore-panel .ac-hero-title .ac-sub { display: none; }
-  #aicore-root #aicore-panel .ac-close,
-  #aicore-root #aicore-panel .ac-clear-chat-btn-top { width: 32px; height: 32px; }
-  #aicore-root #aicore-panel #ac-expand-btn { display: none; }
   #aicore-root #aicore-panel .ac-status-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
   #aicore-root #aicore-panel .ac-status-item { padding: 6px 6px; }
   #aicore-root #aicore-panel .ac-si-value { font-size: 12px; }

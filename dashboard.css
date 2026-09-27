@@ -7459,7 +7459,8 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
    نجمة صفراء لو الشخص له مرؤوسين، وخط جانبي ملوّن (border-inline-start)
    بيوضح حالة التوظيف بنظرة واحدة — فكرة مأخوذة من كارت .onode في الكود
    المرجعي. الفروع الكبيرة اللي كل عناصرها "أوراق" (مفيش حد منهم له
-   مرؤوسين) بتتعرض كقائمة رأسية مضغوطة (.orgc-stack) بدل تفرّع أفقي عريض.
+   مرؤوسين) بتتجمع في شبكة واحدة (.orgc-leafgrid) بصفوف فوق بعض، بدل
+   تفرّع أفقي عريض محتاج سكرول (راجع v6 تحت).
    ★ اتجاه شجرة كل بانل (.orgc-tree/.orgc-children/.orgc-li) متثبّت LTR
    عمدًا عشان حسابات مواقع خطوط التوصيل (يمين/يسار) تبقى صحيحة 100% في
    كل المتصفحات، بغض النظر عن اتجاه الصفحة العام (RTL) — ده تأثير هيكلي
@@ -7727,6 +7728,35 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-ext.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
 .orgc-ext.orgc-search-dim { opacity: .22; }
 
+/* ── ★ 2026-09-27 (v5): رأس فرع كل منطقة (العقدة في القمة، depth=0) —
+   سواء كارت موظف حقيقي (مدير مشروع/مدير منطقة نفسه) أو وسم "مدير خارج
+   نطاق الملف" — بشكل داكن مميز، مستوحى **شكلًا بس** من الصندوق العلوي
+   الداكن في "قالب الهيكل الوظيفي للاستشاري" (pptx) اللي بعتته المستخدمة
+   (بدون أي اسم أو بيانات منه إطلاقًا). الهدف: العين توصل على طول لرأس
+   كل منطقة وسط الشجرة، بالظبط زي ما بيبان في القالب المرجعي. ──────── */
+.orgc-root-node > .orgc-card {
+  background: linear-gradient(155deg, #0f2a37, #0b6b7e);
+  border-color: #0b6b7e;
+  border-inline-start-color: #0ea5b8;
+  box-shadow: 0 4px 10px rgba(11,53,66,.22), 0 10px 26px rgba(11,53,66,.18);
+}
+.orgc-root-node > .orgc-card .orgc-card-name { color: #fff; }
+.orgc-root-node > .orgc-card .orgc-card-title { color: #bfe9ee; }
+.orgc-root-node > .orgc-card .orgc-card-foot { border-top-color: rgba(255,255,255,.18); }
+.orgc-root-node > .orgc-card .orgc-avatar { background: linear-gradient(160deg,#12414f,#0b6b7e); border-color: #7fd4de; color: #fff; }
+.orgc-root-node > .orgc-card .orgc-card-tag { background: rgba(255,255,255,.16); color: #eaf9fb; }
+.orgc-root-node > .orgc-card.orgc-status-active .orgc-card-status { color: #8ef0c4; }
+.orgc-root-node > .orgc-card.orgc-status-active .orgc-status-dot { background: #34d399; }
+
+.orgc-root-node > .orgc-ext {
+  background: linear-gradient(155deg, #0f2a37, #0b6b7e);
+  border: 1.5px solid #0ea5b8;
+  padding: 9px 16px;
+}
+.orgc-root-node > .orgc-ext .orgc-ext-icon { filter: brightness(0) invert(1); opacity: .85; }
+.orgc-root-node > .orgc-ext .orgc-ext-name { color: #fff; }
+.orgc-root-node > .orgc-ext .orgc-ext-note { color: #bfe9ee; }
+
 /* ── عقدة تجميعية (مجموعة "نوع الفريق" داخل بانل المنطقة) — بانر بلون
    العلامة التجارية، مختلف تمامًا عن كارت الشخص، عشان يوضح إنه مستوى
    تنظيم في الهيكل مش شخص حقيقي. ─────────────────────────────────── */
@@ -7757,41 +7787,30 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   padding: 3px 11px;
 }
 
-/* ── تكديس الأوراق (leaf stacking) — مستوحى من ul.stack في الكود
-   المرجعي: بدل ما فرع كبير كل عناصره أوراق (زي كل موظفي "مدير خارج
-   نطاق هذا الملف" الواحد) يتفرّع أفقيًا بعرض هائل، بيتعرض كقائمة رأسية
-   مضغوطة بخط جانبي بسيط يوصل كل عنصر بالعقدة الأب. ────────────────── */
-.orgc-children.orgc-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 20px 0 0 0;
-  min-width: 186px;
+/* ── ★ 2026-09-27 (v6): تجميع الأوراق في شبكة (leaf grid) — بناءً على
+   طلب صريح إن الشكل يبقى "زي اللي في الأورجانيزيشن" وصفوف فوق بعض مش
+   صف واحد طويل. بدل ما فرع كبير كل عناصره (أو أغلبها) أوراق (موظفين
+   عاديين، زي مرؤوسي مدير إدارة المرافق المباشرين) يتفرّع أفقيًا بعرض
+   هائل محتاج سكرول، بيتجمعوا في صندوق واحد (خط وصل واحد من العقدة الأب)
+   فيه شبكة بعدد أعمدة ثابت — فبيبانوا صفوف مرتبة فوق بعض، بالظبط زي
+   شارت تنظيمي حقيقي. راجع _orgRenderNode (useLeafGrid) في dashboard.js. */
+.orgc-li-grid { min-width: 0; }
+.orgc-leafgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 186px);
+  gap: 12px;
+  justify-content: center;
+  padding: 16px 16px 12px;
+  border: 1.5px dashed #d7e2ea;
+  border-radius: 18px;
+  background: rgba(241, 246, 249, .55);
 }
-.orgc-children.orgc-stack::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 50%;
-  width: 0; height: 20px;
-  border-left: 2px solid #cbd5e1;
+.orgc-leafgrid-item { display: block; }
+.orgc-leafgrid-item .orgc-card,
+.orgc-leafgrid-item .orgc-ext { width: 100%; }
+@media (max-width: 900px) {
+  .orgc-leafgrid { grid-template-columns: repeat(3, 186px); }
 }
-.orgc-stack-item {
-  position: relative;
-  padding-inline-start: 16px;
-  text-align: start;
-}
-.orgc-stack-item::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  top: 50%;
-  width: 12px;
-  height: 0;
-  border-top: 2px solid #cbd5e1;
-}
-.orgc-stack-item .orgc-card,
-.orgc-stack-item .orgc-ext { display: block; width: 100%; }
 
 /* ── بانل المنطقة (v3) — هيدر مستقل + شريط مؤشرات أداء + شجرة خاصة —
    مستوحى من هيدر كل office في renderOrgChart بالكود المرجعي. ──────── */

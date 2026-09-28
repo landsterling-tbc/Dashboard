@@ -295,7 +295,10 @@ window.__PRESENTATION_MODE__ = true;
 // العين 👁 المستخدمة أصلاً لإخفاء "الطلاب وعمر المبنى"، من غير حذف أي
 // كود أو دالة عرض (لسه كل الدوال والـ switch-case بتاعتهم موجودين
 // بالكامل، وممكن ترجع تظهر تاني في أي وقت بالضغط على زر العين).
-var PRESENTATION_HIDDEN_TABS = ["students", "elevators", "elevator-status", "khanadeq", "spare"];
+// ★ 2026-09-27: أُضيفت "التكلفة" هنا كمان بناءً على طلب صريح — بنفس آلية
+// زر العين 👁 بالظبط (تختفي وهو ON، وترجع تظهر لوحدها بمجرد الضغط عليه
+// تاني لإطفاء وضع العرض)، من غير أي حذف لكود التبويب نفسه.
+var PRESENTATION_HIDDEN_TABS = ["students", "elevators", "elevator-status", "khanadeq", "spare", "cost"];
 
 // ★ 2026-09-20: تبويبات مقصورة على شعار Landsterling فقط — راجعها المستخدم
 // تبويب تبويب بالكامل (39 تبويب في الشريط الرئيسي + 7 تبويبات فرعية) وحدد
@@ -1025,9 +1028,7 @@ function buildDynamicFilters() {
     sectors = [...new Set(RAW.map((r) => r.sector).filter((s) => s && "#N/A" !== s))];
   ((document.getElementById("fg-city").style.display = cities.length > 1 ? "" : "none"),
     (document.getElementById("fg-sector").style.display = sectors.length > 1 ? "" : "none"));
-  (setText("topTitle", "en" === LANG ? "Educational Facilities Management Dashboard" : "لوحة بيانات إدارة المرافق التعليمية"),
-    setText("topSub", "FACILITIES MANAGEMENT DASHBOARD"),
-    (window._SHOW_CITY_COL = cities.length > 1));
+  (window._SHOW_CITY_COL = cities.length > 1);
   const cityTh = document.getElementById("th-city");
   (cityTh && (cityTh.style.display = window._SHOW_CITY_COL ? "" : "none"),
     (window._SHOW_SECTOR_COL = sectors.length > 0));
@@ -1879,7 +1880,239 @@ function makeVBar(id, labels, datasets) {
    ║  📊  JS تبويب: نظرة عامة
    ║  (tab-overview) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ╚════════════════════════════════════════════════════════════╝ */
+/* ╔════════════════════════════════════════════════════════════╗
+   ║  🏠 (2026-09-28 — بناءً على طلب صريح) كروت "نظرة عامة شاملة"
+   ║  في أعلى تبويب نظرة عامة — ملخص سريع بكارت لكل قسم رئيسي في
+   ║  الداشبورد كله، وليس فقط تحليل FCA. الأرقام مبنية على نفس دوال
+   ║  الحساب المستخدمة فعليًا في سياق المساعد الذكي
+   ║  (buildStatisticsSection/buildSupplementalSection) حتى تبقى
+   ║  متطابقة مع باقي الداشبورد، بالإضافة لبعض الحسابات الخاصة
+   ║  (NEW SLA، التدريب، مدفوعات المقاولين) المبنية بنفس منطق
+   ║  تبويباتها الأصلية. أي قسم بياناته غير محمَّلة بعد أو فارغة
+   ║  يُستبعد بصمت بدل ما يظهر كارت فاضي أو بصفر مضلِّل، وكل كارت
+   ║  قابل للضغط لفتح تبويبه مباشرة. ╚═══════════════════════════ */
+function _ovEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function _ovFmt(n) {
+  return typeof n === "number" && isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
+}
+function _ovCard(opts) {
+  const { icon, title, lines, tab } = opts;
+  if (!lines || !lines.length) return "";
+  if (tab && typeof __isPresentationHiddenTab === "function" && __isPresentationHiddenTab(tab)) return "";
+  const openable = tab && typeof window.__navOpenTab === "function";
+  const clickAttrs = openable
+    ? ` onclick="window.__navOpenTab('${tab}')" role="button" tabindex="0" style="cursor:pointer"`
+    : "";
+  return `<div class="card ov-card"${clickAttrs}>
+    <div class="card-title" style="margin-bottom:6px">
+      <span>${icon} ${_ovEsc(title)}</span>
+      ${openable ? `<span class="sub">فتح ›</span>` : ""}
+    </div>
+    ${lines.map((l) => `<div style="font-size:12px;color:var(--tx-main);padding:2px 0;display:flex;justify-content:space-between;gap:8px">
+      <span style="color:var(--tx-muted)">${_ovEsc(l.k)}</span><span style="font-weight:800">${_ovEsc(l.v)}</span>
+    </div>`).join("")}
+  </div>`;
+}
+function renderOverviewSummaryCards() {
+  const el = document.getElementById("overview-summary-cards");
+  if (!el) return;
+  const fmt = _ovFmt;
+
+  // نفس دوال بناء سياق المساعد الذكي — عشان الأرقام تبقى متطابقة في كل مكان بالداشبورد
+  let stat = {}, sup = {};
+  try {
+    const DALL = Array.isArray(window.RAW) ? window.RAW : typeof RAW !== "undefined" && Array.isArray(RAW) ? RAW : [];
+    if (typeof window.buildStatisticsSection === "function") stat = window.buildStatisticsSection(DALL, DALL) || {};
+  } catch (e) { console.warn("[Overview] buildStatisticsSection", e); }
+  try {
+    const supInput = {
+      balagh: window.RAW_BALAGH, systems: window.RAW_ALL_SYSTEMS, elevators: window.RAW_ELEVATORS,
+      hasr: window.HASR, fuel: window.RAW_NEW_FUEL, vehicles: window.RAW_NEW_VEHICLES,
+      orgStructure: window.RAW_NEW_ORG_STRUCTURE, lsPayments: window.RAW_NEW_LS_PAYMENTS,
+      contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS, ppmMaximo: window.RAW_NEW_PPM_MAXIMO,
+      visitsMonthly: window.RAW_NEW_VISITS_MONTHLY, visitsByRegion: window.RAW_NEW_VISITS_BY_REGION,
+      pettyCashLaynada: window.RAW_NEW_PETTY_CASH_LAYNADA, pettyCashMeer: window.RAW_NEW_PETTY_CASH_MEER,
+      correspondence: window.RAW_NEW_CORRESPONDENCE, kpiContractor: window.RAW_NEW_KPI_CONTRACTOR,
+      kpiConsultant: window.RAW_NEW_KPI_CONSULTANT, training: window.RAW_NEW_TRAINING,
+      gatekeepers: window.RAW_NEW_GATEKEEPERS, supervisors: window.RAW_NEW_SUPERVISORS,
+    };
+    if (typeof window.buildSupplementalSection === "function") sup = window.buildSupplementalSection(supInput) || {};
+  } catch (e) { console.warn("[Overview] buildSupplementalSection", e); }
+
+  // NEW SLA — تُحسب هنا مباشرة بنفس منطق تبويبها (بما في ذلك حالة "اختراق
+  // حالي" للبلاغات المفتوحة اللي تجاوزت وقتها المستهدف) عشان الكارت يعكس
+  // الواقع الفعلي، مش مجرد عدد سجلات.
+  let newSla = null;
+  try {
+    if (typeof window.__balaghNormalizeRows === "function") {
+      const rows = window.__balaghNormalizeRows();
+      const p1to4 = rows.filter((r) => r.newSlaMatched && !r.newSlaIsP5);
+      if (p1to4.length) {
+        const compliant = p1to4.filter((r) => r.newSlaEvalStatus === "compliant").length;
+        const breach = p1to4.filter((r) => r.newSlaEvalStatus === "breach" || r.newSlaEvalStatus === "breach_open").length;
+        const evaluated = compliant + breach;
+        newSla = { total: p1to4.length, breach, pct: evaluated ? Math.round((compliant / evaluated) * 1000) / 10 : null };
+      }
+    }
+  } catch (e) { console.warn("[Overview] NEW SLA", e); }
+
+  // برامج التدريب — نسبة إنجاز فعلية (موظف × دورة إلزامية)، بنفس منطق تبويبها
+  let train = null;
+  try {
+    const rows = window.RAW_NEW_TRAINING || [];
+    if (rows.length && typeof _trainPivotByEmployee_ === "function") {
+      const list = _trainPivotByEmployee_(rows);
+      const courses = list.courseNames || [];
+      if (courses.length) {
+        const totalSlots = list.length * courses.length;
+        const doneSlots = list.reduce((s, e) => s + e.completedCount, 0);
+        train = { employees: list.length, courses: courses.length, pct: totalSlots ? Math.round((doneSlots / totalSlots) * 1000) / 10 : null };
+      }
+    }
+  } catch (e) { console.warn("[Overview] training", e); }
+
+  // مدفوعات وعقود المقاولين — المدفوع/المتبقي الفعلي، بنفس منطق تبويبها
+  let ctp = null;
+  try {
+    const rows = window.RAW_NEW_CONTRACTOR_PAYMENTS || [];
+    if (rows.length && typeof _ctpEffectiveValue === "function" && typeof _ctpPaymentFields === "function") {
+      let value = 0, paid = 0;
+      rows.forEach((r) => { value += _ctpEffectiveValue(r); paid += _ctpPaymentFields(r).paid; });
+      ctp = { count: rows.length, value, paid, remaining: Math.max(value - paid, 0), pct: value ? Math.round((paid / value) * 1000) / 10 : null };
+    }
+  } catch (e) { console.warn("[Overview] contractor payments", e); }
+
+  const groups = [
+    {
+      title: "🏫 المدارس والتقييمات",
+      cards: [
+        stat.تحليل_FCA && _ovCard({ icon: "📈", title: "تحليل FCA", tab: "fca", lines: [
+          { k: "مدارس مقيَّمة", v: fmt(stat.تحليل_FCA.عدد_المدارس_المقيّمة) },
+          { k: "متوسط الدرجة", v: fmt(stat.تحليل_FCA.المتوسط_الفعلي) },
+        ]}),
+        stat.البيئة_المدرسية && _ovCard({ icon: "🌿", title: "البيئة المدرسية", tab: "env", lines: [
+          { k: "مدارس مقيَّمة", v: fmt(stat.البيئة_المدرسية.عدد_المقيّم) },
+          { k: "متوسط الدرجة", v: fmt(stat.البيئة_المدرسية.المتوسط_الفعلي) },
+        ]}),
+        stat.التكلفة && _ovCard({ icon: "💵", title: "التكلفة", tab: "cost", lines: [
+          { k: "الإجمالي (ر.س)", v: fmt(stat.التكلفة.الإجمالي) },
+          { k: "مدارس لها تكلفة", v: fmt(stat.التكلفة.عدد_مدارس_لها_تكلفة) },
+        ]}),
+        stat.الطلاب_والمبنى && stat.الطلاب_والمبنى.إجمالي_الطلاب != null && _ovCard({ icon: "🎒", title: "الطلاب وعمر المبنى", tab: "students", lines: [
+          { k: "إجمالي الطلاب", v: fmt(stat.الطلاب_والمبنى.إجمالي_الطلاب) },
+        ]}),
+      ],
+    },
+    {
+      title: "📢 البلاغات والسلامة",
+      cards: [
+        sup.البلاغات && _ovCard({ icon: "📢", title: "البلاغات", tab: "balagh", lines: [
+          { k: "الإجمالي", v: fmt(sup.البلاغات.إجمالي_البلاغات) },
+        ]}),
+        newSla && _ovCard({ icon: "⏱️", title: "NEW SLA", tab: "new-sla", lines: [
+          { k: "نسبة الالتزام", v: newSla.pct != null ? newSla.pct + "%" : "—" },
+          { k: "اختراق (شامل الحالي)", v: fmt(newSla.breach) },
+        ]}),
+        (Array.isArray(window.RAW_SECURITY_SAFETY) && window.RAW_SECURITY_SAFETY.length) && _ovCard({ icon: "🛡️", title: "بلاغات الأمن والسلامة", tab: "security-safety", lines: [
+          { k: "الإجمالي", v: fmt(window.RAW_SECURITY_SAFETY.length) },
+        ]}),
+      ],
+    },
+    {
+      title: "⚙️ الموارد البشرية والتشغيل",
+      cards: [
+        sup.الهيكل_الوظيفي && _ovCard({ icon: "🗂️", title: "الهيكل الوظيفي", tab: "org-structure", lines: [
+          { k: "إجمالي الوظائف", v: fmt(sup.الهيكل_الوظيفي.إجمالي_الوظائف_والسجلات) },
+          { k: "شاغرة", v: fmt(sup.الهيكل_الوظيفي.الوظائف_الشاغرة) },
+          { k: "نسبة الإشغال", v: sup.الهيكل_الوظيفي.نسبة_الإشغال || "—" },
+        ]}),
+        train && _ovCard({ icon: "🎓", title: "برامج التدريب", tab: "training", lines: [
+          { k: "عدد الموظفين", v: fmt(train.employees) },
+          { k: "نسبة الإنجاز", v: train.pct != null ? train.pct + "%" : "—" },
+        ]}),
+        sup.السيارات && _ovCard({ icon: "🚗", title: "السيارات", tab: "vehicles", lines: [
+          { k: "إجمالي السيارات", v: fmt(sup.السيارات.إجمالي_السيارات) },
+        ]}),
+        sup.استهلاك_الوقود && _ovCard({ icon: "⛽", title: "استهلاك الوقود", tab: "fuel", lines: [
+          { k: "إجمالي اللترات", v: fmt(sup.استهلاك_الوقود.إجمالي_اللترات) },
+          { k: "إجمالي التكلفة (ر.س)", v: fmt(sup.استهلاك_الوقود.إجمالي_التكلفة_SAR) },
+        ]}),
+        sup.البوابون && _ovCard({ icon: "🚪", title: "البوابون", tab: "gatekeepers", lines: [
+          { k: "الإجمالي", v: fmt(sup.البوابون.إجمالي_البوابين) },
+        ]}),
+        sup.المشرفون_والمهندسون && _ovCard({ icon: "👷", title: "المشرفون والمهندسون", tab: "supervisors", lines: [
+          { k: "الإجمالي", v: fmt(sup.المشرفون_والمهندسون.إجمالي_السجلات) },
+        ]}),
+        sup.سجل_المراسلات && _ovCard({ icon: "✉️", title: "سجل المراسلات", tab: "correspondence", lines: [
+          { k: "الإجمالي", v: fmt(sup.سجل_المراسلات.إجمالي_المراسلات) },
+        ]}),
+        sup.الزيارات && _ovCard({ icon: "🚚", title: "الزيارات", tab: "visits", lines: [
+          { k: "نسبة الإنجاز", v: sup.الزيارات.نسبة_الإنجاز_الكلية || "—" },
+          { k: "مكتملة", v: fmt(sup.الزيارات.إجمالي_الزيارات_المكتملة) },
+        ]}),
+      ],
+    },
+    {
+      title: "💰 العقود والتكاليف",
+      cards: [
+        sup.مدفوعات_وعقود_LS && _ovCard({ icon: "💳", title: "مدفوعات وعقود LS", tab: "ls-payments", lines: [
+          { k: "نسبة السداد", v: sup.مدفوعات_وعقود_LS.نسبة_السداد_الكلية || "—" },
+          { k: "المتبقي (ر.س)", v: fmt(sup.مدفوعات_وعقود_LS.المتبقي_SAR) },
+        ]}),
+        ctp && _ovCard({ icon: "🏗️", title: "مدفوعات وعقود المقاولين", tab: "contractor-payments", lines: [
+          { k: "نسبة السداد", v: ctp.pct != null ? ctp.pct + "%" : "—" },
+          { k: "المتبقي (ر.س)", v: fmt(ctp.remaining) },
+        ]}),
+        sup.العهدة && _ovCard({ icon: "🧾", title: "العهدة", tab: "petty-cash", lines: [
+          { k: "الرصيد المتبقي (ر.س)", v: fmt(sup.العهدة.الرصيد_المتبقي) },
+        ]}),
+      ],
+    },
+    {
+      title: "🔧 الصيانة والأصول",
+      cards: [
+        sup.المصاعد && _ovCard({ icon: "🛗", title: "المصاعد", tab: "elevators", lines: [
+          { k: "العاملة", v: fmt(sup.المصاعد.العاملة) },
+          { k: "المتعطلة", v: fmt(sup.المصاعد.المتعطلة) },
+        ]}),
+        sup.حصر_الأصول && _ovCard({ icon: "📦", title: "حصر الأصول", tab: "hasr", lines: [
+          { k: "إجمالي الأصول", v: fmt(sup.حصر_الأصول.إجمالي_الأصول) },
+        ]}),
+        sup.الصيانة_الوقائية_Maximo && _ovCard({ icon: "🛠️", title: "الصيانة الوقائية (Maximo)", tab: "ppm-maximo", lines: [
+          { k: "نسبة الإنجاز الفعلي", v: sup.الصيانة_الوقائية_Maximo.Actual_الإجمالي || "—" },
+        ]}),
+      ],
+    },
+    {
+      title: "📊 مؤشرات الأداء",
+      cards: [
+        sup.مؤشرات_الأداء && _ovCard({ icon: "📊", title: "مؤشرات أداء المقاول", tab: "mag-kpi", lines: [
+          { k: "عدد المؤشرات", v: fmt(sup.مؤشرات_الأداء.عدد_مؤشرات_المقاول) },
+        ]}),
+        sup.مؤشرات_الأداء && _ovCard({ icon: "📊", title: "مؤشرات أداء الاستشاري", tab: "consultant-kpi", lines: [
+          { k: "عدد المؤشرات", v: fmt(sup.مؤشرات_الأداء.عدد_مؤشرات_الاستشاري) },
+        ]}),
+      ],
+    },
+  ];
+
+  const groupsHtml = groups
+    .map((g) => {
+      const cardsHtml = g.cards.filter(Boolean).join("");
+      if (!cardsHtml) return "";
+      return `<div class="mb14">
+        <div style="font-size:13px;font-weight:800;color:var(--tx-muted);margin:4px 0 8px">${_ovEsc(g.title)}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px">${cardsHtml}</div>
+      </div>`;
+    })
+    .join("");
+
+  el.innerHTML = groupsHtml || `<div class="card" style="text-align:center;padding:24px;color:var(--tx-muted);font-size:13px">لا توجد بيانات محمَّلة بعد لعرض النظرة العامة الشاملة.</div>`;
+}
 function renderOverviewCharts() {
+  try { renderOverviewSummaryCards(); } catch (e) { console.warn("[Overview] summary cards", e); }
   const D = FILTERED,
     histLabels = [
       "0–9",
@@ -4524,15 +4757,10 @@ let __bgRevalidatedOnce = false;
       }
       // ★ 2026-09-17: الملفات الأربعة الجديدة (نفس الرابط، نفس الآب سكريبت)
       window.RAW_NEW_LS_PAYMENTS = d.ls_payments?.sheets?.["LS Payments and Contracts"] || [];
-      // ★ 2026-09-20: بناءً على طلب صريح — استبدال المصدر بالكامل من شيت
-      // "Payments and Contracts" (65 صف، عقد واحد لكل صف، فيه بيانات
-      // المدفوعات) إلى "Copy of Payments and Contracts" (108 صف، نفس
-      // رقم العقد بيتكرر لعدة مشاريع/نطاقات فرعية تحته، فيه القيمة
-      // الأساسية والمحدثة والتواريخ بس — أعمدة المدفوعات
-      // (Payment Released/% Paid/Remaining/Deduction) فاضية تمامًا في
-      // المصدر الجديد). تبويب "مدفوعات وعقود المقاولين" اتعدّل بالتبعية
-      // ليعرض مستوى المشروع الفرعي بدل مستوى العقد ويشيل كروت/أعمدة
-      // المدفوعات بدل ما يوريها صفر بشكل مضلل.
+      // المصدر: شيت "Copy of Payments and Contracts" (108 صف، عقد واحد
+      // قد يتكرر لعدة مشاريع/نطاقات فرعية تحته). تبويب "مدفوعات وعقود
+      // المقاولين" يعرض من هذا المصدر تحليل المدفوع/المتبقي لكل مشروع،
+      // مع معاملة العقود التي لم تبدأ بعد بوصفها قيمتها بالكامل متبقية.
       window.RAW_NEW_CONTRACTOR_PAYMENTS = d.contractor_payments?.sheets?.["Copy of Payments and Contracts"] || [];
       // PPM Maximo: شيت مستقل لكل منطقة — بنجمعهم في مصفوفة واحدة مع
       // إضافة عمود "المنطقة" لكل صف عشان نقدر نحسب إجمالي/انجاز كل
@@ -4568,13 +4796,14 @@ let __bgRevalidatedOnce = false;
       if (json && json.errors) console.warn("[NEW_TEMPLATES] ⚠️ بعض الملفات فيها خطأ:", json.errors);
     }
 
-    // استخراج منطق إعادة رسم أي تبويب مفتوح فعلاً حاليًا — نفس المنطق
-    // بالظبط اللي كان بعد الـ try/catch/finally سابقًا.
+    // استخلاص منطق إعادة رسم أي تبويب مفتوح حاليًا فعليًا — وهو نفس
+    // المنطق الذي كان موجودًا بعد جملة try/catch/finally سابقًا.
     function _reRenderActiveNewTemplateTabs() {
-      // ⚡ لو تبويب "سجل المراسلات" مفتوح فعلاً وقت ما التحميل خلص (تحميل
-      // منفصل غير متزامن — ممكن ياخد وقت أطول من فتح المستخدم للتبويب قبل
-      // ما البيانات توصل)، نعيد رسمه فورًا عشان يعرض البيانات الحقيقية من
-      // غير ما يحتاج المستخدم يبدّل تبويب يدويًا لتحديثه.
+      // ⚡ إذا كان تبويب "سجل المراسلات" مفتوحًا فعليًا عند اكتمال التحميل
+      // (وهو تحميل منفصل غير متزامن قد يستغرق وقتًا أطول من فتح المستخدم
+      // للتبويب قبل وصول البيانات)، يُعاد رسمه فورًا ليعرض البيانات
+      // الحقيقية دون أن يحتاج المستخدم إلى التنقل بين التبويبات يدويًا
+      // لتحديثه.
       if (document.getElementById("tab-correspondence")?.classList.contains("active")) {
         try { renderCorrespondenceTab(); } catch (e) { console.warn("[NEW_TEMPLATES][correspondence render]", e); }
       }
@@ -4595,6 +4824,27 @@ let __bgRevalidatedOnce = false;
       }
       if (document.getElementById("tab-petty-cash")?.classList.contains("active")) {
         try { renderPettyCashTab(); } catch (e) { console.warn("[NEW_TEMPLATES][petty-cash render]", e); }
+      }
+      // ⚡ (2026-09-28 — إصلاح جذري) نفس مشكلة "سجل المراسلات" أعلاه كانت
+      // موجودة أيضًا لتبويبات السيارات والتدريب والوقود والبوابين
+      // والمشرفين: إذا فتح المستخدم أحدها قبل وصول بيانات
+      // training_fuel/gatekeepers_supervisors من الشبكة، يظل التبويب
+      // يعرض حالة فارغة أو حالة تحميل إلى ما لا نهاية حتى بعد وصول
+      // البيانات فعليًا، لأنها لم تكن مُدرجة هنا فيُعاد عرضها.
+      if (document.getElementById("tab-vehicles")?.classList.contains("active")) {
+        try { renderVehiclesTab(); } catch (e) { console.warn("[NEW_TEMPLATES][vehicles render]", e); }
+      }
+      if (document.getElementById("tab-training")?.classList.contains("active")) {
+        try { renderTrainingTab(); } catch (e) { console.warn("[NEW_TEMPLATES][training render]", e); }
+      }
+      if (document.getElementById("tab-fuel")?.classList.contains("active")) {
+        try { renderFuelTab(); } catch (e) { console.warn("[NEW_TEMPLATES][fuel render]", e); }
+      }
+      if (document.getElementById("tab-gatekeepers")?.classList.contains("active") && typeof renderGatekeepersTab === "function") {
+        try { renderGatekeepersTab(); } catch (e) { console.warn("[NEW_TEMPLATES][gatekeepers render]", e); }
+      }
+      if (document.getElementById("tab-supervisors")?.classList.contains("active") && typeof renderSupervisorsTab === "function") {
+        try { renderSupervisorsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][supervisors render]", e); }
       }
     }
 
@@ -7043,7 +7293,7 @@ function renderSecuritySafetyTab() {
     const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
     const msg =
       balaghState === "loading"
-        ? "يجري تحميل بيانات البلاغات في الخلفية، وستُحدَّث بيانات الأمن والسلامة تلقائيًا فور اكتمال التحميل."
+        ? "يتم تحميل البيانات."
         : balaghState === "error"
         ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
         : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
@@ -7085,7 +7335,7 @@ function renderSecuritySafetyTab() {
     </div>`;
   }
 
-  // ── حالة الفلاتر (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم) ──
+  // ── حالة الفلاتر (تُحفظ في window لتبقى ثابتة بين مرات إعادة الرسم) ──
   const ST = (window.__SEC_BALAGH_STATE__ = window.__SEC_BALAGH_STATE__ || {
     search: "", status: "", category: "", priority: "", region: "", dateFrom: "", dateTo: "",
     sort: "date_desc", page: 0, size: 25,
@@ -7454,7 +7704,7 @@ function renderSecuritySafetySummaryTab() {
     const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
     const msg =
       balaghState === "loading"
-        ? "يجري تحميل بيانات البلاغات في الخلفية، وسيُحدَّث هذا الملخص تلقائيًا فور اكتمال التحميل."
+        ? "يتم تحميل البيانات."
         : balaghState === "error"
         ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
         : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
@@ -7479,9 +7729,9 @@ function renderSecuritySafetySummaryTab() {
     </div>`;
   }
 
-  // ── حالة فلتر التاريخ (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم)
-  // — بنفس نمط window.__SEC_BALAGH_STATE__ المستخدم في تبويب "بلاغات الأمن
-  // والسلامة" الشقيق. ──
+  // ── حالة فلتر التاريخ (تُحفظ في window لتبقى ثابتة بين مرات إعادة الرسم)
+  // — وفق نفس نمط window.__SEC_BALAGH_STATE__ المستخدم في تبويب "بلاغات
+  // الأمن والسلامة" الشقيق. ──
   const ST = (window.__SEC_SUMMARY_STATE__ = window.__SEC_SUMMARY_STATE__ || {
     dateFrom: "", dateTo: "",
   });
@@ -7681,9 +7931,14 @@ function renderSecuritySafetySummaryTab() {
   `;
 }
 
-/* JS تبويب: NEW SLA (tab-new-sla) — السلا الجديد يُحسب فقط للبلاغات
-   المغلقة غير P5، P5 مستبعدة تمامًا من الحساب (قسم مستقل بالأسفل). راجع
-   newSlaMatched/newSlaEvalStatus/newSlaCategory في normalizeRows فوق. */
+/* JS تبويب: NEW SLA (tab-new-sla) — يُحسب السلا الجديد للبلاغات المغلقة
+   غير P5 وفق مدة الحل الفعلية، وكذلك للبلاغات المفتوحة التي لم تُغلق بعد
+   إذا تجاوزت المدة المنقضية منذ تاريخ إنشائها الهدف الزمني المحدَّد (حالة
+   "breach_open" — اختراق قائم)، حتى لا يُستثنى أي بلاغ من الحساب لمجرد
+   بقائه مفتوحًا. تُستبعد فئة P5 كليًا من الحساب (قسم مستقل أدناه). يوجد
+   فلتر تاريخ إلزامي أعلى الصفحة، أساسه تاريخ الإنشاء، ويُطبَّق على جميع
+   الأقسام. يُراجَع newSlaMatched/newSlaEvalStatus/newSlaCategory/
+   newSlaOpenOverdue في الدالة normalizeRows أعلاه. */
 function renderNewSlaTab() {
   const el = document.getElementById("new-sla-content");
   if (!el) return;
@@ -7699,7 +7954,7 @@ function renderNewSlaTab() {
     const icon = balaghState === "loading" ? "⏳" : balaghState === "error" ? "❌" : "📥";
     const msg =
       balaghState === "loading"
-        ? "يجري تحميل بيانات البلاغات في الخلفية، وسيُحدَّث تبويب NEW SLA تلقائيًا فور اكتمال التحميل."
+        ? "يتم تحميل البيانات."
         : balaghState === "error"
         ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
         : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
@@ -7716,9 +7971,10 @@ function renderNewSlaTab() {
   }
 
   const mapCatalogLen = typeof window.__balaghNewSlaRawMapLen_ === "function" ? window.__balaghNewSlaRawMapLen_() : 0;
-  // ⚠️ لو الخريطة المرجعية لسه فاضية رغم إن البلاغات محمَّلة فعليًا — الأرجح
-  // إن ملف Apps Script (balagh_reports.gs) عنده نسخة قديمة لسه متعرفش تقرأ
-  // شيت "NEW SLA" (تحديث مطلوب — راجع خطوات النشر في تعليمات التسليم).
+  // ⚠️ إذا كانت الخريطة المرجعية لا تزال فارغة رغم أن البلاغات محمَّلة
+  // فعليًا، فالأرجح أن ملف Apps Script (balagh_reports.gs) لا يزال بنسخة
+  // قديمة لا تقرأ شيت "NEW SLA" (تحديث مطلوب — راجع خطوات النشر في
+  // تعليمات التسليم).
   let mapMissingHtml = "";
   if (!notLoaded && !mapCatalogLen) {
     mapMissingHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
@@ -7727,27 +7983,45 @@ function renderNewSlaTab() {
     </div>`;
   }
 
-  const allRows = window.__balaghNormalizeRows();
+  // ── حالة الفلاتر (تُحفظ في window لتبقى ثابتة بين مرات إعادة الرسم) ──
+  const ST = (window.__NEW_SLA_STATE__ = window.__NEW_SLA_STATE__ || {
+    search: "", priority: "", evalStatus: "", page: 0, size: 25, dateFrom: "", dateTo: "",
+  });
+
+  const rawAllRows = window.__balaghNormalizeRows();
+  // ── فلتر التاريخ (ضروري — على أساس تاريخ الإنشاء) — بيُطبَّق على كل
+  // شيء تحت (لوحات KPI، الرسوم، الجداول) قبل أي تصنيف آخر. لو الفلتر
+  // فاضي (من/إلى) بيتم عرض كل البيانات بدون استثناء. ──
+  const dateFromObj = ST.dateFrom ? new Date(ST.dateFrom + "T00:00:00") : null;
+  const dateToObj = ST.dateTo ? new Date(ST.dateTo + "T23:59:59") : null;
+  const allRows = rawAllRows.filter((r) => {
+    if (!dateFromObj && !dateToObj) return true;
+    if (!r.creationDateObj) return false; // لو الفلتر مفعّل، البلاغات بتاريخ غير مقروء تُستبعد بدل ما تظهر بشكل مضلِّل
+    if (dateFromObj && r.creationDateObj.getTime() < dateFromObj.getTime()) return false;
+    if (dateToObj && r.creationDateObj.getTime() > dateToObj.getTime()) return false;
+    return true;
+  });
   const matchedRows = allRows.filter((r) => r.newSlaMatched);
   const p1to4Rows = matchedRows.filter((r) => !r.newSlaIsP5);
   const p5Rows = matchedRows.filter((r) => r.newSlaIsP5);
   const unmatchedRows = allRows.filter((r) => !r.newSlaMatched && r.subCategory);
 
-  // ── حالة الفلاتر (تُحفظ في window عشان تفضل ثابتة بين إعادة الرسم) ──
-  const ST = (window.__NEW_SLA_STATE__ = window.__NEW_SLA_STATE__ || {
-    search: "", priority: "", evalStatus: "", page: 0, size: 25,
-  });
-
   const priorityOrder = { P1: 1, P2: 2, P3: 3, P4: 4, P5: 5 };
   const evalStatusLabel = (s) => ({
-    compliant: "ملتزم", breach: "غير ملتزم (اختراق)", pending: "قيد التنفيذ — لم يُحدَّد بعد",
-    p5: "P5 — بدون SLA جديد", unmatched: "غير مصنّفة — بدون أولوية",
+    compliant: "ملتزم", breach: "غير ملتزم (اختراق)", breach_open: "اختراق حالي — لا يزال مفتوحًا",
+    pending: "قيد التنفيذ — لم يُحدَّد بعد", p5: "P5 — بدون SLA جديد", unmatched: "غير مصنّفة — بدون أولوية",
   }[s] || s || "—");
+  // "اختراق" بالمعنى الشامل = بلاغ مغلق تجاوز الهدف، أو بلاغ لا يزال مفتوحًا
+  // لكنه تجاوز فعليًا الوقت المستهدف من تاريخ إنشائه (راجع openIsOverdue في
+  // normalizeRows) — بهذه الطريقة لا يُستثنى أي بلاغ من الحساب لمجرد بقائه مفتوحًا.
+  const isBreachStatus = (s) => s === "breach" || s === "breach_open";
 
   // ── لوحة KPI عامة: على أساس P1-P4 المطابقة فقط (P5 مُستثناة تمامًا هنا) ──
   const totalP1to4 = p1to4Rows.length;
   const compliantCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "compliant").length;
-  const breachCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "breach").length;
+  const breachClosedCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "breach").length;
+  const breachOpenCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "breach_open").length;
+  const breachCount = breachClosedCount + breachOpenCount;
   const pendingCount = p1to4Rows.filter((r) => r.newSlaEvalStatus === "pending").length;
   const evaluatedCount = compliantCount + breachCount;
   const compliancePct = pct2(compliantCount, evaluatedCount);
@@ -7756,7 +8030,7 @@ function renderNewSlaTab() {
   const priorityStats = ["P1", "P2", "P3", "P4"].map((p) => {
     const pRows = p1to4Rows.filter((r) => r.newSlaPriority === p);
     const pCompliant = pRows.filter((r) => r.newSlaEvalStatus === "compliant").length;
-    const pBreach = pRows.filter((r) => r.newSlaEvalStatus === "breach").length;
+    const pBreach = pRows.filter((r) => isBreachStatus(r.newSlaEvalStatus)).length;
     const pPending = pRows.filter((r) => r.newSlaEvalStatus === "pending").length;
     const pEvaluated = pCompliant + pBreach;
     const targetRow = pRows.find((r) => r.newSlaHoursTarget != null);
@@ -7767,9 +8041,9 @@ function renderNewSlaTab() {
   });
   const maxPriorityTotal = Math.max(1, ...priorityStats.map((p) => p.total));
 
-  // ── تفصيل حسب الفئة الجديدة (القيمة الجديدة التي ستتطبق) — بما فيها
-  // فئات موجودة في الخريطة المرجعية ولسه معهاش أي بلاغ حالياً (عدّها صفر)،
-  // بنفس مبدأ عرض التصنيفات الستة عشر كاملة في تبويب الأمن والسلامة. ──
+  // ── تفصيل حسب الفئة الجديدة (القيمة الجديدة التي ستتطبق) — بما في ذلك
+  // فئات موجودة في الخريطة المرجعية ولا يوجد لها أي بلاغ حاليًا (عدّها صفر)،
+  // وفق نفس مبدأ عرض التصنيفات الستة عشر كاملةً في تبويب الأمن والسلامة. ──
   const catalogEntries = typeof window.__balaghNewSlaCatalogEntries_ === "function" ? window.__balaghNewSlaCatalogEntries_() : [];
   const catalogP1to4 = catalogEntries.filter((e) => !e.isP5);
   const catalogP5 = catalogEntries.filter((e) => e.isP5);
@@ -7778,7 +8052,7 @@ function renderNewSlaTab() {
   const categoryStats = [...catByNewCategory_.entries()].map(([cat, e]) => {
     const cRows = p1to4Rows.filter((r) => r.newSlaCategory === cat);
     const cCompliant = cRows.filter((r) => r.newSlaEvalStatus === "compliant").length;
-    const cBreach = cRows.filter((r) => r.newSlaEvalStatus === "breach").length;
+    const cBreach = cRows.filter((r) => isBreachStatus(r.newSlaEvalStatus)).length;
     const cEvaluated = cCompliant + cBreach;
     return {
       category: cat, priority: e.priority, hoursTarget: e.hoursTarget, total: cRows.length,
@@ -7803,9 +8077,10 @@ function renderNewSlaTab() {
     return { category: cat, priority: e.priority, count: n, pct: pct2(n, matchedRows.length) };
   }).sort((a, b) => b.count - a.count);
 
-  // ── قسم "غير مصنّفة": فئات فرعية موجودة فعليًا في البلاغات لكن مش موجودة
-  // في خريطة NEW SLA (86 صف) — بدون أولوية/SLA جديد (بدل ما تُخترع)، وبدون
-  // حذفها من الداشبورد. عدد البلاغات + اسم الفئة الأصلي فقط، بنفس أسلوب P5. ──
+  // ── قسم "غير مصنّفة": فئات فرعية موجودة فعليًا في البلاغات لكنها غير
+  // موجودة في خريطة NEW SLA (86 صفًا) — تُعرض بلا أولوية أو SLA جديد
+  // (بدلًا من اختلاقهما)، ومن دون حذفها من لوحة المعلومات. تُعرض عدد
+  // البلاغات واسم الفئة الأصلي فقط، وفق نفس أسلوب قسم P5. ──
   const unclassifiedTotal = unmatchedRows.length;
   const unclassifiedFreq = {};
   unmatchedRows.forEach((r) => { unclassifiedFreq[r.subCategory] = (unclassifiedFreq[r.subCategory] || 0) + 1; });
@@ -7834,8 +8109,21 @@ function renderNewSlaTab() {
   const list = rows.slice(ST.page * ST.size, ST.page * ST.size + ST.size);
 
   el.innerHTML = `
-    ${bannerHtml}
-    ${mapMissingHtml}
+    <div class="card mb14" style="border:1px solid #BAE6FD;background:#F0F9FF">
+      <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px 0">
+        <div class="fg">
+          <div class="fg-lbl">من تاريخ</div>
+          <input type="date" class="finp" value="${esc(ST.dateFrom)}"
+            onchange="window.__NEW_SLA_STATE__.dateFrom=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">إلى تاريخ</div>
+          <input type="date" class="finp" value="${esc(ST.dateTo)}"
+            onchange="window.__NEW_SLA_STATE__.dateTo=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+        </div>
+        <button class="f-clear" onclick="window.__NEW_SLA_STATE__.dateFrom='';window.__NEW_SLA_STATE__.dateTo='';window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">✕ عرض كل التواريخ</button>
+      </div>
+    </div>
 
     <div class="card mb14">
       <div class="card-title">
@@ -7846,7 +8134,7 @@ function renderNewSlaTab() {
         <div class="kpi kc-amber">
           <div class="kpi-val" style="color:#D97706">${fmt2(totalP1to4)}</div>
           <div class="kpi-lbl">إجمالي P1-P4 المطابقة</div>
-          <div class="kpi-sub">${fmt2(evaluatedCount)} تم تقييمها (مغلقة)</div>
+          <div class="kpi-sub">${fmt2(evaluatedCount)} تم تقييمها (مغلقة أو تجاوزت الوقت المستهدف)</div>
         </div>
         <div class="kpi kc-green">
           <div class="kpi-val" style="color:#059669">${compliancePct}%</div>
@@ -7856,12 +8144,12 @@ function renderNewSlaTab() {
         <div class="kpi kc-red">
           <div class="kpi-val" style="color:#991b1b">${fmt2(breachCount)}</div>
           <div class="kpi-lbl">اختراق SLA الجديد</div>
-          <div class="kpi-sub">${pct2(breachCount, evaluatedCount)}% من المُقيَّم</div>
+          <div class="kpi-sub">${pct2(breachCount, evaluatedCount)}% من المُقيَّم${breachOpenCount ? ` · منها ${fmt2(breachOpenCount)} لا يزال مفتوحًا` : ""}</div>
         </div>
         <div class="kpi kc-blue">
           <div class="kpi-val" style="color:#0891B2">${fmt2(pendingCount)}</div>
           <div class="kpi-lbl">قيد التنفيذ — لم يُحدَّد بعد</div>
-          <div class="kpi-sub">مفتوحة أو بيانات مدة غير متاحة</div>
+          <div class="kpi-sub">مفتوحة ولم تتجاوز الوقت المستهدف بعد، أو بيانات مدة غير متاحة</div>
         </div>
       </div>
     </div>
@@ -8010,10 +8298,10 @@ function renderNewSlaTab() {
           <div class="fg-lbl">حالة الالتزام</div>
           <select class="fsel" onchange="window.__NEW_SLA_STATE__.evalStatus=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
             <option value="">الكل</option>
-            ${["compliant", "breach", "pending", "p5", "unmatched"].map((s) => `<option value="${s}" ${ST.evalStatus === s ? "selected" : ""}>${evalStatusLabel(s)}</option>`).join("")}
+            ${["compliant", "breach", "breach_open", "pending", "p5", "unmatched"].map((s) => `<option value="${s}" ${ST.evalStatus === s ? "selected" : ""}>${evalStatusLabel(s)}</option>`).join("")}
           </select>
         </div>
-        <button class="f-clear" onclick="window.__NEW_SLA_STATE__={search:'',priority:'',evalStatus:'',page:0,size:25};renderNewSlaTab()">✕ مسح الفلاتر</button>
+        <button class="f-clear" onclick="window.__NEW_SLA_STATE__={...window.__NEW_SLA_STATE__,search:'',priority:'',evalStatus:'',page:0,size:25};renderNewSlaTab()">✕ مسح فلاتر السجل (بدون التاريخ)</button>
       </div>
     </div>
 
@@ -8027,7 +8315,7 @@ function renderNewSlaTab() {
           <thead>
             <tr>
               <th>رقم البلاغ</th><th>تاريخ الإنشاء</th><th>الفئة الأصلية</th><th>الفئة الجديدة</th>
-              <th>الأولوية الجديدة</th><th>الحالة</th><th>مدة الحل (ساعة)</th><th>الهدف (ساعة)</th><th>حالة الالتزام الجديد</th>
+              <th>الأولوية الجديدة</th><th>الحالة</th><th>مدة الحل / المدة المنقضية (ساعة)</th><th>الهدف (ساعة)</th><th>حالة الالتزام الجديد</th>
             </tr>
           </thead>
           <tbody>
@@ -8039,9 +8327,13 @@ function renderNewSlaTab() {
                 <td style="max-width:200px">${esc(r.newSlaCategory) || "—"}</td>
                 <td style="font-weight:700">${esc(r.newSlaPriority) || "—"}</td>
                 <td>${esc(window.balaghStatusLabel(r.status))}</td>
-                <td>${r.slaDurationHours != null ? r.slaDurationHours.toFixed(1) : "—"}</td>
+                <td>${r.slaDurationHours != null
+                  ? r.slaDurationHours.toFixed(1)
+                  : r.newSlaOpenElapsedHours != null
+                  ? `${r.newSlaOpenElapsedHours.toFixed(1)} <span style="color:var(--tx-muted);font-size:10px">(لا يزال مفتوحًا)</span>`
+                  : "—"}</td>
                 <td>${r.newSlaHoursTarget != null ? r.newSlaHoursTarget : "—"}</td>
-                <td style="color:${r.newSlaEvalStatus === "compliant" ? "#059669" : r.newSlaEvalStatus === "breach" ? "#DC2626" : "var(--tx-muted)"};font-weight:700">${evalStatusLabel(r.newSlaEvalStatus)}</td>
+                <td style="color:${r.newSlaEvalStatus === "compliant" ? "#059669" : isBreachStatus(r.newSlaEvalStatus) ? "#DC2626" : "var(--tx-muted)"};font-weight:700">${evalStatusLabel(r.newSlaEvalStatus)}</td>
               </tr>`).join("")
               : `<tr><td colspan="9"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>`}
           </tbody>
@@ -8069,7 +8361,12 @@ function renderNewSlaTab() {
     }
 
     if (document.getElementById("ch-newsla-status")) {
-      const statusMap = { "ملتزم": compliantCount, "غير ملتزم (اختراق)": breachCount, "قيد التنفيذ": pendingCount };
+      const statusMap = {
+        "ملتزم": compliantCount,
+        "اختراق (مغلق)": breachClosedCount,
+        "اختراق حالي (لا يزال مفتوحًا)": breachOpenCount,
+        "قيد التنفيذ": pendingCount,
+      };
       makeDoughnut("ch-newsla-status", statusMap, {});
     }
   });
@@ -11189,16 +11486,26 @@ function _sysDownloadFile(filename, content, mime) {
         const newSlaPriority = newSlaEntry ? newSlaEntry.priority : "";
         const newSlaIsP5 = newSlaEntry ? newSlaEntry.isP5 : false;
         const newSlaHoursTarget = newSlaEntry ? newSlaEntry.hoursTarget : null;
+        // يُحسب هنا الزمن المنقضي فعليًا (الآن ناقص تاريخ الإنشاء) للبلاغات
+        // المفتوحة؛ فإذا تجاوز الهدف الزمني المحدَّد تتحوَّل حالة البلاغ إلى
+        // "breach_open" (اختراق قائم مع بقائه مفتوحًا) بدلًا من تصنيفه ضمن
+        // البلاغات قيد التنفيذ. وإذا تعذَّرت قراءة تاريخ الإنشاء يبقى البلاغ
+        // ضمن "قيد التنفيذ" تفاديًا لإظهار مدة سالبة أو وهمية.
+        const nowTs = Date.now();
+        const openElapsedHours =
+          openLike && creationDateObj ? Math.max(0, (nowTs - creationDateObj.getTime()) / 3600000) : null;
+        const openIsOverdue =
+          openLike && !newSlaIsP5 && newSlaHoursTarget != null && openElapsedHours != null && openElapsedHours > newSlaHoursTarget;
         let newSlaEvalStatus;
         if (!newSlaMatched) newSlaEvalStatus = "unmatched";
         else if (newSlaIsP5) newSlaEvalStatus = "p5";
-        else if (openLike) newSlaEvalStatus = "pending";
-        else if (slaDurationHours == null) newSlaEvalStatus = "pending"; // مغلق لكن مدة الحل غير قابلة للقراءة — راجع newSlaDataGap
+        else if (openLike) newSlaEvalStatus = openIsOverdue ? "breach_open" : "pending";
+        else if (slaDurationHours == null) newSlaEvalStatus = "pending"; // بلاغ مغلق لكن مدة الحل غير قابلة للقراءة — راجع newSlaDataGap
         else newSlaEvalStatus = slaDurationHours <= newSlaHoursTarget ? "compliant" : "breach";
-        const newSlaCompliant = newSlaEvalStatus === "compliant" ? true : newSlaEvalStatus === "breach" ? false : null;
-        // فجوة بيانات نادرة: بلاغ مغلق ومطابق (وليس P5) لكن SLA DAYS الخام
-        // مش قابل للتحليل (فاضي/صيغة غير معروفة) — نفصح عنها بدل ما نخفيها
-        // ضمن "قيد التنفيذ" بصمت.
+        const newSlaCompliant =
+          newSlaEvalStatus === "compliant" ? true : (newSlaEvalStatus === "breach" || newSlaEvalStatus === "breach_open") ? false : null;
+        // حالة نادرة: بلاغ مغلق ومطابق (غير P5) لكن قيمة SLA DAYS الخام غير
+        // قابلة للتحليل — تُبيَّن صراحةً بدلًا من إخفائها ضمن "قيد التنفيذ".
         const newSlaDataGap = newSlaMatched && !newSlaIsP5 && !openLike && slaDurationHours == null;
         return {
           idx: idx + 1,
@@ -11256,9 +11563,11 @@ function _sysDownloadFile(filename, content, mime) {
           newSlaPriority,                // P1..P5 — فاضي لو غير مطابقة
           newSlaHoursTarget,             // مستوى الخدمة الجديد بالساعة (null لـ P5 أو غير المطابق)
           newSlaIsP5,                    // true = فئة P5 — لا يوجد لها SLA جديد بناءً على طلب صريح
-          newSlaEvalStatus,              // "compliant" | "breach" | "pending" | "p5" | "unmatched"
-          newSlaCompliant,               // true/false لبس المغلق غير P5 المطابق، وإلا null
+          newSlaEvalStatus,              // "compliant" | "breach" | "breach_open" | "pending" | "p5" | "unmatched"
+          newSlaCompliant,               // true/false لبس المغلق (أو المفتوح المتجاوز) غير P5 المطابق، وإلا null
           newSlaDataGap,                 // true لو مغلق ومطابق لكن SLA DAYS الخام غير قابل للتحليل
+          newSlaOpenElapsedHours: openElapsedHours, // المدة المنقضية فعليًا بالساعة للبلاغات المفتوحة فقط (null غير ذلك)
+          newSlaOpenOverdue: openIsOverdue,         // true = بلاغ مفتوح تجاوز الوقت المستهدف فعليًا (اختراق حالي)
         };
       })
       .filter((r) => r.recordNo || r.schoolName || r.problemDescription);
@@ -18609,6 +18918,20 @@ function exportTajFinExcel(rows) {
 const MOKAYEFAT_URL = "https://script.google.com/macros/s/AKfycbwL7KgC18ZSLOGvC1k_ZrPgEEkXxD-u0E8oh8Yeq6E7rTI9CgZhZM5IO7MLPqNu8m7Y/exec";
 const MOKAYEFAT_CACHE_KEY = "tbc_mokayefat_cache_v1";
 
+// ★ 2026-09-28: علامة يدوية بسيطة لاكتمال التسليم لكل شركة — بناءً على
+// طلب صريح من المستخدم بتمييز شركة الأساسية كمكتملة التسليم بالكامل.
+// هذه علامة عرض فقط (badge) ولا تُغيّر أي رقم فعلي من أعمدة "موردة/متبقي/
+// نسبة الإنجاز" القادمة من الشيت — الأرقام تبقى كما هي من المصدر دائمًا،
+// والعلامة هنا توضيح إضافي فقط. لتحديثها لاحقًا (مثلًا عند اكتمال شركة
+// الزامل أيضًا)، عدّل القيمة المقابلة في الكائن أدناه إلى true.
+const MOK_COMPANY_COMPLETED = { الأساسية: true, الزامل: false };
+function _mokIsCompanyCompleted(company) {
+  return !!MOK_COMPANY_COMPLETED[company];
+}
+function _mokCompletedBadgeHtml() {
+  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:2px 9px;border-radius:99px;margin-inline-start:6px">✅ مكتمل التسليم</span>`;
+}
+
 const MOKAYEFAT = {
   loaded: false,
   loading: false,
@@ -18720,9 +19043,15 @@ function _mokRenderBadge() {
   const schools = new Set(MOKAYEFAT.rows.map((r) => r.minId || r.schoolName)).size;
   const hasSupply = MOKAYEFAT.rows.some((r) => r.supplied !== null);
   const totalPlanned = MOKAYEFAT.rows.reduce((a, r) => a + (r.planned || 0), 0);
-  el.textContent = hasSupply
-    ? `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة`
-    : `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة · لم يبدأ التوريد بعد`;
+  const completedNote = Object.keys(MOK_COMPANY_COMPLETED)
+    .filter((c) => _mokIsCompanyCompleted(c))
+    .map((c) => `✅ اكتمل توريد شركة ${c}`)
+    .join(" · ");
+  el.textContent = (
+    hasSupply
+      ? `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة`
+      : `${numFmt(schools)} مدرسة · ${numFmt(totalPlanned)} وحدة مخططة · لم يبدأ التوريد بعد`
+  ) + (completedNote ? ` · ${completedNote}` : "");
 }
 
 function getMokFiltered() {
@@ -18756,7 +19085,7 @@ function _mokAggByCity(rows) {
 function _mokCityTableCard(companyName, cityAgg) {
   return `<div class="card">
     <div class="card-title">
-      توزيع حسب المدينة — شركة ${esc(companyName)}
+      توزيع حسب المدينة — شركة ${esc(companyName)}${_mokIsCompanyCompleted(companyName) ? _mokCompletedBadgeHtml() : ""}
       <span class="sub">${cityAgg.length} مدينة</span>
     </div>
     <div class="tbl-wrap" style="max-height:260px">
@@ -18905,6 +19234,17 @@ function _mokRenderModal() {
     <span style="font-size:15px">⏳</span>
     <span>قسم <b>مؤقت</b> — البيانات هنا خاصة بمشروع توريد وتركيب المكيفات، ومتوقع إزالة هذا القسم من الداشبورد خلال شهر إلى ثلاثة أشهر على الأكثر.</span>
   </div>
+  ${
+    Object.keys(MOK_COMPANY_COMPLETED).some(_mokIsCompanyCompleted)
+      ? `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803D;display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px">✅</span>
+          <span>${Object.keys(MOK_COMPANY_COMPLETED)
+            .filter(_mokIsCompanyCompleted)
+            .map((c) => `اكتمل التسليم بالكامل من <b>شركة ${esc(c)}</b>`)
+            .join(" — ")}.</span>
+        </div>`
+      : ""
+  }
 
   <div class="filters-row" style="margin-bottom:16px">
     <div class="fg">
@@ -18918,8 +19258,8 @@ function _mokRenderModal() {
       <div class="fg-lbl">الشركة</div>
       <select class="fsel" id="mok-f-company" onchange="mokRerender()" style="min-width:130px">
         <option value="">الكل</option>
-        <option value="الأساسية" ${fCompany === "الأساسية" ? "selected" : ""}>الأساسية</option>
-        <option value="الزامل" ${fCompany === "الزامل" ? "selected" : ""}>الزامل</option>
+        <option value="الأساسية" ${fCompany === "الأساسية" ? "selected" : ""}>الأساسية${_mokIsCompanyCompleted("الأساسية") ? " ✅ مكتمل" : ""}</option>
+        <option value="الزامل" ${fCompany === "الزامل" ? "selected" : ""}>الزامل${_mokIsCompanyCompleted("الزامل") ? " ✅ مكتمل" : ""}</option>
       </select>
     </div>
     <div class="fg">
@@ -18956,7 +19296,7 @@ function _mokRenderModal() {
     ${companyAgg
       .map(
         (c) => `<div class="card">
-      <div class="card-title">شركة ${esc(c.الشركة)}</div>
+      <div class="card-title">شركة ${esc(c.الشركة)}${_mokIsCompanyCompleted(c.الشركة) ? _mokCompletedBadgeHtml() : ""}</div>
       <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="kpi kc-navy"><div class="kpi-val" style="font-size:18px">${numFmt(c.مخطط)}</div><div class="kpi-lbl">مخطط</div></div>
         <div class="kpi kc-teal"><div class="kpi-val" style="font-size:18px">${c.hasSupply ? numFmt(c.موردة) : "—"}</div><div class="kpi-lbl">موردة</div></div>
@@ -19004,7 +19344,7 @@ function _mokRenderModal() {
   // (مش بس أول صفحة زي ما كان قبل الإصلاح).
   const mokTableCols = [
     (r) => `<td>${esc(r.city)}</td>`,
-    (r) => `<td>${esc(r.company)}</td>`,
+    (r) => `<td>${esc(r.company)}${_mokIsCompanyCompleted(r.company) ? " ✅" : ""}</td>`,
     (r) => `<td>${esc(r.schoolName)}</td>`,
     (r) => `<td>${esc(r.minId)}</td>`,
     (r) => `<td>${esc(r.unitType || "—")}</td>`,
@@ -21410,23 +21750,22 @@ function exportNashatExcel(rows) {
     try {
       const trRowsRaw = Array.isArray(window.RAW_NEW_TRAINING) ? window.RAW_NEW_TRAINING : [];
       if (trRowsRaw.length) {
-        const n_ = v => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x)?0:x; };
-        const trRows = _trainPivotByEmployee_(trRowsRaw); // الشيت طولي (صف لكل موظف×برنامج) — نجمّعه لكل موظف أولاً
+        const trRows = _trainPivotByEmployee_(trRowsRaw); // الشيت طولي (صف لكل موظف×دورة) — نجمّعه لكل موظف أولاً
+        const courses = trRows.courseNames || [];
         const total = trRows.length;
-        const cleanCompleted  = trRows.filter(r => r.clean.status === "مكتملة").length;
-        const cleanInProgress = trRows.filter(r => r.clean.status === "قيد التنفيذ").length;
-        const cleanNotStarted = trRows.filter(r => r.clean.status === "لم تبدأ").length;
-        const supCompleted  = trRows.filter(r => r.sup.status === "مكتملة").length;
-        const supInProgress = trRows.filter(r => r.sup.status === "قيد التنفيذ").length;
-        const supNotStarted = trRows.filter(r => r.sup.status === "لم تبدأ").length;
-        const neverLogged = trRows.filter(r => !r.lastLoginKey).length;
-        const avgClean = trRows.filter(r=>n_(r.clean.score)>0);
+        const completedAll = trRows.filter(r => courses.length && r.completedCount === courses.length).length;
+        const neverStarted = trRows.filter(r => r.completedCount === 0).length;
+        const graded = trRows.filter(r => r.avgGrade !== null);
+        const perCourse = {};
+        courses.forEach(c => { perCourse[c] = trRows.filter(r => r.courses[c] && r.courses[c].completed).length; });
         summary.برامج_التدريب = {
-          مصدر: "تبويب برامج التدريب — شيت برامج التدريب",
-          إجمالي_الموظفين_المسجلين: total,
-          دورة_النظافة: { مكتملة: cleanCompleted, قيد_التنفيذ: cleanInProgress, لم_يبدأ: cleanNotStarted, متوسط_الدرجة: avgClean.length ? +(avgClean.reduce((s,r)=>s+n_(r.clean.score),0)/avgClean.length).toFixed(1) : null },
-          برنامج_المشرفين: { مكتمل: supCompleted, قيد_التنفيذ: supInProgress, لم_يبدأ: supNotStarted },
-          لم_يسجّل_دخول_للمنصة_إطلاقاً: neverLogged,
+          مصدر: "تبويب برامج التدريب — شيت برامج التدريب (صف لكل موظف × دورة)",
+          إجمالي_الموظفين: total,
+          عدد_الدورات_الإلزامية: courses.length,
+          أكملوا_كل_الدورات: completedAll,
+          لم_يبدأوا_أي_دورة: neverStarted,
+          متوسط_الدرجة_لمن_أكمل: graded.length ? +(graded.reduce((s,r)=>s+r.avgGrade,0)/graded.length).toFixed(1) : null,
+          الإنجاز_حسب_الدورة: perCourse,
         };
       } else {
         summary.برامج_التدريب = { تنبيه: "لم تُحمَّل بيانات التدريب بعد أو التبويب لم يُفتح بعد." };
@@ -31537,34 +31876,36 @@ function _orgMatchKey(v) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ★ محرر الهيكل الوظيفي داخل ORG CHART — بناءً على طلب صريح من المستخدم
-// إنه يقدر يعدّل موظف/مكان/مدير مباشر من جوّه الشارت نفسه، من غير ما
-// يفتح ملف تاني. وضع التعديل محمي بباسورد (لدخول الوضع)، والحفظ نفسه
-// محمي بباسورد تاني منفصل — نفس فلسفة حماية شعار Land Sterling الموجودة
-// أصلًا في الصفحة (طبقة واجهة بصرية بسيطة، مش تشفير حقيقي، وسهل تغييرها
-// من الثابتين تحت في أي وقت).
+// ★ محرِّر الهيكل الوظيفي داخل ORG CHART — يتيح تعديل الموظف أو الموقع
+// أو المدير المباشر مباشرةً من داخل الشجرة، دون الحاجة إلى فتح ملف آخر.
+// دخول وضع التعديل محمي بكلمة مرور، وكذلك عملية الحفظ — وكلتاهما تستخدمان
+// الآن نفس كلمة المرور الموحَّدة لكل الداشبورد (راجع الثابتين أدناه)، بنفس
+// فلسفة حماية شعار Land Sterling الموجودة أصلًا في الصفحة (طبقة واجهة
+// بصرية بسيطة وليست تشفيرًا حقيقيًا، ويمكن تغييرها من الثابتين أدناه في
+// أي وقت).
 //
-// ⚠️ التعديلات هنا بتتطبّق فورًا على window.RAW_NEW_ORG_STRUCTURE في
-// الذاكرة (فالشارت وجدول "قائمة الوظائف" وكل إحصائيات "📊 التحليل"
-// بتتحدّث فورًا)، وبتتخزّن كمان في localStorage بتاع المتصفح عشان تفضل
-// ظاهرة بعد أي Refresh للصفحة — لأن البيانات الأصلية بتتسحب من جديد من
-// جوجل شيت في كل تحميل. **دي مش مزامنة حقيقية مع جوجل شيت نفسه** — لسه
-// محتاجين نقطة كتابة (doPost) في الآب سكريبت المصدر عشان كده (راجع
-// ملاحظة التسليم). التخزين المحلي هنا بيفضل بس في نفس المتصفح/الجهاز.
-const ORGC_EDIT_ENTER_PASSWORD = "2468";
-const ORGC_EDIT_SAVE_PASSWORD  = "1357";
+// ⚠️ تُطبَّق التعديلات هنا فورًا على window.RAW_NEW_ORG_STRUCTURE في
+// الذاكرة (فتتحدَّث الشجرة وجدول "قائمة الوظائف" وكل إحصائيات "📊 التحليل"
+// فورًا)، وتُخزَّن أيضًا في التخزين المحلي (localStorage) الخاص بالمتصفح
+// كي تبقى ظاهرة بعد أي إعادة تحميل للصفحة — لأن البيانات الأصلية تُسحَب من
+// جديد من جوجل شيت في كل تحميل. **هذا ليس مزامنة حقيقية مع جوجل شيت نفسه**
+// — ما زالت هناك حاجة إلى نقطة كتابة (doPost) في الآب سكريبت المصدر لذلك
+// (راجع ملاحظة التسليم). يبقى التخزين المحلي هنا مقتصرًا على نفس المتصفح
+// والجهاز فقط.
+const ORGC_EDIT_ENTER_PASSWORD = "1248";
+const ORGC_EDIT_SAVE_PASSWORD  = "1248";
 const ORGC_LOCAL_EDITS_KEY = "orgc_local_edits_v1";
-// ★ توكن مزامنة جوجل شيت — لازم يبقى نفس القيمة بالظبط بتاع
-// ORG_EDIT_WRITE_TOKEN جوه ملف الآب سكريبت (apps_script_new_templates_v2.gs)
-// المُسلَّم مع هذا التحديث. لو الآب سكريبت لسه مش متحدّث (مفيش __row في
-// بيانات الصفوف)، التعديل بيفضل محفوظ محليًا بس زي الأول من غير أي محاولة
-// شبكة — التزامن الفعلي بيشتغل تلقائيًا أول ما يتعمل Deploy للنسخة الجديدة.
+// ★ رمز مزامنة جوجل شيت — يجب أن يطابق تمامًا قيمة ORG_EDIT_WRITE_TOKEN
+// داخل ملف الآب سكريبت (apps_script_new_templates_v2.gs) المُسلَّم مع هذا
+// التحديث. إذا لم يكن الآب سكريبت محدَّثًا بعد (لا يوجد __row في بيانات
+// الصفوف)، يبقى التعديل محفوظًا محليًا فقط كما كان، دون أي محاولة اتصال
+// بالشبكة — وتعمل المزامنة الفعلية تلقائيًا فور نشر (Deploy) النسخة الجديدة.
 const ORGC_WRITE_TOKEN = "orgc-sync-7d3f91";
 
-// مفتاح تخزين موحّد لكل صف: لو __row (رقم الصف الحقيقي في شيت جوجل)
-// موجود — استخدمه هو (أدق وأثبت، مفيش احتمال تصادم خالص). لو لسه مش
-// موجود (الآب سكريبت القديم قبل التحديث)، ارجع للبصمة المركّبة
-// (__orgcKey) القديمة كـ fallback.
+// مفتاح تخزين موحَّد لكل صف: إذا وُجد __row (رقم الصف الحقيقي في شيت
+// جوجل) يُستخدَم هو (أدق وأثبت، ولا يوجد أي احتمال للتصادم إطلاقًا). أما
+// إذا لم يكن موجودًا بعد (الآب سكريبت القديم قبل التحديث)، تُستخدَم
+// البصمة المركَّبة (__orgcKey) القديمة كحل بديل.
 function _orgRowStorageKey(row) {
   return row.__row != null ? "row:" + row.__row : row.__orgcKey;
 }
@@ -31582,18 +31923,19 @@ function _orgLocalEditsCount() {
   return Object.keys(_orgLoadLocalEdits()).length;
 }
 
-// بيحسب "بصمة هوية" ثابتة لكل صف (منطقة+فريق+مسمى+اسم وقت أول تحميل
-// طازة من الشيت، + رقم تكرار لو فيه أكتر من صف بنفس التركيبة زي شواغر
-// متعددة بنفس المسمى/المنطقة وبدون اسم) — بتتحسب مرة واحدة بس فور وصول
-// البيانات من الشبكة، **قبل** تطبيق أي تعديل محلي، عشان تفضل نفس
-// البصمة في كل تحميل تالي للصفحة (لأن الشيت الأصلي نفسه ما اتغيرش)
-// ونقدر نلاقي "نفس الصف" ونرجّع له تعديلاته المحفوظة.
-// ★ خط دفاع إضافي: لو صف وصل لأي شاشة عرض (_orgBuildForest) من غير ما
-// يمر على مسار السحب من الشبكة أصلًا (نظريًا مايحصلش في المنتج الحقيقي،
-// بس تحسّبًا)، بنحسبله بصمة هنا كـ fallback عشان زرار الحفظ في المحرر
-// (_orgOpenEditForm) ميخزّنش أي تعديل تحت مفتاح فاضي (undefined) بيتضارب
-// مع تعديلات تانية. بنتجاهل أي صف عنده بصمة محسوبة أصلًا (__orgcKey)
-// عشان مانغيّرش بصمة صف اتعدّل فعليًا في نفس الجلسة.
+// يحسب "بصمة هوية" ثابتة لكل صف (المنطقة + نوع الفريق + المسمى الوظيفي +
+// الاسم وقت أول تحميل حديث من الشيت، مع رقم تكرار إذا وُجد أكثر من صف
+// بنفس التركيبة، مثل وظائف شاغرة متعددة بنفس المسمى والمنطقة وبدون اسم) —
+// تُحسَب مرة واحدة فقط فور وصول البيانات من الشبكة، **قبل** تطبيق أي
+// تعديل محلي، حتى تبقى نفس البصمة في كل تحميل تالٍ للصفحة (لأن الشيت
+// الأصلي نفسه لا يتغيّر)، فيتسنى العثور على "نفس الصف" وإرجاع تعديلاته
+// المحفوظة إليه.
+// ★ خط دفاع إضافي: إذا وصل صف إلى أي شاشة عرض (_orgBuildForest) دون أن
+// يمر أصلًا على مسار السحب من الشبكة (نظريًا لا يحدث هذا في المنتج
+// الفعلي، لكن احتياطًا)، تُحسَب له بصمة هنا كحل بديل حتى لا يخزّن زر
+// الحفظ في المحرِّر (_orgOpenEditForm) أي تعديل تحت مفتاح فارغ
+// (undefined) يتعارض مع تعديلات أخرى. يُتجاهل أي صف لديه بصمة محسوبة
+// أصلًا (__orgcKey) حتى لا تتغيّر بصمة صف عُدِّل فعليًا في نفس الجلسة.
 function _orgEnsureIdentityKeys(rows) {
   if (rows.every((r) => r.__orgcKey != null)) return;
   const counts = {};
@@ -31619,9 +31961,9 @@ function _orgAssignIdentityKeysAndApplyLocalEdits(rows) {
   });
 }
 
-// اسم عمود المسمى الوظيفي واسم الموظف بيختلفوا حسب مصدر الصف (LS/TBC) —
-// بنعدّل نفس العمود اللي فيه قيمة فعلية أصلًا في هذا الصف بالذات، بدل ما
-// نخمّن أو نضيف عمود جديد.
+// اسم عمود المسمى الوظيفي واسم الموظف يختلف حسب مصدر الصف (LS/TBC) —
+// يُعدَّل نفس العمود الذي توجد فيه قيمة فعلية أصلًا في هذا الصف بالذات،
+// بدلًا من التخمين أو إضافة عمود جديد.
 function _orgTitleFieldName(row) {
   return _orgNorm(row["المسمى الوظيفي (LS)"]) ? "المسمى الوظيفي (LS)" : "المسمى الوظيفي (TBC)";
 }
@@ -31636,9 +31978,9 @@ function _orgCloseModal() {
   if (overlay) overlay.remove();
 }
 
-// مودال عام بسيط (باسورد أو أي محتوى HTML) — منفصل تمامًا عن مودال
-// كلمة مرور شعار Land Sterling (خاص بشاشة الدخول)، بنفس روح الألوان
-// (تيل #0b6b7e) عشان يبان جزء طبيعي من نفس الصفحة.
+// نافذة منبثقة عامة بسيطة (كلمة مرور أو أي محتوى HTML) — منفصلة تمامًا
+// عن نافذة كلمة مرور شعار Land Sterling (الخاصة بشاشة الدخول)، وبنفس
+// روح الألوان (تيل #0b6b7e) حتى تبدو جزءًا طبيعيًا من الصفحة نفسها.
 function _orgShowModal(innerHtml) {
   _orgCloseModal();
   const overlay = document.createElement("div");
@@ -31697,38 +32039,38 @@ function _orgShowToast(message, kind) {
   }, 6000);
 }
 
-// ★ مزامنة صف اتعدّل مع جوجل شيت فعليًا (doPost في apps_script_new_
-// templates_v2.gs — راجع ملاحظة التسليم). لو الآب سكريبت لسه مش
-// متحدّث (مفيش row.__row لأن __row بيوصل بس من النسخة الجديدة)، بنكتفي
-// بالتخزين المحلي اللي حصل فعلًا قبل النداء ده، ونوضح للمستخدم إن
-// المزامنة التلقائية لسه محتاجة تحديث الآب سكريبت.
+// ★ مزامنة صف تم تعديله مع جوجل شيت فعليًا (doPost في apps_script_new_
+// templates_v2.gs — راجع ملاحظة التسليم). إذا لم يكن الآب سكريبت محدَّثًا
+// بعد (لا يوجد row.__row لأنه لا يصل إلا من النسخة الجديدة)، يُكتفى
+// بالتخزين المحلي الذي تم بالفعل قبل هذا النداء، مع توضيح للمستخدم أن
+// المزامنة التلقائية لا تزال بحاجة إلى تحديث الآب سكريبت.
 async function _orgSyncRowToSheet(row, changes) {
   if (row.__row == null) {
-    _orgShowToast("✅ اتحفظ في الداشبورد محليًا. ⚠️ التزامن التلقائي مع جوجل شيت محتاج تحديث الآب سكريبت أولاً.", "warn");
+    _orgShowToast("✅ تم الحفظ في الداشبورد محليًا. ⚠️ المزامنة التلقائية مع جوجل شيت تحتاج تحديث الآب سكريبت أولاً.", "warn");
     return;
   }
   const url = window.NEW_TEMPLATES_URL;
   if (!url) {
-    _orgShowToast("✅ اتحفظ محليًا فقط — رابط المزامنة مش متاح دلوقتي.", "warn");
+    _orgShowToast("✅ تم الحفظ محليًا فقط — رابط المزامنة غير متاح حاليًا.", "warn");
     return;
   }
   try {
     const resp = await fetch(url, {
       method: "POST",
-      // ★ text/plain عمدًا (مش application/json) عشان نتفادى CORS
-      // preflight (OPTIONS) اللي Apps Script Web Apps مابيردّش عليه —
-      // نفس الملاحظة الموجودة في doPost بالآب سكريبت.
+      // ★ text/plain عمدًا (وليس application/json) لتفادي طلب CORS
+      // المبدئي (preflight OPTIONS) الذي لا تستجيب له تطبيقات الويب
+      // الخاصة بـ Apps Script — نفس الملاحظة الموجودة في doPost بالآب سكريبت.
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "update_org_structure_row", token: ORGC_WRITE_TOKEN, row: row.__row, changes }),
     });
     const json = await resp.json().catch(() => null);
     if (json && json.ok) {
-      _orgShowToast("✅ اتحفظ في الداشبورد وفي جوجل شيت بنجاح.", "ok");
+      _orgShowToast("✅ تم الحفظ في الداشبورد وفي جوجل شيت بنجاح.", "ok");
     } else {
-      _orgShowToast("⚠️ اتحفظ في الداشبورد بس فشلت المزامنة مع جوجل شيت: " + (json && json.error ? json.error : "خطأ غير معروف"), "warn");
+      _orgShowToast("⚠️ تم الحفظ في الداشبورد، لكن فشلت المزامنة مع جوجل شيت: " + (json && json.error ? json.error : "خطأ غير معروف"), "warn");
     }
   } catch (err) {
-    _orgShowToast("⚠️ اتحفظ في الداشبورد بس فشلت المزامنة مع جوجل شيت (مشكلة شبكة): " + err.message, "warn");
+    _orgShowToast("⚠️ تم الحفظ في الداشبورد، لكن فشلت المزامنة مع جوجل شيت (مشكلة في الشبكة): " + err.message, "warn");
   }
 }
 
@@ -31766,13 +32108,13 @@ function _orgToggleEditMode() {
 }
 window._orgToggleEditMode = _orgToggleEditMode;
 
-// عرض فورم تعديل صف واحد (موظف/شاغر) — بيتفتح من زرار ✏️ على أي كارت
-// وقت ما وضع التعديل مفعّل. المديرين "خارج نطاق الملف" ومستويات التجميع
-// مالهمش صف حقيقي (row=null) فمفيش حاجة تتعدل فيهم هنا.
+// عرض نموذج تعديل صف واحد (موظف/شاغر) — يُفتَح من زر ✏️ على أي بطاقة
+// عندما يكون وضع التعديل مفعَّلًا. المديرون "خارج نطاق الملف" ومستويات
+// التجميع ليس لهم صف حقيقي (row=null) فلا يوجد ما يُعدَّل فيهم هنا.
 function _orgOpenEditForm(nodeId) {
   if (!ORG._editMode) return;
   const row = (window.__ORGC_NODE_INDEX__ || {})[nodeId];
-  if (!row) { alert("مفيش بيانات صف حقيقية لهذه العقدة (مثلاً: وسم مدير خارج نطاق الملف)."); return; }
+  if (!row) { alert("لا توجد بيانات صف حقيقية لهذه العقدة (مثلاً: وسم مدير خارج نطاق الملف)."); return; }
 
   const titleField = _orgTitleFieldName(row);
   const nameField = _orgNameFieldName(row);
@@ -31787,9 +32129,9 @@ function _orgOpenEditForm(nodeId) {
 
   const overlay = _orgShowModal(`
     <div class="orgc-modal-title">تعديل الوظيفة</div>
-    <div class="orgc-modal-sub">التعديل بيتطبق فورًا على الداشبورد، ومحفوظ محليًا في هذا المتصفح.</div>
+    <div class="orgc-modal-sub">يُطبَّق التعديل فورًا على الداشبورد، ويُحفَظ محليًا في هذا المتصفح.</div>
     <form id="orgc-edit-form" class="orgc-edit-form" autocomplete="off">
-      <label>الاسم<input type="text" name="name" value="${_orgEsc(currentName)}" placeholder="اترك فاضي لو الوظيفة شاغرة" /></label>
+      <label>الاسم<input type="text" name="name" value="${_orgEsc(currentName)}" placeholder="اترك الحقل فارغًا إذا كانت الوظيفة شاغرة" /></label>
       <label>المسمى الوظيفي<input type="text" name="title" value="${_orgEsc(currentTitle)}" required /></label>
       <label>المنطقة
         <input type="text" name="region" list="orgc-region-list" value="${_orgEsc(currentRegion)}" required />
@@ -31808,7 +32150,7 @@ function _orgOpenEditForm(nodeId) {
       </label>
       <label>الجنسية<input type="text" name="nationality" value="${_orgEsc(currentNat)}" /></label>
       <label>سنوات الخبرة<input type="text" name="experience" value="${_orgEsc(currentExp)}" /></label>
-      <div class="orgc-modal-note">ℹ️ تواريخ بداية/نهاية العقد للعرض فقط ولسه مش قابلة للتعديل من هنا.</div>
+      <div class="orgc-modal-note">ℹ️ تاريخا بداية العقد ونهايته للعرض فقط، وغير قابلين للتعديل من هنا حاليًا.</div>
       <div class="orgc-modal-actions">
         <button type="button" class="orgc-modal-btn orgc-modal-btn-secondary" id="orgc-edit-cancel">إلغاء</button>
         <button type="submit" class="orgc-modal-btn orgc-modal-btn-primary">حفظ التعديل</button>
@@ -31832,7 +32174,7 @@ function _orgOpenEditForm(nodeId) {
     _orgCloseModal();
     _orgPromptPassword(
       "تأكيد الحفظ",
-      "أدخل كلمة مرور تأكيد الحفظ عشان تطبّق التعديل فعليًا",
+      "أدخل كلمة مرور تأكيد الحفظ لتطبيق التعديل فعليًا",
       ORGC_EDIT_SAVE_PASSWORD,
       () => {
         Object.assign(row, changes);
@@ -32241,6 +32583,22 @@ function _orgBuildForest(rows) {
   return { regions, allNodes: nodes, externalCount: Object.keys(externalByKey).length };
 }
 
+// ★ 2026-09-28: تصنيف لوني للمسمى الوظيفي — مطابقةً لنظام الألوان في
+// الملف المرجعي (PPTX): أزرق للمهندسين، برتقالي للمشرفين، وردي لأدوار
+// الخدمات المساندة، وبنفسجي للمديرين (تصنيف إضافي منطقي لجذور الفروع
+// الإدارية لا يوجد مقابل له صريح في الملف المرجعي). يُعاد فحص الفئات
+// بالترتيب من الأكثر تحديدًا إلى الأعم حتى لا يُصنَّف مثلًا "مدير نظام
+// إدارة المرافق المحوسب" كمدير عام بدل تصنيفه الأدق.
+function _orgRoleColorClass(title) {
+  const t = _orgNorm(title);
+  if (!t) return "";
+  if (t.indexOf("الخدمات المساندة") !== -1 || t.indexOf("مشرفة") !== -1) return "orgc-role-support";
+  if (t.indexOf("مدير") !== -1) return "orgc-role-manager";
+  if (t.indexOf("مشرف") !== -1) return "orgc-role-supervisor";
+  if (t.indexOf("مهندس") !== -1) return "orgc-role-engineer";
+  return "";
+}
+
 function _orgCardHtml(node) {
   const hasChildren = node.children.length > 0;
 
@@ -32285,10 +32643,11 @@ function _orgCardHtml(node) {
     avatarLetter = node.name ? node.name.trim().charAt(0) : "؟";
   }
   const nameDisplay = node.name ? _orgEsc(node.name) : node.vacant ? "شاغر" : "—";
+  const roleCls = _orgRoleColorClass(node.title);
   const searchBlob = _orgMatchKey(
     [node.name, node.title, node.region, node.team, statusLabel].filter(Boolean).join(" ")
   ).toLowerCase();
-  return `<div class="orgc-card ${statusCls}${hasChildren ? " orgc-has-children" : ""}" data-node-id="${node.id}" data-orgc-search="${_orgEsc(searchBlob)}">
+  return `<div class="orgc-card ${statusCls}${roleCls ? " " + roleCls : ""}${hasChildren ? " orgc-has-children" : ""}" data-node-id="${node.id}" data-orgc-search="${_orgEsc(searchBlob)}">
     ${hasChildren ? '<span class="orgc-star" title="له مرؤوسون في الهيكل">★</span>' : ""}
     <span class="orgc-avatar">${_orgEsc(avatarLetter)}</span>
     <div class="orgc-card-name">${nameDisplay}</div>
@@ -32647,7 +33006,14 @@ function _orgRegionDisplayLabel(name) {
   return name === "المنطقة الغربية" ? "WR" : name;
 }
 
-function _orgBuildRegionPanels(rows) {
+// ★ 2026-09-28: يقبل الآن معامل ثانٍ اختياري opts = {slugPrefix, titleSuffix}
+// — يُستخدَم لبناء مجموعة بانلات ثانية منفصلة (قسم "التجهيزات"، راجع
+// _orgBuildChartPanel تحت) بمعرّفات DOM فريدة (slug) لا تتصادم مع بانلات
+// المناطق الرئيسية، حتى لو كان اسم المنطقة نفسه مكرَّرًا بين القسمين.
+function _orgBuildRegionPanels(rows, opts) {
+  opts = opts || {};
+  const slugPrefix = opts.slugPrefix || "";
+  const titleSuffix = opts.titleSuffix || "";
   const forest = _orgBuildForest(rows);
 
   const regionStats = {};
@@ -32673,7 +33039,7 @@ function _orgBuildRegionPanels(rows) {
 
   const usedSlugs = {};
   const panelsMeta = orderedRegions.map((rg, i) => {
-    let slug = "orgc-region-" + _orgSlug(rg.name);
+    let slug = "orgc-region-" + slugPrefix + _orgSlug(rg.name);
     if (usedSlugs[slug] != null) { usedSlugs[slug]++; slug = slug + "-" + usedSlugs[slug]; } else { usedSlugs[slug] = 0; }
     const stats = regionStats[rg.name] || { total: 0, vacant: 0 };
     return { rg, slug, stats };
@@ -32688,7 +33054,7 @@ function _orgBuildRegionPanels(rows) {
       const treesHtml = rg.roots.map((r) => `<ul class="orgc-tree">${_orgRenderNode(r, new Set(), 0)}</ul>`).join("");
       return `<section class="orgc-panel" id="${slug}">
         <div class="orgc-panel-head">
-          <div class="orgc-panel-title">${_orgEsc(_orgRegionDisplayLabel(rg.name))}</div>
+          <div class="orgc-panel-title">${_orgEsc(_orgRegionDisplayLabel(rg.name) + titleSuffix)}</div>
           <div class="orgc-kpi-row">
             <span class="orgc-kpi orgc-kpi-total"><b>${total.toLocaleString("ar")}</b><small>إجمالي</small></span>
             <span class="orgc-kpi orgc-kpi-occ"><b>${occupied.toLocaleString("ar")}</b><small>مشغولة</small></span>
@@ -32779,15 +33145,37 @@ function _orgBuildGroupedChart(rows) {
   return `<ul class="org-chart-root-list">${html}</ul>`;
 }
 
+// ★ 2026-09-28: اسم فريق "التجهيزات" — يُعامَل كقسم منفصل تمامًا عن الشجرة
+// الرئيسية لفرق المناطق (راجع _orgBuildChartPanel تحت)، مطابقةً لهيكل
+// الملف المرجعي (PPTX) الذي يعرض "التجهيزات" كشجرة تنظيمية قائمة بذاتها،
+// منفصلة عن مكاتب المناطق.
+const ORGC_EQUIPMENT_TEAM_NAME = "التجهيزات";
+
 // ⚠️ تذكير: أي نص يظهر هنا للمستخدم (ملاحظات، عناوين، رسائل) يجب أن يكون
 // بالعربية الفصحى فقط — بلا ألفاظ عامية (راجع القاعدة الثابتة أعلى الملف).
 // حُذفت ملاحظة "لسه مش متعبّى" سابقاً من هذه الدالة لمخالفتها هذه القاعدة
 // ولطلب صريح من المستخدم بإزالتها بالكامل من واجهة تبويب الهيكل الوظيفي.
+//
+// ★ 2026-09-28: تُبنى الآن شجرتان منفصلتان بدلًا من شجرة واحدة — الأولى
+// لكل فرق المناطق الفنية، والثانية لفريق "التجهيزات" وحده، معروضة كقسم
+// قائم بذاته أسفل الشجرة الرئيسية بنفس تصميم البانلات (رأس + مؤشرات
+// إشغال/شواغر + شجرة الأسماء)، حتى لا يختلط موظفو "التجهيزات" بموظفي
+// فرق المناطق داخل نفس البانل — مطابقةً لهيكل الملف المرجعي (PPTX).
 function _orgBuildChartPanel(rows) {
   const mgrCount = rows.filter((r) => _orgManager(r)).length;
   if (mgrCount > 0) {
-    const panels = _orgBuildRegionPanels(rows);
+    const technicalRows = rows.filter((r) => _orgNorm(r["نوع الفريق"]) !== ORGC_EQUIPMENT_TEAM_NAME);
+    const equipmentRows = rows.filter((r) => _orgNorm(r["نوع الفريق"]) === ORGC_EQUIPMENT_TEAM_NAME);
+    const panels = _orgBuildRegionPanels(technicalRows);
+    const equipPanels = equipmentRows.length
+      ? _orgBuildRegionPanels(equipmentRows, { slugPrefix: "equip-", titleSuffix: " — التجهيزات" })
+      : null;
     if (panels.totalNodes) {
+      const equipSectionHtml =
+        equipPanels && equipPanels.totalNodes
+          ? `<div class="orgc-section-divider">🔧 قسم التجهيزات</div>
+             <div class="org-chart-wrap">${equipPanels.html}</div>`
+          : "";
       return (
         `<div class="orgc-toolbar">
           <button type="button" class="org-view-btn" id="orgc-fullscreen-btn" onclick="_orgToggleFullscreen()">⛶ ملء الشاشة</button>
@@ -32795,16 +33183,22 @@ function _orgBuildChartPanel(rows) {
           <input type="text" class="orgc-search-input" placeholder="ابحث بالاسم أو المسمى الوظيفي…" oninput="_orgChartSearch(this.value)">
           <div class="orgc-legend">
             <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#16a34a"></span>موظف حالي</span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#94a3b8"></span>شاغر</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot orgc-legend-dot-dashed" style="border-color:#94a3b8"></span>شاغر</span>
             <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d4af6a"></span>مدير خارج نطاق الملف</span>
             <span class="orgc-legend-item">★ له مرؤوسون</span>
+            <span class="orgc-legend-sep"></span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#2563eb"></span>مهندس</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d97706"></span>مشرف</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#db2777"></span>خدمات مساندة</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#7c3aed"></span>مدير</span>
           </div>
         </div>` +
         `<div class="orgc-local-edits-row">
           <span id="orgc-local-edits-badge" class="orgc-local-edits-badge" style="display:none"></span>
           <button type="button" class="orgc-local-edits-clear" onclick="_orgClearAllLocalEdits()">🗑️ مسح كل التعديلات المحلية</button>
         </div>` +
-        `<div class="org-chart-wrap">${panels.html}</div>`
+        `<div class="org-chart-wrap">${panels.html}</div>` +
+        equipSectionHtml
       );
     }
   }
@@ -32874,6 +33268,20 @@ function renderOrgStructureTab() {
   });
   const titleEntries = Object.entries(byTitle).sort((a, b) => (b[1].مشغولة + b[1].شاغرة) - (a[1].مشغولة + a[1].شاغرة));
 
+  // ★ (2026-09-28 — بناءً على طلب صريح من المستخدم) توزيع الإشغال والشواغر
+  // حسب "نوع الفريق" — لكل نوع فريق: عدد الوظائف المشغولة (المتوظَّف بها)
+  // وعدد الوظائف الشاغرة، وفق نفس منطق توزيع المسميات الوظيفية أعلاه.
+  // الصفوف التي يكون عمود "نوع الفريق" فارغًا فيها تُجمَّع تحت "غير محدد"
+  // بدلًا من أن تختفي من الإحصائية.
+  const byTeam = {};
+  rows.forEach((r) => {
+    const tm = _orgNorm(r["نوع الفريق"]) || "غير محدد";
+    if (!byTeam[tm]) byTeam[tm] = { مشغولة: 0, شاغرة: 0 };
+    byTeam[tm][_orgIsVacant(r) ? "شاغرة" : "مشغولة"]++;
+  });
+  const teamEntries = Object.entries(byTeam).sort((a, b) => (b[1].مشغولة + b[1].شاغرة) - (a[1].مشغولة + a[1].شاغرة));
+  const teamLabels = teamEntries.map(([t]) => t);
+
   // ★ 2026-09-22: توزيع الجنسيات (سعودي / غير سعودي) — بناءً على طلب صريح.
   // الوظائف الشاغرة مالهاش جنسية أصلًا (العمود فاضي)، فبنحسب النسبة من
   // الوظائف المشغولة فقط اللي فيها جنسية مسجّلة، مش من إجمالي كل الوظائف.
@@ -32924,6 +33332,40 @@ function renderOrgStructureTab() {
     <div class="card">
       <div class="card-title">توزيع الوظائف: مشغولة مقابل شاغرة</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-org-status"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">الإشغال والشواغر حسب نوع الفريق</div>
+    <div class="chart-box" style="height:280px"><canvas id="ch-org-team-status"></canvas></div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">تفصيل نوع الفريق — متوظف وشاغر لكل نوع</div>
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">نوع الفريق</th>
+          <th style="padding:8px 10px;text-align:center">متوظف</th>
+          <th style="padding:8px 10px;text-align:center">شاغر</th>
+          <th style="padding:8px 10px;text-align:center">الإجمالي</th>
+          <th style="padding:8px 10px;text-align:center">نسبة الإشغال</th>
+        </tr></thead>
+        <tbody>
+          ${teamEntries
+            .map(([tm, v]) => {
+              const teamTotal = v.مشغولة + v.شاغرة;
+              return `<tr style="border-bottom:1px solid var(--brd)">
+                <td style="padding:6px 10px;font-weight:700">${_orgEsc(tm)}</td>
+                <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.positive()};font-weight:700">${v.مشغولة.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center${v.شاغرة ? ";color:" + CSS_TOKENS.danger() + ";font-weight:700" : ""}">${v.شاغرة.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${teamTotal.toLocaleString("ar")}</td>
+                <td style="padding:6px 10px;text-align:center;font-weight:700">${teamTotal ? Math.round((v.مشغولة / teamTotal) * 100) + "%" : "—"}</td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -33058,6 +33500,20 @@ function renderOrgStructureTab() {
       {
         label: "شاغرة",
         data: regionsSet.map((rg) => byRegion[rg].شاغرة || 0),
+        backgroundColor: CSS_TOKENS.danger() + "88",
+        borderColor: CSS_TOKENS.danger(),
+      },
+    ]);
+    makeVBar("ch-org-team-status", teamLabels, [
+      {
+        label: "متوظف",
+        data: teamLabels.map((tm) => byTeam[tm].مشغولة || 0),
+        backgroundColor: CSS_TOKENS.positive() + "88",
+        borderColor: CSS_TOKENS.positive(),
+      },
+      {
+        label: "شاغر",
+        data: teamLabels.map((tm) => byTeam[tm].شاغرة || 0),
         backgroundColor: CSS_TOKENS.danger() + "88",
         borderColor: CSS_TOKENS.danger(),
       },
@@ -33243,20 +33699,17 @@ function renderLsPaymentsTab() {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  💰  JS تبويب: مدفوعات وعقود المقاولين
    ║  (tab-contractor-payments)
-   ║  المصدر: window.RAW_NEW_CONTRACTOR_PAYMENTS.
-   ║  ★ 2026-09-20: اتغيّر مصدر الشيت بالكامل بناءً على طلب صريح — من
-   ║  "Payments and Contracts" (عقد واحد لكل صف، فيه متابعة مدفوعات
-   ║  كاملة) إلى "Copy of Payments and Contracts" (نفس رقم العقد بيتكرر
-   ║  لعدة مشاريع/نطاقات فرعية تحته). أعمدة الشيت الجديد:
-   ║  Contract No., Contractor, Region, Project Name, Classification,
-   ║  Base Contract Value (SAR), Updated Contract Value (SAR),
-   ║  Payment Released (SAR), % Paid, Remaining (SAR), KPI Deduction,
-   ║  Deduction, Total Deduction, Contract Start/End Date, Rev End Date, Notes.
-   ║  ⚠️ في المصدر الجديد أعمدة المدفوعات (Payment Released/% Paid/
-   ║  Remaining/Deduction) فاضية تمامًا لكل الصفوف — فمفيش متابعة مدفوعات
-   ║  متاحة، والتبويب اتعدّل عشان يعرض مستوى "المشروع/النطاق الفرعي تحت
-   ║  العقد" (القيمة الأساسية/المحدثة + التواريخ) من غير ما يورّي أرقام
-   ║  مدفوعات صفرية بشكل مضلل.
+   ║  المصدر: window.RAW_NEW_CONTRACTOR_PAYMENTS — شيت "Copy of
+   ║  Payments and Contracts"، عقد واحد قد يتكرر لعدة مشاريع/نطاقات
+   ║  فرعية تحته. الأعمدة: Contract No., Contractor, Region,
+   ║  Project Name, Classification, Base/Updated Contract Value,
+   ║  Payment Released, % Paid, Remaining, KPI/Total Deduction,
+   ║  Contract Start/End Date, Rev End Date, Notes.
+   ║  المدفوع والمتبقي ونسبة السداد تُحسب من القيمة المحدّثة والمدفوع
+   ║  الفعلي مباشرة (_ctpPaymentFields)، وليس من عمود Remaining الجاهز
+   ║  في الشيت، لضمان الاتساق. العقود التي لم تبدأ بعد (نص "Not
+   ║  started" في تاريخ البداية) تُعرض بوضوح على أنها كذلك بدل نسبة
+   ║  سداد صفرية مضلِّلة.
    ╚════════════════════════════════════════════════════════════╝ */
 const CTP = { _region: "", _classification: "", _q: "", filtered: [] };
 window.CTP = CTP;
@@ -33281,6 +33734,24 @@ function _ctpEsc(v) {
 function _ctpEffectiveValue(r) {
   const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
   return updated !== null ? updated : (_ctpNum(r["Base Contract Value (SAR)"]) || 0);
+}
+// تحليل المدفوع/المتبقي: يُحسب من القيمة المحدّثة والمدفوع الفعلي مباشرة
+// (وليس من عمود "Remaining" الجاهز في الشيت، لأنه غير مكتمل لبعض الصفوف)،
+// فتكون النتيجة متسقة لكل الصفوف. العقود التي لم تبدأ بعد (نصّ "Not
+// started" في تاريخ البداية) قيمتها بالكامل تُحسب "متبقية" ولا تُعرض
+// كنسبة سداد مضلِّلة.
+function _ctpIsNotStarted(r) {
+  return /not\s*started/i.test(String(r["Contract Start Date"] || "").trim());
+}
+function _ctpPaymentFields(r) {
+  const value = _ctpEffectiveValue(r);
+  const paid = _ctpNum(r["Payment Released (SAR)"]) || 0;
+  return {
+    paid,
+    remaining: Math.max(value - paid, 0),
+    pct: value > 0 ? (paid / value) * 100 : 0,
+    notStarted: _ctpIsNotStarted(r),
+  };
 }
 function _ctpFmtDate(v) {
   if (!v || v === "_" || v === "-") return "—";
@@ -33316,6 +33787,8 @@ function _ctpRowHtml(r, withContractor) {
   const updated = _ctpNum(r["Updated Contract Value (SAR)"]);
   const variance = (updated !== null && base !== null) ? (updated - base) : null;
   const varColor = variance === null ? CSS_TOKENS.txMuted() : variance > 0 ? CSS_TOKENS.warning() : variance < 0 ? CSS_TOKENS.positive() : CSS_TOKENS.txMuted();
+  const pf = _ctpPaymentFields(r);
+  const pctColor = pf.notStarted ? CSS_TOKENS.txMuted() : pf.pct >= 100 ? CSS_TOKENS.positive() : pf.pct >= 50 ? CSS_TOKENS.info() : pf.pct > 0 ? CSS_TOKENS.warning() : CSS_TOKENS.txMuted();
   return `<tr style="border-bottom:1px solid var(--brd)">
     <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${_ctpEsc(r["Contract No."]) || "—"}</td>
     ${withContractor ? `<td style="padding:6px 10px;font-size:11px">${_ctpEsc(r["Contractor"]) || "—"}</td>` : ""}
@@ -33325,8 +33798,11 @@ function _ctpRowHtml(r, withContractor) {
     <td style="padding:6px 10px;text-align:center;font-size:11px">${base !== null ? base.toLocaleString("en-US") : "—"}</td>
     <td style="padding:6px 10px;text-align:center;font-size:11px">${updated !== null ? updated.toLocaleString("en-US") : "—"}</td>
     <td style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:${varColor}">${variance === null ? "—" : (variance > 0 ? "+" : "") + variance.toLocaleString("en-US")}</td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_ctpFmtDate(r["Contract Start Date"])}</td>
-    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${_ctpFmtDate(r["Contract End Date"])}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${pf.notStarted ? "لم يبدأ" : Math.round(pf.paid).toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;font-weight:700;color:${pctColor}">${pf.notStarted ? "—" : pf.pct.toFixed(1) + "%"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px">${Math.round(pf.remaining).toLocaleString("en-US")}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${pf.notStarted ? "لم يبدأ بعد" : _ctpFmtDate(r["Contract Start Date"])}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap">${pf.notStarted ? "—" : _ctpFmtDate(r["Contract End Date"])}</td>
   </tr>`;
 }
 function _ctpRenderTable() {
@@ -33334,7 +33810,7 @@ function _ctpRenderTable() {
   if (!tbody) return;
   tbody.innerHTML =
     CTP.filtered.map((r) => _ctpRowHtml(r, true)).join("") ||
-    `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+    `<tr><td colspan="13" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("ctp-count");
   if (countEl) countEl.textContent = CTP.filtered.length.toLocaleString("ar");
 }
@@ -33343,15 +33819,23 @@ function _ctpMajalRenderTable() {
   if (!tbody) return;
   tbody.innerHTML =
     CTP_MAJAL.filtered.map((r) => _ctpRowHtml(r, false)).join("") ||
-    `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+    `<tr><td colspan="11" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("ctp-majal-count");
   if (countEl) countEl.textContent = CTP_MAJAL.filtered.length.toLocaleString("ar");
+}
+const CTP_CSV_PAYMENT_HEADERS = ["المدفوع (ريال)", "نسبة السداد", "المتبقي (ريال)"];
+function _ctpCsvCell(r, h) {
+  const pf = _ctpPaymentFields(r);
+  if (h === "المدفوع (ريال)") return pf.notStarted ? "لم يبدأ" : Math.round(pf.paid);
+  if (h === "نسبة السداد") return pf.notStarted ? "—" : pf.pct.toFixed(1) + "%";
+  if (h === "المتبقي (ريال)") return Math.round(pf.remaining);
+  return r[h] ?? "";
 }
 function _ctpExportCSV() {
   const src = CTP.filtered.length ? CTP.filtered : (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter((r) => !_ctpIsMajal(r));
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["Contract No.", "Contractor", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Contract Start Date", "Contract End Date", "Notes"];
-  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const headers = ["Contract No.", "Contractor", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", ...CTP_CSV_PAYMENT_HEADERS, "Contract Start Date", "Contract End Date", "Notes"];
+  const rows = src.map((r) => headers.map((h) => `"${String(_ctpCsvCell(r, h)).replace(/"/g, '""')}"`).join(","));
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
     download: "مدفوعات_وعقود_باقي_المقاولين.csv",
@@ -33361,8 +33845,8 @@ function _ctpExportCSV() {
 function _ctpMajalExportCSV() {
   const src = CTP_MAJAL.filtered.length ? CTP_MAJAL.filtered : (window.RAW_NEW_CONTRACTOR_PAYMENTS || []).filter(_ctpIsMajal);
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["Contract No.", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", "Contract Start Date", "Contract End Date", "Notes"];
-  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  const headers = ["Contract No.", "Region", "Project Name", "Classification", "Base Contract Value (SAR)", "Updated Contract Value (SAR)", ...CTP_CSV_PAYMENT_HEADERS, "Contract Start Date", "Contract End Date", "Notes"];
+  const rows = src.map((r) => headers.map((h) => `"${String(_ctpCsvCell(r, h)).replace(/"/g, '""')}"`).join(","));
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
     download: "عقود_المجال_العربي.csv",
@@ -33376,6 +33860,10 @@ function _ctpSectionKpisHtml(rows) {
   const totalBase = rows.reduce((s, r) => s + (_ctpNum(r["Base Contract Value (SAR)"]) || 0), 0);
   const totalValue = rows.reduce((s, r) => s + _ctpEffectiveValue(r), 0);
   const totalVariance = totalValue - totalBase;
+  const notStartedCount = rows.filter(_ctpIsNotStarted).length;
+  const totalPaid = rows.reduce((s, r) => s + _ctpPaymentFields(r).paid, 0);
+  const totalRemaining = rows.reduce((s, r) => s + _ctpPaymentFields(r).remaining, 0);
+  const overallPct = totalValue > 0 ? (totalPaid / totalValue) * 100 : 0;
   return `
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="kpi kc-blue">
@@ -33396,6 +33884,28 @@ function _ctpSectionKpisHtml(rows) {
       <div class="kpi-val">${totalVariance > 0 ? "+" : ""}${Math.round(totalVariance).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">صافي التغيير عن القيمة الأساسية</div>
       <div class="kpi-sub">المحدّثة − الأساسية</div>
+    </div>
+  </div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+    <div class="kpi kc-green">
+      <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المدفوع</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-info">
+      <div class="kpi-val">${overallPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة السداد الإجمالية</div>
+      <div class="kpi-sub">المدفوع ÷ القيمة المحدّثة</div>
+    </div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${Math.round(totalRemaining).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">إجمالي المتبقي</div>
+      <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-navy">
+      <div class="kpi-val">${notStartedCount.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">مشاريع لم تبدأ بعد</div>
+      <div class="kpi-sub">من أصل ${rows.length.toLocaleString("ar")}</div>
     </div>
   </div>`;
 }
@@ -33421,7 +33931,7 @@ function renderContractorPaymentsTab() {
 
   el.innerHTML = `
   <div class="card-title" style="border:0;padding:0;margin:0 0 8px;display:flex;align-items:center;gap:8px">
-    🏢 المجال العربي <span class="sub">Al majal al arabi group · تصنيف IFM</span>
+    🏢 المجال العربي
   </div>
   ${_ctpSectionKpisHtml(majalRows)}
 
@@ -33446,6 +33956,9 @@ function renderContractorPaymentsTab() {
           <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
           <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
           <th style="padding:8px 10px;text-align:center">الفرق</th>
+          <th style="padding:8px 10px;text-align:center">المدفوع (ريال)</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+          <th style="padding:8px 10px;text-align:center">المتبقي (ريال)</th>
           <th style="padding:8px 10px;text-align:center">تاريخ البداية</th>
           <th style="padding:8px 10px;text-align:center">تاريخ النهاية</th>
         </tr></thead>
@@ -33486,6 +33999,9 @@ function renderContractorPaymentsTab() {
           <th style="padding:8px 10px;text-align:center">القيمة الأساسية</th>
           <th style="padding:8px 10px;text-align:center">القيمة المحدّثة</th>
           <th style="padding:8px 10px;text-align:center">الفرق</th>
+          <th style="padding:8px 10px;text-align:center">المدفوع (ريال)</th>
+          <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
+          <th style="padding:8px 10px;text-align:center">المتبقي (ريال)</th>
           <th style="padding:8px 10px;text-align:center">تاريخ البداية</th>
           <th style="padding:8px 10px;text-align:center">تاريخ النهاية</th>
         </tr></thead>
@@ -34050,70 +34566,77 @@ function renderVisitsTab() {
 /* ╔════════════════════════════════════════════════════════════╗
    ║  🎓  JS تبويب: برامج التدريب
    ║  (tab-training)
-   ║  أعمدة الشيت: تاريخ التقرير، الاسم، البريد الإلكتروني،
-   ║               آخر دخول للمنصة، حالة دورة النظافة،
-   ║               وحدات مكتملة (من 12)، نسبة الإنجاز،
-   ║               متوسط الدرجة %، حالة برنامج المشرفين،
-   ║               وحدات مكتملة (من 24)، نسبة الإنجاز، ملاحظات التنظيف
+   ║  المصدر: window.RAW_NEW_TRAINING — شيت "برامج التدريب"، صف
+   ║  مستقل لكل (موظف × دورة تدريبية). الأعمدة: الاسم، البريد
+   ║  الإلكتروني، القسم، المحاولة، بدأ في، آخر دخول، الدرجة، اسم
+   ║  الدورة. الدورات تُستخرج ديناميكيًا من البيانات (وليست عددًا
+   ║  ثابتًا) حتى تُستوعب أي دورة تُضاف أو تُحذف مستقبلًا. المحاولة/بدأ
+   ║  في/آخر دخول/الدرجة تكون "-" معًا إذا لم يبدأ الموظف الدورة،
+   ║  وإلا فكلها معبّأة (لا توجد حالة "قيد التنفيذ" في هذا المصدر).
    ╚════════════════════════════════════════════════════════════╝ */
-/* 🧩 قالب "قالب التدريب والوقود.xlsx" شيت "برامج التدريب" شكله طولي
-   (Long/Tidy): صف مستقل لكل (موظف × برنامج) — يعني ممكن يبقى في صفّين
-   للموظف الواحد (صف لـ"دورة النظافة" وصف لـ"برنامج المشرفين"). الأعمدة
-   الحقيقية: اسم الموظف، البريد الإلكتروني، اسم البرنامج / الدورة
-   التدريبية، تاريخ التقرير، تاريخ آخر دخول للمنصة، إجمالي عدد الوحدات،
-   عدد الوحدات المكتملة، نسبة الإنجاز، الحالة، متوسط الدرجة %، ملاحظات.
-   الدالة دي بتجمّع الصفوف دي في سجل واحد لكل موظف (زي ما التبويب متوقّع
-   يعرضها) بدل ما تفترض عمودين منفصلين لكل برنامج زي شكل قديم مختلف. */
-function _trainClassifyStatus_(s) {
+const TRAIN_AR_MONTHS_ = { "يناير":0,"فبراير":1,"مارس":2,"أبريل":3,"مايو":4,"يونيو":5,"يوليو":6,"أغسطس":7,"سبتمبر":8,"أكتوبر":9,"نوفمبر":10,"ديسمبر":11 };
+function _trainParseArDate_(s) {
   s = String(s || "").trim();
-  if (!s) return "لم تبدأ";
-  if (s.includes("مكتمل")) return "مكتملة";
-  if (s.includes("قيد")) return "قيد التنفيذ";
-  return "لم تبدأ";
+  if (!s || s === "-") return null;
+  const m = s.match(/^(\d{1,2})\s+([^\s,،]+)\s+(\d{4})[،,]?\s*(\d{1,2}):(\d{2})\s*(ص|م)?$/);
+  if (!m) return null;
+  const month = TRAIN_AR_MONTHS_[m[2]];
+  if (month === undefined) return null;
+  let hour = +m[4];
+  if (m[6] === "م" && hour < 12) hour += 12;
+  if (m[6] === "ص" && hour === 12) hour = 0;
+  const d = new Date(+m[3], month, +m[1], hour, +m[5]);
+  return isNaN(d.getTime()) ? null : d;
+}
+function _trainNum_(v) {
+  const s = String(v ?? "").trim();
+  if (!s || s === "-") return null;
+  const n = parseFloat(s.replace(/%/g, "").replace(/,/g, ""));
+  return isNaN(n) ? null : n;
 }
 function _trainPivotByEmployee_(allRows) {
   const byEmp = new Map();
+  const courseSet = new Set();
   allRows.forEach((r) => {
-    const name = String(r["اسم الموظف"] || r["الاسم"] || "").trim();
+    const course = String(r["اسم الدورة"] || "").trim();
+    if (!course) return;
+    courseSet.add(course);
+    const name = String(r["الاسم"] || "").trim();
     const email = String(r["البريد الإلكتروني"] || "").trim();
-    const key = name || email || Math.random().toString(36);
+    const dept = String(r["القسم"] || "").trim();
+    const key = email || name || Math.random().toString(36);
     if (!byEmp.has(key)) {
-      byEmp.set(key, {
-        name: name || "—",
-        email,
-        lastLogin: "",
-        lastLoginKey: "",
-        notes: "",
-        clean: { status: "لم تبدأ", units: 0, totalUnits: 12, score: 0 },
-        sup: { status: "لم تبدأ", units: 0, totalUnits: 24 },
-      });
+      byEmp.set(key, { name: name || "—", email, department: "", courses: {}, lastAccess: null, lastAccessRaw: "" });
     }
     const emp = byEmp.get(key);
-    const prog = String(r["اسم البرنامج / الدورة التدريبية"] || "").trim();
-    const bucket = prog.includes("مشرف") ? "sup" : "clean"; // أي حاجة غير "برنامج المشرفين" تتحسب دورة نظافة (القيمة الوحيدة التانية فعليًا)
-    const status = _trainClassifyStatus_(r["الحالة"]);
-    const units = parseFloat(String(r["عدد الوحدات المكتملة"] ?? 0)) || 0;
-    const totalUnits = parseFloat(String(r["إجمالي عدد الوحدات"] ?? (bucket === "sup" ? 24 : 12))) || (bucket === "sup" ? 24 : 12);
-    emp[bucket] = { status, units, totalUnits, score: bucket === "clean" ? (parseFloat(String(r["متوسط الدرجة %"] ?? 0)) || 0) : 0 };
-
-    const loginRaw = r["تاريخ آخر دخول للمنصة"];
-    const loginStr = loginRaw instanceof Date ? loginRaw.toISOString() : String(loginRaw || "");
-    const loginKey = loginStr.slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(loginKey) && (!emp.lastLoginKey || loginKey > emp.lastLoginKey)) {
-      emp.lastLoginKey = loginKey;
-      emp.lastLogin = loginKey;
-    } else if (!emp.lastLogin && loginStr) {
-      emp.lastLogin = loginStr; // مثلاً "لم يدخل أبداً"
+    if (dept && dept !== "-" && !emp.department) emp.department = dept;
+    const grade = _trainNum_(r["الدرجة"]);
+    const lastAccessAt = _trainParseArDate_(r["آخر دخول"]);
+    emp.courses[course] = { completed: grade !== null, grade };
+    if (lastAccessAt && (!emp.lastAccess || lastAccessAt > emp.lastAccess)) {
+      emp.lastAccess = lastAccessAt;
+      emp.lastAccessRaw = String(r["آخر دخول"] || "");
     }
-    const note = String(r["ملاحظات"] || "").trim();
-    if (note && !emp.notes) emp.notes = note;
   });
-  return [...byEmp.values()];
+  const courses = [...courseSet];
+  const list = courses.length
+    ? [...byEmp.values()].map((emp) => {
+        const completedList = courses.map((c) => emp.courses[c]).filter((c) => c && c.completed);
+        return {
+          ...emp,
+          completedCount: completedList.length,
+          avgGrade: completedList.length ? completedList.reduce((s, c) => s + c.grade, 0) / completedList.length : null,
+        };
+      })
+    : [];
+  list.courseNames = courses;
+  return list;
 }
 
 function renderTrainingTab(_fromDate, _toDate) {
   const el = document.getElementById("training-content");
   if (!el) return;
+  const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const allRawRows = window.RAW_NEW_TRAINING || [];
   if (!allRawRows.length) {
@@ -34126,68 +34649,63 @@ function renderTrainingTab(_fromDate, _toDate) {
   }
 
   const allRows = _trainPivotByEmployee_(allRawRows);
+  const courses = allRows.courseNames || [];
+  const totalCourses = courses.length;
 
-  // ── استخراج نطاق التواريخ (حسب آخر دخول للمنصة) ──
-  const dateCol = (r) => r.lastLoginKey || "";
-  const allDates = allRows.map(dateCol).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-  const minDate  = allDates[0] || "";
-  const maxDate  = allDates[allDates.length-1] || "";
+  // ── نطاق التواريخ حسب آخر دخول فعلي للمنصة ──
+  const dateKey = (r) => (r.lastAccess ? r.lastAccess.toISOString().slice(0, 10) : "");
+  const allDateKeys = allRows.map(dateKey).filter(Boolean).sort();
+  const minDate = allDateKeys[0] || "";
+  const maxDate = allDateKeys[allDateKeys.length - 1] || "";
 
   const fromEl = document.getElementById("tr-date-from");
-  const toEl   = document.getElementById("tr-date-to");
+  const toEl = document.getElementById("tr-date-to");
   const fromDate = _fromDate || (fromEl ? fromEl.value : "") || minDate;
-  const toDate   = _toDate   || (toEl   ? toEl.value   : "") || maxDate;
+  const toDate = _toDate || (toEl ? toEl.value : "") || maxDate;
 
-  const rows = allRows.filter(r => {
-    const d = dateCol(r);
-    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return true;
-    if (fromDate && d < fromDate) return false;
-    if (toDate   && d > toDate)   return false;
+  const deptEl = document.getElementById("tr-filter-dept");
+  const deptFilter = deptEl ? deptEl.value : "";
+
+  const byDate = allRows.filter((r) => {
+    const k = dateKey(r);
+    if (!k) return true; // من لم يدخل المنصة إطلاقًا يفضل ظاهر دايمًا
+    if (fromDate && k < fromDate) return false;
+    if (toDate && k > toDate) return false;
     return true;
   });
-
-  const n_ = (v) => { const x = parseFloat(String(v||'').replace(/%/g,'').replace(/,/g,'')); return isNaN(x) ? 0 : x; };
+  const rows = byDate.filter((r) => !deptFilter || r.department === deptFilter);
+  const deptSet = [...new Set(allRows.map((r) => r.department).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar"));
 
   const total = rows.length;
+  const neverStarted = rows.filter((r) => r.completedCount === 0).length;
+  const completedAll = rows.filter((r) => totalCourses > 0 && r.completedCount === totalCourses).length;
+  const totalCompletions = rows.reduce((s, r) => s + r.completedCount, 0);
+  const totalPossible = total * totalCourses;
+  const overallCompletionPct = totalPossible ? (totalCompletions / totalPossible) * 100 : 0;
+  const gradedRows = rows.filter((r) => r.avgGrade !== null);
+  const overallAvgGrade = gradedRows.length ? gradedRows.reduce((s, r) => s + r.avgGrade, 0) / gradedRows.length : 0;
 
-  // دورة النظافة (12 وحدة)
-  const clean_completed  = rows.filter(r => r.clean.status === "مكتملة").length;
-  const clean_inProgress = rows.filter(r => r.clean.status === "قيد التنفيذ").length;
-  const clean_notStarted = rows.filter(r => r.clean.status === "لم تبدأ").length;
-  const clean_avgScore   = rows.filter(r=>n_(r.clean.score)>0).reduce((s,r,_,a)=>s+n_(r.clean.score)/a.length, 0);
-
-  // برنامج المشرفين (24 وحدة)
-  const sup_completed  = rows.filter(r => r.sup.status === "مكتملة").length;
-  const sup_inProgress = rows.filter(r => r.sup.status === "قيد التنفيذ").length;
-  const sup_notStarted = rows.filter(r => r.sup.status === "لم تبدأ").length;
-
-  const neverLogged = rows.filter(r => !r.lastLoginKey).length;
-
-  // توزيع حالة دورة النظافة
-  const cleanStatusMap = { "مكتملة": clean_completed, "قيد التنفيذ": clean_inProgress, "لم تبدأ": clean_notStarted };
-  const supStatusMap   = { "مكتملة": sup_completed, "قيد التنفيذ": sup_inProgress, "لم تبدأ": sup_notStarted };
-
-  // توزيع عدد الوحدات المكتملة (نظافة)
-  const unitBuckets12 = {"0":0,"1-3":0,"4-6":0,"7-9":0,"10-11":0,"12":0};
-  rows.forEach(r => {
-    const u = n_(r.clean.units);
-    if (u===12)       unitBuckets12["12"]++;
-    else if (u>=10)   unitBuckets12["10-11"]++;
-    else if (u>=7)    unitBuckets12["7-9"]++;
-    else if (u>=4)    unitBuckets12["4-6"]++;
-    else if (u>=1)    unitBuckets12["1-3"]++;
-    else              unitBuckets12["0"]++;
+  // ── إحصاء لكل دورة على حدة ──
+  const perCourse = courses.map((c) => {
+    const completed = rows.filter((r) => r.courses[c] && r.courses[c].completed).length;
+    const grades = rows.filter((r) => r.courses[c] && r.courses[c].completed).map((r) => r.courses[c].grade);
+    return {
+      name: c,
+      completed,
+      pct: total ? (completed / total) * 100 : 0,
+      avgGrade: grades.length ? grades.reduce((s, g) => s + g, 0) / grades.length : 0,
+    };
   });
 
-  const statsCleanCols = Object.keys(cleanStatusMap);
-  const statsCleanVals = Object.values(cleanStatusMap);
-  const statsSupCols   = Object.keys(supStatusMap);
-  const statsSupVals   = Object.values(supStatusMap);
+  // ── توزيع الموظفين حسب عدد الدورات المكتملة ──
+  const completionBuckets = {};
+  for (let i = 0; i <= totalCourses; i++) completionBuckets[i] = 0;
+  rows.forEach((r) => { completionBuckets[r.completedCount] = (completionBuckets[r.completedCount] || 0) + 1; });
 
   el.innerHTML = `
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-2);border:1px solid var(--bd-light);border-radius:12px;padding:10px 14px;margin-bottom:14px">
-    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ</span>
-    <div style="display:flex;align-items:center;gap:6px;flex:1;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:700;color:var(--tx-sec)">📅 فلتر التاريخ (آخر دخول)</span>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <label style="font-size:11px;color:var(--tx-muted)">من</label>
       <input type="date" id="tr-date-from" value="${fromDate}" min="${minDate}" max="${maxDate}"
         style="border:1px solid var(--bd-light);border-radius:7px;padding:4px 8px;font-size:11px;background:var(--bg-3);color:var(--tx-main);font-family:inherit"
@@ -34198,181 +34716,189 @@ function renderTrainingTab(_fromDate, _toDate) {
         onchange="renderTrainingTab(document.getElementById('tr-date-from').value, this.value)">
       <button onclick="renderTrainingTab('${minDate}','${maxDate}')"
         style="background:var(--bg-3);border:1px solid var(--bd-light);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--tx-sec);font-family:inherit">إعادة تعيين</button>
+      ${deptSet.length ? `
+      <label style="font-size:11px;color:var(--tx-muted)">القسم</label>
+      <select class="fsel" id="tr-filter-dept" onchange="renderTrainingTab()" style="font-size:11px">
+        <option value="">— كل الأقسام —</option>
+        ${deptSet.map((d) => `<option value="${esc(d)}" ${d === deptFilter ? "selected" : ""}>${esc(d)}</option>`).join("")}
+      </select>` : ""}
     </div>
-    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${rows.length.toLocaleString()} متدرب</span>
+    <span style="font-size:11px;font-weight:700;color:var(--teal);background:var(--teal-glow);padding:3px 10px;border-radius:20px">${total.toLocaleString("ar")} موظف</span>
   </div>
 
   <div class="kpi-grid" style="margin-bottom:16px">
     <div class="kpi kc-blue">
-      <div class="kpi-val">${total.toLocaleString()}</div>
-      <div class="kpi-lbl">إجمالي المتدربين</div>
-      <div class="kpi-sub">${neverLogged} لم يدخلوا أبداً</div>
+      <div class="kpi-val">${total.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">إجمالي الموظفين</div>
+      <div class="kpi-sub">${totalCourses} دورات إلزامية لكل موظف</div>
+    </div>
+    <div class="kpi kc-teal">
+      <div class="kpi-val">${overallCompletionPct.toFixed(1)}%</div>
+      <div class="kpi-lbl">نسبة الإنجاز الإجمالية</div>
+      <div class="kpi-sub">من كل (موظف × دورة)</div>
     </div>
     <div class="kpi kc-green">
-      <div class="kpi-val">${clean_completed.toLocaleString()}</div>
-      <div class="kpi-lbl">مكتملو دورة النظافة</div>
-      <div class="kpi-sub">${total ? ((clean_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+      <div class="kpi-val">${completedAll.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">أكملوا كل الدورات</div>
+      <div class="kpi-sub">من أصل ${total.toLocaleString("ar")}</div>
     </div>
-    <div class="kpi kc-purple">
-      <div class="kpi-val">${sup_completed.toLocaleString()}</div>
-      <div class="kpi-lbl">مكتملو برنامج المشرفين</div>
-      <div class="kpi-sub">${total ? ((sup_completed/total)*100).toFixed(1) : 0}% من المتدربين</div>
+    <div class="kpi kc-red">
+      <div class="kpi-val">${neverStarted.toLocaleString("ar")}</div>
+      <div class="kpi-lbl">لم يبدأوا أي دورة</div>
+      <div class="kpi-sub">من أصل ${total.toLocaleString("ar")}</div>
     </div>
     <div class="kpi kc-amber">
-      <div class="kpi-val">${clean_avgScore.toFixed(1)}%</div>
+      <div class="kpi-val">${overallAvgGrade.toFixed(1)}%</div>
       <div class="kpi-lbl">متوسط الدرجة</div>
-      <div class="kpi-sub">دورة النظافة</div>
-    </div>
-  </div>
-
-  <div class="g2 mb14">
-    <div class="card">
-      <div class="card-title">حالة دورة النظافة <span class="sub">12 وحدة</span></div>
-      <div class="chart-box" style="height:220px"><canvas id="ch-tr-clean-status"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title">حالة برنامج المشرفين <span class="sub">24 وحدة</span></div>
-      <div class="chart-box" style="height:220px"><canvas id="ch-tr-sup-status"></canvas></div>
+      <div class="kpi-sub">لمن أكمل دورة واحدة على الأقل</div>
     </div>
   </div>
 
   <div class="card mb14">
-    <div class="card-title">توزيع الوحدات المكتملة — دورة النظافة</div>
-    <div class="chart-box" style="height:180px"><canvas id="ch-tr-units12"></canvas></div>
+    <div class="card-title">نسبة الإنجاز حسب الدورة</div>
+    <div class="chart-box" style="height:240px"><canvas id="ch-tr-course-completion"></canvas></div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">توزيع الموظفين حسب عدد الدورات المكتملة</div>
+    <div class="chart-box" style="height:200px"><canvas id="ch-tr-completion-buckets"></canvas></div>
+  </div>
+
+  <div class="card mb14">
+    <div class="card-title">تفصيل الدورات</div>
+    <div style="overflow:auto;max-height:260px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">الدورة</th>
+          <th style="padding:8px 10px;text-align:center">أكملها</th>
+          <th style="padding:8px 10px;text-align:center">نسبة الإنجاز</th>
+          <th style="padding:8px 10px;text-align:center">متوسط الدرجة</th>
+        </tr></thead>
+        <tbody>
+          ${perCourse.map((c) => `<tr style="border-bottom:1px solid var(--brd)">
+            <td style="padding:6px 10px;font-weight:600">${esc(c.name)}</td>
+            <td style="padding:6px 10px;text-align:center">${c.completed.toLocaleString("ar")} / ${total.toLocaleString("ar")}</td>
+            <td style="padding:6px 10px;text-align:center;font-weight:700;color:${c.pct >= 50 ? CSS_TOKENS.positive() : c.pct > 0 ? CSS_TOKENS.warning() : CSS_TOKENS.txMuted()}">${c.pct.toFixed(1)}%</td>
+            <td style="padding:6px 10px;text-align:center">${c.avgGrade ? c.avgGrade.toFixed(1) + "%" : "—"}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المتدربين <span class="sub">${total} متدرب</span></div>
-      <select class="fsel" id="train-sort" onchange="window.__trainSort && window.__trainSort()" style="font-size:11px">
-        <option value="name" selected>الاسم (أبجدي)</option>
-        <option value="units12_desc">وحدات النظافة ↓</option>
-        <option value="score_desc">الدرجة ↓ الأعلى</option>
-        <option value="score_asc">الدرجة ↑ الأقل</option>
-        <option value="units24_desc">وحدات المشرفين ↓</option>
-        <option value="never_in">لم يدخل المنصة أولاً</option>
-      </select>
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة الموظفين <span class="sub" id="train-count">${total.toLocaleString("ar")}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="finp" id="train-q" type="text" placeholder="بحث بالاسم/البريد الإلكتروني/القسم…" oninput="window.__trainFilterSort && window.__trainFilterSort()" style="font-size:11px;min-width:200px">
+        <select class="fsel" id="train-sort" onchange="window.__trainFilterSort && window.__trainFilterSort()" style="font-size:11px">
+          <option value="name" selected>الاسم (أبجدي)</option>
+          <option value="completed_desc">الدورات المكتملة ↓</option>
+          <option value="completed_asc">الدورات المكتملة ↑</option>
+          <option value="score_desc">متوسط الدرجة ↓</option>
+          <option value="never_first">لم يبدأوا أولاً</option>
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_trainExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
     </div>
-    <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
     <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="train-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">الاسم</th>
+          <th style="padding:8px 10px;text-align:right">البريد الإلكتروني</th>
+          <th style="padding:8px 10px;text-align:right">القسم</th>
+          <th style="padding:8px 10px;text-align:center">الدورات المكتملة</th>
+          <th style="padding:8px 10px;text-align:center">متوسط الدرجة</th>
           <th style="padding:8px 10px;text-align:right">آخر دخول</th>
-          <th style="padding:8px 10px;text-align:center">حالة النظافة</th>
-          <th style="padding:8px 10px;text-align:center">وحدات (12)</th>
-          <th style="padding:8px 10px;text-align:center">الدرجة %</th>
-          <th style="padding:8px 10px;text-align:center">حالة المشرفين</th>
-          <th style="padding:8px 10px;text-align:center">وحدات (24)</th>
-          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
         </tr></thead>
-        <tbody id="train-tbody">
-          ${rows.map(r => {
-            const cleanDone = r.clean.status === "مكتملة";
-            const supDone   = r.sup.status === "مكتملة";
-            const neverIn   = !r.lastLoginKey;
-            const score     = n_(r.clean.score);
-            const scoreColor = score >= 80 ? CSS_TOKENS.positive() : score >= 60 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-            return `<tr style="border-bottom:1px solid var(--brd)${neverIn?';background:#FFFBEB':''}">
-              <td style="padding:6px 10px;font-weight:600">${esc(r.name)||"—"}</td>
-              <td style="padding:6px 10px;font-size:11px;color:${neverIn?'#DC2626':'var(--tx-muted)'}">${esc(r.lastLogin)||"—"}</td>
-              <td style="padding:6px 10px;text-align:center">${cleanDone
-                ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
-                : `<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r.clean.status)||"—"}</span>`}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r.clean.units)||"0"} / 12</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700;color:${scoreColor}">${score ? score+"%":"—"}</td>
-              <td style="padding:6px 10px;text-align:center">${supDone
-                ? '<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
-                : `<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">${esc(r.sup.status)||"—"}</span>`}</td>
-              <td style="padding:6px 10px;text-align:center;font-weight:700">${esc(r.sup.units)||"0"} / 24</td>
-              <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">${esc(r.notes)||"—"}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
+        <tbody id="train-tbody"></tbody>
       </table>
     </div>
   </div>`;
 
   requestAnimationFrame(() => {
-    const COLORS_STATUS = [CSS_TOKENS.positive(),CSS_TOKENS.warning(),CSS_TOKENS.danger()];
-
-    const cClean = document.getElementById("ch-tr-clean-status");
-    if (cClean && typeof Chart !== "undefined") {
-      killChart("ch-tr-clean-status");
-      CHARTS["ch-tr-clean-status"] = new Chart(cClean, {
-        type:"doughnut",
-        data:{ labels:statsCleanCols, datasets:[{ data:statsCleanVals, backgroundColor:COLORS_STATUS, borderWidth:2 }] },
-        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}} }
-      });
-    }
-
-    const cSup = document.getElementById("ch-tr-sup-status");
-    if (cSup && typeof Chart !== "undefined") {
-      killChart("ch-tr-sup-status");
-      CHARTS["ch-tr-sup-status"] = new Chart(cSup, {
-        type:"doughnut",
-        data:{ labels:statsSupCols, datasets:[{ data:statsSupVals, backgroundColor:COLORS_STATUS, borderWidth:2 }] },
-        options:{ maintainAspectRatio:false, cutout:"55%", plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}} }
-      });
-    }
-
-    const cUnits = document.getElementById("ch-tr-units12");
-    if (cUnits && typeof Chart !== "undefined") {
-      killChart("ch-tr-units12");
-      CHARTS["ch-tr-units12"] = new Chart(cUnits, {
-        type:"bar",
-        data:{
-          labels: Object.keys(unitBuckets12).map(k => "وحدات: "+k),
-          datasets:[{ data:Object.values(unitBuckets12), backgroundColor:[CSS_TOKENS.danger(),CSS_TOKENS.warning(),CSS_TOKENS.warning(),CSS_TOKENS.positive(),CSS_TOKENS.positive(),CSS_TOKENS.info()], borderRadius:4 }]
+    const cCourse = document.getElementById("ch-tr-course-completion");
+    if (cCourse && typeof Chart !== "undefined") {
+      killChart("ch-tr-course-completion");
+      CHARTS["ch-tr-course-completion"] = new Chart(cCourse, {
+        type: "bar",
+        data: {
+          labels: perCourse.map((c) => c.name),
+          datasets: [{ label: "نسبة الإنجاز %", data: perCourse.map((c) => +c.pct.toFixed(1)), backgroundColor: CSS_TOKENS.info() + "cc", borderRadius: 4 }],
         },
-        options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
+        options: { maintainAspectRatio: false, indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, max: 100 } } },
+      });
+    }
+
+    const cBuckets = document.getElementById("ch-tr-completion-buckets");
+    if (cBuckets && typeof Chart !== "undefined") {
+      killChart("ch-tr-completion-buckets");
+      const keys = Object.keys(completionBuckets).sort((a, b) => +a - +b);
+      CHARTS["ch-tr-completion-buckets"] = new Chart(cBuckets, {
+        type: "bar",
+        data: {
+          labels: keys.map((k) => `${k} من ${totalCourses}`),
+          datasets: [{ data: keys.map((k) => completionBuckets[k]), backgroundColor: keys.map((k) => (+k === 0 ? CSS_TOKENS.danger() : +k === totalCourses ? CSS_TOKENS.positive() : CSS_TOKENS.warning())), borderRadius: 4 }],
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
       });
     }
   });
 
-  // ── فلتر الترتيب لجدول المتدربين ──
-  window.__trainSort = function() {
-    var sort = document.getElementById('train-sort') ? document.getElementById('train-sort').value : 'name';
-    var tbody = document.getElementById('train-tbody');
+  // ── بحث/ترتيب/رسم جدول الموظفين (قابل لإعادة الاستدعاء بدون إعادة رسم كل التبويب) ──
+  window.__trainRows = rows;
+  window.__trainFilterSort = function () {
+    const q = (document.getElementById("train-q")?.value || "").trim().toLowerCase();
+    const sort = document.getElementById("train-sort")?.value || "name";
+    const tbody = document.getElementById("train-tbody");
+    const countEl = document.getElementById("train-count");
     if (!tbody) return;
-    var rows = _trainPivotByEmployee_(window.RAW_NEW_TRAINING || []);
-    function n_(v){return isNaN(parseFloat(v))?0:parseFloat(v);}
-    rows.sort(function(a,b){
-      if (sort==='name') return String(a.name||'').localeCompare(String(b.name||''),'ar');
-      if (sort==='units12_desc') return n_(b.clean.units) - n_(a.clean.units);
-      if (sort==='score_desc')   return n_(b.clean.score) - n_(a.clean.score);
-      if (sort==='score_asc')    return n_(a.clean.score) - n_(b.clean.score);
-      if (sort==='units24_desc') return n_(b.sup.units) - n_(a.sup.units);
-      if (sort==='never_in') {
-        var fa = a.lastLoginKey ? 1 : 0;
-        var fb = b.lastLoginKey ? 1 : 0;
-        return fa - fb;
-      }
+    let list = (window.__trainRows || []).filter((r) =>
+      !q ||
+      r.name.toLowerCase().includes(q) ||
+      r.email.toLowerCase().includes(q) ||
+      (r.department || "").toLowerCase().includes(q)
+    );
+    list = list.slice().sort((a, b) => {
+      if (sort === "name") return a.name.localeCompare(b.name, "ar");
+      if (sort === "completed_desc") return b.completedCount - a.completedCount;
+      if (sort === "completed_asc") return a.completedCount - b.completedCount;
+      if (sort === "score_desc") return (b.avgGrade ?? -1) - (a.avgGrade ?? -1);
+      if (sort === "never_first") return a.completedCount - b.completedCount;
       return 0;
     });
-    function esc(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-    tbody.innerHTML = rows.map(function(r){
-      var cleanDone = r.clean.status === 'مكتملة';
-      var supDone   = r.sup.status === 'مكتملة';
-      var neverIn   = !r.lastLoginKey;
-      var score     = n_(r.clean.score);
-      var scoreColor = score>=80?'#16A34A':score>=60?'#D97706':'#DC2626';
-      return '<tr style="border-bottom:1px solid var(--brd)'+(neverIn?';background:#FFFBEB':'')+'">'+
-        '<td style="padding:6px 10px;font-weight:600">'+esc(r.name||'—')+'</td>'+
-        '<td style="padding:6px 10px;font-size:11px;color:'+(neverIn?'#DC2626':'var(--tx-muted)')+'">'+esc(r.lastLogin||'—')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center">'+(cleanDone
-          ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتملة</span>'
-          :'<span style="background:#FEF3C7;color:#D97706;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r.clean.status||'—')+'</span>')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r.clean.units||'0')+' / 12</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:700;color:'+scoreColor+'">'+(score?score+'%':'—')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center">'+(supDone
-          ?'<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">✓ مكتمل</span>'
-          :'<span style="background:#F3E8FF;color:#7C3AED;border-radius:4px;padding:2px 7px;font-size:10px">'+esc(r.sup.status||'—')+'</span>')+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-weight:700">'+esc(r.sup.units||'0')+' / 24</td>'+
-        '<td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:180px">'+esc(r.notes||'—')+'</td>'+
-        '</tr>';
-    }).join('');
+    if (countEl) countEl.textContent = list.length.toLocaleString("ar");
+    tbody.innerHTML =
+      list.map((r) => {
+        const neverStartedRow = r.completedCount === 0;
+        const pct = totalCourses ? (r.completedCount / totalCourses) * 100 : 0;
+        const pctColor = pct >= 100 ? CSS_TOKENS.positive() : pct > 0 ? CSS_TOKENS.info() : CSS_TOKENS.txMuted();
+        return `<tr style="border-bottom:1px solid var(--brd)${neverStartedRow ? ";background:#FFFBEB" : ""}">
+          <td style="padding:6px 10px;font-weight:600">${esc(r.name)}</td>
+          <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted)">${esc(r.email) || "—"}</td>
+          <td style="padding:6px 10px;font-size:11px">${esc(r.department) || "—"}</td>
+          <td style="padding:6px 10px;text-align:center;font-weight:700;color:${pctColor}">${r.completedCount} / ${totalCourses}</td>
+          <td style="padding:6px 10px;text-align:center">${r.avgGrade !== null ? r.avgGrade.toFixed(1) + "%" : "—"}</td>
+          <td style="padding:6px 10px;font-size:11px;color:${neverStartedRow ? "#DC2626" : "var(--tx-muted)"}">${esc(r.lastAccessRaw) || "لم يدخل أبداً"}</td>
+        </tr>`;
+      }).join("") ||
+      `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   };
+  window.__trainFilterSort();
+}
+function _trainExportCSV() {
+  const rows = window.__trainRows || [];
+  if (!rows.length) { alert("لا توجد بيانات"); return; }
+  const totalCourses = (window.RAW_NEW_TRAINING ? _trainPivotByEmployee_(window.RAW_NEW_TRAINING).courseNames || [] : []).length;
+  const headers = ["الاسم", "البريد الإلكتروني", "القسم", "الدورات المكتملة", "إجمالي الدورات", "متوسط الدرجة", "آخر دخول"];
+  const csvRows = rows.map((r) => [
+    r.name, r.email, r.department || "", r.completedCount, totalCourses, r.avgGrade !== null ? r.avgGrade.toFixed(1) : "", r.lastAccessRaw || "لم يدخل أبداً",
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...csvRows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: "برامج_التدريب.csv",
+  });
+  a.click();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -34549,7 +35075,9 @@ function renderTrainingTab(_fromDate, _toDate) {
 
         if (vehRows.length || trRows.length || orgRows.length || lspRows.length || ctpRows.length || ppmRows.length || visMonthlyRows.length || visRegionRows.length || corrRows.length || pcLaynadaRows.length || pcMeerRows.length) {
           const vehData  = vehRows.length  ? `\n- بيانات السيارات: ${vehRows.length.toLocaleString()} سيارة (الأعمدة: رقم اللوحة، الماركة، سنة الصنع، رقم/اسم المستخدم الفعلي = السائق، تفويض حتى، الحالة)` : '';
-          const trData   = trRows.length   ? `\n- بيانات التدريب: ${trRows.length.toLocaleString()} سجل متدرب` : '';
+          const trPivot  = trRows.length && typeof _trainPivotByEmployee_ === 'function' ? _trainPivotByEmployee_(trRows) : [];
+          const trCourses = trPivot.courseNames || [];
+          const trData   = trRows.length   ? `\n- بيانات التدريب: ${trPivot.length.toLocaleString()} موظف عبر ${trCourses.length} دورات إلزامية` : '';
 
           const orgVacant = orgRows.filter(function(r){ return String(r["حالة التوظيف"]||"").trim() === "شاغر"; }).length;
           const orgData  = orgRows.length  ? `\n- بيانات الهيكل الوظيفي: ${orgRows.length.toLocaleString()} وظيفة/سجل (الشاغر منها: ${orgVacant.toLocaleString()})` : '';
@@ -37971,6 +38499,7 @@ var PORTAL_CATEGORIES = {
       { name: "supervisors",     label: "المشرفون والمهندسون" },
       { name: "training",        label: "برامج التدريب" },
       { name: "vehicles",        label: "السيارات" },
+      { name: "fuel",            label: "استهلاك الوقود" },
       { name: "correspondence",  label: "سجل المراسلات" },
       { name: "org-structure",   label: "الهيكل الوظيفي" },
       { name: "visits",          label: "الزيارات" }
@@ -40155,6 +40684,8 @@ setTimeout(function tellUserStillTrying() {
   }
 
   /* ── Statistics Section ─────────────────────────────────────────────────── */
+  // 🔗 (2026-09-28) تعريض لتبويب "نظرة عامة" — راجع تعريض buildSupplementalSection أعلاه لنفس السبب.
+  window.buildStatisticsSection = function (D, DALL) { return buildStatisticsSection(D, DALL); };
   function buildStatisticsSection(D, DALL) {
     var sec = {
       _source:      "Statistics",
@@ -40325,6 +40856,10 @@ setTimeout(function tellUserStillTrying() {
   }
 
   /* ── Supplemental Section ────────────────────────────────────────────────── */
+  // 🔗 (2026-09-28) تعريض للاستخدام من تبويب "نظرة عامة" (خارج هذا الـ IIFE)
+  // عشان يبني كروت ملخص شاملة لكل الأقسام بنفس الحسابات المستخدمة فعليًا
+  // في سياق المساعد الذكي، بدون تكرار نفس المنطق في مكان تاني.
+  window.buildSupplementalSection = function (sup) { return buildSupplementalSection(sup); };
   function buildSupplementalSection(sup) {
     var sec = {
       _source:     "SupplementalData",
@@ -41213,10 +41748,10 @@ setTimeout(mokInit, 1200);
     "new-sla": { d: "مستوى الخدمة الجديد NEW SLA: الفئات والأولويات الجديدة والالتزام بالساعات", s: ["sla جديد", "مستوى الخدمة", "الاولوية الجديدة", "زمن الاستجابة"], data: ["RAW_BALAGH", "RAW_BALAGH_NEW_SLA_MAP"] },
     "gatekeepers": { d: "البوابون: الأسماء والجوالات والمدارس المغطاة حسب المدينة", s: ["بواب", "بوابين", "حارس", "حراس"], data: ["RAW_NEW_GATEKEEPERS"] },
     "supervisors": { d: "المشرفون الميدانيون والمهندسون ومسؤولو التطوير لكل مدرسة", s: ["مشرف", "مشرفين", "مهندس", "مسؤول تطوير", "اشراف"], data: ["RAW_NEW_SUPERVISORS"] },
-    "training": { d: "برامج التدريب: دورة النظافة وبرنامج المشرفين، المتدربون والوحدات المكتملة", s: ["تدريب", "دورات", "متدربين", "دورة النظافة"], data: ["RAW_NEW_TRAINING"] },
+    "training": { d: "برامج التدريب: 6 دورات إلزامية لكل موظف، حالة الإكمال والدرجات لكل دورة", s: ["تدريب", "دورات", "متدربين", "دورة"], data: ["RAW_NEW_TRAINING"] },
     "vehicles": { d: "السيارات والمركبات: الأنواع والحالة والتوزيع حسب المنطقة", s: ["سيارة", "مركبات", "مركبة", "اسطول"], data: ["RAW_NEW_VEHICLES"] },
     "correspondence": { d: "سجل المراسلات الصادرة والواردة حسب المنطقة والنوع والحالة", s: ["مراسلات", "خطابات", "صادر", "وارد"], data: ["RAW_NEW_CORRESPONDENCE"] },
-    "org-structure": { d: "الهيكل الوظيفي: الوظائف المشغولة والشاغرة ونسبة السعودة حسب المنطقة والمسمى", s: ["هيكل", "وظائف", "شواغر", "سعودة", "موظفين", "توظيف"], data: ["RAW_NEW_ORG_STRUCTURE"] },
+    "org-structure": { d: "الهيكل الوظيفي: الوظائف المشغولة والشاغرة ونسبة السعودة حسب المنطقة ونوع الفريق والمسمى", s: ["هيكل", "وظائف", "شواغر", "سعودة", "موظفين", "توظيف", "نوع الفريق"], data: ["RAW_NEW_ORG_STRUCTURE"] },
     "visits": { d: "الزيارات المسندة والمكتملة شهرياً ونسبة الإنجاز حسب المنطقة", s: ["زيارة", "زيارات", "زيارات ميدانية", "جولات"], data: ["RAW_NEW_VISITS_MONTHLY", "RAW_NEW_VISITS_BY_REGION"] },
     "tajheez-contracts": { d: "عقود التجهيزات: الموردون وقيم العقود والمصروف وحالة الإنجاز وأوامر الإيقاف", s: ["تجهيزات", "عقود التوريد", "موردين", "اوامر عمل"], data: ["TAJCON"] },
     "tajheez": { d: "المخصص مقابل الاحتياج من التجهيزات والفائض/العجز حسب القسم والصنف والمدينة", s: ["مخصص", "احتياج", "عجز", "فائض", "اثاث"], data: ["RAW_TAJHEEZ_INV"] },

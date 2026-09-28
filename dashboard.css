@@ -7213,6 +7213,20 @@ button.ix-profile-source:hover{
   line-height: 1.7;
 }
 .org-chart-wrap { padding: 4px 2px 14px; overflow-x: auto; }
+/* ★ 2026-09-28: عنوان فاصل بين شجرة فرق المناطق الرئيسية وقسم "التجهيزات"
+   المنفصل (راجع _orgBuildChartPanel في dashboard.js) — يوضّح بصريًا أن ما
+   يليه قسم تنظيمي مستقل، بنفس روح ألوان الصفحة (تيل #0b6b7e). */
+.orgc-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0b6b7e;
+  margin: 22px 2px 10px;
+  padding-top: 18px;
+  border-top: 2px solid #e2e8f0;
+}
 .org-chart-root-list { list-style: none; margin: 0; padding: 0; }
 .org-chart-root-list > li { margin-bottom: 10px; }
 .org-tree-children {
@@ -7503,6 +7517,12 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 .orgc-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .orgc-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* ★ 2026-09-28: نقطة الشرح الخاصة بحالة "شاغر" — حلقة مفرَّغة بحدّ متقطّع
+   بدل دائرة مصمتة، عشان تعكس بصريًا نفس الحد المتقطّع لكارت الوظيفة
+   الشاغرة نفسه (راجع .orgc-card.orgc-status-vacant تحت). */
+.orgc-legend-dot-dashed { background: transparent; border: 2px dashed; }
+/* فاصل بصري بسيط بين مجموعة شرح الحالة ومجموعة شرح ألوان المسمى الوظيفي. */
+.orgc-legend-sep { width: 1px; align-self: stretch; background: #e2e8f0; }
 
 .orgc-forest {
   /* ★ 2026-09-21: لازم يبقى هو نفسه حاوية الـ scroll (مش .org-chart-wrap
@@ -7699,11 +7719,27 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-card.orgc-status-active .orgc-card-status { color: #15803d; }
 .orgc-card.orgc-status-active .orgc-status-dot { background: #16a34a; }
 
-.orgc-card.orgc-status-vacant { background: #fbfcfd; border-inline-start-color: #cbd5e1; }
+/* ★ 2026-09-28: حدّ متقطّع (dashed) لكل الكارت، لا الجانب الملوَّن فقط —
+   إشارة بصرية إضافية للوظيفة الشاغرة مطابقة لأسلوب الملف المرجعي (PPTX)،
+   حيث تُرسَم الأدوار غير المشغولة بحدّ متقطّع. يبقى هذا مستقلًا تمامًا عن
+   الحدّ المتقطّع الآخر (outline) الخاص بوضع التعديل (راجع
+   #org-view-chart.orgc-edit-mode .orgc-card تحت) — الأول border والثاني
+   outline، فلا يتعارضان حتى لو اجتمعا على نفس الكارت. */
+.orgc-card.orgc-status-vacant { background: #fbfcfd; border-inline-start-color: #cbd5e1; border-style: dashed; }
 .orgc-card.orgc-status-vacant .orgc-avatar { border-color: #dbe3ea; color: #94a3b8; background: linear-gradient(160deg,#f4f6f8,#fff); }
 .orgc-card.orgc-status-vacant .orgc-card-name { color: #94a3b8; font-style: italic; }
 .orgc-card.orgc-status-vacant .orgc-card-status { color: #94a3b8; }
 .orgc-card.orgc-status-vacant .orgc-status-dot { background: #94a3b8; }
+
+/* ★ 2026-09-28: تصنيف لوني للمسمى الوظيفي (راجع _orgRoleColorClass في
+   dashboard.js) — شريط علوي ملوَّن فوق الكارت، مستقل عن لون الجانب
+   (border-inline-start) الخاص بحالة التوظيف، ومستقل أيضًا عن نمط الحدّ
+   (solid/dashed) حتى يبقى المتقطّع الخاص بالشاغر ظاهرًا حتى مع وجود لون
+   الدور. يُطبَّق فقط على العرض والّلون، لا على النمط. */
+.orgc-card.orgc-role-engineer { border-top-width: 3px; border-top-color: #2563eb; }
+.orgc-card.orgc-role-supervisor { border-top-width: 3px; border-top-color: #d97706; }
+.orgc-card.orgc-role-support { border-top-width: 3px; border-top-color: #db2777; }
+.orgc-card.orgc-role-manager { border-top-width: 3px; border-top-color: #7c3aed; }
 
 .orgc-card.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
 .orgc-card.orgc-search-dim { opacity: .22; }

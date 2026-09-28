@@ -5007,12 +5007,23 @@ var NEW_TEMPLATES_TOP_LABELS = {
 var NEW_TEMPLATES_URL_FALLBACK =
   "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
 
+// روابط مكرَّرة هنا حرفيًا (بنفس القيمة المستخدمة في مكانها الأصلي داخل
+// الملف) عشان تكون متاحة دايمًا لدالة النسخة الاحتياطية الكاملة، بغض
+// النظر عن ترتيب تحميل الصفحة أو هل المستخدم فتح التبويب الأصلي قبل كده
+// أو لأ — الثابتان الأصليان (BALAGH_URL وCOST_URL) معرَّفان داخل نطاقات
+// دوال محلية ومش متاحين من هنا مباشرة.
+const BALAGH_BACKUP_URL =
+  "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec";
+const COST_BACKUP_URL =
+  "https://script.google.com/macros/s/AKfycbweVcD1cOAqFa6nkt9555c1kOyATcU6t_UWHGmySeOENb4y8XfmVbl9juXgRtqp2uEdeA/exec";
+
 function __buildBackupSources_() {
   return [
     {
       url: CFG.GAS_URL,
       kind: "multi",
       fileLabel: "البيانات_الرئيسية",
+      heavy: true, // 21 شيت في طلب واحد — يحتاج مهلة أطول
       names: {
         buildings: "المباني",
         fcaHistory: "تقييمات_FCA_المراحل",
@@ -5082,13 +5093,40 @@ function __buildBackupSources_() {
     // المراسلات) للنسخة الاحتياطية — كلهم بييجوا من نفس الآب سكريبت
     // (NEW_TEMPLATES_URL) في طلب واحد، فبيتحمّلوا هنا كمصدر واحد فقط
     // (fetch واحد) وبينزلوا في ملف إكسل واحد بشيتات منفصلة لكل نوع بيانات
-    // — بدون أي طلبات شبكة إضافية. البلاغات/الحصر/التكلفة يفضلوا مستبعدين
-    // عمدًا زي القرار السابق (بياناتهم محفوظة بأمان في مكان تاني).
+    // — بدون أي طلبات شبكة إضافية.
     {
       url: window.NEW_TEMPLATES_URL || NEW_TEMPLATES_URL_FALLBACK,
       kind: "nested",
       fileLabel: "الملفات_الجديدة",
       topLabels: NEW_TEMPLATES_TOP_LABELS,
+      heavy: true, // عدة أنواع بيانات مجمّعة في طلب واحد
+    },
+    // ★ 2026-09-28: بناءً على طلب صريح — البلاغات (النظام الرئيسي عبر
+    // NEW SLA) والحصر والتكلفة وبلاغات المدارس المباشرة كلها بقت جزء من
+    // النسخة الاحتياطية الكاملة، بعد ما كانت مستبعدة عمدًا قبل كده.
+    {
+      url: BALAGH_BACKUP_URL,
+      kind: "balagh",
+      fileLabel: "البلاغات",
+      heavy: true, // حوالي 125 ألف صف — أثقل مصدر في النسخة الاحتياطية كلها
+    },
+    {
+      url: TAJINV_URL,
+      kind: "multi",
+      fileLabel: "الحصر_والاحتياج",
+      names: { data: "حصر الأصول والاحتياج" },
+    },
+    {
+      url: COST_BACKUP_URL,
+      kind: "flat",
+      fileLabel: "التكلفة",
+      label: "التكلفة",
+    },
+    {
+      url: SCHOOL_REPORTS_URL,
+      kind: "flat",
+      fileLabel: "بلاغات_المدارس_المباشرة",
+      label: "بلاغات المدارس المباشرة",
     },
   ];
 }
@@ -5122,10 +5160,24 @@ function __backupAddSheet_(wb, usedNames, label, rows) {
 function __backupBuildWorkbookForSource_(src, apiResponse) {
   const wb = XLSX.utils.book_new();
   const usedNames = new Set();
-  const data = apiResponse && apiResponse.data;
+  // بعض المصادر (زي التكلفة) بترجع أحيانًا مصفوفة الصفوف مباشرة من غير
+  // غلاف {data: [...]}. الاستخلاص هنا يتعامل مع الشكلين معًا بدل الاعتماد
+  // على apiResponse.data فقط.
+  const data =
+    apiResponse && apiResponse.data !== undefined ? apiResponse.data : apiResponse;
 
   if (src.kind === "flat") {
     __backupAddSheet_(wb, usedNames, src.label, Array.isArray(data) ? data : []);
+  } else if (src.kind === "balagh") {
+    // استجابة البلاغات فيها حقلان شقيقان على نفس المستوى (data +
+    // newSlaMapping) وليس أحدهما متداخلًا داخل الآخر، فشكلها لا يطابق أيًا
+    // من multi/nested/auto الموجودة أصلًا — لذلك احتاجت نوعًا خاصًا بها.
+    __backupAddSheet_(wb, usedNames, "البلاغات", Array.isArray(data) ? data : []);
+    const slaMap =
+      apiResponse && Array.isArray(apiResponse.newSlaMapping) ? apiResponse.newSlaMapping : [];
+    if (slaMap.length) {
+      __backupAddSheet_(wb, usedNames, "خريطة_NEW_SLA_المرجعية", slaMap);
+    }
   } else if (data && typeof data === "object") {
     if (src.kind === "multi") {
       Object.keys(src.names).forEach((key) => {
@@ -5167,9 +5219,17 @@ function __backupBuildWorkbookForSource_(src, apiResponse) {
 // تلقائيًا حتى ثلاث مرات قبل الاستسلام فعليًا. كل مصدر مستقل تمامًا عن
 // باقي المصادر، فتعثُّر واحد أو إعادة محاولته لا يؤخِّر الباقي.
 const __BACKUP_FETCH_TIMEOUT_MS = 25000;
-const __BACKUP_FETCH_TIMEOUT_MAIN_MS = 45000; // المصدر الرئيسي أثقل من غيره
-const __BACKUP_FETCH_MAX_ATTEMPTS = 3;
-const __BACKUP_FETCH_RETRY_DELAY_MS = 2000;
+const __BACKUP_FETCH_TIMEOUT_MAIN_MS = 60000; // المصادر الثقيلة (البيانات الرئيسية/الملفات الجديدة/البلاغات)
+// ★ 2026-09-28: بناءً على طلب صريح — رُفع عدد المحاولات وزمن الانتظار بين
+// كل محاولة والتالية (بدل ما نستسلم بسرعة)، مع تحويل التنزيل بالكامل من
+// "كل المصادر مرة واحدة بالتوازي" إلى "مصدر واحد في كل مرة، بالترتيب" (راجع
+// window.__downloadFullDataBackup تحت) — لتفادي مزاحمة كل الطلبات على حد
+// أقصى 6 اتصالات متزامنة لنفس المضيف (script.google.com) بيفرضه المتصفح
+// نفسه، واللي كان بيتسبب أحيانًا في فشل مصادر ثقيلة (زي البلاغات والملفات
+// الجديدة) بخطأ "انتهت المهلة" رغم إن السبب الحقيقي هو الازدحام مش تعطُّل
+// فعلي في الخادم.
+const __BACKUP_FETCH_MAX_ATTEMPTS = 4;
+const __BACKUP_FETCH_RETRY_DELAY_MS = 3000;
 
 function __backupFetchOnce_(url, timeoutMs) {
   const controller = new AbortController();
@@ -5263,7 +5323,13 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
     (auto ? "جارٍ تنفيذ النسخ الاحتياطي التلقائي" : "جارٍ تنفيذ النسخ الاحتياطي") +
     "</div>" +
     "</div>" +
+    '<div style="display:flex;align-items:center;gap:10px">' +
     '<div id="__backupProgTimer" style="font-size:11px;opacity:.65;font-variant-numeric:tabular-nums">00:00</div>' +
+    '<button type="button" id="__backupProgMinBtn" title="تصغير النافذة" aria-label="تصغير النافذة" ' +
+    'style="width:22px;height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;' +
+    'border:1px solid rgba(255,255,255,.2);border-radius:6px;background:rgba(255,255,255,.08);' +
+    'color:rgba(255,255,255,.8);font-size:13px;line-height:1;cursor:pointer;padding:0">‒</button>' +
+    "</div>" +
     "</div>" +
     '<div id="__backupProgList" style="padding:10px 16px;overflow-y:auto;flex:1"></div>' +
     '<div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.1)">' +
@@ -5281,10 +5347,64 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
   const summaryEl = modal.querySelector("#__backupProgSummary");
   const closeBtn = modal.querySelector("#__backupProgCloseBtn");
   const headerEl = modal.querySelector("#__backupProgHeader");
+  const minBtn = modal.querySelector("#__backupProgMinBtn");
+
+  // ── تصغير النافذة إلى فقّاعة صغيرة غير حاجبة للشاشة ──
+  // الفقّاعة تُوضَع أسفل يمين الشاشة (right/bottom) لتفادي أيقونة
+  // المساعد الذكي العائمة أسفل يسار الشاشة (left/bottom).
+  let minimized = false;
+  let pill = null;
+  let pillTextEl = null;
+  let pillTimerEl = null;
+  function buildPill_() {
+    const p = document.createElement("div");
+    p.id = "__backupProgressPill";
+    p.title = "اضغط لعرض تفاصيل النسخ الاحتياطي";
+    p.style.cssText =
+      "position:fixed;right:22px;bottom:22px;z-index:100000;background:#0B2733;" +
+      "border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 14px;" +
+      "display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.45);" +
+      "direction:rtl;color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;" +
+      "font-size:12px;user-select:none";
+    p.innerHTML =
+      '<span aria-hidden="true" style="font-size:14px">🔽</span>' +
+      '<span id="__backupProgPillText" style="font-weight:700;white-space:nowrap">' +
+      (auto ? "نسخ احتياطي تلقائي جارٍ..." : "نسخ احتياطي جارٍ...") +
+      "</span>" +
+      '<span id="__backupProgPillTimer" style="opacity:.65;font-variant-numeric:tabular-nums">00:00</span>';
+    p.addEventListener("click", restore);
+    document.body.appendChild(p);
+    return p;
+  }
+  function minimize() {
+    if (minimized || closed) return;
+    minimized = true;
+    overlay.style.background = "transparent";
+    overlay.style.pointerEvents = "none";
+    modal.style.display = "none";
+    if (!pill) {
+      pill = buildPill_();
+      pillTextEl = pill.querySelector("#__backupProgPillText");
+      pillTimerEl = pill.querySelector("#__backupProgPillTimer");
+    }
+    pill.style.display = "flex";
+  }
+  function restore() {
+    if (!minimized) return;
+    minimized = false;
+    overlay.style.background = "rgba(6,20,28,.6)";
+    overlay.style.pointerEvents = "";
+    modal.style.display = "flex";
+    if (pill) pill.style.display = "none";
+  }
+  minBtn.addEventListener("click", minimize);
 
   // إمكانية سحب النافذة لأي مكان على الشاشة (مثلًا لأسفل) من مقبض العنوان.
   let dragOffset = null;
   headerEl.addEventListener("pointerdown", (e) => {
+    // تجاهل بداية السحب لو الضغطة كانت على زر التصغير نفسه، حتى لا يتحرك
+    // مقبض العنوان بدل تنفيذ التصغير.
+    if (e.target.closest && e.target.closest("#__backupProgMinBtn")) return;
     const rect = modal.getBoundingClientRect();
     modal.style.position = "fixed";
     modal.style.left = rect.left + "px";
@@ -5330,7 +5450,9 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
     const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
     const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
     const ss = String(elapsedSec % 60).padStart(2, "0");
-    timerEl.textContent = `${mm}:${ss}`;
+    const text = `${mm}:${ss}`;
+    timerEl.textContent = text;
+    if (pillTimerEl) pillTimerEl.textContent = text;
   }, 1000);
 
   let closed = false;
@@ -5339,6 +5461,7 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
     closed = true;
     clearInterval(timerHandle);
     overlay.remove();
+    if (pill) pill.remove();
   }
   closeBtn.onclick = closeNow;
 
@@ -5365,7 +5488,14 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
       overlay.onclick = (e) => {
         if (e.target === overlay) closeNow();
       };
+      // لو المستخدم مصغِّر النافذة وقت الانتهاء، الفقّاعة نفسها تعكس
+      // اكتمال العملية بدل ما تفضل عالقة على "جارٍ..." للأبد.
+      if (pillTextEl) pillTextEl.textContent = "اكتمل النسخ الاحتياطي — اضغط للعرض";
+      const pillIcon = pill && pill.querySelector("span[aria-hidden]");
+      if (pillIcon) pillIcon.textContent = "✅";
     },
+    minimize,
+    restore,
     close: closeNow,
   };
 }
@@ -5378,12 +5508,17 @@ let __fullBackupInflight = false;
 // النافذة المرئية (__backupCreateProgressUI_) تعرض تقدُّم كل مصدر لحظيًا
 // حتى يكون واضحًا تمامًا أن التنزيل يعمل فعليًا، دون الاعتماد على أي
 // إشعار عابر قد يُفوَّت.
-// 🔑 كل مصدر يُجلَب ويُعاد جلبه (عند الفشل) بشكل مستقل تمامًا عن باقي
-// المصادر (Promise لكل مصدر على حدة)، فلو مصدر واحد (عادة الرئيسي، لأنه
-// الأثقل) احتاج وقتًا أطول أو إعادة محاولة، هذا لا يؤخِّر تنزيل بقية
-// الملفات الجاهزة فعلًا. الكتابة الفعلية للملفات (XLSX.writeFile) تمرّ
-// عبر طابور واحد بترتيب أول مصدر يجهز (وليس بترتيب المصادر الأصلي)
-// وبفاصل زمني بسيط بينها، حتى لا تنزل كل الملفات في نفس اللحظة.
+// ★ 2026-09-28: بناءً على طلب صريح بعد ملاحظة فشل بعض المصادر الثقيلة
+// (البلاغات/الملفات الجديدة) بخطأ "انتهت المهلة" — السبب الحقيقي إن كل
+// المصادر العشرة كانت بتُجلَب بالتوازي (Promise.all) في نفس اللحظة، وكلها
+// بترجع لنفس المضيف (script.google.com)، والمتصفح بيسمح بحد أقصى 6 اتصالات
+// متزامنة لنفس المضيف فقط — فبعض الطلبات (خصوصًا الثقيلة منها) كانت
+// بتتزاحم/تتأخر في الطابور لحد ما تضرب المهلة قبل ما تاخد فرصتها فعليًا.
+// الحل: التنزيل بقى **مصدر واحد بعد التاني بالترتيب** (تبويب/شيت بشيت
+// بالظبط زي ما طُلب) — كل مصدر ياخد فرصته الكاملة للاتصال والمحاولة
+// وإعادة المحاولة (حتى 4 مرات) من غير أي مزاحمة من باقي المصادر، وبمجرد
+// نجاحه يُكتَب ملفه فورًا وننتقل للمصدر التالي. أبطأ شوية إجمالًا، لكن
+// أوثق بكتير — وهو بالظبط المطلوب.
 window.__downloadFullDataBackup = async function (opts) {
   if (__fullBackupInflight) return;
   __fullBackupInflight = true;
@@ -5397,50 +5532,41 @@ window.__downloadFullDataBackup = async function (opts) {
   const dateTag = new Date().toISOString().slice(0, 10);
   const failedSources = [];
   let successCount = 0;
-  let writeChain = Promise.resolve();
 
   try {
-    const tasks = backupSources.map((src, idx) => {
+    for (let idx = 0; idx < backupSources.length; idx++) {
+      const src = backupSources[idx];
       const displayName = src.fileLabel || src.label || src.url;
-      const timeoutMs = src.url === CFG.GAS_URL ? __BACKUP_FETCH_TIMEOUT_MAIN_MS : __BACKUP_FETCH_TIMEOUT_MS;
+      const timeoutMs = src.heavy ? __BACKUP_FETCH_TIMEOUT_MAIN_MS : __BACKUP_FETCH_TIMEOUT_MS;
       progress.setStatus(idx, "downloading");
 
-      return __backupFetchWithTimeout_(src.url, timeoutMs, (attempt) => {
-        progress.setStatus(idx, "retrying", attempt);
-      })
-        .then((apiResponse) => {
-          // ملحوظة: فشل الاتصال أو رد الخادم بـ status:"error" تمت معالجته
-          // ومحاولاته مرارًا بالفعل داخل __backupFetchWithTimeout_ — لو
-          // وصلنا هنا فالرد سليم فعلًا.
-          const wb = __backupBuildWorkbookForSource_(src, apiResponse);
-          if (!wb.SheetNames.length) {
-            throw Object.assign(new Error("لا توجد بيانات"), { __backupReason: "empty" });
-          }
-          // الانضمام لطابور الكتابة — يُنفَّذ بترتيب أول مصدر يجهز فعليًا.
-          writeChain = writeChain.then(() => {
-            const runWrite = () => {
-              XLSX.writeFile(wb, `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`);
-              successCount++;
-              progress.setStatus(idx, "done");
-              progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
-            };
-            // فاصل بسيط بين كل تنزيل والذي يليه حتى يتعامل المتصفح مع كل
-            // ملف على حدة بدلًا من اعتبارها كلها طلبًا واحدًا مشبوهًا.
-            return successCount > 0
-              ? new Promise((resolve) => setTimeout(resolve, 450)).then(runWrite)
-              : runWrite();
-          });
-          return writeChain;
-        })
-        .catch((err) => {
-          console.error("[__downloadFullDataBackup] فشل مصدر:", displayName, err);
-          failedSources.push(displayName);
-          progress.setStatus(idx, "failed", __backupReasonText_(err));
-          progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+      try {
+        const apiResponse = await __backupFetchWithTimeout_(src.url, timeoutMs, (attempt) => {
+          progress.setStatus(idx, "retrying", attempt);
         });
-    });
-
-    await Promise.all(tasks);
+        // ملحوظة: فشل الاتصال أو رد الخادم بـ status:"error" تمت معالجته
+        // ومحاولاته مرارًا بالفعل داخل __backupFetchWithTimeout_ — لو
+        // وصلنا هنا فالرد سليم فعلًا.
+        const wb = __backupBuildWorkbookForSource_(src, apiResponse);
+        if (!wb.SheetNames.length) {
+          throw Object.assign(new Error("لا توجد بيانات"), { __backupReason: "empty" });
+        }
+        XLSX.writeFile(wb, `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`);
+        successCount++;
+        progress.setStatus(idx, "done");
+        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+        // فاصل بسيط قبل الانتقال للمصدر التالي حتى يتعامل المتصفح مع كل
+        // ملف تنزيل على حدة بدلًا من اعتبارها كلها طلبًا واحدًا مشبوهًا.
+        if (idx < backupSources.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 450));
+        }
+      } catch (err) {
+        console.error("[__downloadFullDataBackup] فشل مصدر:", displayName, err);
+        failedSources.push(displayName);
+        progress.setStatus(idx, "failed", __backupReasonText_(err));
+        progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+      }
+    }
 
     if (!successCount) {
       throw new Error("تعذّر جلب أي مصدر بيانات");
@@ -16833,9 +16959,15 @@ function _tajSortRowsGeneric(rows, state, getVal) {
   });
 }
 
+// ★ 2026-09-28: سجل خفيف يحتفظ بآخر (كل الصفوف + دوال الأعمدة) لكل جدول
+// بُني عبر renderTajheezTable — يُستخدم فقط بمعرفة downloadCurrentTab() عشان
+// يطبع/يحمّل الجدول كاملًا (كل الصفوف من أولها لآخرها)، مش الصفحة الحالية
+// المعروضة على الشاشة بس. لا يُغيّر أي سلوك على الشاشة نفسها إطلاقًا.
+window.__PRINT_TABLE_REGISTRY__ = window.__PRINT_TABLE_REGISTRY__ || {};
 function renderTajheezTable(tableId, rows, cols, pagState, pagBarId, onPageChange) {
   const tbody = document.getElementById(tableId);
   if (!tbody) return;
+  window.__PRINT_TABLE_REGISTRY__[tableId] = { rows, cols, pagBarId };
   const total = rows.length;
   const maxPage = Math.max(0, Math.ceil(total / pagState.size) - 1);
   pagState.cur = Math.min(pagState.cur, maxPage);
@@ -19526,6 +19658,691 @@ function mokInit() {
   }
 }
 /* ══════════════════════════════════ نهاية القسم المؤقت (توريد المكيفات) ══════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   📋 بانر + مودال "بلاغات المدارس المباشرة" — أُضيف 2026-09-28
+   ──────────────────────────────────────────────────────────────────────
+   قسم دائم (غير مؤقت). المصدر: Google Sheet باسم "بلاغات المدارس
+   المباشرة - الردود"، تبويب "Form Responses 1"، يتغذّى تلقائيًا من نموذج
+   Google Form مخصَّص لبلاغات المدارس. الصف الأول عناوين أعمدة، والبيانات
+   من الصف الثاني، وكل بلاغ جديد يُضاف تلقائيًا كصف جديد.
+
+   الربط عبر ملف Apps Script مستقل (منشور كـ Web App) يقرأ الشيت بترتيب
+   العمود (A→J) لا باسمه — عشان أي مسافات أو نقاط زايدة في نص سؤال الفورم
+   ما تكسرش القراءة. استبدل الرابط أدناه برابط /exec الحقيقي بعد النشر.
+
+   شكل الاستجابة المتوقَّع من Apps Script:
+   { "status": "ok", "timestamp": "<ISO>", "data": [
+       { "timestamp": "<ISO>", "reporterName": "..", "phone": "..",
+         "schoolName": "..", "ministryId": "..", "city": "..",
+         "address": "..", "reportType": "..", "description": "..",
+         "priority": "عاجل|متوسط|عادي" }, ... ] }
+   أو عند الخطأ: { "status": "error", "message": ".." }
+
+   ⚠️ خصوصية: الشيت فيه بيانات شخصية (اسم المُبلّغ ورقم جواله). بناءً على
+   تأكيد صريح من المستخدم (2026-09-28)، يُعرض رقم التواصل داخل هذا القسم
+   فقط (مودال تفصيلي يفتح بالضغط على البانر/الكروت)، وليس في أي مكان عام
+   آخر من الداشبورد.
+   ══════════════════════════════════════════════════════════════════════ */
+const SCHOOL_REPORTS_URL = "https://script.google.com/macros/s/AKfycbxW5s_zblUUEcZoQzA0APA98Zft3vIHYWm41Q9YgsyPjrPkZtEkjlb2SuUWct1tLZQx5g/exec";
+const SCHOOL_REPORTS_CACHE_KEY = "tbc_school_reports_cache_v1";
+const SR_ALERT_SEEN_KEY = "tbc_school_reports_seen_urgent_v1";
+const SCHOOL_REPORTS_POLL_MS = 30000; // فحص دوري كل 30 ثانية طالما الداشبورد مفتوح (بأي تبويب داخلي)
+
+// القوائم الثابتة للفلاتر — كما وردت في تصميم النموذج. أي قيمة إضافية
+// تظهر فعليًا في البيانات ولا تنتمي لهذه القوائم تُضاف تلقائيًا بعدها
+// (راجع _srOptionList) بدل ما تُخفى.
+const SR_CITIES = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف", "القنفذة", "الليث", "ينبع", "المهد", "العلا"];
+const SR_TYPES = ["عطل", "شكوى", "اقتراح", "مخالفة", "أخرى"];
+const SR_PRIORITIES = ["عاجل", "متوسط", "عادي"];
+
+const SCHOOL_REPORTS = {
+  loaded: false,
+  loading: false,
+  error: "",
+  rows: [],
+  timestamp: null,
+  pag: { cur: 0, size: 25 },
+};
+window.SCHOOL_REPORTS = SCHOOL_REPORTS;
+
+function _srS(v) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+function _srOptionList(fixedList, rows, field) {
+  const extra = Array.from(new Set(rows.map((r) => r[field]).filter((v) => v && fixedList.indexOf(v) === -1)));
+  return fixedList.concat(extra.sort((a, b) => a.localeCompare(b, "ar")));
+}
+function _srFmtDateTimeCompact(d) {
+  if (!d) return "—";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function _srFmtDateTimeFull(d) {
+  if (!d) return "—";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function _srPriorityColor(p) {
+  if (p === "عاجل") return { bg: "#FEE2E2", fg: "#991B1B", bd: "#FCA5A5" };
+  if (p === "متوسط") return { bg: "#FEF3C7", fg: "#92400E", bd: "#FDE68A" };
+  return { bg: "#DCFCE7", fg: "#15803D", bd: "#86EFAC" };
+}
+function _srPriorityBadge(p) {
+  const label = p || "غير محدَّد";
+  const c = _srPriorityColor(p);
+  const icon = p === "عاجل" ? "🚨" : p === "متوسط" ? "⏱️" : "🟢";
+  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;background:${c.bg};color:${c.fg};border:1px solid ${c.bd};padding:2px 9px;border-radius:99px;white-space:nowrap">${icon} ${esc(label)}</span>`;
+}
+
+function _srParseRow(r) {
+  const ts = _srS(r.timestamp);
+  const dateObj = ts ? new Date(ts) : null;
+  return {
+    timestamp: ts,
+    dateObj: dateObj && !isNaN(dateObj.getTime()) ? dateObj : null,
+    reporterName: _srS(r.reporterName),
+    phone: _srS(r.phone),
+    schoolName: _srS(r.schoolName),
+    ministryId: _srS(r.ministryId),
+    city: _srS(r.city),
+    address: _srS(r.address),
+    reportType: _srS(r.reportType),
+    description: _srS(r.description),
+    priority: _srS(r.priority),
+  };
+}
+
+function _srApply(json) {
+  const arr = Array.isArray(json && json.data) ? json.data : [];
+  SCHOOL_REPORTS.rows = arr.map(_srParseRow);
+  SCHOOL_REPORTS.timestamp = json.timestamp || null;
+  SCHOOL_REPORTS.loaded = true;
+}
+
+let _srPollTimer = null;
+function _srStartPolling() {
+  if (_srPollTimer) return;
+  _srPollTimer = setInterval(() => loadSchoolReportsData(true), SCHOOL_REPORTS_POLL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) loadSchoolReportsData(true);
+  });
+}
+
+async function loadSchoolReportsData(forceNetwork) {
+  if (SCHOOL_REPORTS.loading) return;
+  SCHOOL_REPORTS.loading = true;
+  try {
+    if (!forceNetwork && !SCHOOL_REPORTS.loaded && window._idb) {
+      try {
+        const cached = await window._idb.get(SCHOOL_REPORTS_CACHE_KEY);
+        if (cached) {
+          _srApply(cached);
+          _srRenderBadge();
+          _srRenderModalIfOpen();
+        }
+      } catch (_) {}
+    }
+    if (!SCHOOL_REPORTS_URL || SCHOOL_REPORTS_URL.indexOf("PASTE_") === 0) {
+      SCHOOL_REPORTS.error = "لم يتم إدراج رابط ملف Apps Script الخاص ببلاغات المدارس المباشرة (SCHOOL_REPORTS_URL) في dashboard.js بعد";
+      _srRenderBadge();
+      if (!SCHOOL_REPORTS.loaded) _srRenderModalIfOpen();
+      return;
+    }
+    const resp = await fetch(SCHOOL_REPORTS_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const json = await resp.json();
+    if (json && json.status === "error") throw new Error(json.message || "خطأ من Apps Script");
+    if (window._idb) window._idb.set(SCHOOL_REPORTS_CACHE_KEY, json);
+    _srApply(json);
+    SCHOOL_REPORTS.error = "";
+    _srRenderBadge();
+    _srRenderModalIfOpen();
+    _srCheckUrgentAlerts(SCHOOL_REPORTS.rows);
+    _srStartPolling();
+  } catch (err) {
+    SCHOOL_REPORTS.error = err && err.message ? err.message : String(err);
+    _srRenderBadge();
+    _srRenderModalIfOpen();
+  } finally {
+    SCHOOL_REPORTS.loading = false;
+  }
+}
+
+function _srRenderModalIfOpen() {
+  const overlay = document.getElementById("sr-overlay");
+  if (overlay && overlay.classList.contains("sr-open")) _srRenderModal();
+}
+
+// ── بطاقة "لمحة سريعة" على البانر نفسه — تتحدّث فور وصول البيانات، وتُفعِّل
+// نبضة بصرية حمراء على البانر لو فيه بلاغات عاجلة ضمن البيانات الحالية ──
+function _srRenderBadge() {
+  const el = document.getElementById("sr-banner-badge");
+  const bannerEl = document.getElementById("sr-banner");
+  if (!el) return;
+  if (SCHOOL_REPORTS.error && !SCHOOL_REPORTS.loaded) {
+    el.textContent = "تعذّر التحميل";
+    bannerEl && bannerEl.classList.remove("sr-has-urgent");
+    return;
+  }
+  if (!SCHOOL_REPORTS.loaded) {
+    el.textContent = "جاري التحميل…";
+    return;
+  }
+  const total = SCHOOL_REPORTS.rows.length;
+  const urgent = SCHOOL_REPORTS.rows.filter((r) => r.priority === "عاجل").length;
+  el.textContent = `${numFmt(total)} بلاغ${urgent ? ` · 🚨 ${numFmt(urgent)} عاجل` : ""}`;
+  if (bannerEl) bannerEl.classList.toggle("sr-has-urgent", urgent > 0);
+  const iconEl = document.getElementById("sr-banner-icon");
+  const pillEl = document.getElementById("sr-banner-badge-pill");
+  if (iconEl) iconEl.textContent = urgent > 0 ? "🚨" : "📋";
+  if (pillEl) {
+    const dot = pillEl.querySelector("#sr-banner-live-dot");
+    pillEl.innerHTML = "";
+    if (dot) pillEl.appendChild(dot);
+    pillEl.appendChild(document.createTextNode(urgent > 0 ? `🚨 ${numFmt(urgent)} عاجل` : "مباشر"));
+  }
+}
+
+function getSrFiltered() {
+  const fCity = (document.getElementById("sr-f-city")?.value || "").trim();
+  const fType = (document.getElementById("sr-f-type")?.value || "").trim();
+  const fPriority = (document.getElementById("sr-f-priority")?.value || "").trim();
+  const fSearch = (document.getElementById("sr-f-search")?.value || "").trim().toLowerCase();
+  return SCHOOL_REPORTS.rows
+    .filter((r) => {
+      if (fCity && r.city !== fCity) return false;
+      if (fType && r.reportType !== fType) return false;
+      if (fPriority && r.priority !== fPriority) return false;
+      if (
+        fSearch &&
+        !(
+          r.schoolName.toLowerCase().includes(fSearch) ||
+          r.reporterName.toLowerCase().includes(fSearch) ||
+          r.description.toLowerCase().includes(fSearch) ||
+          String(r.ministryId || "").toLowerCase().includes(fSearch)
+        )
+      )
+        return false;
+      return true;
+    })
+    .sort((a, b) => (b.dateObj ? b.dateObj.getTime() : 0) - (a.dateObj ? a.dateObj.getTime() : 0)); // الأحدث أولًا دائمًا
+}
+
+function _srAggBy(rows, field) {
+  const m = {};
+  rows.forEach((r) => {
+    const key = r[field] || "غير محدَّد";
+    m[key] = (m[key] || 0) + 1;
+  });
+  return Object.entries(m)
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+// ── بطاقة توزيع قابلة للضغط: الضغط على أي فئة يفلتر الجدول تلقائيًا
+// ويمرّر الشاشة له مباشرة (طلب صريح من المستخدم) ──
+function _srBreakdownCard(title, field, items, total) {
+  const max = Math.max(1, ...items.map((i) => i.count));
+  return `<div class="card">
+    <div class="card-title">${esc(title)}<span class="sub">${items.length} فئة</span></div>
+    <div style="display:flex;flex-direction:column;gap:9px;padding-top:4px">
+      ${
+        items.length
+          ? items
+              .map(
+                (i) => `<div onclick="srFilterBy('${field}','${esc(i.key)}')" style="cursor:pointer;display:flex;flex-direction:column;gap:3px" title="اضغط لعرض بلاغات هذه الفئة في الجدول أدناه">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12.5px;font-weight:700">
+            <span>${field === "priority" ? _srPriorityBadge(i.key) : esc(i.key)}</span>
+            <span style="color:${CSS_TOKENS.txMuted()};white-space:nowrap">${numFmt(i.count)} (${pctFmt((i.count / total) * 100)})</span>
+          </div>
+          <div style="height:6px;border-radius:99px;background:#EEF2F6;overflow:hidden">
+            <div style="height:100%;width:${(i.count / max) * 100}%;border-radius:99px;background:${field === "priority" && i.key === "عاجل" ? "#DC2626" : "#0891B2"}"></div>
+          </div>
+        </div>`,
+              )
+              .join("")
+          : `<div style="text-align:center;color:${CSS_TOKENS.txMuted()};padding:16px;font-size:12px">لا توجد بيانات ضمن الفلاتر الحالية</div>`
+      }
+    </div>
+  </div>`;
+}
+
+function srFilterBy(field, value) {
+  const idByField = { city: "sr-f-city", reportType: "sr-f-type", priority: "sr-f-priority" };
+  const id = idByField[field];
+  const el = id && document.getElementById(id);
+  if (el) el.value = value === "غير محدَّد" ? "" : value;
+  SCHOOL_REPORTS.pag.cur = 0;
+  _srRenderModal();
+  requestAnimationFrame(() => {
+    document.getElementById("sr-table-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+window.srFilterBy = srFilterBy;
+
+function srRerender() {
+  SCHOOL_REPORTS.pag.cur = 0;
+  _srRenderModal();
+}
+window.srRerender = srRerender;
+
+function srClearFilters() {
+  ["sr-f-city", "sr-f-type", "sr-f-priority", "sr-f-search"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  SCHOOL_REPORTS.pag.cur = 0;
+  _srRenderModal();
+}
+window.srClearFilters = srClearFilters;
+
+function exportSrCSV(rows) {
+  const headers = ["التاريخ والوقت", "اسم المدرسة", "الرقم الوزاري", "المحافظة", "العنوان بالتفصيل", "نوع البلاغ", "درجة الأهمية", "اسم المُبلّغ", "رقم التواصل", "وصف المشكلة"];
+  const csv = [headers.map((h) => `"${h}"`).join(",")];
+  rows.forEach((r) => {
+    csv.push(
+      [r.dateObj ? _srFmtDateTimeFull(r.dateObj) : r.timestamp, r.schoolName, r.ministryId, r.city, r.address, r.reportType, r.priority, r.reporterName, r.phone, r.description]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    );
+  });
+  const blob = new Blob(["﻿" + csv.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "بلاغات_المدارس_المباشرة_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+}
+window.exportSrCSV = exportSrCSV;
+
+function openSrModal() {
+  const overlay = document.getElementById("sr-overlay");
+  if (!overlay) return;
+  overlay.classList.add("sr-open");
+  overlay.setAttribute("aria-hidden", "false");
+  if (!SCHOOL_REPORTS.loaded && !SCHOOL_REPORTS.loading) loadSchoolReportsData(false);
+  _srRenderModal();
+}
+function closeSrModal() {
+  const overlay = document.getElementById("sr-overlay");
+  overlay?.classList.remove("sr-open");
+  overlay?.setAttribute("aria-hidden", "true");
+}
+window.openSrModal = openSrModal;
+window.closeSrModal = closeSrModal;
+
+function _srRenderModal() {
+  const body = document.getElementById("sr-modal-body");
+  if (!body) return;
+
+  if (SCHOOL_REPORTS.error && !SCHOOL_REPORTS.loaded) {
+    body.innerHTML = `
+    <div style="text-align:center;padding:40px 20px">
+      <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+      <div style="font-weight:700;margin-bottom:6px">تعذّر تحميل بلاغات المدارس المباشرة</div>
+      <div style="color:${CSS_TOKENS.txMuted()};font-size:13px;margin-bottom:14px">${esc(SCHOOL_REPORTS.error || "")}</div>
+      <button class="export-btn" onclick="loadSchoolReportsData(true)">إعادة المحاولة</button>
+    </div>`;
+    return;
+  }
+  if (!SCHOOL_REPORTS.loaded) {
+    body.innerHTML = `
+    <div class="loading-placeholder" style="padding:40px 20px">
+      <div class="loading-placeholder-icon">📋</div>
+      <div class="loading-placeholder-text">جاري التحميل…</div>
+    </div>`;
+    return;
+  }
+
+  const cityOptions = _srOptionList(SR_CITIES, SCHOOL_REPORTS.rows, "city");
+  const typeOptions = _srOptionList(SR_TYPES, SCHOOL_REPORTS.rows, "reportType");
+  const priorityOptions = _srOptionList(SR_PRIORITIES, SCHOOL_REPORTS.rows, "priority");
+  const fCity = document.getElementById("sr-f-city")?.value || "";
+  const fType = document.getElementById("sr-f-type")?.value || "";
+  const fPriority = document.getElementById("sr-f-priority")?.value || "";
+  const fSearch = document.getElementById("sr-f-search")?.value || "";
+
+  const filteredRows = getSrFiltered();
+  const totalCount = filteredRows.length;
+  const urgentCount = filteredRows.filter((r) => r.priority === "عاجل").length;
+  const schoolCount = new Set(filteredRows.map((r) => r.ministryId || r.schoolName)).size;
+  const latest = filteredRows[0] || null;
+  const byType = _srAggBy(filteredRows, "reportType");
+  const byCity = _srAggBy(filteredRows, "city");
+  const byPriority = _srAggBy(filteredRows, "priority");
+
+  body.innerHTML = `
+  <div class="filters-row" style="margin-bottom:16px">
+    <div class="fg">
+      <div class="fg-lbl">المحافظة</div>
+      <select class="fsel" id="sr-f-city" onchange="srRerender()" style="min-width:150px">
+        <option value="">الكل</option>
+        ${cityOptions.map((c) => `<option value="${esc(c)}" ${fCity === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">نوع البلاغ</div>
+      <select class="fsel" id="sr-f-type" onchange="srRerender()" style="min-width:130px">
+        <option value="">الكل</option>
+        ${typeOptions.map((t) => `<option value="${esc(t)}" ${fType === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg">
+      <div class="fg-lbl">درجة الأهمية</div>
+      <select class="fsel" id="sr-f-priority" onchange="srRerender()" style="min-width:120px">
+        <option value="">الكل</option>
+        ${priorityOptions.map((p) => `<option value="${esc(p)}" ${fPriority === p ? "selected" : ""}>${esc(p)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="fg" style="flex:1;min-width:200px">
+      <div class="fg-lbl">بحث (مدرسة / اسم المُبلّغ / وصف المشكلة)</div>
+      <input class="finp" id="sr-f-search" type="text" placeholder="بحث…" value="${esc(fSearch)}" oninput="smartSearchRerender(this, srRerender)">
+    </div>
+    <button class="f-clear" onclick="srClearFilters()">✕ مسح الفلاتر</button>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi kc-blue"><div class="kpi-val">${numFmt(totalCount)}</div><div class="kpi-lbl">إجمالي البلاغات</div></div>
+    <div class="kpi kc-red"><div class="kpi-val">${numFmt(urgentCount)}</div><div class="kpi-lbl">بلاغات عاجلة</div></div>
+    <div class="kpi kc-navy"><div class="kpi-val">${numFmt(schoolCount)}</div><div class="kpi-lbl">عدد المدارس المختلفة</div></div>
+    <div class="kpi kc-teal"><div class="kpi-val" style="font-size:15px">${latest && latest.dateObj ? _srFmtDateTimeCompact(latest.dateObj) : "—"}</div><div class="kpi-lbl">آخر بلاغ وارد</div></div>
+  </div>
+
+  <div class="g3 mb14">
+    ${_srBreakdownCard("حسب نوع البلاغ", "reportType", byType, totalCount)}
+    ${_srBreakdownCard("حسب المحافظة", "city", byCity, totalCount)}
+    ${_srBreakdownCard("حسب درجة الأهمية", "priority", byPriority, totalCount)}
+  </div>
+
+  <div class="card mb14" id="sr-table-anchor">
+    <div class="card-title">
+      أحدث البلاغات
+      <span class="sub">${numFmt(totalCount)} بلاغ ضمن الفلاتر الحالية</span>
+      <div style="margin-right:auto">
+        <button class="export-btn export-btn-csv" onclick="exportSrCSV(getSrFiltered())">⬇ CSV</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:420px">
+      <table>
+        <thead><tr>
+          <th>التاريخ والوقت</th>
+          <th>اسم المدرسة</th>
+          <th>الرقم الوزاري</th>
+          <th>المحافظة</th>
+          <th>نوع البلاغ</th>
+          <th>درجة الأهمية</th>
+          <th>اسم المُبلّغ</th>
+          <th>رقم التواصل</th>
+          <th>وصف المشكلة</th>
+        </tr></thead>
+        <tbody id="sr-tbl-body"></tbody>
+      </table>
+    </div>
+    <div class="pag-bar" id="sr-tbl-pag"><span class="pag-info"></span><div class="pag-btns"></div></div>
+  </div>
+  `;
+
+  const srTableCols = [
+    (r) => `<td>${_srFmtDateTimeFull(r.dateObj)}</td>`,
+    (r) => `<td>${esc(r.schoolName || "—")}</td>`,
+    (r) => `<td>${esc(r.ministryId || "—")}</td>`,
+    (r) => `<td>${esc(r.city || "—")}</td>`,
+    (r) => `<td>${esc(r.reportType || "—")}</td>`,
+    (r) => `<td>${_srPriorityBadge(r.priority)}</td>`,
+    (r) => `<td>${esc(r.reporterName || "—")}</td>`,
+    (r) => `<td dir="ltr" style="text-align:right">${esc(r.phone || "—")}</td>`,
+    (r) => `<td style="max-width:280px;white-space:normal" title="${esc(r.description)}">${esc(r.description || "—")}</td>`,
+  ];
+  renderTajheezTable("sr-tbl-body", filteredRows, srTableCols, SCHOOL_REPORTS.pag, "sr-tbl-pag", _srRenderModal);
+}
+
+/* ── محرّك التنبيه الفوري للبلاغات العاجلة (بصري + صوتي)، يعمل طالما
+   الداشبورد مفتوح بأي تبويب داخلي — بناءً على طلب صريح من المستخدم. يعتمد
+   على تتبّع مُعرِّفات البلاغات العاجلة "المُشاهَدة" محليًا (localStorage)
+   عشان ما يكررش نفس التنبيه بعد أي تحديث/إعادة تحميل للصفحة، ولا يُنبِّه
+   عن بلاغات عاجلة كانت موجودة أصلاً قبل أول مرة يُفتح فيها الداشبورد على
+   هذا المتصفح (بيسجّلها كـ"مُشاهَدة" بصمت في أول تحميل فقط). ── */
+function _srRowId(r) {
+  return [r.timestamp, r.schoolName, r.reporterName, (r.description || "").slice(0, 30)].join("|");
+}
+function _srLoadSeenUrgentIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SR_ALERT_SEEN_KEY) || "[]"));
+  } catch (_) {
+    return new Set();
+  }
+}
+function _srSaveSeenUrgentIds(set) {
+  try {
+    localStorage.setItem(SR_ALERT_SEEN_KEY, JSON.stringify(Array.from(set).slice(-1000)));
+  } catch (_) {}
+}
+function _srCheckUrgentAlerts(rows) {
+  const isFirstRun = !localStorage.getItem(SR_ALERT_SEEN_KEY);
+  const seen = _srLoadSeenUrgentIds();
+  const urgentRows = rows.filter((r) => r.priority === "عاجل");
+  if (isFirstRun) {
+    urgentRows.forEach((r) => seen.add(_srRowId(r)));
+    _srSaveSeenUrgentIds(seen);
+    return;
+  }
+  const newUrgent = urgentRows.filter((r) => !seen.has(_srRowId(r)));
+  if (!newUrgent.length) return;
+  newUrgent.forEach((r) => seen.add(_srRowId(r)));
+  _srSaveSeenUrgentIds(seen);
+  _srShowUrgentAlert(newUrgent);
+  _srPlayAlertSound();
+}
+
+function _srEnsureAlertStack() {
+  let stack = document.getElementById("sr-alert-stack");
+  if (!stack) {
+    stack = document.createElement("div");
+    stack.id = "sr-alert-stack";
+    document.body.appendChild(stack);
+  }
+  return stack;
+}
+function _srShowUrgentAlert(newRows) {
+  const stack = _srEnsureAlertStack();
+  newRows.forEach((r) => {
+    const card = document.createElement("div");
+    card.className = "sr-alert-card";
+    card.innerHTML = `
+      <div class="sr-alert-icon">🚨</div>
+      <div class="sr-alert-body">
+        <div class="sr-alert-title">بلاغ عاجل جديد — ${esc(r.schoolName || "مدرسة غير محدَّدة")}</div>
+        <div class="sr-alert-sub">${esc(r.reportType || "")}${r.reportType && r.description ? " — " : ""}${esc((r.description || "").slice(0, 60))}</div>
+      </div>
+      <button class="sr-alert-close" aria-label="إغلاق التنبيه">✕</button>
+    `;
+    card.querySelector(".sr-alert-close").addEventListener("click", (e) => {
+      e.stopPropagation();
+      card.remove();
+    });
+    card.addEventListener("click", () => {
+      openSrModal();
+      srFilterBy("priority", "عاجل");
+      card.remove();
+    });
+    stack.appendChild(card);
+    setTimeout(() => card.remove(), 15000); // إخفاء تلقائي بعد 15 ثانية لو محدش تفاعل معه
+  });
+}
+
+// ── صوت التنبيه: نغمة مولَّدة عبر Web Audio API (بدون أي ملف صوتي خارجي)
+// — المتصفحات بتمنع تشغيل الصوت تلقائيًا قبل أول تفاعل من المستخدم مع
+// الصفحة، فبنجهّز الـ AudioContext من أول ضغطة/لمسة/ضغط زر لوحة مفاتيح ──
+let _srAudioCtx = null;
+function _srUnlockAudio() {
+  if (_srAudioCtx) return;
+  try {
+    _srAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (_) {}
+}
+["click", "keydown", "touchstart"].forEach((evt) => document.addEventListener(evt, _srUnlockAudio, { once: true, passive: true }));
+
+function _srPlayAlertSound() {
+  try {
+    if (!_srAudioCtx) _srUnlockAudio();
+    if (!_srAudioCtx) return;
+    if (_srAudioCtx.state === "suspended") _srAudioCtx.resume();
+    const beepAt = (delay, freq) => {
+      const osc = _srAudioCtx.createOscillator();
+      const gain = _srAudioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t0 = _srAudioCtx.currentTime + delay;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+      osc.connect(gain);
+      gain.connect(_srAudioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.32);
+    };
+    beepAt(0, 880);
+    beepAt(0.35, 880);
+    beepAt(0.7, 1046.5);
+  } catch (e) {
+    console.warn("[school-reports][sound]", e);
+  }
+}
+
+// ── حقن البانر + المودال ديناميكيًا في Portal Home (بدون أي تعديل في
+//    index.html)، فوق بانر "توريد المكيفات" مباشرة لو موجود ──
+function srInit() {
+  try {
+    if (document.getElementById("sr-banner")) return; // منع الحقن المزدوج
+
+    const style = document.createElement("style");
+    style.textContent = `
+      /* ★ 2026-09-28: بناءً على طلب صريح — البانر بقى عنصرًا عائمًا ثابتًا
+         (position:fixed) على مستوى الصفحة كلها بدل ما يكون جزءًا من محتوى
+         تبويب "الرئيسية" فقط. السبب: التبويبات التانية عندها display:none
+         على مستوى الحاوية بالكامل وقت عدم تفعيلها، فأي عنصر بداخلها بيختفي
+         تلقائيًا معاها حتى لو كان هو نفسه position:fixed — فكان البانر
+         بيختفي كل ما المستخدم يفتح أي تبويب غير الرئيسية رغم إن البيانات
+         نفسها بتتحدث في الخلفية كل 30 ثانية بشكل مستقل تمامًا عن أي تبويب.
+         الحل: البانر بقى مُلحَقًا مباشرة بـ body (زي مودال البلاغات ونافذة
+         التنبيهات العاجلة اللي كانوا بالفعل شغالين بنفس الطريقة)، فيفضل
+         ظاهرًا وشغالًا بنفس القيم اللحظية أيًا كان التبويب المفتوح.
+         الشكل اتحوَّل كمان من بانر عريض لـ"حبّة" مدمجة أسفل يمين الشاشة —
+         أول محاولة كانت أعلى يمين الشاشة، لكنها تعارضت فعليًا مع "شريط
+         القسم" (secNav) اللي بيظهر بعرض الصفحة أسفل الشريط العلوي مباشرة
+         في كل التبويبات وبيحجب الضغط على تبويباته. أسفل يمين الشاشة مكان
+         فاضي فعليًا: بعيد عن أيقونة المساعد الذكي وروبوت المساعدة (الاتنين
+         أسفل يسار الشاشة)، وأعلى شوية من فقّاعة تقدُّم النسخة الاحتياطية
+         (لما تكون مصغَّرة) بفاصل كافٍ يمنع أي تداخل بينهم. */
+      #sr-banner {
+        display:flex; align-items:center; gap:10px; padding:10px 14px;
+        background:linear-gradient(135deg,#ECFEFF,#F0F9FF); border:1px solid #A5F3FC; border-radius:999px;
+        cursor:pointer; position:fixed; bottom:96px; right:16px; z-index:9500;
+        max-width:min(280px,calc(100vw - 32px)); overflow:hidden;
+        box-shadow:0 10px 26px rgba(8,60,80,.22); transition:transform .15s,box-shadow .15s;
+      }
+      #sr-banner:hover { transform:translateY(-2px); box-shadow:0 14px 32px rgba(8,60,80,.28); }
+      #sr-banner:active { transform:translateY(-1px); }
+      @media (max-width:640px) {
+        #sr-banner { bottom:82px; right:12px; }
+      }
+      #sr-banner.sr-has-urgent {
+        background:linear-gradient(135deg,#FEF2F2,#FEE2E2); border-color:#FCA5A5; animation:sr-pulse 1.8s infinite;
+      }
+      #sr-banner.sr-has-urgent #sr-banner-icon-wrap { background:#FECACA; }
+      #sr-banner.sr-has-urgent #sr-banner-title { color:#991B1B; }
+      #sr-banner.sr-has-urgent #sr-banner-badge { color:#991B1B; font-weight:800; }
+      #sr-banner.sr-has-urgent #sr-banner-sub { color:#B91C1C; }
+      #sr-banner.sr-has-urgent #sr-banner-badge-pill { background:linear-gradient(135deg,#DC2626,#B91C1C); }
+      @keyframes sr-pulse {
+        0% { box-shadow:0 0 0 0 rgba(220,38,38,.35); }
+        70% { box-shadow:0 0 0 10px rgba(220,38,38,0); }
+        100% { box-shadow:0 0 0 0 rgba(220,38,38,0); }
+      }
+      #sr-banner-icon-wrap { width:34px; height:34px; border-radius:10px; background:#CFFAFE; display:flex; align-items:center; justify-content:center; flex:none; transition:background .2s; }
+      #sr-banner-icon { font-size:17px; line-height:1; }
+      #sr-banner-text { flex:1; min-width:0; }
+      #sr-banner-title-row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+      #sr-banner-title { font-weight:800; font-size:12px; color:#0E7490; letter-spacing:-.005em; transition:color .2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+      #sr-banner-badge-pill {
+        display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800;
+        background:linear-gradient(135deg,#0891B2,#0E7490); color:#fff; padding:2px 8px; border-radius:99px; transition:background .2s; flex:none;
+      }
+      #sr-banner-live-dot { width:6px; height:6px; border-radius:50%; background:#A7F3D0; animation:sr-live 1.6s infinite; }
+      @keyframes sr-live { 0%{box-shadow:0 0 0 0 rgba(167,243,208,.6);} 70%{box-shadow:0 0 0 5px rgba(167,243,208,0);} 100%{box-shadow:0 0 0 0 rgba(167,243,208,0);} }
+      #sr-banner-badge { font-size:11px; font-weight:600; color:#155E75; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .2s; }
+      /* الجملة التعريفية الطويلة مالهاش لازمة في الشكل المدمج (الحبّة) —
+         العنوان + الشارة كافيين، والتفاصيل الكاملة داخل المودال أصلًا. */
+      #sr-banner-sub { display:none; }
+      #sr-banner-arrow-wrap { display:none; }
+
+      #sr-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:9999; align-items:center; justify-content:center; padding:20px; }
+      #sr-overlay.sr-open { display:flex; }
+      #sr-modal { background:#fff; border-radius:16px; max-width:1100px; width:100%; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
+      #sr-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #E5E7EB; }
+      #sr-modal-title { font-weight:800; font-size:16px; display:flex; align-items:center; gap:10px; }
+      #sr-modal-close { border:none; background:#F1F5F9; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; }
+      #sr-modal-body { padding:18px 20px; overflow:auto; }
+
+      #sr-alert-stack { position:fixed; top:16px; inset-inline-end:16px; z-index:10000; display:flex; flex-direction:column; gap:10px; max-width:340px; }
+      .sr-alert-card {
+        display:flex; align-items:flex-start; gap:10px; background:#fff; border:1px solid #FCA5A5; border-inline-start:4px solid #DC2626;
+        border-radius:12px; padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,.15); cursor:pointer; animation:sr-alert-in .25s ease-out;
+      }
+      @keyframes sr-alert-in { from{opacity:0;transform:translateY(-8px);} to{opacity:1;transform:translateY(0);} }
+      .sr-alert-icon { font-size:20px; line-height:1; }
+      .sr-alert-body { flex:1; min-width:0; }
+      .sr-alert-title { font-weight:800; font-size:12.5px; color:#991B1B; }
+      .sr-alert-sub { font-size:11px; color:#7F1D1D; margin-top:2px; opacity:.85; }
+      .sr-alert-close { border:none; background:transparent; color:#9CA3AF; cursor:pointer; font-size:12px; }
+    `;
+    document.head.appendChild(style);
+
+    const banner = document.createElement("div");
+    banner.id = "sr-banner";
+    banner.setAttribute("onclick", "openSrModal()");
+    banner.innerHTML = `
+      <div id="sr-banner-icon-wrap"><div id="sr-banner-icon">📋</div></div>
+      <div id="sr-banner-text">
+        <div id="sr-banner-title-row">
+          <span id="sr-banner-title">بلاغات المدارس المباشرة</span>
+          <span id="sr-banner-badge-pill"><span id="sr-banner-live-dot"></span>مباشر</span>
+        </div>
+        <div id="sr-banner-badge">جاري التحميل…</div>
+        <div id="sr-banner-sub">بلاغات واردة مباشرة من نموذج Google الخاص بالمدارس</div>
+      </div>
+      <div id="sr-banner-arrow-wrap"><span id="sr-banner-arrow">‹</span></div>
+    `;
+
+    const overlay = document.createElement("div");
+    overlay.id = "sr-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.innerHTML = `
+      <div id="sr-modal">
+        <div id="sr-modal-head">
+          <div id="sr-modal-title"><span>📋</span> بلاغات المدارس المباشرة</div>
+          <button id="sr-modal-close" onclick="closeSrModal()">✕</button>
+        </div>
+        <div id="sr-modal-body"></div>
+      </div>
+    `;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeSrModal();
+    });
+
+    // ★ 2026-09-28: البانر بقى مُلحَقًا مباشرة بـ body (مش داخل تبويب
+    // "الرئيسية" زي الأول) عشان يفضل ظاهرًا وشغالًا في كل التبويبات، بنفس
+    // فكرة إلحاق المودال (overlay) ونافذة التنبيهات العاجلة أدناه.
+    document.body.appendChild(banner);
+    document.body.appendChild(overlay);
+
+    loadSchoolReportsData(false);
+  } catch (e) {
+    console.warn("[school-reports][init]", e);
+  }
+}
+/* ══════════════════════════════════ نهاية قسم بلاغات المدارس المباشرة ══════════════════════════════════ */
 
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -27409,12 +28226,35 @@ ${(() => {
    تنزيل التبويب الحالي بالكامل (رسومات بيانية + جداول) كصورة أو PDF
    Download the current active tab (charts + tables) as PNG or PDF
 ════════════════════════════════════════════════════════════════════ */
+// ★ 2026-09-28: تبويبات كبيرة (آلاف السجلات) ليها نظام صفحات خاص بها،
+// مش عبر renderTajheezTable المشترك — عشان الطباعة/التنزيل تشمل كل
+// السجلات فعليًا (مش الصفحة الحالية المعروضة بس)، لازم نوسّع حالة
+// الصفحات دي مؤقتًا، نعيد الرسم، ننسخ، وبعدين نرجّعها زي ما كانت بالظبط.
+var __PRINT_EXPAND_TABS__ = {
+  "tab-balagh": { stateKey: "__BALAGH_STATE__", renderFn: "renderBalaghTab" },
+  "tab-security-safety": { stateKey: "__SEC_BALAGH_STATE__", renderFn: "renderSecuritySafetyTab" },
+  "tab-new-sla": { stateKey: "__NEW_SLA_STATE__", renderFn: "renderNewSlaTab" },
+};
+
 function downloadCurrentTab() {
   var panel = document.querySelector(".panel.active");
   if (!panel) {
     if (typeof showToast === "function") showToast("تعذّر تحديد التبويب الحالي", "warn");
     else alert("تعذّر تحديد التبويب الحالي");
     return;
+  }
+
+  // وسّع مؤقتًا حالة الصفحات لو التبويب الحالي من التبويبات الكبيرة أعلاه،
+  // عشان الجدول يترسم بكل صفوفه على الشاشة الحية لحظيًا قبل النسخ — وهنرجّعه
+  // زي ما كان فور ما نلقط نسخة الطباعة (تحت، بعد panelHTML مباشرة).
+  var __expandCfg = __PRINT_EXPAND_TABS__[panel.id];
+  var __expandSaved = null;
+  if (__expandCfg && window[__expandCfg.stateKey] && typeof window[__expandCfg.renderFn] === "function") {
+    var __st = window[__expandCfg.stateKey];
+    __expandSaved = { ref: __st, page: __st.page, size: __st.size };
+    __st.page = 0;
+    __st.size = 1000000; // كبير كفاية عشان كل السجلات تتعرض في "صفحة" واحدة وقت الطباعة فقط
+    window[__expandCfg.renderFn]();
   }
 
   var btn = document.getElementById("btnDownloadTab");
@@ -27482,6 +28322,33 @@ function downloadCurrentTab() {
   }
   var clone = panel.cloneNode(true);
   clone.style.cssText = "display:block!important;position:static!important;max-height:none!important;overflow:visible!important;";
+
+  // ★ 2026-09-28: أي جدول اتبنى عبر renderTajheezTable المشترك (توريد
+  // المكيفات، بلاغات المدارس المباشرة، جداول التجهيزات...الخ) بيترسم على
+  // الشاشة بصفحة واحدة بس (25 صف افتراضيًا) — هنا بنوسّعه في النسخة
+  // المُستنسخة فقط (مش الشاشة الحية) عشان يطبع/يتنزّل بكل صفوفه من أولها
+  // لآخرها، ونظبط شريط الصفحات في النسخة يوضّح إن كل الصفوف ظاهرة.
+  Object.keys(window.__PRINT_TABLE_REGISTRY__ || {}).forEach(function (tid) {
+    var body = clone.querySelector("#" + tid);
+    var entry = window.__PRINT_TABLE_REGISTRY__[tid];
+    if (!body || !entry) return;
+    var frag = document.createDocumentFragment();
+    entry.rows.forEach(function (row, i) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = entry.cols.map(function (c) { return c(row, i); }).join("");
+      frag.appendChild(tr);
+    });
+    body.innerHTML = "";
+    body.appendChild(frag);
+    var pagBar = entry.pagBarId ? clone.querySelector("#" + entry.pagBarId) : null;
+    if (pagBar) {
+      var info = pagBar.querySelector(".pag-info");
+      var btns = pagBar.querySelector(".pag-btns");
+      if (info) info.textContent = "كل الصفوف (" + entry.rows.length.toLocaleString() + ")";
+      if (btns) btns.innerHTML = "";
+    }
+  });
+
   wrapper.appendChild(clone);
 
   wrapper.querySelectorAll("*").forEach(function(el){
@@ -27505,8 +28372,17 @@ function downloadCurrentTab() {
   var panelHTML = wrapper.innerHTML;
   var googleFonts = '<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">';
 
+  // رجّع حالة الصفحات في الشاشة الحية زي ما كانت بالظبط فور ما خلّصنا لقط
+  // النسخة المطلوبة للطباعة (panelHTML فوق بقى نص ثابت، مش هيتأثر بأي حاجة
+  // بعد كده) — المستخدم هيرجع يلاقي نفس الصفحة اللي كان واقف عندها بالظبط.
+  if (__expandSaved) {
+    __expandSaved.ref.page = __expandSaved.page;
+    __expandSaved.ref.size = __expandSaved.size;
+    window[__expandCfg.renderFn]();
+  }
+
   // 4. افتح نافذة طباعة
-  var pw = window.open("", "_blank", "width=1400,height=900");
+  var pw = window.open("", "_blank", "width=1400,height=900,resizable=yes,scrollbars=yes");
   if (!pw) {
     if (typeof showToast === "function") showToast("يرجى السماح بفتح النوافذ المنبثقة ثم المحاولة مجددًا", "warn");
     finish();
@@ -27551,11 +28427,39 @@ ${cssStyles}
     }
     body { padding: 0; }
     @page { margin: 10mm; size: A3 landscape; }
-    .card, .kpi-card, canvas, img, table, tr,
-    .chart-wrap, .chart-container, .tbl-wrap {
+
+    /* منع أي بطاقة أو جدول أو رسم أو صورة من الانقسام بين صفحتين، طالما
+       مساحتها بتسمح بكده (أسماء الأصناف هنا مطابقة للأصناف الفعلية
+       المستخدمة في الداشبورد: .kpi و.chart-box، وليس .kpi-card/.chart-wrap
+       اللي مش موجودة أصلًا). */
+    .card, .kpi, canvas, img, .chart-box, .tbl-wrap {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
     }
+
+    /* overflow:hidden على .card بيخلّي محرّك طباعة المتصفح يتجاهل
+       break-inside:avoid لو البطاقة طالت عن صفحة واحدة — بنشيله وقت
+       الطباعة فقط، من غير ما يأثر على شكل الداشبورد العادي على الشاشة. */
+    .card { overflow: visible !important; }
+
+    /* الإصلاح الأساسي المطلوب: عنوان الكارت/الجدول يفضل ملتصق بأول جزء
+       من محتواه، وميتقلّش لوحده لصفحة تانية تارك الجدول في الصفحة اللي
+       قبلها (أو العكس). */
+    .card-title, thead, thead tr {
+      break-after: avoid !important;
+      page-break-after: avoid !important;
+    }
+    .tbl-wrap, table, tbody tr:first-child {
+      break-before: avoid !important;
+      page-break-before: avoid !important;
+    }
+
+    /* لو جدول امتد لأكتر من صفحة رغم كل ما سبق، عنوان الأعمدة (thead)
+       يتكرر تلقائيًا أعلى كل صفحة جديدة بدل ما يفضل في الصفحة الأولى بس،
+       وكل صف بياناته منفصلة عن غيره عشان ما ينقسمش نصف صف بين صفحتين. */
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr, td, th { break-inside: avoid !important; page-break-inside: avoid !important; }
   }
 </style>
 </head>
@@ -41556,6 +42460,18 @@ if (document.readyState === "loading") {
 }
 setTimeout(mokInit, 1200);
 /* ══ نهاية القسم المؤقت (توريد المكيفات) ══ */
+
+/* ══ تفعيل بانر/مودال "بلاغات المدارس المباشرة" — نفس نمط تشغيل قسم
+   المكيفات أعلاه بالضبط، لكن بعده مباشرة في كل نقطة تشغيل عشان بانر
+   بلاغات المدارس يضمن ظهوره فوق بانر المكيفات دائمًا (راجع srInit،
+   اللي بيحط نفسه قبل #mok-banner لو موجود). ══ */
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", srInit);
+} else {
+  srInit();
+}
+setTimeout(srInit, 1300);
+/* ══ نهاية تفعيل قسم بلاغات المدارس المباشرة ══ */
 
 /* ══════════════════════════════════════════════════════════════════════════
    Portal Home v4 — تحسينات الواجهة الرئيسية (★ 2026-09-26، طلب صريح: "أحدث

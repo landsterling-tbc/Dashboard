@@ -2431,19 +2431,15 @@
     <div style="width:1px;height:20px;background:rgba(255,255,255,.1)"></div>
     <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC"
          style="height:36px;filter:brightness(0) invert(1);opacity:.94;display:block" data-evt="102">
-  </div>
-  <div style="display:flex;align-items:center;gap:10px">
-    <!-- زر نسخة احتياطية كاملة — مقصود إخفاؤه بالكامل (شفافية صفر، بدون
-         عنوان/تلميح، بدون أي أثر عند مرور الماوس). الضغط عليه يفتح قائمة
-         صغيرة فيها "تحميل الآن" أو جدولة تحميل تلقائي يومي في وقت مُحدَّد.
-         ملحوظة: الزر متعمّد وضعه قبل الجملة (بعيدًا عن حافة الشاشة) عشان
-         لا يقع تحت أيقونة مساعد الذكاء الاصطناعي العائمة. -->
+    <!-- زر نسخة احتياطية كاملة — بطلب صريح: مُخفي تمامًا (opacity:0،
+         بدون أي title يظهر عند المرور بالماوس) وموضوع هنا داخل مجموعة
+         الشعارين نفسها، عمدًا بعيدًا عن أيقونة المساعد الذكي العائمة أسفل
+         يسار الشاشة (كانت بتغطي الزر لما كان على الطرف التاني من البار).
+         الضغط عليه يفتح قائمة صغيرة فيها "تنزيل الآن" أو جدولة تحميل
+         تلقائي يومي في وقت مُحدَّد — نفس المنطق القديم بدون أي تغيير. -->
     <button type="button" id="fullBackupBtn" onclick="window.__openBackupMenu(event)"
-      style="width:14px;height:14px;padding:0;border:none;background:transparent;
-        opacity:0;cursor:pointer;display:flex;align-items:center;justify-content:center">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    </button>
+      style="width:28px;height:28px;padding:0;margin:0;border:none;background:transparent;
+        opacity:0;cursor:pointer;flex-shrink:0"></button>
   </div>
 </footer>
 

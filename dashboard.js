@@ -1776,8 +1776,13 @@ function makeDoughnut(id, dataMap, colorMap = {}) {
     plugins: [centerPlugin],
   });
 }
-function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) {
-  if (chartUnchanged(id, ["hbar", labels, values, colors, maxVal, fullLabels])) return; // Task 2
+function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null, pctValues = null) {
+  // ★ 2026-09-30 (بناءً على طلب صريح): pctValues باراميتر اختياري جديد في
+  // الآخر — لو اتبعت (مصفوفة نسب %، بنفس ترتيب/طول values)، بتتضاف كـ "(س%)"
+  // جنب الرقم في الـ tooltip بس، من غير ما تغيّر شكل الأعمدة نفسها ولا
+  // تأثّر على أي استدعاء تاني لـ makeHBar في الملف (كلهم من غير الباراميتر
+  // ده فبيشتغلوا زي ما هم بالظبط — تراجعي بالكامل).
+  if (chartUnchanged(id, ["hbar", labels, values, colors, maxVal, fullLabels, pctValues])) return; // Task 2
   // نتحقق من البيانات أولاً — لا نحذف الشارت القديم إلا لو فيه داتا جديدة
   const safeValues = Array.isArray(values) ? values.filter((v) => v != null && v !== "") : [];
   const safeLabels = Array.isArray(labels) ? labels : [];
@@ -1819,7 +1824,11 @@ function makeHBar(id, labels, values, colors, maxVal = null, fullLabels = null) 
           mode: "nearest", intersect: true,
           callbacks: {
             title: (ctx) => String(tooltipLabels[ctx[0].dataIndex] ?? ctx[0].label ?? "") || "—",
-            label: (ctx) => `  ${maxVal ? ctx.raw + "%" : Number(ctx.raw).toLocaleString("ar")}`,
+            label: (ctx) => {
+              const base = maxVal ? ctx.raw + "%" : Number(ctx.raw).toLocaleString("ar");
+              const p = Array.isArray(pctValues) ? pctValues[ctx.dataIndex] : null;
+              return `  ${base}${p != null ? ` (${p}%)` : ""}`;
+            },
           },
         },
       },
@@ -8602,7 +8611,7 @@ function renderNewSlaTab() {
     <div class="card mb14">
       <div class="card-title">
         <span>نظرة عامة — P1 إلى P4</span>
-        <span class="sub">${fmt2(totalP1to4)} بلاغ مطابق · ${fmt2(p5Total)} ضمن P5 · ${fmt2(unclassifiedTotal)} غير مصنّفة</span>
+        <span class="sub"></span>
       </div>
       <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
         <div class="kpi kc-amber">
@@ -8652,11 +8661,22 @@ function renderNewSlaTab() {
     <div class="card mb14">
       <div class="card-title">التوزيع حسب الأولوية الجديدة (P1-P4)</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;padding:6px 0">
-        ${priorityStats.map((p) => `
+        ${priorityStats.map((p) => {
+          // ★ 2026-09-30 (بناءً على طلب صريح): شيلنا شارة "نسبة الالتزام"
+          // من هيدر الكارت لأنها بالفعل مذكورة تحت جمب "ملتزم"، وبدلها
+          // بنعرض هنا نسبة عدد بلاغات الأولوية دي من إجمالي P1-P4
+          // (حصة الأولوية من الإجمالي، مش نسبة التزام)
+          const pEvaluated2 = p.compliant + p.breach;
+          const hasPct = pEvaluated2 > 0;
+          const shareOfTotal = totalP1to4 ? pct2(p.total, totalP1to4) : "0.0";
+          return `
           <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
               <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${p.priority}${p.hoursTarget != null ? ` <span style="font-size:11px;font-weight:600;color:var(--tx-muted)">(الهدف ${p.hoursTarget} ساعة)</span>` : ""}</span>
-              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(p.total)} بلاغ</span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:11px;font-weight:800;color:var(--tx-muted);background:#F3F4F6;border-radius:999px;padding:2px 8px" title="نسبة عدد بلاغات هذه الأولوية من إجمالي بلاغات P1-P4">${shareOfTotal}% من الإجمالي</span>
+                <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(p.total)} بلاغ</span>
+              </span>
             </div>
             <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
               <div style="height:100%;width:${(p.total / maxPriorityTotal) * 100}%;background:#0891B2;border-radius:5px"></div>
@@ -8664,18 +8684,19 @@ function renderNewSlaTab() {
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
                 <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(p.compliant)}</div>
-                <div style="font-size:9px;color:var(--tx-muted)">ملتزم</div>
+                <div style="font-size:9px;color:var(--tx-muted)">ملتزم${hasPct ? ` (${p.compliancePct}%)` : ""}</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
                 <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(p.breach)}</div>
-                <div style="font-size:9px;color:var(--tx-muted)">اختراق</div>
+                <div style="font-size:9px;color:var(--tx-muted)">اختراق${hasPct ? ` (${pct2(p.breach, pEvaluated2)}%)` : ""}</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
                 <div style="font-size:13px;font-weight:800;color:#0891B2">${fmt2(p.pending)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">قيد التنفيذ</div>
               </div>
             </div>
-          </div>`).join("")}
+          </div>`;
+        }).join("")}
       </div>
     </div>
 
@@ -8831,7 +8852,11 @@ function renderNewSlaTab() {
       const nonZero = categoryStats.filter((c) => c.total > 0);
       const dataEntries = (nonZero.length ? nonZero : categoryStats).slice(0, 20);
       const colors = dataEntries.map((_, i) => PAL[i % PAL.length] + "DD");
-      makeHBar("ch-newsla-category", dataEntries.map((c) => c.category), dataEntries.map((c) => c.total), colors);
+      // ★ 2026-09-30 (بناءً على طلب صريح): نسبة كل فئة من إجمالي P1-P4
+      // المطابقة (نفس أساس نسبة الالتزام العامة فوق) — بتظهر في الـ
+      // tooltip جنب العدد الخام، من غير ما تغيّر ترتيب/ارتفاع الأعمدة
+      const pctValues = dataEntries.map((c) => (totalP1to4 ? pct2(c.total, totalP1to4) : "0.0"));
+      makeHBar("ch-newsla-category", dataEntries.map((c) => c.category), dataEntries.map((c) => c.total), colors, null, null, pctValues);
     }
 
     if (document.getElementById("ch-newsla-status")) {

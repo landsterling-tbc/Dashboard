@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظرة عامة — منصة إدارة المرافق التعليمية</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     ★ 2026-09-29: بناءً على طلب صريح — صفحة "نظرة عامة" عامة، ملف HTML
+     مستقل تمامًا (يُنشر بشكل منفصل على GitHub Pages مثلًا)، بدون أي بوابة
+     دخول أو كلمة مرور، هدفها إتاحة أرقام إجمالية/ملخّصة (KPIs) لكل
+     الموظفين والمناطق. التصميم هنا مقصود ومطابق عمدًا لنفس هوية الداشبورد
+     الرئيسي (نفس متغيرات الألوان من dashboard.css: --navy/--teal/--brass،
+     نفس الشريط العلوي الداكن باللوجوهات، نفس شكل الكروت البيضاء بالشريط
+     العلوي الملوّن) — بس بملف واحد مستقل بدون أي اعتماد على dashboard.css
+     نفسه (لأنه هيتفتح من مكان استضافة مختلف تمامًا). تعمّدنا استبعاد أي
+     بيانات مالية أو حساسة (تكلفة/رواتب/تفاصيل فردية) والاكتفاء بأرقام
+     إجمالية بسيطة ومضمونة الدقة (بنفس منطق التصنيف المستخدم في الداشبورد
+     الرئيسي حيث أمكن، مثل تصنيف "البلاغات المغلقة") — بدل محاولة إعادة
+     بناء حسابات معقّدة (زي نسبة الالتزام بـ SLA) قد تُحمَّل بشكل غير دقيق
+     هنا.
+     ══════════════════════════════════════════════════════════════════ */
+  :root {
+    /* نفس متغيرات الألوان الأساسية من dashboard.css بالضبط */
+    --navy: #0d2f40;
+    --teal: #0d849c;
+    --teal-2: #16a4bf;
+    --teal-3: #0b6b7e;
+    --brass: #b08a4e;
+    --brass-2: #d4af6a;
+    --red: #7d1f2c;
+    --good: #066a52;
+    --bg: #eef3f7;
+    --tx-main: #0c2330;
+    --tx-sec: #2c5468;
+    --tx-faint: #6e8fa0;
+    --bd-light: #dbe7ee;
+    --r-lg: 18px;
+    --r-2xl: 26px;
+    --r-pill: 999px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    color: var(--tx-main);
+    font-family: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
+    background:
+      radial-gradient(1000px 500px at 95% -8%, rgba(13,132,156,.07), transparent 50%),
+      radial-gradient(800px 450px at -5% 105%, rgba(176,138,78,.05), transparent 48%),
+      linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%);
+  }
+
+  /* ── الشريط العلوي الداكن — نفس تصميم .topbar بالضبط في dashboard.css ── */
+  .topbar {
+    height: 60px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 200; padding: 0 22px;
+    background: linear-gradient(180deg, rgba(5,18,26,.98) 0%, rgba(7,28,40,.96) 100%);
+    backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 1px 0 rgba(255,255,255,.05), 0 8px 24px rgba(3,12,18,.28);
+    position: relative;
+  }
+  .topbar::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
+    background: linear-gradient(to left, transparent 0%, var(--teal-3) 14%, var(--teal) 28%,
+      rgba(255,255,255,.08) 46%, rgba(255,255,255,.08) 54%, var(--brass) 70%, var(--teal-2) 88%, transparent 100%);
+    opacity: .9;
+  }
+  .tb-brand { display: flex; align-items: center; gap: 14px; }
+  .tb-brand img { height: 21px; filter: brightness(0) invert(1); opacity: .94; display: block; }
+  .tb-divider { width: 1px; height: 20px; background: rgba(255,255,255,.1); }
+  .tb-title { font-size: 13px; font-weight: 700; color: #fff; }
+  .tb-right { display: flex; align-items: center; gap: 12px; }
+  .tb-meta { font-size: 10px; color: rgba(255,255,255,.4); font-weight: 500; }
+  .tb-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 9px;
+    background: rgba(13,132,156,.18); color: var(--teal-2); border: 1px solid rgba(22,164,191,.35);
+    font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: .15s;
+  }
+  .tb-btn:hover { background: rgba(13,132,156,.3); }
+  .tb-btn[disabled] { opacity: .55; cursor: default; }
+  .tb-btn .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ★ 2026-09-29 (توسعة ثالثة — بناءً على طلب صريح "تنظيم أكتر"): شريط
+     تنقّل سريع لاصق تحت الشريط العلوي — الصفحة بقت طويلة (أكتر من 15
+     قسم)، فده بيدّي المستخدم قفزة مباشرة لأي قسم من غير سكرول يدوي طويل. */
+  .quicknav {
+    position: sticky; top: 60px; z-index: 190;
+    background: rgba(238,243,247,.94); backdrop-filter: blur(10px) saturate(140%);
+    border-bottom: 1px solid var(--bd-light);
+    display: flex; gap: 6px; overflow-x: auto; padding: 9px 20px;
+    scrollbar-width: thin;
+  }
+  .quicknav::-webkit-scrollbar { height: 5px; }
+  .quicknav::-webkit-scrollbar-thumb { background: var(--bd-light); border-radius: var(--r-pill); }
+  .qn-link {
+    flex: none; font-size: 11.5px; font-weight: 700; color: var(--tx-sec); text-decoration: none;
+    padding: 6px 12px; border-radius: var(--r-pill); background: rgba(255,255,255,.8);
+    border: 1px solid var(--bd-light); white-space: nowrap; transition: .15s;
+  }
+  .qn-link:hover { background: #fff; color: var(--teal-3); border-color: var(--teal-2); }
+  .qn-sep { flex: none; width: 1px; align-self: stretch; background: var(--bd-light); margin: 2px 4px; }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 26px 20px 48px; }
+  /* أي قسم بيتقفز له من شريط التنقّل — نعوّض ارتفاع الشريطين اللاصقين
+     (العلوي + التنقّل) عشان العنوان ميختفيش تحتهم بعد القفزة */
+  .section-label { scroll-margin-top: 108px; }
+  .page-title { font-size: 21px; font-weight: 800; margin: 0 0 20px; color: var(--tx-main); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+
+  /* ── الكارت — نفس تصميم .card بالضبط في dashboard.css (خلفية بيضاء +
+     شريط علوي متدرّج تيل⟶برونزي + ظل ناعم) ── */
+  .card {
+    background: rgba(255,255,255,.97); border: 1px solid var(--bd-light); border-radius: var(--r-2xl);
+    padding: 20px 22px; position: relative; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(8,45,60,.04), 0 4px 14px rgba(8,45,60,.07), inset 0 1px 0 rgba(255,255,255,.8);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    background: linear-gradient(90deg, var(--teal-3), var(--teal-2) 55%, var(--brass-2));
+    opacity: .85;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(8,45,60,.06), 0 10px 28px rgba(8,45,60,.11); }
+  .card-icon {
+    width: 34px; height: 34px; border-radius: 11px; background: rgba(13,132,156,.1);
+    display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+  }
+  .card.is-alert .card-icon { background: rgba(125,31,44,.1); }
+  /* ── تنبيه بصري واضح (نبض أحمر) لكارت بلاغات المدارس المباشرة عند وجود
+     بلاغ عاجل واحد على الأقل — بنفس فكرة كلاس sr-has-urgent في الداشبورد
+     الرئيسي (dashboard.js)، بس مطبَّقة هنا على الكارت كله ── */
+  .card.has-urgent {
+    border-color: #FCA5A5;
+    animation: card-urgent-pulse 1.8s infinite;
+  }
+  .card.has-urgent::before { background: linear-gradient(90deg, #DC2626, #B91C1C); opacity: 1; }
+  .card.has-urgent .card-icon { background: rgba(220,38,38,.14); }
+  @keyframes card-urgent-pulse {
+    0%   { box-shadow: 0 1px 2px rgba(8,45,60,.04), 0 4px 14px rgba(8,45,60,.07), inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 0 rgba(220,38,38,.35); }
+    70%  { box-shadow: 0 1px 2px rgba(8,45,60,.04), 0 4px 14px rgba(8,45,60,.07), inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 10px rgba(220,38,38,0); }
+    100% { box-shadow: 0 1px 2px rgba(8,45,60,.04), 0 4px 14px rgba(8,45,60,.07), inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 0 rgba(220,38,38,0); }
+  }
+  .card-value { font-size: 27px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.15; color: var(--tx-main); }
+  .card-value.is-loading { color: var(--tx-faint); font-size: 14px; font-weight: 600; }
+  .card-label { font-size: 12px; color: var(--tx-sec); margin-top: 6px; font-weight: 700; }
+  .card-note { font-size: 10.5px; color: var(--tx-faint); margin-top: 6px; }
+  .card-note.is-error { color: var(--red); }
+  /* ★ 2026-09-29 (توسعة ثالثة): حالة "بيانات من الكاش المحلي وبيتحدّث دلوقتي
+     في الخلفية" — مختلفة بصريًا عن حالة الخطأ الفعلي (لونها محايد/أزرق
+     مش أحمر) عشان المستخدم يفهم إنها مش مشكلة، هي بس بتنتظر نسخة أحدث. */
+  .card-note.is-info { color: var(--teal-3); }
+  .card-sub-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: var(--r-pill); background: #eef5f8; color: var(--tx-sec);
+  }
+  .pill.is-urgent { background: #fdf0f2; color: var(--red); }
+  .pill.is-good { background: #edfaf5; color: var(--good); }
+
+  .section-label {
+    font-size: 11px; font-weight: 800; color: var(--tx-faint); letter-spacing: .04em;
+    text-transform: uppercase; margin: 32px 0 12px;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* ── دليل الأنظمة الرقمية — بلاطات تعريفية ثابتة، بدون أي بيانات حيّة ── */
+  .systems-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .sys-chip {
+    background: rgba(255,255,255,.97); border: 1px solid var(--bd-light); border-radius: var(--r-pill);
+    padding: 9px 16px; font-size: 12px; font-weight: 700; color: var(--tx-sec);
+    box-shadow: 0 1px 2px rgba(8,45,60,.04);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     ★ 2026-09-29: بناءً على طلب صريح — تحليلات بصرية بسيطة (دونَت +
+     أعمدة توزيع)، مبنية بـ CSS بحت (conic-gradient) من غير أي مكتبة
+     خارجية (زي Chart.js) — عشان الصفحة تفضل ملف واحد مستقل تمامًا بدون
+     أي اعتماد على شبكة خارجية غير مصادر البيانات نفسها. ══════════════
+  */
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .chart-card { display: flex; align-items: center; gap: 18px; }
+  .chart-card.is-wide { flex-direction: column; align-items: stretch; }
+  .donut-wrap { position: relative; width: 96px; height: 96px; flex: none; }
+  .donut { width: 96px; height: 96px; border-radius: 50%; background: conic-gradient(var(--bd-light) 0 100%); }
+  .donut::after {
+    content: ""; position: absolute; inset: 15px; background: #fff; border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(8,45,60,.04);
+  }
+  .donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .donut-center .dc-val { font-size: 17px; font-weight: 800; color: var(--tx-main); line-height: 1; }
+  .donut-center .dc-lbl { font-size: 8.5px; color: var(--tx-faint); font-weight: 700; margin-top: 2px; }
+  .chart-body { flex: 1; min-width: 0; }
+  .chart-title { font-size: 12.5px; font-weight: 800; color: var(--tx-main); margin-bottom: 10px; }
+  .chart-subtitle { font-size: 10.5px; font-weight: 700; color: var(--tx-faint); margin-inline-start: 8px; }
+  .legend { display: flex; flex-direction: column; gap: 7px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--tx-sec); }
+  .legend-item i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .legend-item b { color: var(--tx-main); font-weight: 800; margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+  .bars { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label { font-size: 11.5px; color: var(--tx-sec); width: 110px; flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; height: 9px; border-radius: var(--r-pill); background: var(--bg); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: var(--r-pill); background: linear-gradient(90deg, var(--teal-3), var(--teal-2)); }
+  .bar-val { font-size: 11.5px; font-weight: 800; color: var(--tx-main); width: 40px; flex: none; text-align: left; font-variant-numeric: tabular-nums; }
+
+  /* ★ 2026-09-29 (توسعة رابعة): شارت أعمدة زمني (Trend) — لبيانات "بالشهر"
+     تحديدًا (12 نقطة زمنية متتالية)، بدل قائمة الأعمدة الأفقية العادية
+     (chart-bars) المستخدمة للتوزيعات الفئوية (حسب المنطقة/المدينة). عمود
+     رأسي بقاعدة واحدة وخط أساس واضح أنسب بصريًا لقراءة "اتجاه عبر الوقت"
+     — بنفس تدرج اللون التركوازي المستخدم في باقي الصفحة (لون واحد Sequential،
+     مش فئوي) ووسم قيمة انتقائي بس على أعلى نقطة وآخر نقطة (مش كل نقطة) */
+  .trend-chart {
+    display: flex; align-items: flex-end; gap: 5px;
+    height: 150px; padding: 0 2px;
+    border-bottom: 1px solid var(--bd-light);
+  }
+  .trend-col {
+    flex: 1; min-width: 0; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    gap: 4px;
+  }
+  .trend-val {
+    font-size: 10px; font-weight: 800; color: var(--tx-main);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .trend-bar {
+    width: 100%; max-width: 22px; min-height: 3px;
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, var(--teal-2), var(--teal-3));
+  }
+  .trend-col.is-peak .trend-bar { background: linear-gradient(180deg, var(--brass), var(--brass-2)); }
+  .trend-labels { display: flex; gap: 5px; padding: 0 2px; margin-top: 8px; }
+  .trend-lbl {
+    flex: 1; min-width: 0; text-align: center;
+    font-size: 10px; color: var(--tx-faint); font-weight: 700;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  @media (max-width: 560px) {
+    .topbar { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 8px; }
+    .page-title { font-size: 18px; }
+    .chart-card { flex-direction: column; align-items: stretch; }
+    .trend-lbl { font-size: 8.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-brand">
+    <img src="https://landsterling.sa/wp-content/uploads/2024/08/LS-Logo-White-English.png" alt="Land Sterling">
+    <div class="tb-divider"></div>
+    <img src="https://tbc.sa/Portals/0/tbcnew-01.svg?ver=2019-08-07-114519-183" alt="TBC" style="height:34px">
+    <div>
+      <div class="tb-title">منصة إدارة المرافق التعليمية</div>
+    </div>
+  </div>
+  <div class="tb-right">
+    <span class="tb-meta">آخر تحديث: <span id="lastUpdated">—</span></span>
+    <button type="button" class="tb-btn" id="refreshBtn" onclick="window.__ovLoadAll()">
+      <span id="refreshIcon">↻</span> تحديث الآن
+    </button>
+  </div>
+</div>
+
+<!-- ★ 2026-09-29 (توسعة ثالثة — بناءً على طلب صريح "تنظيم أكتر"): شريط
+     تنقّل سريع لاصق، مقسَّم بفواصل بصرية لمجموعات منطقية (سلامة/منشآت/
+     صيانة/عمليات وموارد بشرية/تحليلات) — بديل للسكرول اليدوي الطويل. -->
+<div class="quicknav" id="quickNav">
+  <a class="qn-link" href="#sec-balagh">📢 البلاغات</a>
+  <span class="qn-sep"></span>
+  <a class="qn-link" href="#sec-resources">🏢 المنشآت</a>
+  <a class="qn-link" href="#sec-students">🏫 المدارس</a>
+  <a class="qn-link" href="#sec-assessments">📋 التقييمات</a>
+  <a class="qn-link" href="#sec-digital">🖥️ الأنظمة</a>
+  <span class="qn-sep"></span>
+  <a class="qn-link" href="#sec-maintenance">🔧 الصيانة والأصول</a>
+  <a class="qn-link" href="#sec-assets">📦 حصر الأصول</a>
+  <a class="qn-link" href="#sec-ppm">🛠️ PPM Maximo</a>
+  <span class="qn-sep"></span>
+  <a class="qn-link" href="#sec-gatekeepers">🚪 البوابون</a>
+  <a class="qn-link" href="#sec-training">🎓 التدريب</a>
+  <a class="qn-link" href="#sec-fuel">⛽ الوقود</a>
+  <a class="qn-link" href="#sec-correspondence">✉️ المراسلات</a>
+  <a class="qn-link" href="#sec-org">👥 الهيكل الوظيفي</a>
+  <a class="qn-link" href="#sec-visits">🧭 الزيارات</a>
+  <span class="qn-sep"></span>
+  <a class="qn-link" href="#sec-charts">📈 التحليلات</a>
+</div>
+
+<div class="wrap">
+
+  <h1 class="page-title">نظرة عامة</h1>
+
+  <div class="section-label" id="sec-balagh">📢 البلاغات العامة</div>
+  <div class="grid">
+    <div class="card" id="card-balagh-total">
+      <div class="card-icon">📋</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي البلاغات</div>
+      <div class="card-sub-row" data-role="sub"></div>
+      <div class="card-note" data-role="note">⏳ جارٍ التحميل — قد يستغرق حتى دقيقتين (حجم بيانات البلاغات كبير)</div>
+    </div>
+    <div class="card" id="card-balagh-open">
+      <div class="card-icon">🕓</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">البلاغات المفتوحة</div>
+      <div class="card-note" data-role="note">⏳ جارٍ التحميل — قد يستغرق حتى دقيقتين</div>
+    </div>
+    <div class="card" id="card-balagh-closed">
+      <div class="card-icon">✅</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">البلاغات المغلقة</div>
+      <div class="card-note" data-role="note">⏳ جارٍ التحميل — قد يستغرق حتى دقيقتين</div>
+    </div>
+    <div class="card" id="card-sr">
+      <div class="card-icon" data-role="icon">🏫</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">بلاغات المدارس المباشرة</div>
+      <div class="card-sub-row" data-role="sub"></div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على تنبيه صريح من المستخدم — "تصحيحات وتصعيدات
+       الأمن والسلامة" (correctionsEscalations) اتشالت خالص من هنا، لأن
+       المستخدم أكّد إنه مسحها هو نفسه من الداتا الأساسية ومن الداشبورد
+       الرئيسي. اتأكّد بالفحص المباشر: التبويب ده مش موجود لا في شريط
+       التبويبات العلوي (index.html) ولا في PORTAL_CATEGORIES — يعني كود
+       العرض في dashboard.js فضل موجود (كود ميت) بس التبويب نفسه اتشال من
+       الواجهة، فكان عرضه هنا بيانات لميزة بقت غير موجودة فعليًا. -->
+
+  <!-- ★ 2026-09-29: بنفس المنطق، "طلبات التوظيف" (recruitment) اتشالت
+       كمان — نفس النمط بالظبط: كود العرض (renderRecruitmentTab) وپانل
+       (tab-recruitment) لسه موجودين جوه dashboard.js/index.html، لكن
+       مفيش أي خانة ليهم لا في شريط التبويبات العلوي ولا في
+       PORTAL_CATEGORIES (اتأكّد بالفحص المباشر) — يعني تبويب متروك مش
+       معروض لحد في الداشبورد الرئيسي حاليًا. -->
+
+  <div class="section-label" id="sec-resources">🏢 المنشآت والموارد</div>
+  <div class="grid">
+    <div class="card" id="card-buildings">
+      <div class="card-icon">🏫</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">المدارس / المباني المُدارة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-vehicles">
+      <div class="card-icon">🚗</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي السيارات</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على طلب صريح ("حط كل الداتا الممكنة") — من نفس
+       مصفوفة المدارس (buildings) المجلوبة بالفعل فوق، بدون أي طلب شبكة
+       إضافي: أعمدة بسيطة ومباشرة (عدد الطلاب، عدد الفصول، عمر المبنى) —
+       بدون أي حساب أو منطق معقّد، عدّ/متوسط مباشر بس. -->
+  <div class="section-label" id="sec-students">🏫 بيانات المدارس</div>
+  <div class="grid">
+    <div class="card" id="card-students">
+      <div class="card-icon">🎒</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي عدد الطلاب</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-classrooms">
+      <div class="card-icon">🚪</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي عدد الفصول</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-building-age">
+      <div class="card-icon">🏗️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">متوسط عمر المبنى</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على طلب صريح — "التقييمات الأخرى" (تقييم منصة
+       أصول / تقييم عاين / البيئة المدرسية) هي أعمدة مباشرة وبسيطة في نفس
+       مصفوفة المدارس (مفيش دمج/منطق معقّد زي FCA الموحَّد اللي بيدمج بين
+       مصدرين بتاريخ الأحدث — ده اتعمّد استبعاده لنفس سبب استبعاد NEW SLA%
+       قبل كده: منطق دمج معقّد مش آمن نعيد بناؤه هنا بره الداشبورد الرئيسي). -->
+  <div class="section-label" id="sec-assessments">📋 التقييمات الأخرى</div>
+  <div class="grid">
+    <div class="card" id="card-asol">
+      <div class="card-icon">🗂️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">مدارس لها تقييم منصة أصول</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-ayen">
+      <div class="card-icon">🔍</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">متوسط تقييم عاين</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-env">
+      <div class="card-icon">🌿</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">متوسط درجة البيئة المدرسية</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على طلب صريح ("الأنظمة الرقمية") — دليل تعريفي
+       بسيط بأسماء الأنظمة الرقمية المستخدمة فقط (بدون أي بيانات حيّة أو
+       تسجيل دخول)، مفيش أي طلب شبكة له خالص — نفس الأسماء المعروضة في
+       تبويب "الأنظمة الرقمية" بالداشبورد الرئيسي (DIGITAL_SYSTEMS_DATA). -->
+  <div class="section-label" id="sec-digital">🖥️ الأنظمة الرقمية المستخدمة</div>
+  <div class="systems-grid">
+    <div class="sys-chip">MAXIMO</div>
+    <div class="sys-chip">TAKAMUL — تكامل</div>
+    <div class="sys-chip">TFMP</div>
+    <div class="sys-chip">UniFire — يوني فاير</div>
+    <div class="sys-chip">Fares — فارس</div>
+    <div class="sys-chip">نظام متابعة المركبات</div>
+    <div class="sys-chip">نظام إدارة الموارد</div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على طلب صريح ("زود كمان الحاجات اللي ممكن
+       نحطها") — قسم إضافي بأرقام إجمالية بسيطة من نفس استجابة المصدر
+       الرئيسي (بدون أي طلب شبكة إضافي)، بنفس معيار الأمان المتّبع في باقي
+       الصفحة: عدّ مباشر (.length) لمصفوفات بيانات مؤكَّدة، بدون أي حسابات
+       أو تصنيفات معقّدة. -->
+  <div class="section-label" id="sec-maintenance">🔧 الصيانة والأصول</div>
+  <div class="grid">
+    <div class="card" id="card-contracts">
+      <div class="card-icon">📄</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">عقود عدا المجال</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-elevators">
+      <div class="card-icon">🛗</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">المصاعد</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-spareparts">
+      <div class="card-icon">🧰</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">قطع الغيار المسجَّلة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29 (توسعة ثالثة — بناءً على طلب صريح "زود حاجات أكتر"):
+       "حصر الأصول" (hasr) — تبويب حي مستقل بمصدر Apps Script خاص بيه
+       (HASR_SCRIPT_URL، مختلف عن الأربع مصادر التانية)، بس استجابته أصلاً
+       أرقام مجمّعة جاهزة من السيرفر (summary.totalAssets/
+       totalSchoolsSurveyed + مجموع deteriorated لكل مدرسة) — مفيش أي حساب
+       أو دمج معقّد من جانبنا، فهو آمن للعرض هنا برغم إنه مصدر خامس منفصل. -->
+  <div class="section-label" id="sec-assets">📦 حصر الأصول</div>
+  <div class="grid">
+    <div class="card" id="card-assets-total">
+      <div class="card-icon">📦</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي الأصول المحصورة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-assets-schools">
+      <div class="card-icon">🏫</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">مدارس تم حصرها</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-assets-deteriorated">
+      <div class="card-icon">⚠️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">أصول متهالكة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-ppm">🛠️ الصيانة الوقائية (PPM Maximo)</div>
+  <div class="grid">
+    <div class="card" id="card-ppm-tasks">
+      <div class="card-icon">🛠️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي مهام الصيانة الوقائية</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-ppm-planned">
+      <div class="card-icon">📋</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">نسبة الإنجاز المخطَّط</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-ppm-actual">
+      <div class="card-icon">✔️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">نسبة الإنجاز الفعلي</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29 (توسعة ثانية — بناءً على طلب صريح "زود الداشبورد أكتر
+       وأكتر، كل حاجة ممكن تظهر"): 7 أقسام إضافية، كلها من نفس استجابة
+       مصدر "الملفات الجاهزة الجديدة" (NEW_TEMPLATES) اللي بيتجاب بالفعل
+       لكارت السيارات — يعني صفر طلبات شبكة إضافية. كل رقم هنا اتأكّد إنه
+       تبويب حي فعليًا (موجود في شريط التبويبات العلوي وPORTAL_CATEGORIES)
+       عن طريق فحص مباشر لكود dashboard.js، وكل حساب هنا بسيط (عدّ/مجموع/
+       نسبة مباشرة) بدون أي دمج بين مصادر أو منطق pivot معقّد — أي حساب
+       معقّد (زي تحليل التدريب بالتفصيل لكل موظف/دورة) اتعمّد تبسيطه لعدّ
+       مباشر فقط، بنفس فلسفة استبعاد FCA/مؤشرات الأداء المعقّدة. -->
+  <div class="section-label" id="sec-gatekeepers">🚪 البوابون والمشرفون الميدانيون</div>
+  <div class="grid">
+    <div class="card" id="card-gatekeepers">
+      <div class="card-icon">🚪</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي البوابين المسجَّلين</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-supervisors-schools">
+      <div class="card-icon">👷</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">مدارس لها مشرف ميداني مُعيَّن</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-engineers">
+      <div class="card-icon">👨‍🔧</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">عدد المهندسين المسؤولين</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-training">🎓 التدريب</div>
+  <div class="grid">
+    <div class="card" id="card-training-employees">
+      <div class="card-icon">🎓</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">عدد الموظفين المسجَّلين في التدريب</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-training-courses">
+      <div class="card-icon">📚</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">عدد البرامج التدريبية المتاحة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-fuel">⛽ استهلاك الوقود</div>
+  <div class="grid">
+    <div class="card" id="card-fuel-liters">
+      <div class="card-icon">⛽</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي اللترات المستهلَكة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-fuel-cost">
+      <div class="card-icon">💳</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي تكلفة الوقود (ريال)</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-correspondence">✉️ المراسلات</div>
+  <div class="grid">
+    <div class="card" id="card-corr-total">
+      <div class="card-icon">✉️</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي المراسلات</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-corr-out">
+      <div class="card-icon">📤</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">مراسلات صادرة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-corr-in">
+      <div class="card-icon">📥</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">مراسلات واردة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-org">👥 الهيكل الوظيفي</div>
+  <div class="grid">
+    <div class="card" id="card-org-total">
+      <div class="card-icon">👥</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">إجمالي الوظائف بالهيكل</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-org-vacant">
+      <div class="card-icon">🪑</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">وظائف شاغرة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-org-saudi">
+      <div class="card-icon">🇸🇦</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">نسبة السعودة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <div class="section-label" id="sec-visits">🧭 الزيارات الميدانية</div>
+  <div class="grid">
+    <div class="card" id="card-visits-completed">
+      <div class="card-icon">✅</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">زيارات ميدانية مكتملة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+    <div class="card" id="card-visits-assigned">
+      <div class="card-icon">🧭</div>
+      <div class="card-value is-loading" data-role="value">جارٍ التحميل...</div>
+      <div class="card-label">زيارات ميدانية مسندة</div>
+      <div class="card-note" data-role="note"></div>
+    </div>
+  </div>
+
+  <!-- ★ 2026-09-29: بناءً على طلب صريح ("حتى لو هتحط تشارتات بسيطة") —
+       قسم تحليلات بصرية بسيطة من نفس البيانات المجلوبة بالفعل فوق (بدون
+       أي طلب شبكة إضافي)، بنفس معيار الأمان: نسب/توزيعات إجمالية فقط،
+       بدون أي تفاصيل فردية أو حسابات معقّدة. -->
+  <div class="section-label" id="sec-charts">📈 تحليلات بسيطة</div>
+  <div class="chart-grid">
+    <div class="card chart-card" id="chart-balagh">
+      <div class="donut-wrap">
+        <div class="donut" data-role="donut"></div>
+        <div class="donut-center"><div class="dc-val" data-role="dcval">—</div><div class="dc-lbl">مغلقة</div></div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-title">حالة البلاغات العامة</div>
+        <div class="legend" data-role="legend"></div>
+      </div>
+    </div>
+    <div class="card chart-card" id="chart-sr">
+      <div class="donut-wrap">
+        <div class="donut" data-role="donut"></div>
+        <div class="donut-center"><div class="dc-val" data-role="dcval">—</div><div class="dc-lbl">عاجل</div></div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-title">أولوية بلاغات المدارس المباشرة</div>
+        <div class="legend" data-role="legend"></div>
+      </div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-regions">
+      <div class="chart-title">أكثر المناطق بلاغات (أعلى 6)</div>
+      <div class="bars" data-role="bars"><div class="card-note">جارٍ التحميل...</div></div>
+    </div>
+    <div class="card chart-card" id="chart-org">
+      <div class="donut-wrap">
+        <div class="donut" data-role="donut"></div>
+        <div class="donut-center"><div class="dc-val" data-role="dcval">—</div><div class="dc-lbl">شاغرة</div></div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-title">الوظائف: مشغولة مقابل شاغرة</div>
+        <div class="legend" data-role="legend"></div>
+      </div>
+    </div>
+    <div class="card chart-card" id="chart-corr">
+      <div class="donut-wrap">
+        <div class="donut" data-role="donut"></div>
+        <div class="donut-center"><div class="dc-val" data-role="dcval">—</div><div class="dc-lbl">صادر</div></div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-title">المراسلات: صادر مقابل وارد</div>
+        <div class="legend" data-role="legend"></div>
+      </div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-ppm-region">
+      <div class="chart-title">نسبة الإنجاز الفعلي للصيانة الوقائية حسب المنطقة</div>
+      <div class="bars" data-role="bars"><div class="card-note">جارٍ التحميل...</div></div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-visits-region">
+      <div class="chart-title">الزيارات الميدانية المكتملة حسب المنطقة</div>
+      <div class="bars" data-role="bars"><div class="card-note">جارٍ التحميل...</div></div>
+    </div>
+    <div class="card chart-card" id="chart-assets">
+      <div class="donut-wrap">
+        <div class="donut" data-role="donut"></div>
+        <div class="donut-center"><div class="dc-val" data-role="dcval">—</div><div class="dc-lbl">متهالكة</div></div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-title">حالة الأصول المحصورة</div>
+        <div class="legend" data-role="legend"></div>
+      </div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-gatekeepers-city">
+      <div class="chart-title">البوابون حسب المدينة (أعلى 6)</div>
+      <div class="bars" data-role="bars"><div class="card-note">جارٍ التحميل...</div></div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-supervisors-region">
+      <div class="chart-title">تغطية المشرفين الميدانيين حسب المنطقة</div>
+      <div class="bars" data-role="bars"><div class="card-note">جارٍ التحميل...</div></div>
+    </div>
+    <div class="card chart-card is-wide" id="chart-fuel-month">
+      <div class="chart-title">استهلاك الوقود بالشهر (لتر)<span class="chart-subtitle" data-role="trendrange"></span></div>
+      <div class="trend-chart" data-role="trend"><div class="card-note">جارٍ التحميل...</div></div>
+      <div class="trend-labels" data-role="trendlabels"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+// روابط مصادر البيانات — نفس الروابط المستخدمة بالضبط في الداشبورد
+// الرئيسي (dashboard.js) لضمان تطابق الأرقام. الصفحة دي لا تحمّل
+// dashboard.js نفسه (ملف كبير جدًا ومرتبط بواجهة الداشبورد الكاملة)،
+// وبدل كده بتجيب البيانات الخام مباشرة وتحسب منها أرقامًا إجمالية بسيطة
+// فقط (بدون أي منطق معقّد زي حساب نسبة الالتزام بـ SLA، تعمّدنا استبعاده
+// هنا تجنبًا لأي حساب غير دقيق خارج الداشبورد الرئيسي).
+const OV_URLS = {
+  MAIN: "https://script.google.com/macros/s/AKfycbw5M_EQ7sfH5doRcL2xcALwii7CeD9SpaB0NNvf14VKJgGHtgXeOm5886tVnDLdEdDC/exec",
+  BALAGH: "https://script.google.com/macros/s/AKfycbyDUkCwSdayZ4IPIUq5F17SaFb3pqU5jwEvuoySr1bKVyqQwubqDShSxelCP-GuTYlp/exec",
+  SCHOOL_REPORTS: "https://script.google.com/macros/s/AKfycbxW5s_zblUUEcZoQzA0APA98Zft3vIHYWm41Q9YgsyPjrPkZtEkjlb2SuUWct1tLZQx5g/exec",
+  // ★ 2026-09-29: مصدر "الملفات الجاهزة الجديدة" (نفس الرابط NEW_TEMPLATES_URL
+  // في dashboard.js) — السيارات بقت بتُقرأ منه فعليًا في التبويب الحي، مش من
+  // الحقل القديم "vehicles" جوه المصدر الرئيسي (بقى غير مستخدم هناك خالص).
+  NEW_TEMPLATES: "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec",
+  // ★ 2026-09-29 (توسعة رابعة): مصدر "حصر الأصول" (HASR_SCRIPT_URL في
+  // dashboard.js) — رابط منفصل تمامًا عن باقي المصادر، ورده مش ملفوف في
+  // {data: ...} زي باقي المصادر (شكله مباشرة {summary, schools, meta}).
+  HASR: "https://script.google.com/macros/s/AKfycbx8aut4MnraV5AjeLM6a00ur1WV0hVvI54PAfvNZoKjVVFV9ge2-wKt2AcOqhst65At/exec",
+};
+
+// نفس مجموعة حالات "مغلق" المستخدمة في الداشبورد الرئيسي بالضبط (راجع
+// BALAGH_CLOSED_STATUSES في dashboard.js) — لضمان تطابق رقم "البلاغات
+// المغلقة" هنا مع الرقم الظاهر في الداشبورد الرئيسي.
+const OV_BALAGH_CLOSED_STATUSES = new Set([
+  "تم حله", "ملغى", "ملغي", "مغلق", "closed", "cancelled", "resolved",
+]);
+function ovBalaghIsClosed(status) {
+  return OV_BALAGH_CLOSED_STATUSES.has(String(status ?? "").trim().toLowerCase());
+}
+
+function ovSetCard(id, { value, unit, label2, sub, note, isError, isInfo, alert, icon } = {}) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  const valueEl = card.querySelector('[data-role="value"]');
+  const noteEl = card.querySelector('[data-role="note"]');
+  const subEl = card.querySelector('[data-role="sub"]');
+  const iconEl = card.querySelector('[data-role="icon"]');
+  if (valueEl && value !== undefined) {
+    valueEl.classList.remove("is-loading");
+    valueEl.innerHTML = String(value) + (unit ? `<span class="unit">${unit}</span>` : "");
+  }
+  if (noteEl) {
+    noteEl.textContent = note || "";
+    noteEl.classList.toggle("is-error", !!isError);
+    // ★ 2026-09-29 (توسعة ثالثة): حالة معلوماتية محايدة (مش خطأ) — بتُستخدم
+    // لما بنعرض قيمة من الكاش المحلي فورًا وقت التحميل وإحنا لسه بنستنى رد
+    // الشبكة الفعلي يحدّثها (راجع ovHydrateFromCache_ تحت)
+    noteEl.classList.toggle("is-info", !!isInfo);
+  }
+  if (subEl && sub !== undefined) subEl.innerHTML = sub;
+  // ── تنبيه بصري (نبض أحمر + تغيير الأيقونة) — يُستخدم لكارت بلاغات
+  // المدارس المباشرة عند وجود بلاغ عاجل واحد على الأقل ──
+  if (alert !== undefined) card.classList.toggle("has-urgent", !!alert);
+  if (iconEl && icon) iconEl.textContent = icon;
+}
+
+// ★ 2026-09-29: بناءً على ملاحظة فعلية — رسالة "تعذّر جلب البيانات" كانت
+// بتظهر من وقت للتاني وتمسح رقم كان ظاهر بالفعل من تحديث سابق، وده كان
+// مربك. دلوقتي: لو الكارت عنده قيمة حقيقية سابقة (نجحت قبل كده)، تحديث
+// فاشل جديد بيسيب الرقم زي ما هو وبس يحط ملاحظة تحذير بسيطة (مع الاحتفاظ
+// بمحاولات إعادة الجلب التلقائية في الخلفية — راجع setInterval تحت).
+// "—" بتظهر فقط أول مرة، لو فشل أول تحميل قبل ما توصل أي بيانات خالص.
+function ovSetCardError_(id, fallbackOpts) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  const valueEl = card.querySelector('[data-role="value"]');
+  const noteEl = card.querySelector('[data-role="note"]');
+  const hasPriorValue = valueEl && !valueEl.classList.contains("is-loading") && valueEl.textContent.trim() !== "—";
+  if (hasPriorValue) {
+    if (noteEl) {
+      noteEl.textContent = "⚠ تعذّر آخر تحديث — الرقم المعروض من آخر تحديث ناجح";
+      noteEl.classList.add("is-error");
+    }
+  } else {
+    ovSetCard(id, Object.assign({ value: "—", note: "تعذّر جلب البيانات، جارٍ إعادة المحاولة تلقائيًا", isError: true }, fallbackOpts || {}));
+  }
+}
+
+// ★ 2026-09-29: بناءً على طلب صريح — كل الأرقام في الصفحة بالإنجليزية
+// (أرقام لاتينية 0-9)، بما فيها الفاصلة الألفية وطابع "آخر تحديث"، رغم
+// إن باقي نصوص الصفحة عربية RTL.
+function ovNumberEn(n) {
+  return new Intl.NumberFormat("en-US").format(n);
+}
+
+// ★ 2026-09-29 (تصحيح جذري): بناءً على ملاحظة فعلية — الصفحة كانت بتوضّح
+// "تعذّر جلب البيانات" كتير رغم إن الداشبورد الرئيسي شغّال، والسبب الحقيقي
+// اكتشفناه في dashboard.js نفسه (تعليق سطر ~20): شيت البلاغات بقى فيه أكتر
+// من 100 ألف صف فعليًا — حمولة ضخمة جدًا ياخد تحميلها وتحليلها وقت طويل،
+// خصوصًا على أول تحميل من غير أي كاش. الداشبورد الرئيسي بيتجاوز المشكلة دي
+// عن طريق كاش محلي (IndexedDB): بيعرض آخر بيانات ناجحة فورًا وهو بيجيب
+// نسخة جديدة في الخلفية بهدوء، فالمستخدم نادرًا ما يحس بأي فشل. الصفحة دي
+// (نظرة عامة) كانت بتعتمد بالكامل على نجاح الطلب الحي في كل تحميل صفحة من
+// غير أي كاش خالص — فأي بطء أو تعثر مؤقت من طرف السيرفر كان بيظهر كرسالة
+// خطأ فورية. الحل: نفس فلسفة الداشبورد الرئيسي بالظبط، لكن بدل تخزين
+// الصفوف الخام (ممكن تتجاوز حد مساحة localStorage)، بنخزّن الأرقام
+// النهائية المحسوبة بس (كائن صغير جدًا بالكيلوبايت) — كافية لعرض آخر حالة
+// معروفة فورًا لو الطلب الحي فشل، مع توضيح واضح إن الرقم من تحديث سابق.
+const OV_CACHE_PREFIX = "ovCache_v1_";
+function ovCacheSave_(key, payload) {
+  try {
+    localStorage.setItem(OV_CACHE_PREFIX + key, JSON.stringify({ ts: Date.now(), payload }));
+  } catch (e) {
+    // تجاهل بصمت (وضع تصفح متخفٍ، أو localStorage معطّل/ممتلئ) — الصفحة
+    // تفضل شغّالة عادي، بس من غير كاش احتياطي في هذه الحالة النادرة
+    console.warn("[overview][cache-save]", e);
+  }
+}
+function ovCacheLoad_(key) {
+  try {
+    const raw = localStorage.getItem(OV_CACHE_PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.ts !== "number" || parsed.payload === undefined) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+function ovCacheTimeLabel_(ts) {
+  return new Date(ts).toLocaleString("en-GB", {
+    hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit",
+  });
+}
+
+function ovEsc_(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ★ 2026-09-29: بناءً على طلب صريح — تحليلات بصرية بسيطة (دونَت CSS بحت،
+// من غير أي مكتبة خارجية) من نفس البيانات المجلوبة أصلاً لكروت الأرقام،
+// بدون أي طلب شبكة إضافي. لو فشل التحميل، بنسيب الشارت زي ما هو (نفس
+// فلسفة "الاحتفاظ بآخر قيمة ناجحة" المستخدمة في الكروت) بدل ما نمسحه.
+function ovRenderDonut_(chartId, segments) {
+  const root = document.getElementById(chartId);
+  if (!root) return;
+  const donutEl = root.querySelector('[data-role="donut"]');
+  const dcValEl = root.querySelector('[data-role="dcval"]');
+  const legendEl = root.querySelector('[data-role="legend"]');
+  const total = segments.reduce((s, x) => s + x.count, 0);
+  if (!total) {
+    if (dcValEl) dcValEl.textContent = "—";
+    if (legendEl) legendEl.innerHTML = '<div class="legend-item">لا توجد بيانات كافية</div>';
+    return;
+  }
+  let acc = 0;
+  const stops = segments.map((seg) => {
+    const from = acc;
+    acc += (seg.count / total) * 100;
+    return `${seg.color} ${from}% ${acc}%`;
+  }).join(", ");
+  if (donutEl) donutEl.style.background = `conic-gradient(${stops})`;
+  if (dcValEl) {
+    const centerSeg = segments.find((s) => s.isCenter) || segments[0];
+    dcValEl.textContent = ovNumberEn(Math.round((centerSeg.count / total) * 100)) + "%";
+  }
+  if (legendEl) {
+    legendEl.innerHTML = segments.map((seg) =>
+      `<div class="legend-item"><i style="background:${seg.color}"></i>${ovEsc_(seg.label)}<b>${ovNumberEn(seg.count)}</b></div>`
+    ).join("");
+  }
+}
+
+function ovRenderBars_(chartId, items, unit) {
+  const root = document.getElementById(chartId);
+  if (!root) return;
+  const barsEl = root.querySelector('[data-role="bars"]');
+  if (!barsEl) return;
+  if (!items.length) {
+    barsEl.innerHTML = '<div class="card-note">لا توجد بيانات كافية</div>';
+    return;
+  }
+  const max = Math.max(...items.map((x) => x.count));
+  barsEl.innerHTML = items.map((x) => `
+    <div class="bar-row">
+      <div class="bar-label">${ovEsc_(x.label)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${max ? Math.round((x.count / max) * 100) : 0}%"></div></div>
+      <div class="bar-val">${ovNumberEn(x.count)}${unit || ""}</div>
+    </div>
+  `).join("");
+}
+
+// ★ 2026-09-29 (توسعة رابعة): شارت أعمدة زمني (Trend) — لسلسلة زمنية
+// متتالية (زي "استهلاك الوقود بالشهر")، بدل ovRenderBars_ الأفقي المستخدم
+// للتوزيعات الفئوية. لون واحد تركوازي (Sequential) لكل الأعمدة، ما عدا
+// أعلى نقطة بتتلوّن باللون البرونزي (Emphasis) عشان تبرز فورًا، ووسم قيمة
+// بس على أعلى نقطة وآخر نقطة (مش كل نقطة) تجنبًا لازدحام بصري.
+function ovRenderTrend_(chartId, items, unit) {
+  const root = document.getElementById(chartId);
+  if (!root) return;
+  const trendEl = root.querySelector('[data-role="trend"]');
+  const labelsEl = root.querySelector('[data-role="trendlabels"]');
+  const rangeEl = root.querySelector('[data-role="trendrange"]');
+  if (!trendEl) return;
+  if (!items.length) {
+    trendEl.innerHTML = '<div class="card-note">لا توجد بيانات كافية</div>';
+    if (labelsEl) labelsEl.innerHTML = "";
+    if (rangeEl) rangeEl.textContent = "";
+    return;
+  }
+  // ★ 2026-09-29 (تحسين شكل): محور الأعمدة بيعرض رقم الشهر بس (يدخل
+  // مضمون في أي عرض كارت)، وده السطر اللي بيدّي السياق الكامل: أول شهر
+  // وآخر شهر بالاسم العربي، فوق الشارت مباشرة
+  if (rangeEl) {
+    rangeEl.textContent = items.length > 1 ? `(${items[0].label} ← ${items[items.length - 1].label})` : `(${items[0].label})`;
+  }
+  const max = Math.max(...items.map((x) => x.count), 0);
+  const peakIdx = items.reduce((best, x, i) => (x.count > items[best].count ? i : best), 0);
+  const lastIdx = items.length - 1;
+  trendEl.innerHTML = items.map((x, i) => {
+    const h = max ? Math.max(6, Math.round((x.count / max) * 100)) : 6;
+    const showVal = i === peakIdx || i === lastIdx;
+    return `
+      <div class="trend-col${i === peakIdx ? " is-peak" : ""}" title="${ovEsc_(x.label)}: ${ovNumberEn(x.count)}${unit || ""}">
+        ${showVal ? `<div class="trend-val">${ovNumberEn(x.count)}</div>` : ""}
+        <div class="trend-bar" style="height:${h}%"></div>
+      </div>
+    `;
+  }).join("");
+  if (labelsEl) {
+    labelsEl.innerHTML = items.map((x) =>
+      `<div class="trend-lbl" title="${ovEsc_(x.label)}">${ovEsc_(x.axisLabel || x.label)}</div>`
+    ).join("");
+  }
+}
+
+async function ovFetchJson_(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 25000);
+  try {
+    const r = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ★ 2026-09-29: بناءً على ملاحظة فعلية من الاستخدام — أحيانًا مصدر بيانات
+// واحد (زي مصدر البلاغات) بياخد وقت أطول من المتوقع في الاستجابة (بطء
+// مؤقت من طرف السيرفر)، فكانت بتوصل لمهلة الانتظار (timeout) وتفشل رغم إن
+// المصدر شغّال فعليًا. عشان كده بنعمل محاولة تانية تلقائية قبل ما نعرض
+// رسالة الخطأ للمستخدم — بيدي فرصة حقيقية للبيانات إنها توصل من غير ما
+// المستخدم يحتاج يدوس "تحديث الآن" بنفسه.
+async function ovFetchJsonRetry_(url, timeoutMs, retries) {
+  let lastErr;
+  const attempts = (retries || 0) + 1;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await ovFetchJson_(url, timeoutMs);
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        await new Promise((res) => setTimeout(res, 1200));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// ★ 2026-09-29 (توسعة رابعة): مساعد موحّد لتحديد "ملاحظة الكارت" المرتبطة
+// بوجود بيانات من الكاش المحلي — بوضعين مختلفين تمامًا في الشكل والمعنى:
+//   • mode="revalidating": الصفحة لسه بتحمّل (أول مرة أو بعد تحديث الصفحة)
+//     وعندنا نسخة محفوظة من زيارة سابقة، فبنعرضها فورًا بلون محايد (أزرق)
+//     مع توضيح إن في تحديث شغّال في الخلفية دلوقتي — مش رسالة خطأ خالص.
+//   • أي وضع تاني (افتراضيًا "error"): فشل فعلي في الجلب الحي بعد كل
+//     المحاولات، وبنرجع لآخر رقم ناجح محفوظ مع تحذير أحمر واضح.
+function ovStaleInfo_(cacheTs, mode) {
+  if (!cacheTs) return { note: "", isError: false, isInfo: false };
+  if (mode === "revalidating") {
+    return {
+      note: `🔄 عرض آخر بيانات محفوظة (${ovCacheTimeLabel_(cacheTs)}) — جارٍ التحديث الآن...`,
+      isError: false,
+      isInfo: true,
+    };
+  }
+  return {
+    note: `⚠ بيانات من آخر تحديث ناجح (${ovCacheTimeLabel_(cacheTs)}) — تعذّر الوصول للسيرفر الآن، جارٍ إعادة المحاولة تلقائيًا`,
+    isError: true,
+    isInfo: false,
+  };
+}
+
+// ★ 2026-09-29 (تصحيح جذري ثانٍ): راجعنا الكود الفعلي لمصدر البلاغات
+// (balagh_reports.gs) مباشرة — فيه تصريح واضح إن حمولة الرد الكامل ممكن
+// "تتجاوز 100 ميجابايت مع أكتر من 100 ألف صف بلاغ"، وإن كاش السيرفر نفسه
+// (CacheService) ممكن يفشل يخزّن حمولة بهذا الحجم أحيانًا (حصة الكاش
+// محدودة)، وفي الحالة دي كل طلب بيضطر يقرأ الشيت كامل حيًا (بطيء فعليًا،
+// مش مجرد تعثر عابر). عشان كده مهلة الانتظار هنا طويلة جدًا (دقيقتين)
+// عشان تدّي فرصة حقيقية للحمولة الضخمة دي توصل، مع محاولة واحدة إضافية لو
+// الأولى فشلت. ولو المحاولتان فشلتا، بنرجع لآخر نتيجة ناجحة محفوظة محليًا
+// (localStorage) بدل ما نوضّح "—" فورًا — راجع ovCacheSave_/Load_.
+function ovApplyBalagh_(summary, cacheTs, opts) {
+  const skipTotal = !!(opts && opts.skipTotal); // الإجمالي جالنا فعلاً من فحص ?meta=1 الحي — ما نستبدلوش برقم كاش أقدم
+  const info = ovStaleInfo_(cacheTs, opts && opts.mode);
+  if (!skipTotal) {
+    ovSetCard("card-balagh-total", { value: ovNumberEn(summary.total), note: info.note, isError: info.isError, isInfo: info.isInfo });
+  }
+  ovSetCard("card-balagh-open", { value: ovNumberEn(summary.open), note: info.note, isError: info.isError, isInfo: info.isInfo });
+  const pct = summary.total ? Math.round((summary.closed / summary.total) * 100) : 0;
+  ovSetCard("card-balagh-closed", {
+    value: ovNumberEn(summary.closed),
+    note: info.note || (summary.total ? `${pct}% من إجمالي البلاغات` : ""),
+    isError: info.isError, isInfo: info.isInfo,
+  });
+  ovRenderDonut_("chart-balagh", [
+    { label: "مغلقة", count: summary.closed, color: "var(--good)", isCenter: true },
+    { label: "مفتوحة", count: summary.open, color: "var(--brass-2)" },
+  ]);
+  ovRenderBars_("chart-regions", summary.topRegions || []);
+}
+
+// ★ 2026-09-29: مصدر البلاغات بيوفّر أيضًا فحصًا خفيفًا جدًا (?meta=1) —
+// بيرجّع بس عدد الصفوف الحقيقي الحالي من غير ما يحمّل الحمولة الكاملة
+// الضخمة (راجع doGet في balagh_reports.gs). بنستخدمه هنا عشان "إجمالي
+// البلاغات" يظهر برقم حي وصحيح بسرعة، حتى لو الحمولة الكاملة (اللازمة
+// لحساب المفتوحة/المغلقة والتوزيع الإقليمي) اتأخرت أو فشلت.
+async function ovLoadBalaghMetaQuick_() {
+  try {
+    const sep = OV_URLS.BALAGH.indexOf("?") === -1 ? "?" : "&";
+    const meta = await ovFetchJsonRetry_(OV_URLS.BALAGH + sep + "meta=1", 15000, 1);
+    if (meta && meta.status === "ok" && typeof meta.rows === "number") {
+      ovSetCard("card-balagh-total", { value: ovNumberEn(meta.rows) });
+      return true;
+    }
+  } catch (e) {
+    console.warn("[overview][balagh-meta]", e);
+  }
+  return false;
+}
+
+// ── البلاغات العامة (إجمالي + مفتوحة + مغلقة) ──
+async function ovLoadBalagh_() {
+  const gotFreshTotal = await ovLoadBalaghMetaQuick_();
+  try {
+    const json = await ovFetchJsonRetry_(OV_URLS.BALAGH, 120000, 1);
+    const rows = Array.isArray(json && json.data) ? json.data : (Array.isArray(json) ? json : []);
+    const total = rows.length;
+    const closed = rows.filter((r) => ovBalaghIsClosed(r["الحالة"])).length;
+    const open = total - closed;
+    // توزيع البلاغات حسب المنطقة (نفس عمود "المحافظة التابع لها المدرسة"
+    // المستخدم في الداشبورد الرئيسي للتحليل الإقليمي) — أعلى 6 مناطق فقط
+    const regionCounts = {};
+    rows.forEach((r) => {
+      const rg = String(r["المحافظة التابع لها المدرسة"] || "").trim() || "غير محدد";
+      regionCounts[rg] = (regionCounts[rg] || 0) + 1;
+    });
+    const topRegions = Object.entries(regionCounts)
+      .sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([label, count]) => ({ label, count }));
+    const summary = { total, open, closed, topRegions };
+    ovCacheSave_("balagh", summary);
+    ovApplyBalagh_(summary);
+  } catch (e) {
+    console.warn("[overview][balagh]", e);
+    const cached = ovCacheLoad_("balagh");
+    if (cached) {
+      // لو نجحنا في جلب إجمالي حي وحديث من الفحص الخفيف (ولو المصدر
+      // الرئيسي فشل)، نفضّله على رقم الإجمالي المحفوظ (ممكن يكون أقدم
+      // شوية) — بس المفتوحة/المغلقة/التوزيع الإقليمي لسه بيحتاجوا الحمولة
+      // الكاملة، فبتفضل من الكاش
+      ovApplyBalagh_(cached.payload, cached.ts, { skipTotal: gotFreshTotal });
+    } else if (!gotFreshTotal) {
+      ovSetCardError_("card-balagh-total");
+      ovSetCardError_("card-balagh-open");
+      ovSetCardError_("card-balagh-closed");
+    } else {
+      ovSetCardError_("card-balagh-open");
+      ovSetCardError_("card-balagh-closed");
+    }
+  }
+}
+
+function ovApplySr_(summary, cacheTs, opts) {
+  const total = summary.total, urgent = summary.urgent;
+  const info = ovStaleInfo_(cacheTs, opts && opts.mode);
+  ovSetCard("card-sr", {
+    value: ovNumberEn(total),
+    icon: urgent ? "🚨" : "🏫",
+    alert: urgent > 0,
+    note: info.note,
+    isError: info.isError,
+    isInfo: info.isInfo,
+    sub: urgent
+      ? `<span class="pill is-urgent">🚨 ${ovNumberEn(urgent)} عاجل</span>`
+      : `<span class="pill is-good">لا يوجد عاجل حاليًا</span>`,
+  });
+  ovRenderDonut_("chart-sr", [
+    { label: "عاجل", count: urgent, color: "var(--red)", isCenter: true },
+    { label: "غير عاجل", count: total - urgent, color: "var(--teal-2)" },
+  ]);
+}
+
+// ── بلاغات المدارس المباشرة (إجمالي + عاجل) ──
+async function ovLoadSchoolReports_() {
+  try {
+    const json = await ovFetchJsonRetry_(OV_URLS.SCHOOL_REPORTS, 30000, 2);
+    const rows = Array.isArray(json && json.data) ? json.data : (Array.isArray(json) ? json : []);
+    const summary = { total: rows.length, urgent: rows.filter((r) => r.priority === "عاجل").length };
+    ovCacheSave_("sr", summary);
+    ovApplySr_(summary);
+  } catch (e) {
+    console.warn("[overview][school-reports]", e);
+    const cached = ovCacheLoad_("sr");
+    if (cached) {
+      ovApplySr_(cached.payload, cached.ts);
+    } else {
+      ovSetCardError_("card-sr", { alert: false, icon: "🏫" });
+    }
+  }
+}
+
+// ── المصدر الرئيسي (المباني/بيانات المدارس/التقييمات الأخرى/العقود/
+// المصاعد/قطع الغيار) — طلب واحد ثقيل نسبيًا (عشرات الشيتات)، فمهلته أطول
+// من باقي المصادر. كل هذه المفاتيح تُقرأ من نفس رد الطلب الواحد — بدون
+// أي طلبات شبكة إضافية. ملحوظة: "vehicles" اتشال من هنا لأنه بقى حقل
+// قديم غير مستخدم فعليًا في الداشبورد الرئيسي — راجع ovLoadNewTemplates_
+// تحت اللي بيجيب السيارات (وباقي بيانات العمليات) من المصدر الحي الصحيح. وكارتا "بلاغات الأمن
+// والسلامة" القديم و"تصحيحات وتصعيدات الأمن والسلامة" اتشالوا بالكامل
+// (مصادر متروكة/محذوفة، مش أي تبويب حي فعليًا في الداشبورد الرئيسي). ──
+// ★ 2026-09-29: أدوات بسيطة لقراءة أعمدة رقمية/نصّية مباشرة من صفوف
+// مصفوفة "buildings" الخام — بدون أي تجميع/دمج معقّد (زي FCA الموحَّد
+// اللي بيدمج بين مصدرين، ده اتعمّد استبعاده لخطورة تكراره بشكل غير دقيق
+// بره الداشبورد الرئيسي، بنفس منطق استبعاد NEW SLA%).
+function ovNumOrNull_(v) {
+  const s = String(v == null ? "" : v).replace(/,/g, "").trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+function ovSumField_(rows, key) {
+  return rows.reduce((s, r) => s + (ovNumOrNull_(r[key]) || 0), 0);
+}
+function ovAvgField_(rows, key) {
+  const vals = rows.map((r) => ovNumOrNull_(r[key])).filter((v) => v !== null);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+function ovRound1_(n) {
+  return Math.round(n * 10) / 10;
+}
+
+function ovApplyMain_(summary, cacheTs, opts) {
+  const info = ovStaleInfo_(cacheTs, opts && opts.mode);
+  const staleNote = info.note, isErr = info.isError, isInf = info.isInfo;
+  ovSetCard("card-buildings", { value: ovNumberEn(summary.buildings), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-contracts", { value: ovNumberEn(summary.contracts), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-elevators", { value: ovNumberEn(summary.elevators), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-spareparts", { value: ovNumberEn(summary.spareparts), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-students", { value: ovNumberEn(summary.students), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-classrooms", { value: ovNumberEn(summary.classrooms), note: staleNote, isError: isErr, isInfo: isInf });
+  ovSetCard("card-building-age", {
+    value: summary.buildingAge !== null ? ovNumberEn(summary.buildingAge) : "—",
+    unit: summary.buildingAge !== null ? " سنة" : "",
+    note: staleNote,
+    isError: isErr, isInfo: isInf,
+  });
+  ovSetCard("card-asol", {
+    value: ovNumberEn(summary.asolCount),
+    note: staleNote || (summary.asolTotal ? `من إجمالي ${ovNumberEn(summary.asolTotal)} مدرسة` : ""),
+    isError: isErr, isInfo: isInf,
+  });
+  ovSetCard("card-ayen", {
+    value: summary.ayenAvg !== null ? ovNumberEn(summary.ayenAvg) : "—",
+    note: staleNote,
+    isError: isErr, isInfo: isInf,
+  });
+  ovSetCard("card-env", {
+    value: summary.envAvg !== null ? ovNumberEn(summary.envAvg) : "—",
+    note: staleNote,
+    isError: isErr, isInfo: isInf,
+  });
+}
+
+async function ovLoadMain_() {
+  try {
+    const json = await ovFetchJsonRetry_(OV_URLS.MAIN, 70000, 2);
+    const data = json && json.data !== undefined ? json.data : json;
+    const arr = (key) => (Array.isArray(data && data[key]) ? data[key] : []);
+    const buildingsRows = arr("buildings");
+
+    // 🏫 بيانات المدارس — من نفس مصفوفة buildings، أعمدة مباشرة (عدّ/متوسط
+    // بسيط بدون أي منطق معقّد)
+    const avgAge = ovAvgField_(buildingsRows, "عمر_المبني");
+
+    // 📋 التقييمات الأخرى — أعمدة مباشرة وبسيطة (منصة أصول / عاين / البيئة
+    // المدرسية)، بدون أي دمج بين مصادر متعددة
+    const asolCount = buildingsRows.filter((r) => {
+      const v = String(r["تقييم (منصة أصول)"] ?? r["تقييم_منصة_أصول"] ?? "").trim();
+      return v && v !== "—" && v.toLowerCase() !== "null";
+    }).length;
+    const ayenAvg = ovAvgField_(buildingsRows, "تقييم_عاين");
+    const envAvg = ovAvgField_(buildingsRows, "درجة_البيئة_المدرسية");
+
+    const summary = {
+      buildings: buildingsRows.length,
+      contracts: arr("fmContracts").length,
+      elevators: arr("elevators").length,
+      spareparts: arr("spareParts").length,
+      students: ovSumField_(buildingsRows, "عدد_الطلاب"),
+      classrooms: ovSumField_(buildingsRows, "عدد_الفصول"),
+      buildingAge: avgAge !== null ? ovRound1_(avgAge) : null,
+      asolCount,
+      asolTotal: buildingsRows.length,
+      ayenAvg: ayenAvg !== null ? ovRound1_(ayenAvg) : null,
+      envAvg: envAvg !== null ? ovRound1_(envAvg) : null,
+    };
+    ovCacheSave_("main", summary);
+    ovApplyMain_(summary);
+  } catch (e) {
+    console.warn("[overview][main]", e);
+    const cached = ovCacheLoad_("main");
+    if (cached) {
+      ovApplyMain_(cached.payload, cached.ts);
+    } else {
+      ["card-buildings", "card-contracts", "card-elevators", "card-spareparts", "card-students", "card-classrooms", "card-building-age", "card-asol", "card-ayen", "card-env"].forEach((id) => {
+        ovSetCardError_(id);
+      });
+    }
+  }
+}
+
+// ★ 2026-09-29 (توسعة ثانية): مصدر "الملفات الجاهزة الجديدة" (NEW_TEMPLATES)
+// فيه أكتر بكتير من السيارات بس — نفس الرد الواحد فيه كمان البوابين/
+// المشرفين/التدريب/الوقود/المراسلات/الهيكل الوظيفي/الزيارات الميدانية/
+// الصيانة الوقائية (PPM Maximo)، كلهم تبويبات حية اتأكّدت بفحص مباشر لكود
+// dashboard.js (شريط التبويبات العلوي + PORTAL_CATEGORIES). بنقرأهم كلهم
+// من نفس الاستجابة الواحدة دي — صفر طلبات شبكة إضافية.
+function ovNumOrZero_(v) {
+  const n = ovNumOrNull_(v);
+  return n === null ? 0 : n;
+}
+function ovComputeNewTemplatesSummary_(data) {
+  const vehiclesRows = (data && data.vehicles && data.vehicles.sheets && data.vehicles.sheets["السيارات"]) || [];
+
+  const gkRows = (data && data.gatekeepers_supervisors && data.gatekeepers_supervisors.sheets && data.gatekeepers_supervisors.sheets["البوابون"]) || [];
+  const svRows = (data && data.gatekeepers_supervisors && data.gatekeepers_supervisors.sheets && data.gatekeepers_supervisors.sheets["المشرفون والمهندسون"]) || [];
+  const supervisorsSchools = new Set(svRows.map((r) => String(r["الرقم الوزاري"] ?? "").trim()).filter(Boolean)).size;
+  const engineers = new Set(svRows.map((r) => String(r["المهندس - الاسم"] ?? "").trim()).filter(Boolean)).size;
+
+  // ★ 2026-09-29 (توسعة رابعة): تصنيف البوابين حسب المدينة (أعلى 6) —
+  // نفس صفوف "البوابون" المستخدمة أصلاً لعدّهم الإجمالي، بدون أي طلب إضافي
+  const gkCityCounts = {};
+  gkRows.forEach((r) => {
+    const city = String(r["المدينة"] ?? "").trim() || "غير محدد";
+    gkCityCounts[city] = (gkCityCounts[city] || 0) + 1;
+  });
+  const gatekeepersByCity = Object.entries(gkCityCounts)
+    .sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([label, count]) => ({ label, count }));
+
+  // تغطية المشرفين الميدانيين حسب المنطقة — عدد المدارس الفريدة (نفس منطق
+  // supervisorsSchools بس مقسّم حسب عمود "المنطقة" لو موجود في نفس الصفوف
+  const svRegionSchools = {};
+  svRows.forEach((r) => {
+    const region = String(r["المنطقة"] ?? "").trim() || "غير محدد";
+    const schoolKey = String(r["الرقم الوزاري"] ?? "").trim();
+    if (!schoolKey) return;
+    if (!svRegionSchools[region]) svRegionSchools[region] = new Set();
+    svRegionSchools[region].add(schoolKey);
+  });
+  const supervisorsByRegion = Object.entries(svRegionSchools)
+    .map(([label, set]) => ({ label, count: set.size }))
+    .sort((a, b) => b.count - a.count).slice(0, 6);
+
+  const trainRows = (data && data.training_fuel && data.training_fuel.sheets && data.training_fuel.sheets["برامج التدريب"]) || [];
+  const trainingCourses = new Set(trainRows.map((r) => String(r["اسم الدورة"] ?? "").trim()).filter(Boolean)).size;
+  const trainingEmployees = new Set(
+    trainRows.map((r) => String(r["البريد الإلكتروني"] ?? "").trim() || String(r["الاسم"] ?? "").trim()).filter(Boolean)
+  ).size;
+
+  const fuelRows = (data && data.training_fuel && data.training_fuel.sheets && data.training_fuel.sheets["استهلاك الوقود"]) || [];
+  const fuelLiters = fuelRows.reduce((s, r) => s + ovNumOrZero_(r["اللترات"]), 0);
+  const fuelCost = fuelRows.reduce((s, r) => s + ovNumOrZero_(r["التكلفة (SAR)"] ?? r["التكلفة(SAR)"] ?? r["التكلفة"]), 0);
+
+  // استهلاك الوقود بالشهر — بناءً على ملاحظة فعلية: الشارت كان بيطلع
+  // "لا توجد بيانات كافية" مع البيانات الحقيقية رغم إن كروت اللترات/التكلفة
+  // بتظهر صح. السبب: كنا بنتعرّف بس على رقم شهر مباشر (1-12) أو اسم شهر
+  // عربي، لكن عمود "التاريخ" الفعلي لسه فيه صفوف قديمة بتاريخ كامل (يوم/
+  // شهر/سنة) زي ما هو موضّح بالظبط في تعليق getMonthNum بتاع تبويب الوقود
+  // الحي في dashboard.js — فكل الصفوف دي كانت بترجع null وتتجاهل بالكامل.
+  // دلوقتي بنسخ نفس دالة getMonthNum حرفيًا (بما فيها فحص خلايا الخطأ
+  // "####" وترتيب يوم/شهر التلقائي) عشان نضمن تطابق كامل مع التبويب الحي.
+  const OV_MM_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  // ★ 2026-09-29 (تحسين شكل — تصحيح ثانٍ): جرّبنا الأول اختصار 3 حروف
+  // (ينا/فبر/مار...) لكن قياس فعلي أثبت إنه لسه بيتقصّ لنقط "..." في كارت
+  // ضيّق (12 عمود جنب بعض، وعرض كل عمود بيتغيّر حسب حجم الشاشة). الحل
+  // الموثوق بصرف النظر عن عرض الكارت: رقم الشهر بالإنجليزي (1-12) على
+  // المحور — دايمًا بيدخل، مفيش أي احتمال قص — والاسم العربي الكامل
+  // بيفضل ظاهر فورًا في الـ tooltip (title) عند تمرير الماوس على أي عمود
+  const OV_AR_MONTHS_MAP = { "يناير":1,"فبراير":2,"مارس":3,"أبريل":4,"ابريل":4,"مايو":5,"يونيو":6,"يوليو":7,"أغسطس":8,"اغسطس":8,"سبتمبر":9,"أكتوبر":10,"اكتوبر":10,"نوفمبر":11,"ديسمبر":12 };
+  function ovFuelMonthNum_(r) {
+    const raw = r["التاريخ"] ?? r["الشهر"];
+    if (raw == null) return null;
+    const s = String(raw).trim();
+    if (!s || /^#+$/.test(s)) return null;
+    // رقم شهر مباشر: "4" أو "04"
+    if (/^\d{1,2}$/.test(s)) { const n = +s; return (n >= 1 && n <= 12) ? n : null; }
+    // اسم شهر عربي
+    if (OV_AR_MONTHS_MAP[s]) return OV_AR_MONTHS_MAP[s];
+    // احتياطي: صفوف قديمة بتاريخ كامل (سنة-شهر-يوم)
+    let m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if (m) { const mo = +m[2]; return (mo >= 1 && mo <= 12) ? mo : null; }
+    // احتياطي: صفوف قديمة بتاريخ كامل (يوم-شهر-سنة أو شهر-يوم-سنة)
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (m) {
+      let d = +m[1], mo = +m[2];
+      if (mo > 12 && d <= 12) [d, mo] = [mo, d];
+      return (mo >= 1 && mo <= 12) ? mo : null;
+    }
+    return null;
+  }
+  const fuelMonthTotals = {};
+  fuelRows.forEach((r) => {
+    const mo = ovFuelMonthNum_(r);
+    if (!mo) return;
+    fuelMonthTotals[mo] = (fuelMonthTotals[mo] || 0) + ovNumOrZero_(r["اللترات"]);
+  });
+  const fuelByMonth = Object.keys(fuelMonthTotals)
+    .map(Number).sort((a, b) => a - b)
+    .map((mo) => ({ label: OV_MM_AR[mo - 1], axisLabel: String(mo), count: Math.round(fuelMonthTotals[mo]) }));
+
+  const corrRows = (data && data.correspondence && data.correspondence.sheets && data.correspondence.sheets["سجل المراسلات"]) || [];
+  const corrOut = corrRows.filter((r) => String(r["النوع"] ?? "").trim() === "صادر").length;
+  const corrIn = corrRows.filter((r) => String(r["النوع"] ?? "").trim() === "وارد").length;
+
+  const orgRows = (data && data.org_structure && data.org_structure.sheets && data.org_structure.sheets["البيانات"]) || [];
+  const orgVacant = orgRows.filter((r) => String(r["حالة التوظيف"] ?? "").trim() === "شاغر").length;
+  const orgNat = (r) => {
+    const v = String(r["الجنسية"] ?? "").trim();
+    return v === "سعودية" ? "سعودي" : v;
+  };
+  const orgNatRows = orgRows.filter((r) => orgNat(r) !== "");
+  const orgSaudiPct = orgNatRows.length ? Math.round((orgNatRows.filter((r) => orgNat(r) === "سعودي").length / orgNatRows.length) * 100) : null;
+
+  const visitsMonthly = (data && data.visits && data.visits.sheets && data.visits.sheets["الملخص الشهري"]) || [];
+  const visitsByRegionRaw = (data && data.visits && data.visits.sheets && data.visits.sheets["الزيارات حسب المنطقة"]) || [];
+  const visitsCompleted = visitsMonthly.reduce((s, r) => s + ovNumOrZero_(r["مكتملة (COMPLETED)"]), 0);
+  const visitsAssigned = visitsMonthly.reduce((s, r) => s + ovNumOrZero_(r["مسندة (ASSIGNED)"]), 0);
+  const visitsByRegion = visitsByRegionRaw
+    .map((r) => ({ label: String(r["المنطقة"] ?? "").trim() || "غير محدد", count: ovNumOrZero_(r["عدد الزيارات المكتملة"]) }))
+    .sort((a, b) => b.count - a.count).slice(0, 6);
+
+  const PPM_REGIONS = ["مكة المكرمة", "المدينة المنورة", "جدة", "الطائف"];
+  const ppmSheets = (data && data.ppm_maximo && data.ppm_maximo.sheets) || {};
+  const ppmAllRows = PPM_REGIONS.flatMap((region) => (ppmSheets[region] || []).map((row) => ({ ...row, المنطقة: region })));
+  const ppmAgg = (rows) => {
+    let targetCum = 0, achievedCum = 0, totalTarget = 0;
+    rows.forEach((r) => {
+      targetCum += ovNumOrZero_(r["المستهدف التراكمي"]);
+      achievedCum += ovNumOrZero_(r["المحقق التراكمي"]);
+      totalTarget += ovNumOrZero_(r["اجمالي المستهدف"]);
+    });
+    return { targetCum, achievedCum, totalTarget };
+  };
+  const ppmOverall = ppmAgg(ppmAllRows);
+  const ppmPlannedPct = ppmOverall.totalTarget ? Math.round((ppmOverall.targetCum / ppmOverall.totalTarget) * 100) : null;
+  const ppmActualPct = ppmOverall.totalTarget ? Math.round((ppmOverall.achievedCum / ppmOverall.totalTarget) * 100) : null;
+  const ppmByRegion = PPM_REGIONS.map((region) => {
+    const agg = ppmAgg(ppmAllRows.filter((r) => r["المنطقة"] === region));
+    return { label: region, count: agg.totalTarget ? Math.round((agg.achievedCum / agg.totalTarget) * 100) : 0 };
+  });
+
+  return {
+    vehicles: vehiclesRows.length,
+    gatekeepers: gkRows.length,
+    supervisorsSchools, engineers,
+    trainingEmployees, trainingCourses,
+    fuelLiters: Math.round(fuelLiters), fuelCost: Math.round(fuelCost),
+    corrTotal: corrRows.length, corrOut, corrIn,
+    orgTotal: orgRows.length, orgVacant, orgSaudiPct,
+    visitsCompleted, visitsAssigned, visitsByRegion,
+    ppmTasks: ppmAllRows.length, ppmPlannedPct, ppmActualPct, ppmByRegion,
+    gatekeepersByCity, supervisorsByRegion, fuelByMonth,
+  };
+}
+
+function ovApplyNewTemplates_(s, cacheTs, opts) {
+  const info = ovStaleInfo_(cacheTs, opts && opts.mode);
+  const staleNote = info.note, isErr = info.isError, isInf = info.isInfo;
+  const set = (id, value, extra) => ovSetCard(id, Object.assign({ value: typeof value === "number" ? ovNumberEn(value) : value, note: staleNote, isError: isErr, isInfo: isInf }, extra || {}));
+
+  set("card-vehicles", s.vehicles);
+  set("card-gatekeepers", s.gatekeepers);
+  set("card-supervisors-schools", s.supervisorsSchools);
+  set("card-engineers", s.engineers);
+  set("card-training-employees", s.trainingEmployees);
+  set("card-training-courses", s.trainingCourses);
+  set("card-fuel-liters", s.fuelLiters, { unit: " لتر" });
+  set("card-fuel-cost", s.fuelCost, { unit: " ريال" });
+  set("card-corr-total", s.corrTotal);
+  set("card-corr-out", s.corrOut);
+  set("card-corr-in", s.corrIn);
+  set("card-org-total", s.orgTotal);
+  set("card-org-vacant", s.orgVacant, {
+    note: staleNote || (s.orgTotal ? `${Math.round((s.orgVacant / s.orgTotal) * 100)}% من إجمالي الوظائف` : ""),
+  });
+  set("card-org-saudi", s.orgSaudiPct !== null ? s.orgSaudiPct : "—", { unit: s.orgSaudiPct !== null ? "%" : "" });
+  set("card-visits-completed", s.visitsCompleted);
+  set("card-visits-assigned", s.visitsAssigned, {
+    note: staleNote || (s.visitsAssigned ? `${Math.round((s.visitsCompleted / s.visitsAssigned) * 100)}% نسبة الإنجاز` : ""),
+  });
+  set("card-ppm-tasks", s.ppmTasks);
+  set("card-ppm-planned", s.ppmPlannedPct !== null ? s.ppmPlannedPct : "—", { unit: s.ppmPlannedPct !== null ? "%" : "" });
+  set("card-ppm-actual", s.ppmActualPct !== null ? s.ppmActualPct : "—", { unit: s.ppmActualPct !== null ? "%" : "" });
+
+  ovRenderDonut_("chart-org", [
+    { label: "شاغرة", count: s.orgVacant, color: "var(--red)", isCenter: true },
+    { label: "مشغولة", count: Math.max(s.orgTotal - s.orgVacant, 0), color: "var(--good)" },
+  ]);
+  ovRenderDonut_("chart-corr", [
+    { label: "صادر", count: s.corrOut, color: "var(--teal-2)", isCenter: true },
+    { label: "وارد", count: s.corrIn, color: "var(--brass-2)" },
+  ]);
+  ovRenderBars_("chart-ppm-region", s.ppmByRegion || [], "%");
+  ovRenderBars_("chart-visits-region", s.visitsByRegion || []);
+  ovRenderBars_("chart-gatekeepers-city", s.gatekeepersByCity || []);
+  ovRenderBars_("chart-supervisors-region", s.supervisorsByRegion || []);
+  ovRenderTrend_("chart-fuel-month", s.fuelByMonth || [], " لتر");
+}
+
+// ── مصدر "الملفات الجاهزة الجديدة" — السيارات + البوابون/المشرفون/
+// التدريب/الوقود/المراسلات/الهيكل الوظيفي/الزيارات/PPM Maximo، كلهم من
+// نفس الطلب الواحد ──
+async function ovLoadNewTemplates_() {
+  try {
+    const json = await ovFetchJsonRetry_(OV_URLS.NEW_TEMPLATES, 50000, 2);
+    const data = json && json.data !== undefined ? json.data : json;
+    const summary = ovComputeNewTemplatesSummary_(data);
+    ovCacheSave_("newTemplates", summary);
+    ovApplyNewTemplates_(summary);
+  } catch (e) {
+    console.warn("[overview][new-templates]", e);
+    const cached = ovCacheLoad_("newTemplates");
+    if (cached) {
+      ovApplyNewTemplates_(cached.payload, cached.ts);
+    } else {
+      [
+        "card-vehicles", "card-gatekeepers", "card-supervisors-schools", "card-engineers",
+        "card-training-employees", "card-training-courses", "card-fuel-liters", "card-fuel-cost",
+        "card-corr-total", "card-corr-out", "card-corr-in",
+        "card-org-total", "card-org-vacant", "card-org-saudi",
+        "card-visits-completed", "card-visits-assigned",
+        "card-ppm-tasks", "card-ppm-planned", "card-ppm-actual",
+      ].forEach((id) => ovSetCardError_(id));
+    }
+  }
+}
+
+// ★ 2026-09-29 (توسعة رابعة): مصدر "حصر الأصول" — رابط منفصل (HASR)، ورده
+// مش ملفوف في {data:...} زي باقي المصادر. راجع dashboard.js:
+// `_hasrApplyData(json) { HASR.data = json; ... }` — الشكل مباشرة
+// {summary: {totalAssets, totalSchoolsSurveyed, ...}, schools: [...], meta}.
+function ovApplyHasr_(summary, cacheTs, opts) {
+  const info = ovStaleInfo_(cacheTs, opts && opts.mode);
+  ovSetCard("card-assets-total", { value: ovNumberEn(summary.totalAssets), note: info.note, isError: info.isError, isInfo: info.isInfo });
+  ovSetCard("card-assets-schools", { value: ovNumberEn(summary.totalSchoolsSurveyed), note: info.note, isError: info.isError, isInfo: info.isInfo });
+  ovSetCard("card-assets-deteriorated", { value: ovNumberEn(summary.deteriorated), note: info.note, isError: info.isError, isInfo: info.isInfo });
+  ovRenderDonut_("chart-assets", [
+    { label: "متهالكة", count: summary.deteriorated, color: "var(--red)", isCenter: true },
+    { label: "سليمة", count: Math.max(summary.totalAssets - summary.deteriorated, 0), color: "var(--good)" },
+  ]);
+}
+
+async function ovLoadHasr_() {
+  try {
+    const json = await ovFetchJsonRetry_(OV_URLS.HASR, 60000, 2);
+    const schools = Array.isArray(json && json.schools) ? json.schools : [];
+    const summaryRaw = (json && json.summary) || {};
+    const summary = {
+      totalAssets: ovNumOrZero_(summaryRaw.totalAssets),
+      totalSchoolsSurveyed: ovNumOrZero_(summaryRaw.totalSchoolsSurveyed),
+      deteriorated: schools.reduce((t, x) => t + ovNumOrZero_(x && x.deteriorated), 0),
+    };
+    ovCacheSave_("hasr", summary);
+    ovApplyHasr_(summary);
+  } catch (e) {
+    console.warn("[overview][hasr]", e);
+    const cached = ovCacheLoad_("hasr");
+    if (cached) {
+      ovApplyHasr_(cached.payload, cached.ts);
+    } else {
+      ["card-assets-total", "card-assets-schools", "card-assets-deteriorated"].forEach((id) => ovSetCardError_(id));
+    }
+  }
+}
+
+// ★ 2026-09-29 (توسعة رابعة): "خليه اول ما يحمل اول مره يفضل محفوظ في
+// كاش المتصفح" — قبل حتى ما نبدأ أي طلب شبكة، بنقرأ كل الكاشات المحلية
+// المحفوظة من زيارة سابقة (لو موجودة) ونعرضها فورًا على الكروت والتشارتات
+// بملاحظة زرقاء محايدة "🔄 جارٍ التحديث الآن" (مش تحذير أحمر) — بعدها
+// بيبدأ window.__ovLoadAll() عادي في الخلفية ويحدّث كل كارت بالرقم الحي
+// أول ما يوصل. النتيجة: زيارة تانية للصفحة بتحس إنها "فورية" بدل ما تستنى
+// شاشة تحميل فاضية من الصفر في كل مرة.
+function ovHydrateFromCache_() {
+  const balagh = ovCacheLoad_("balagh");
+  if (balagh) ovApplyBalagh_(balagh.payload, balagh.ts, { mode: "revalidating" });
+  const sr = ovCacheLoad_("sr");
+  if (sr) ovApplySr_(sr.payload, sr.ts, { mode: "revalidating" });
+  const main = ovCacheLoad_("main");
+  if (main) ovApplyMain_(main.payload, main.ts, { mode: "revalidating" });
+  const newTemplates = ovCacheLoad_("newTemplates");
+  if (newTemplates) ovApplyNewTemplates_(newTemplates.payload, newTemplates.ts, { mode: "revalidating" });
+  const hasr = ovCacheLoad_("hasr");
+  if (hasr) ovApplyHasr_(hasr.payload, hasr.ts, { mode: "revalidating" });
+}
+
+window.__ovLoadAll = function () {
+  const btn = document.getElementById("refreshBtn");
+  const icon = document.getElementById("refreshIcon");
+  if (btn) btn.disabled = true;
+  if (icon) icon.classList.add("spin");
+  const tasks = [ovLoadBalagh_(), ovLoadSchoolReports_(), ovLoadMain_(), ovLoadNewTemplates_(), ovLoadHasr_()];
+  Promise.allSettled(tasks).finally(() => {
+    if (btn) btn.disabled = false;
+    if (icon) icon.classList.remove("spin");
+    const now = new Date();
+    const timeEl = document.getElementById("lastUpdated");
+    if (timeEl) {
+      timeEl.textContent = now.toLocaleString("en-GB", {
+        hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit",
+      });
+    }
+  });
+};
+
+ovHydrateFromCache_();
+window.__ovLoadAll();
+
+// ★ 2026-09-29: تحديث تلقائي صامت كل 5 دقائق — لو الصفحة فضلت مفتوحة
+// وحصل تعطل مؤقت في مصدر بيانات، هيتعالج لوحده مع أول تحديث تلقائي جاي
+// من غير ما حد يحتاج يدوس "تحديث الآن" بنفسه.
+setInterval(() => {
+  const btn = document.getElementById("refreshBtn");
+  if (btn && btn.disabled) return; // فيه تحديث شغّال بالفعل، منستناش نضاعفه
+  window.__ovLoadAll();
+}, 5 * 60 * 1000);
+</script>
+</body>
+</html>

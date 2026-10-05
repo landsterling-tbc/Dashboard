@@ -5070,7 +5070,7 @@ const COST_BACKUP_URL =
   "https://script.google.com/macros/s/AKfycbweVcD1cOAqFa6nkt9555c1kOyATcU6t_UWHGmySeOENb4y8XfmVbl9juXgRtqp2uEdeA/exec";
 
 function __buildBackupSources_() {
-  return [
+  const __list = [
     {
       url: CFG.GAS_URL,
       kind: "multi",
@@ -5182,6 +5182,9 @@ function __buildBackupSources_() {
       label: "بلاغات المدارس المباشرة",
     },
   ];
+  // ★ 2026-10-05: ملف البلاغات (أثقل مصدر بفارق كبير: >130 ألف صف) يُنزَّل آخر
+  // مصدر دائمًا، حتى لا يؤخِّر باقي الملفات ولا يتزاحم معها، ويأخذ وقته كاملًا.
+  return __list.filter((x) => x.kind !== "balagh").concat(__list.filter((x) => x.kind === "balagh"));
 }
 
 // برنامج إكسل يرفض أسماء صفحات أطول من 31 حرفًا أو تحتوي على الرموز
@@ -5358,6 +5361,13 @@ function __backupReasonText_(err) {
   if (reason === "server") return "رد غير متوقَّع من الخادم";
   if (reason === "empty") return "لا توجد بيانات في الرد";
   if (reason === "cancelled") return "تم الإيقاف بواسطتك";
+  // ★ 2026-10-05: أخطاء الحفظ في المجلد (واجهة File System Access) كانت تُعرَض
+  // خطأً على أنها "تعذّر الاتصال بالخادم" رغم نجاح جلب البيانات أصلًا.
+  const nm = err && err.name;
+  if (nm === "RangeError") return "الملف كبير جدًا على المتصفح — تعذّر إنشاء ملف الإكسل";
+  if (nm === "NotFoundError" || nm === "NotAllowedError" || nm === "SecurityError" || nm === "InvalidStateError" || nm === "NoModificationAllowedError" || nm === "QuotaExceededError") {
+    return "تعذّر الحفظ في المجلد المحدَّد";
+  }
   return "تعذّر الاتصال بالخادم";
 }
 
@@ -5620,46 +5630,77 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
 // إعدادات الموقع) — فالمرات الجاية بتتحفظ فيه تلقائيًا من غير أي نافذة
 // اختيار تانية. لو المتصفح مش بيدعم الميزة، أو المجلد مش مختار أصلًا، أو
 // الإذن اتلغى، بيرجع تلقائيًا لأسلوب التنزيل العادي (زي ما كان بالظبط).
-const __BACKUP_SAVE_DIR_KEY = "tbc_backup_save_dir_handle_v1";
+// ★ 2026-10-05: دعم مجلدَي حفظ (مثلًا: مجلد SharePoint المتزامن + مجلد على الجهاز).
+// المجلد 1 يحتفظ بنفس المفتاح القديم (v1) فلا يضيع اختيار المستخدم السابق،
+// والمجلد 2 مفتاح جديد (v2). كل مجلد اختياري ومستقل عن الآخر.
+const __BACKUP_SAVE_DIR_KEYS = ["tbc_backup_save_dir_handle_v1", "tbc_backup_save_dir_handle_v2"];
+const __BACKUP_SAVE_DIR_KEY = __BACKUP_SAVE_DIR_KEYS[0]; // للتوافق مع أي استخدام قديم
 
 function __backupFolderApiSupported_() {
   return typeof window.showDirectoryPicker === "function";
 }
 
-// يُستدعى فقط من داخل ضغطة مستخدم مباشرة (زر "اختيار مجلد الحفظ") — متصفحات
+// يُستدعى فقط من داخل ضغطة مستخدم مباشرة (زر "اختيار/تغيير المجلد") — متصفحات
 // الويب بتشترط user activation حقيقي عشان تفتح نافذة اختيار المجلدات.
-async function __backupPickSaveFolder_() {
+// slot: 0 = المجلد 1، 1 = المجلد 2. الـ id بيخلّي المتصفح يفتح كل اختيار على آخر
+// مكان استُخدم له (مفيد لمجلد SharePoint المتزامن ومجلد الجهاز).
+async function __backupPickSaveFolder_(slot) {
+  slot = slot === 1 ? 1 : 0;
   if (!__backupFolderApiSupported_()) {
     throw new Error("هذا المتصفح لا يدعم اختيار مجلد حفظ مباشر (متاح في Chrome/Edge فقط)");
   }
-  const handle = await window.showDirectoryPicker({ mode: "readwrite" });
-  if (window._idb) await window._idb.set(__BACKUP_SAVE_DIR_KEY, handle);
+  const handle = await window.showDirectoryPicker({ id: "tbcBackupSlot" + (slot + 1), mode: "readwrite" });
+  // منع اختيار نفس المجلد في الخانتين
+  if (window._idb) {
+    try {
+      const other = await window._idb.get(__BACKUP_SAVE_DIR_KEYS[slot === 0 ? 1 : 0]);
+      if (other && typeof other.isSameEntry === "function" && (await other.isSameEntry(handle))) {
+        throw Object.assign(new Error("هذا هو نفس المجلد المختار في الخانة الأخرى — اختر مجلدًا مختلفًا"), { __duplicate: true });
+      }
+    } catch (e) {
+      if (e && e.__duplicate) throw e;
+    }
+    await window._idb.set(__BACKUP_SAVE_DIR_KEYS[slot], handle);
+  }
   return handle;
 }
 
-async function __backupClearSaveFolder_() {
-  if (window._idb) await window._idb.set(__BACKUP_SAVE_DIR_KEY, null);
+async function __backupClearSaveFolder_(slot) {
+  slot = slot === 1 ? 1 : 0;
+  if (window._idb) await window._idb.set(__BACKUP_SAVE_DIR_KEYS[slot], null);
 }
 
-// يرجّع مقبض المجلد المحفوظ فقط لو الإذن عليه لسه ممنوح (granted) فعلًا.
-// silent=true (تُستخدم في التنزيل التلقائي المجدوَل، اللي مفيهوش أي ضغطة
-// مستخدم حقيقية) بتمنع أي محاولة لطلب الإذن من جديد — لو محتاج إعادة
-// موافقة، بترجع null على طول وتسيب المنطق يرجع للتنزيل العادي بدل ما
-// تعلَّق أو تفشل بصمت. silent=false (تُستخدم فقط لحظة الضغط على "تنزيل
-// الآن" مباشرة) بتسمح بمحاولة واحدة لإعادة تأكيد الإذن لو لزم.
-async function __backupGetSaveFolder_(silent) {
-  if (!__backupFolderApiSupported_() || !window._idb) return null;
-  try {
-    const handle = await window._idb.get(__BACKUP_SAVE_DIR_KEY);
-    if (!handle || typeof handle.queryPermission !== "function") return null;
-    let perm = await handle.queryPermission({ mode: "readwrite" });
-    if (perm !== "granted" && !silent) {
-      perm = await handle.requestPermission({ mode: "readwrite" });
-    }
-    return perm === "granted" ? handle : null;
-  } catch (_) {
-    return null;
+// يرجّع قائمة مجلدات الحفظ (حتى اثنين) اللي الإذن عليها لسه ممنوح (granted) فعلًا:
+// [{ slot, handle }]. silent=true (التنزيل التلقائي المجدوَل، بدون ضغطة مستخدم)
+// بيمنع أي محاولة لطلب الإذن من جديد. silent=false (لحظة الضغط على "تنزيل الآن")
+// بيسمح بمحاولة لإعادة تأكيد الإذن لكل مجلد — لو فشلت محاولة (مثلًا لانتهاء
+// user activation بعد النافذة الأولى) نتجاوز هذا المجلد بدل ما نوقف الباقي؛
+// ويمكن تأكيد الإذن له بزر "تأكيد الإذن" في القائمة.
+async function __backupGetSaveFolders_(silent) {
+  const out = [];
+  if (!__backupFolderApiSupported_() || !window._idb) return out;
+  for (let slot = 0; slot < __BACKUP_SAVE_DIR_KEYS.length; slot++) {
+    try {
+      const handle = await window._idb.get(__BACKUP_SAVE_DIR_KEYS[slot]);
+      if (!handle || typeof handle.queryPermission !== "function") continue;
+      let perm = await handle.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted" && !silent) {
+        try {
+          perm = await handle.requestPermission({ mode: "readwrite" });
+        } catch (_) {}
+      }
+      if (perm !== "granted") continue;
+      // تجاهل المجلد لو هو نفس مجلد خانة سابقة (حتى لا تُكتب النسخة مرتين في نفس المكان)
+      let dup = false;
+      for (const prev of out) {
+        try {
+          if (await prev.handle.isSameEntry(handle)) dup = true;
+        } catch (_) {}
+      }
+      if (!dup) out.push({ slot, handle });
+    } catch (_) {}
   }
+  return out;
 }
 
 // ★ 2026-09-29: بناءً على طلب صريح — كل نسخة احتياطية بتتحفظ في مجلدها
@@ -5676,14 +5717,213 @@ async function __backupGetDatedSubfolder_(baseDirHandle, dateTag) {
   }
 }
 
-// يكتب دفتر العمل (workbook) مباشرة كملف xlsx داخل المجلد المحدَّد، بدون
-// أي نافذة "تنزيل" من المتصفح على الإطلاق.
-async function __backupWriteWorkbookToFolder_(dirHandle, filename, wb) {
+// يكتب محتوى جاهز (ArrayBuffer) كملف داخل مجلد، بدون أي نافذة "تنزيل" من المتصفح.
+async function __backupWriteBufToFolder_(dirHandle, filename, buf) {
   const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
   const writable = await fileHandle.createWritable();
-  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   await writable.write(buf);
   await writable.close();
+}
+
+// (للتوافق) يكتب دفتر العمل مباشرة كملف xlsx داخل مجلد واحد.
+async function __backupWriteWorkbookToFolder_(dirHandle, filename, wb) {
+  await __backupWriteBufToFolder_(dirHandle, filename, XLSX.write(wb, { bookType: "xlsx", type: "array" }));
+}
+
+// ★ 2026-10-05: تنزيل ملف (ArrayBuffer) عبر المتصفح — يُستخدم عندما لا يوجد مجلد صالح.
+function __backupDownloadBuf_(filename, buf) {
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+// يحفظ محتوى جاهز (buf) في كل مجلدات الحفظ المختارة (حتى اثنين) بشكل مستقل:
+//  - عند فشل الكتابة في مجلد: نعيد إنشاء مجلد اليوم ونحاول مرة واحدة، وإن فشل
+//    نعلّم هذا المجلد "مفقودًا" (t.lost) ونتوقف عن استخدامه لباقي هذه النسخة —
+//    دون أن يتأثر المجلد الآخر.
+//  - التنزيل العادي من المتصفح لا يُستخدم إلا إذا لم ينجح الحفظ في أي مجلد.
+// ctx = { targets: [{ slot, name, base, dir, lost, written:Set }], dateTag }
+async function __backupSaveBufResilient_(ctx, filename, buf) {
+  const targets = (ctx && ctx.targets) || [];
+  let saved = 0;
+  for (const t of targets) {
+    if (!t.dir || t.lost) continue;
+    try {
+      await __backupWriteBufToFolder_(t.dir, filename, buf);
+      t.written.add(filename);
+      saved++;
+      continue;
+    } catch (e1) {
+      console.warn("[backup] فشلت الكتابة في المجلد " + (t.slot + 1) + " — محاولة إعادة إنشاء المجلد الفرعي:", e1);
+    }
+    try {
+      t.dir = await t.base.getDirectoryHandle(ctx.dateTag, { create: true });
+      await __backupWriteBufToFolder_(t.dir, filename, buf);
+      t.written.add(filename);
+      saved++;
+    } catch (e2) {
+      console.warn("[backup] تعذّر الحفظ في المجلد " + (t.slot + 1) + " — سيُتجاوز لباقي هذه النسخة:", e2);
+      t.dir = null;
+      t.lost = true;
+    }
+  }
+  if (saved > 0) return "folder";
+  __backupDownloadBuf_(filename, buf);
+  return "download";
+}
+
+// يحذف (بأفضل جهد) ملفات سبق كتابتها في المجلدات — يُستخدم لتنظيف أجزاء محاولة
+// تقسيم فشلت قبل تجربة تقسيم أصغر، حتى لا تبقى أجزاء يتيمة في المجلد.
+async function __backupRemoveFromTargets_(ctx, names) {
+  for (const t of (ctx && ctx.targets) || []) {
+    if (!t.dir || t.lost) continue;
+    for (const n of names) {
+      try {
+        await t.dir.removeEntry(n);
+      } catch (_) {}
+      t.written.delete(n);
+    }
+  }
+}
+
+// ── تقسيم الشيتات الضخمة (مثل البلاغات: >130 ألف صف) على عدة ملفات ──
+// ملف إكسل واحد بهذا الحجم قد يفشل داخل مكتبة XLSX بالخطأ
+// "RangeError: Invalid array length" (حدود ذاكرة المتصفح) رغم نجاح الجلب.
+// الأجزاء تحمل نفس اسم الشيت، وصف العناوين مكرَّر في كل جزء، والشيتات الصغيرة
+// (مثل خريطة NEW SLA) تكون في الجزء الأول.
+function __backupSliceSheet_(ws, range, from, to) {
+  const out = {};
+  const hdr = range.s.r;
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const h = ws[XLSX.utils.encode_cell({ r: hdr, c })];
+    if (h) out[XLSX.utils.encode_cell({ r: 0, c })] = h;
+  }
+  for (let r = from; r < to; r++) {
+    const srcR = hdr + 1 + r;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: srcR, c })];
+      if (cell) out[XLSX.utils.encode_cell({ r: 1 + (r - from), c })] = cell;
+    }
+  }
+  out["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: to - from, c: range.e.c } });
+  if (ws["!cols"]) out["!cols"] = ws["!cols"];
+  return out;
+}
+
+function __backupPlanParts_(wb, chunkRows) {
+  const infos = wb.SheetNames.map((name) => {
+    const ws = wb.Sheets[name];
+    const ref = ws && ws["!ref"];
+    if (!ref) return { name, ws, range: null, dataRows: 0 };
+    const range = XLSX.utils.decode_range(ref);
+    return { name, ws, range, dataRows: Math.max(0, range.e.r - range.s.r) }; // بدون صف العناوين
+  });
+  const big = infos.filter((i) => i.dataRows > chunkRows);
+  const count = big.length ? Math.max(...big.map((i) => Math.ceil(i.dataRows / chunkRows))) : 1;
+  const build = (k) => {
+    const out = XLSX.utils.book_new();
+    infos.forEach((i) => {
+      if (i.dataRows <= chunkRows) {
+        if (k === 0) XLSX.utils.book_append_sheet(out, i.ws, i.name);
+        return;
+      }
+      const from = k * chunkRows;
+      if (from >= i.dataRows) return;
+      const to = Math.min(i.dataRows, from + chunkRows);
+      XLSX.utils.book_append_sheet(out, __backupSliceSheet_(i.ws, i.range, from, to), i.name);
+    });
+    return out;
+  };
+  return { count, build };
+}
+
+const __BACKUP_SPLIT_LADDER_ = [40000, 20000, 10000]; // أقصى عدد صفوف بيانات للشيت الواحد في الجزء الواحد
+
+// يحفظ دفتر عمل: المحاولة الأولى ملف واحد كالمعتاد (نفس السلوك السابق تمامًا لكل
+// المصادر الطبيعية). فقط لو فشل إنشاء الملف (حجم ضخم) يُقسَّم تلقائيًا لأجزاء
+// مضغوطة بأحجام متناقصة. يرجّع "folder" | "download" | "split".
+// بعد الاستدعاء: ctx.lastParts = أسماء الأجزاء (فارغة لو ملف واحد).
+async function __backupSaveWorkbookResilient_(ctx, filename, wb) {
+  ctx.lastParts = [];
+  let fullErr = null;
+  try {
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    return await __backupSaveBufResilient_(ctx, filename, buf);
+  } catch (e) {
+    // خطأ الكتابة في المجلد لا يصل إلى هنا (يُعالَج داخل __backupSaveBufResilient_)؛
+    // فهذا فشل إنشاء ملف الإكسل نفسه (الحجم).
+    fullErr = e;
+    console.warn("[backup] تعذّر إنشاء ملف إكسل واحد لـ " + filename + " — سيُقسَّم لأجزاء:", e);
+  }
+
+  let lastErr = fullErr;
+  for (const size of __BACKUP_SPLIT_LADDER_) {
+    const plan = __backupPlanParts_(wb, size);
+    if (plan.count <= 1) continue;
+    const doneNames = [];
+    try {
+      if (ctx.onInfo) ctx.onInfo(`ملف كبير — جارٍ تقسيمه إلى ${plan.count} أجزاء (حتى ${size.toLocaleString("en-US")} صف للجزء)...`);
+      for (let k = 0; k < plan.count; k++) {
+        await new Promise((r) => setTimeout(r, 30)); // لإفساح المجال للواجهة بين الأجزاء
+        const pwb = plan.build(k);
+        const pname = filename.replace(/\.xlsx$/i, `_جزء${k + 1}من${plan.count}.xlsx`);
+        const pbuf = XLSX.write(pwb, { bookType: "xlsx", type: "array", compression: true });
+        await __backupSaveBufResilient_(ctx, pname, pbuf);
+        doneNames.push(pname);
+        if (ctx.onInfo) ctx.onInfo(`تم حفظ الجزء ${k + 1} من ${plan.count}...`);
+      }
+      ctx.lastParts = doneNames;
+      return "split";
+    } catch (e) {
+      lastErr = e;
+      console.warn("[backup] فشل التقسيم بحجم " + size + " صف — محاولة بحجم أصغر:", e);
+      await __backupRemoveFromTargets_(ctx, doneNames);
+    }
+  }
+  throw lastErr || new Error("تعذّر إنشاء ملف الإكسل");
+}
+
+// يكتب ملفًا نصيًا في كل المجلدات الصالحة؛ يرجّع true لو نجح في واحد على الأقل.
+async function __backupWriteTextToTargets_(ctx, filename, text) {
+  let ok = 0;
+  for (const t of (ctx && ctx.targets) || []) {
+    if (!t.dir || t.lost) continue;
+    try {
+      await __backupWriteTextToFolder_(t.dir, filename, text);
+      t.written.add(filename);
+      ok++;
+    } catch (e) {
+      console.warn("[backup] تعذّر كتابة الدليل في المجلد " + (t.slot + 1), e);
+    }
+  }
+  return ok > 0;
+}
+
+// نص الختام الذي يصف أين حُفظت النسخة وأين تعذّر الحفظ.
+function __backupBuildFolderNote_(ctx, dateTag, cleanedCount) {
+  const ts = (ctx && ctx.targets) || [];
+  if (!ts.length) return "";
+  const label = (t) => `مجلد ${t.slot + 1} (${t.name})`;
+  const ok = ts.filter((t) => !t.lost);
+  const bad = ts.filter((t) => t.lost);
+  let note = "";
+  if (ok.length) {
+    note +=
+      ` — تم الحفظ في مجلد بتاريخ اليوم (${dateTag}) داخل: ${ok.map(label).join("، ")}` +
+      ` (استبدالًا لأي نسخة سابقة بنفس اليوم${cleanedCount ? `، وحُذف ${cleanedCount} ملف قديم متبقٍّ` : ""})`;
+  }
+  if (bad.length) {
+    note +=
+      ` — ⚠️ تعذّر الحفظ في: ${bad.map(label).join("، ")} (غير موجود أو غير متاح)؛ يُرجى إعادة اختيار مجلد الحفظ` +
+      (ok.length ? "" : "، فتم تنزيل الملفات عبر المتصفح بدلًا منه");
+  }
+  return note;
 }
 
 // يكتب ملف نصي عادي (دليل الملفات) داخل المجلد المحدَّد، بنفس أسلوب كتابة
@@ -5729,7 +5969,7 @@ const __BACKUP_FILE_DESCRIPTIONS_ = {
 
 // يستخرج أسماء الشيتات الفعلية التي أُنتِجت داخل دفتر عمل مصدر مُعيَّن، حتى
 // يعكس الدليل المحتوى الحقيقي للملف (وليس تخمينًا) في كل مرة يُنشأ فيها.
-function __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource) {
+function __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource) {
   const lines = [];
   lines.push("دليل ملفات النسخة الاحتياطية — بتاريخ " + dateTag);
   lines.push("=".repeat(50));
@@ -5744,7 +5984,9 @@ function __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource) {
     const filename = `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`;
     const desc = __BACKUP_FILE_DESCRIPTIONS_[src.fileLabel] || src.label || "بيانات هذا المصدر.";
     const sheetNames = (sheetNamesBySource && sheetNamesBySource[idx]) || [];
-    lines.push(`${idx + 1}) ${filename}`);
+    const parts = (partsBySource && partsBySource[idx]) || [];
+    lines.push(`${idx + 1}) ${parts.length ? filename + " — مقسَّم لعدة أجزاء (الملف كبير جدًا)" : filename}`);
+    if (parts.length) parts.forEach((pn) => lines.push(`   • ${pn}`));
     lines.push(`   البيانات: ${desc}`);
     lines.push(
       `   الشيتات (${sheetNames.length}): ` + (sheetNames.length ? sheetNames.join("، ") : "—"),
@@ -5778,45 +6020,59 @@ window.__downloadFullDataBackup = async function (opts) {
   if (__fullBackupInflight) return;
   __fullBackupInflight = true;
   const auto = !!(opts && opts.auto);
-  const backupSources = __buildBackupSources_();
-  const progress = __backupCreateProgressUI_(
-    backupSources.map((s) => s.fileLabel || s.label || s.url),
-    auto,
-  );
+  let backupSources, progress;
+  try {
+    backupSources = __buildBackupSources_();
+    progress = __backupCreateProgressUI_(
+      backupSources.map((s) => s.fileLabel || s.label || s.url),
+      auto,
+    );
+  } catch (setupErr) {
+    console.error("[__downloadFullDataBackup] فشل التهيئة:", setupErr);
+    __fullBackupInflight = false;
+    if (!auto) alert("تعذّر بدء النسخ الاحتياطي: " + (setupErr && setupErr.message)); // التلقائي: يُعاد تلقائيًا بعد نصف دقيقة
+    return;
+  }
 
   const dateTag = new Date().toISOString().slice(0, 10);
   const failedSources = [];
   const sheetNamesBySource = backupSources.map(() => []);
+  const partsBySource = backupSources.map(() => []);
   let successCount = 0;
   // لو المستخدم اختار مجلد حفظ مباشر قبل كده (والإذن لسه ممنوح)، هيتحفظ كل
   // ملف جواه على طول بدون أي نافذة تنزيل. auto=true (التنزيل المجدوَل تلقائيًا
   // بدون أي ضغطة مستخدم) بيمنع أي محاولة لإعادة تأكيد الإذن، فلو الإذن
   // احتاج تجديد هيرجع تلقائيًا للتنزيل العادي بدل ما يتوقف.
-  const saveDirHandle = await __backupGetSaveFolder_(auto);
-  // كل ملفات هذه النسخة (الإكسل العشرة + ملف الدليل) تتحفظ معًا داخل مجلد
-  // فرعي باسم تاريخ اليوم جوه المجلد الأساسي المختار — راجع __backupGetDatedSubfolder_.
-  const saveDirForRun = saveDirHandle ? await __backupGetDatedSubfolder_(saveDirHandle, dateTag) : null;
-
+  // مجلدات الحفظ المباشر (حتى اثنين: مثلًا SharePoint المتزامن + مجلد الجهاز). لكل
+  // مجلد صالح نُنشئ/نعيد استخدام مجلد فرعي باسم تاريخ اليوم، وتُكتب كل ملفات
+  // النسخة (الإكسل + الدليل) في كل مجلد على حدة. auto=true بيمنع إعادة طلب الإذن.
+  let saveFolders = [];
+  try {
+    saveFolders = await __backupGetSaveFolders_(auto);
+  } catch (e) {
+    console.warn("[backup] تعذّر قراءة مجلدات الحفظ", e);
+  }
+  const targets = [];
+  for (const f of saveFolders) {
+    let dir = null;
+    try {
+      dir = await __backupGetDatedSubfolder_(f.handle, dateTag);
+    } catch (e) {
+      console.warn("[backup] تعذّر تجهيز مجلد اليوم للمجلد " + (f.slot + 1), e);
+    }
+    targets.push({ slot: f.slot, name: f.handle.name, base: f.handle, dir, lost: !dir, written: new Set() });
+  }
+  const saveCtx = { targets, dateTag, lastParts: [], onInfo: (t) => progress.setSummary(t) };
   const shouldStop = () => progress.isStopped();
   let userStopped = false;
 
   try {
-    for (let idx = 0; idx < backupSources.length; idx++) {
-      // فحص طلب الإيقاف قبل بدء أي مصدر جديد — لا نوقف مصدرًا في منتصف
-      // تنزيله، بل نمنع بدء التالي فقط، حتى لا يُترَك ملف منتصف الكتابة.
-      if (shouldStop()) {
-        userStopped = true;
-        for (let j = idx; j < backupSources.length; j++) {
-          progress.setStatus(j, "cancelled");
-        }
-        break;
-      }
-
+    // معالجة مصدر واحد: جلب ← بناء الملف ← حفظ. يرجّع "ok" | "failed" | "cancelled".
+    const processSource = async (idx) => {
       const src = backupSources[idx];
       const displayName = src.fileLabel || src.label || src.url;
       const timeoutMs = src.heavy ? __BACKUP_FETCH_TIMEOUT_MAIN_MS : __BACKUP_FETCH_TIMEOUT_MS;
       progress.setStatus(idx, "downloading");
-
       try {
         const apiResponse = await __backupFetchWithTimeout_(
           src.url,
@@ -5835,11 +6091,8 @@ window.__downloadFullDataBackup = async function (opts) {
         }
         sheetNamesBySource[idx] = wb.SheetNames.slice();
         const filename = `نسخة_احتياطية_${src.fileLabel}_${dateTag}.xlsx`;
-        if (saveDirForRun) {
-          await __backupWriteWorkbookToFolder_(saveDirForRun, filename, wb);
-        } else {
-          XLSX.writeFile(wb, filename);
-        }
+        await __backupSaveWorkbookResilient_(saveCtx, filename, wb);
+        partsBySource[idx] = (saveCtx.lastParts || []).slice();
         successCount++;
         progress.setStatus(idx, "done");
         progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
@@ -5848,20 +6101,60 @@ window.__downloadFullDataBackup = async function (opts) {
         if (idx < backupSources.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 450));
         }
+        return "ok";
       } catch (err) {
-        if (err && err.__backupReason === "cancelled") {
-          userStopped = true;
-          for (let j = idx; j < backupSources.length; j++) {
-            progress.setStatus(j, "cancelled");
-          }
-          break;
-        }
+        if (err && err.__backupReason === "cancelled") return "cancelled";
         console.error("[__downloadFullDataBackup] فشل مصدر:", displayName, err);
-        failedSources.push(displayName);
         progress.setStatus(idx, "failed", __backupReasonText_(err));
         progress.setSummary(`تم تنزيل ${successCount} من ${backupSources.length} ملفات حتى الآن...`);
+        return "failed";
       }
+    };
+
+    let failedIdx = [];
+    for (let idx = 0; idx < backupSources.length; idx++) {
+      // فحص طلب الإيقاف قبل بدء أي مصدر جديد — لا نوقف مصدرًا في منتصف
+      // تنزيله، بل نمنع بدء التالي فقط، حتى لا يُترَك ملف منتصف الكتابة.
+      if (shouldStop()) {
+        userStopped = true;
+        for (let j = idx; j < backupSources.length; j++) progress.setStatus(j, "cancelled");
+        break;
+      }
+      const r = await processSource(idx);
+      if (r === "cancelled") {
+        userStopped = true;
+        for (let j = idx; j < backupSources.length; j++) progress.setStatus(j, "cancelled");
+        break;
+      }
+      if (r === "failed") failedIdx.push(idx);
     }
+
+    // ★ 2026-10-05: جولة إعادة محاولة أخيرة للمصادر التي تعذّرت (بعد انتهاء الباقي
+    // وبعد مهلة قصيرة) — فتأخذ وقتها الكامل دون مزاحمة، ويُحاوَل تنزيل أي شيء
+    // لم يُنزَّل في الجولة الأولى.
+    if (!userStopped && failedIdx.length) {
+      progress.setSummary(`إعادة محاولة ${failedIdx.length} مصدر تعذّر تنزيله...`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      const still = [];
+      for (let q = 0; q < failedIdx.length; q++) {
+        const idx = failedIdx[q];
+        if (shouldStop()) {
+          userStopped = true;
+          still.push(...failedIdx.slice(q));
+          break;
+        }
+        const r = await processSource(idx);
+        if (r === "cancelled") {
+          userStopped = true;
+          progress.setStatus(idx, "cancelled");
+          still.push(...failedIdx.slice(q + 1));
+          break;
+        }
+        if (r === "failed") still.push(idx);
+      }
+      failedIdx = still;
+    }
+    failedIdx.forEach((i) => failedSources.push(backupSources[i].fileLabel || backupSources[i].label || backupSources[i].url));
 
     if (!successCount) {
       if (userStopped) {
@@ -5877,18 +6170,48 @@ window.__downloadFullDataBackup = async function (opts) {
     // يُغلَّف في try/catch مستقل حتى لا يؤثر أي خطأ في إنشائه على نجاح
     // النسخة الاحتياطية نفسها (الملفات العشرة أهم بكثير من الدليل).
     try {
-      const guideText = __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource);
+      const guideText = __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource);
       const guideFilename = `دليل_الملفات_${dateTag}.txt`;
-      if (saveDirForRun) {
-        await __backupWriteTextToFolder_(saveDirForRun, guideFilename, guideText);
-      } else {
-        __backupDownloadTextFile_(guideFilename, guideText);
-      }
+      const guideSaved = await __backupWriteTextToTargets_(saveCtx, guideFilename, guideText);
+      if (!guideSaved) __backupDownloadTextFile_(guideFilename, guideText);
     } catch (guideErr) {
       console.error("[__downloadFullDataBackup] فشل إنشاء ملف الدليل:", guideErr);
     }
 
-    const folderNote = saveDirHandle ? ` — تم الحفظ في مجلد بتاريخ اليوم (${dateTag}) داخل المجلد المحدَّد` : "";
+    // ★ 2026-10-05 (بناءً على طلب): "استبدال" مجلد اليوم بآخر نسخة — لكل مجلد حفظ
+    // على حدة. ملفات النسخة الجديدة تُكتب فوق القديمة بنفس الاسم أصلًا؛ وهنا نحذف
+    // أي ملف نسخة احتياطية متبقٍّ ليس جزءًا من النسخة الجديدة. لا يتم الحذف إلا إذا
+    // نجحت كل المصادر ولم يُوقَف التنزيل.
+    // ⚠️ حماية: لا نحذف إذا كان "مجلد اليوم" هو نفسه المجلد الأساسي (فشل إنشاء
+    // المجلد الفرعي)، ولا نحذف إلا ملفات `نسخة_احتياطية_*` و`دليل_الملفات_*`.
+    let cleanedCount = 0;
+    if (!userStopped && !failedSources.length) {
+      for (const t of saveCtx.targets) {
+        if (!t.dir || t.lost) continue;
+        try {
+          let isDated = false;
+          try {
+            isDated = !(await t.dir.isSameEntry(t.base));
+          } catch (_) {
+            isDated = false;
+          }
+          if (!isDated) continue;
+          const stale = [];
+          for await (const [name, handle] of t.dir.entries()) {
+            const ours = handle.kind === "file" && (name.startsWith("نسخة_احتياطية_") || name.startsWith("دليل_الملفات_"));
+            if (ours && !t.written.has(name)) stale.push(name);
+          }
+          for (const name of stale) {
+            await t.dir.removeEntry(name);
+            cleanedCount++;
+          }
+        } catch (cleanErr) {
+          console.warn("[backup] تعذّر حذف الملفات القديمة المتبقية من مجلد اليوم (مجلد " + (t.slot + 1) + "):", cleanErr);
+        }
+      }
+    }
+
+    const folderNote = __backupBuildFolderNote_(saveCtx, dateTag, cleanedCount);
     if (userStopped) {
       progress.finish(
         `تم إيقاف التنزيل بواسطتك — تم تنزيل ${successCount} من ${backupSources.length} ملفات قبل الإيقاف` +
@@ -5963,25 +6286,32 @@ function __backupSchedulerTick_() {
 }
 let __backupSchedulerTimer = null;
 if (!__backupSchedulerTimer) {
-  __backupSchedulerTick_();
+  // ★ 2026-10-05: كان أول فحص يُستدعى فورًا أثناء تحميل الملف نفسه — فإذا كان
+  // التنزيل التلقائي مستحَقًّا، تُبنى قائمة المصادر قبل أن تُعرَّف ثوابت الروابط
+  // (مثل TAJHEEZ_SUPPLIES_URL) المعرَّفة لاحقًا في الملف، فتظهر رسالة
+  // "Cannot access ... before initialization". الآن يُؤجَّل أول فحص إلى ما
+  // بعد اكتمال تحميل الصفحة + 15 ثانية (يترك للداشبورد تحميل بياناته أولًا).
+  const __backupFirstTick_ = () => setTimeout(__backupSchedulerTick_, 15000);
+  if (document.readyState === "complete") __backupFirstTick_();
+  else window.addEventListener("load", __backupFirstTick_, { once: true });
   __backupSchedulerTimer = setInterval(__backupSchedulerTick_, 3e4);
 }
 
-// يصف حالة مجلد الحفظ المباشر الحالية عشان تُعرَض في القائمة — بدون أي
-// محاولة لطلب إذن جديد (فحص فقط، قراءة صامتة).
-async function __backupDescribeSaveFolder_() {
+// يصف حالة مجلدَي الحفظ عشان تُعرَض في القائمة — بدون أي محاولة لطلب إذن جديد
+// (فحص فقط، قراءة صامتة).
+async function __backupDescribeSaveFolders_() {
   const supported = __backupFolderApiSupported_();
-  if (!supported || !window._idb) return { supported, hasHandle: false };
-  try {
-    const handle = await window._idb.get(__BACKUP_SAVE_DIR_KEY);
-    if (!handle || typeof handle.queryPermission !== "function") {
-      return { supported, hasHandle: false };
-    }
-    const perm = await handle.queryPermission({ mode: "readwrite" });
-    return { supported, hasHandle: true, name: handle.name, granted: perm === "granted" };
-  } catch (_) {
-    return { supported, hasHandle: false };
+  const slots = __BACKUP_SAVE_DIR_KEYS.map(() => ({ hasHandle: false }));
+  if (!supported || !window._idb) return { supported, slots };
+  for (let i = 0; i < __BACKUP_SAVE_DIR_KEYS.length; i++) {
+    try {
+      const handle = await window._idb.get(__BACKUP_SAVE_DIR_KEYS[i]);
+      if (!handle || typeof handle.queryPermission !== "function") continue;
+      const perm = await handle.queryPermission({ mode: "readwrite" });
+      slots[i] = { hasHandle: true, name: handle.name, granted: perm === "granted" };
+    } catch (_) {}
   }
+  return { supported, slots };
 }
 
 // ── القائمة المخفية التي تُفتح عند الضغط على الزر الشفاف ──────────
@@ -5991,21 +6321,51 @@ window.__openBackupMenu = async function (ev) {
 
   const sched = __getBackupSchedule_();
   const lastRun = __lastBackupRunDate_();
-  const folderInfo = await __backupDescribeSaveFolder_();
+  const folderInfo = await __backupDescribeSaveFolders_();
   if (document.getElementById("__backupMenuOverlay")) return; // اتفتحت من ضغطة تانية أثناء الانتظار
 
-  let folderStatusHtml;
+  const SLOT_TITLES = ["المجلد 1 (مثلًا: SharePoint)", "المجلد 2 (مثلًا: جهازي)"];
+  const btnCss =
+    "width:100%;padding:6px;border:none;border-radius:8px;background:rgba(255,255,255,.12);" +
+    "color:#fff;font-size:11px;cursor:pointer;margin-bottom:5px";
+
+  let foldersHtml;
   if (!folderInfo.supported) {
-    folderStatusHtml = "⚠️ هذا المتصفح لا يدعم الحفظ المباشر في مجلد (متاح في Chrome أو Edge فقط)";
-  } else if (!folderInfo.hasHandle) {
-    folderStatusHtml = "لم يتم اختيار مجلد بعد — الملفات هتنزل في مجلد التنزيلات الافتراضي";
-  } else if (folderInfo.granted) {
-    folderStatusHtml =
-      `✅ هيتحفظ مباشرة في مجلد: <b>${esc(folderInfo.name)}</b> ` +
-      "(هيتعمل جواه تلقائيًا مجلد فرعي بتاريخ كل نسخة، وكل ملفاتها هتتحفظ جواه)";
+    foldersHtml =
+      '<div style="font-size:11px;line-height:1.6">⚠️ هذا المتصفح لا يدعم الحفظ المباشر في مجلد (متاح في Chrome أو Edge فقط)</div>';
   } else {
-    folderStatusHtml = `⚠️ إذن الكتابة في مجلد "${esc(folderInfo.name)}" محتاج تأكيد جديد — اضغط الزر تحت`;
+    foldersHtml = folderInfo.slots
+      .map((info, i) => {
+        let status;
+        if (!info.hasHandle) status = "لم يُحدَّد — اختياري";
+        else if (info.granted) status = `✅ <b>${esc(info.name)}</b>`;
+        else status = `⚠️ <b>${esc(info.name)}</b> — إذن الكتابة محتاج تأكيد`;
+        return (
+          '<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:8px;margin-bottom:8px">' +
+          `<div style="font-size:10px;opacity:.7;margin-bottom:4px">${SLOT_TITLES[i]}</div>` +
+          `<div style="font-size:11px;margin-bottom:6px;line-height:1.6">${status}</div>` +
+          (info.hasHandle && !info.granted
+            ? `<button type="button" data-bk-act="grant" data-bk-slot="${i}" style="${btnCss}">تأكيد إذن الكتابة</button>`
+            : "") +
+          `<button type="button" data-bk-act="pick" data-bk-slot="${i}" style="${btnCss}">${info.hasHandle ? "تغيير المجلد" : "اختيار مجلد"}</button>` +
+          (info.hasHandle
+            ? `<button type="button" data-bk-act="forget" data-bk-slot="${i}" style="width:100%;padding:3px;border:none;background:transparent;color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;text-decoration:underline">إلغاء هذا المجلد</button>`
+            : "") +
+          "</div>"
+        );
+      })
+      .join("");
   }
+
+  const anyGranted = folderInfo.slots.some((x) => x.hasHandle && x.granted);
+  const anyHandle = folderInfo.slots.some((x) => x.hasHandle);
+  const folderHint = !folderInfo.supported
+    ? ""
+    : anyGranted
+      ? "هيتعمل جوا كل مجلد تلقائيًا مجلد فرعي بتاريخ النسخة، وتتحفظ النسخة كاملة في كل مجلد مختار. لو مجلد فشل، الثاني بيكمّل عادي."
+      : anyHandle
+        ? "لا يوجد مجلد جاهز للكتابة — اضغط «تأكيد إذن الكتابة» أو اختر مجلدًا. وإلا هتنزل الملفات في التنزيلات الافتراضية."
+        : "لم يتم اختيار مجلد بعد — الملفات هتنزل في مجلد التنزيلات الافتراضي.";
 
   const overlay = document.createElement("div");
   overlay.id = "__backupMenuOverlay";
@@ -6016,7 +6376,7 @@ window.__openBackupMenu = async function (ev) {
   panel.style.cssText =
     "position:fixed;left:16px;bottom:52px;z-index:99999;background:#0B2733;" +
     "border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:14px;" +
-    "width:250px;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
+    "width:285px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
     "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;color:#fff;font-size:12px";
   panel.onclick = (e) => e.stopPropagation();
 
@@ -6026,19 +6386,11 @@ window.__openBackupMenu = async function (ev) {
     'background:#2FB7C8;color:#04202b;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:12px">' +
     "تنزيل الآن</button>" +
     '<div style="border-top:1px solid rgba(255,255,255,.1);margin-bottom:10px;padding-top:10px">' +
-    '<div style="font-size:10px;opacity:.6;margin-bottom:6px">حفظ الملفات مباشرة في مجلد مُحدَّد بدل التنزيلات</div>' +
-    '<div id="__backupFolderStatus" style="font-size:11px;margin-bottom:8px;line-height:1.6">' +
-    folderStatusHtml +
-    "</div>" +
+    '<div style="font-size:10px;opacity:.6;margin-bottom:8px">حفظ الملفات مباشرة في مجلد (أو مجلدين) بدل التنزيلات</div>' +
+    foldersHtml +
+    (folderHint ? `<div style="font-size:10px;opacity:.55;margin-bottom:4px;line-height:1.6">${folderHint}</div>` : "") +
     (folderInfo.supported
-      ? '<button type="button" id="__backupChooseFolderBtn" style="width:100%;padding:7px;border:none;border-radius:8px;' +
-        'background:rgba(255,255,255,.12);color:#fff;font-size:11px;cursor:pointer;margin-bottom:6px">' +
-        (folderInfo.hasHandle ? "تغيير المجلد" : "اختيار مجلد الحفظ") +
-        "</button>"
-      : "") +
-    (folderInfo.hasHandle
-      ? '<button type="button" id="__backupForgetFolderBtn" style="width:100%;padding:5px;border:none;background:transparent;' +
-        'color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;text-decoration:underline">إلغاء واستخدام التنزيل العادي</button>'
+      ? '<div style="font-size:10px;opacity:.55;line-height:1.6">لـ SharePoint: اختر مجلد المزامنة (OneDrive) الموجود على جهازك.</div>'
       : "") +
     "</div>" +
     '<label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;font-size:11px">' +
@@ -6059,6 +6411,13 @@ window.__openBackupMenu = async function (ev) {
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
+  const toast = (msg, kind) => {
+    if (typeof showToast === "function") {
+      showToast(msg, kind || "ok");
+      if (typeof clearToast === "function") setTimeout(clearToast, 4e3);
+    }
+  };
+
   document.getElementById("__backupNowBtn").onclick = () => {
     overlay.remove();
     window.__downloadFullDataBackup();
@@ -6068,39 +6427,36 @@ window.__openBackupMenu = async function (ev) {
     const hhmm = document.getElementById("__backupAutoTime").value || "10:00";
     __setBackupSchedule_(enabled, hhmm);
     overlay.remove();
-    if (typeof showToast === "function") {
-      showToast(
-        enabled ? `تم تفعيل التنزيل التلقائي يوميًا الساعة ${hhmm}` : "تم إيقاف التنزيل التلقائي",
-        "ok",
-      );
-      if (typeof clearToast === "function") setTimeout(clearToast, 4e3);
-    }
+    toast(enabled ? `تم تفعيل التنزيل التلقائي يوميًا الساعة ${hhmm}` : "تم إيقاف التنزيل التلقائي");
   };
-  const chooseFolderBtn = document.getElementById("__backupChooseFolderBtn");
-  if (chooseFolderBtn) {
-    chooseFolderBtn.onclick = async () => {
+
+  panel.querySelectorAll("[data-bk-act]").forEach((btn) => {
+    const slot = Number(btn.getAttribute("data-bk-slot")) === 1 ? 1 : 0;
+    const act = btn.getAttribute("data-bk-act");
+    btn.onclick = async () => {
       try {
-        const handle = await __backupPickSaveFolder_();
-        overlay.remove();
-        if (typeof showToast === "function") {
-          showToast(`تم اختيار المجلد: ${handle.name}`, "ok");
-          if (typeof clearToast === "function") setTimeout(clearToast, 4e3);
+        if (act === "pick") {
+          const handle = await __backupPickSaveFolder_(slot);
+          overlay.remove();
+          toast(`تم اختيار المجلد ${slot + 1}: ${handle.name}`);
+          window.__openBackupMenu(); // إعادة فتح القائمة لعرض الحالة المُحدَّثة فورًا
+        } else if (act === "grant") {
+          const handle = window._idb ? await window._idb.get(__BACKUP_SAVE_DIR_KEYS[slot]) : null;
+          if (handle) await handle.requestPermission({ mode: "readwrite" });
+          overlay.remove();
+          window.__openBackupMenu();
+        } else if (act === "forget") {
+          await __backupClearSaveFolder_(slot);
+          overlay.remove();
+          window.__openBackupMenu();
         }
-        window.__openBackupMenu(); // إعادة فتح القائمة لعرض الحالة المُحدَّثة فورًا
       } catch (err) {
         // المستخدم لغى نافذة الاختيار، أو المتصفح رفض — نسيبه زي ما هو من غير أي إزعاج
-        console.warn("[backup-folder] لم يتم اختيار مجلد:", err && err.message);
+        console.warn("[backup-folder] لم تكتمل العملية:", err && err.message);
+        if (err && err.__duplicate) toast(err.message, "err");
       }
     };
-  }
-  const forgetFolderBtn = document.getElementById("__backupForgetFolderBtn");
-  if (forgetFolderBtn) {
-    forgetFolderBtn.onclick = async () => {
-      await __backupClearSaveFolder_();
-      overlay.remove();
-      window.__openBackupMenu();
-    };
-  }
+  });
 };
 
 /* ════════════════════════════════════════════════════════════

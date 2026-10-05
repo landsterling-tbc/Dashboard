@@ -6016,6 +6016,29 @@ async function __backupWriteTextToTargets_(ctx, filename, text) {
   return ok > 0;
 }
 
+// ★ بند 18: يُضيف سطرًا إلى ملف نصي داخل كل مجلد صالح (ينشئه بعنوان لو مش موجود) — يُستخدم لسجل التنزيلات.
+// لا يرمي أخطاء ولا يؤثر على النسخة؛ يرجّع true لو نجح في مجلد واحد على الأقل.
+async function __backupAppendLogToTargets_(ctx, filename, header, line) {
+  let ok = 0;
+  for (const t of (ctx && ctx.targets) || []) {
+    const dir = t.base || t.dir; // السجل في المجلد الأساسي (يجمع كل التنزيلات)، لا داخل مجلد كل نسخة
+    if (!dir || t.lost) continue;
+    try {
+      let old = "";
+      try {
+        const fh = await dir.getFileHandle(filename);
+        old = await (await fh.getFile()).text();
+      } catch (_) {}
+      const base = old.trim() ? old.replace(/\s+$/, "") + "\n" : header + "\n";
+      await __backupWriteTextToFolder_(dir, filename, base + line + "\n");
+      ok++;
+    } catch (e) {
+      console.warn("[backup] تعذّر تسجيل التنزيل في المجلد " + (t.slot + 1), e);
+    }
+  }
+  return ok > 0;
+}
+
 // نص الختام الذي يصف أين حُفظت النسخة وأين تعذّر الحفظ.
 function __backupBuildFolderNote_(ctx, dateTag, cleanedCount) {
   const ts = (ctx && ctx.targets) || [];
@@ -6026,8 +6049,8 @@ function __backupBuildFolderNote_(ctx, dateTag, cleanedCount) {
   let note = "";
   if (ok.length) {
     note +=
-      ` — تم الحفظ في مجلد بتاريخ اليوم (${dateTag}) داخل: ${ok.map(label).join("، ")}` +
-      ` (استبدالًا لأي نسخة سابقة بنفس اليوم${cleanedCount ? `، وحُذف ${cleanedCount} ملف قديم متبقٍّ` : ""})`;
+      ` — تم الحفظ في مجلد (${dateTag}) داخل: ${ok.map(label).join("، ")}` +
+      (cleanedCount ? ` (حُذف ${cleanedCount} ملف قديم متبقٍّ من نفس المجلد)` : "");
   }
   const errs = (ctx && ctx.errors) || [];
   if (errs.length) {
@@ -6085,9 +6108,10 @@ const __BACKUP_FILE_DESCRIPTIONS_ = {
 
 // يستخرج أسماء الشيتات الفعلية التي أُنتِجت داخل دفتر عمل مصدر مُعيَّن، حتى
 // يعكس الدليل المحتوى الحقيقي للملف (وليس تخمينًا) في كل مرة يُنشأ فيها.
-function __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource) {
+function __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource, runAt) {
   const lines = [];
-  lines.push("دليل ملفات النسخة الاحتياطية — بتاريخ " + dateTag);
+  lines.push("دليل ملفات النسخة الاحتياطية — بتاريخ " + String(dateTag).slice(0, 10));
+  if (runAt instanceof Date) lines.push("وقت هذا التنزيل: " + __fmtDateDMY_(String(dateTag).slice(0, 10)) + " — " + __fmtTime12_(runAt));
   lines.push("=".repeat(50));
   lines.push("");
   lines.push(
@@ -6150,7 +6174,13 @@ window.__downloadFullDataBackup = async function (opts) {
     return;
   }
 
-  const dateTag = new Date().toISOString().slice(0, 10);
+  // ★ بند 18: التاريخ بالتوقيت المحلي (كان UTC فيتأخر يوم واحد بين 00:00 و03:00 بتوقيت السعودية)
+  const runStartedAt = new Date();
+  // ★ بند 19: اسم المجلد والملفات = التاريخ + ساعة بدء التنزيل (24 ساعة ليظل ترتيب المجلدات صحيحًا)،
+  // مثال: 2026-10-05_15-00 . كل تنزيل = مجلد مستقل. (الاسم بدون ":" لأن ويندوز لا يقبلها.)
+  const dayStr = __todayStr_();
+  const dateTag =
+    dayStr + "_" + String(runStartedAt.getHours()).padStart(2, "0") + "-" + String(runStartedAt.getMinutes()).padStart(2, "0");
   const failedSources = [];
   const sheetNamesBySource = backupSources.map(() => []);
   const partsBySource = backupSources.map(() => []);
@@ -6286,12 +6316,31 @@ window.__downloadFullDataBackup = async function (opts) {
     // يُغلَّف في try/catch مستقل حتى لا يؤثر أي خطأ في إنشائه على نجاح
     // النسخة الاحتياطية نفسها (الملفات العشرة أهم بكثير من الدليل).
     try {
-      const guideText = __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource);
+      const guideText = __backupBuildGuideText_(backupSources, dateTag, sheetNamesBySource, partsBySource, runStartedAt);
       const guideFilename = `دليل_الملفات_${dateTag}.txt`;
       const guideSaved = await __backupWriteTextToTargets_(saveCtx, guideFilename, guideText);
       if (!guideSaved) __backupDownloadTextFile_(guideFilename, guideText);
     } catch (guideErr) {
       console.error("[__downloadFullDataBackup] فشل إنشاء ملف الدليل:", guideErr);
+    }
+
+    // ★ بند 18/19: سجل التنزيلات — سطر لكل تنزيل في ملف واحد متراكم `سجل_التنزيلات.txt` في المجلد الأساسي (خارج مجلدات النسخ).
+    try {
+      const modeTxt = auto
+        ? "تلقائي" + (opts && opts.slot ? " (ميعاد " + __fmtTime12_(opts.slot) + ")" : "")
+        : "يدوي";
+      const resTxt = userStopped
+        ? `أوقفه المستخدم — ${successCount} من ${backupSources.length} ملفات`
+        : failedSources.length
+          ? `${successCount} من ${backupSources.length} ملفات — تعذّر: ${failedSources.join("، ")}`
+          : `نجح — ${successCount} ملفات`;
+      const logLine = `${__fmtDateDMY_(dayStr)} | ${__fmtTime12_(runStartedAt)} | ${modeTxt} | ${dateTag} | ${resTxt}`;
+      const logHeader =
+        "سجل تنزيلات النسخة الاحتياطية\n" +
+        "التاريخ | الساعة | نوع التنزيل | اسم المجلد | النتيجة\n" + "=".repeat(60);
+      await __backupAppendLogToTargets_(saveCtx, "سجل_التنزيلات.txt", logHeader, logLine);
+    } catch (logErr) {
+      console.warn("[backup] تعذّر كتابة سجل التنزيلات:", logErr);
     }
 
     // ★ 2026-10-05 (بناءً على طلب): "استبدال" مجلد اليوم بآخر نسخة — لكل مجلد حفظ
@@ -6357,32 +6406,95 @@ window.__downloadFullDataBackup = async function (opts) {
 // (window.__downloadFullDataBackup) فلا يوجد أي منطق مكرَّر.
 const __BACKUP_SCHEDULE_KEY = "fm_backup_schedule_v1";
 const __BACKUP_LAST_RUN_KEY = "fm_backup_last_run_date_v1";
+// ★ 2026-10-05 (بند 18): أكثر من ميعاد يومي. المواعيد تُحفظ في fm_backup_schedule_v1 (times[]، مع بقاء
+// الحقل القديم hhmm = أول ميعاد للتوافق)، وما نُفِّذ اليوم منها في fm_backup_slots_done_v1 {date, done[]}،
+// وتاريخ/وقت آخر نسخة في fm_backup_last_run_at_v1.
+const __BACKUP_SLOTS_KEY = "fm_backup_slots_done_v1";
+const __BACKUP_LAST_AT_KEY = "fm_backup_last_run_at_v1";
+const __BACKUP_MAX_TIMES = 4;
 
+function __normHhmm_(v) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(v || ""));
+  if (!m) return null;
+  const h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+  if (h > 23 || mi > 59) return null;
+  return String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0");
+}
+function __hhmmToMin_(v) {
+  const n = __normHhmm_(v);
+  return n ? parseInt(n.slice(0, 2), 10) * 60 + parseInt(n.slice(3), 10) : 0;
+}
+function __cleanTimes_(arr) {
+  const out = [];
+  (arr || []).forEach((v) => {
+    const n = __normHhmm_(v);
+    if (n && !out.includes(n)) out.push(n);
+  });
+  out.sort();
+  return out.slice(0, __BACKUP_MAX_TIMES);
+}
+// ★ بند 20: جدول أسبوعي لكل يوم على حدة (0 = الأحد … 6 = السبت). الافتراضي:
+// الأحد 2 (10:00 ص + 03:00 م)، الاثنين 1 (03:00 م)، الثلاثاء 2، الأربعاء 1، الخميس 2، الجمعة بلا تنزيل، السبت 1 (01:00 م).
+// (النسخة كاملة في كل مرة، فالميعاد الواحد الأفضل في آخر يوم العمل 03:00 م ليغطي أغلب بيانات اليوم.)
+const __BACKUP_DEFAULT_DAYS = {
+  0: ["10:00", "15:00"],
+  1: ["15:00"],
+  2: ["10:00", "15:00"],
+  3: ["15:00"],
+  4: ["10:00", "15:00"],
+  5: [],
+  6: ["13:00"],
+};
+const __BACKUP_DAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+function __defaultDays_() {
+  const o = {};
+  for (let i = 0; i < 7; i++) o[i] = __BACKUP_DEFAULT_DAYS[i].slice();
+  return o;
+}
+// "14:30" → "02:30 PM"  ،  Date → "02:30 PM" (أرقام إنجليزية ثابتة بصرف النظر عن لغة المتصفح)
+function __fmtTime12_(v) {
+  let h, m;
+  if (v instanceof Date) { h = v.getHours(); m = v.getMinutes(); }
+  else { const n = __normHhmm_(v) || "00:00"; h = parseInt(n.slice(0, 2), 10); m = parseInt(n.slice(3), 10); }
+  return String(h % 12 || 12).padStart(2, "0") + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "AM" : "PM");
+}
+// "2026-10-05" → "05-10-2026"
+function __fmtDateDMY_(ymd) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+  return m ? m[3] + "-" + m[2] + "-" + m[1] : String(ymd || "");
+}
 function __getBackupSchedule_() {
+  // الافتراضي: مُعطَّل (لازم يفعّله المستخدم بنفسه من القائمة المخفية)، والإعداد محفوظ في متصفح كل مستخدم فقط.
+  const def = { enabled: false, days: __defaultDays_() };
   try {
     const raw = JSON.parse(localStorage.getItem(__BACKUP_SCHEDULE_KEY) || "null");
-    if (raw && typeof raw.hhmm === "string") return { enabled: !!raw.enabled, hhmm: raw.hhmm };
+    if (raw && typeof raw === "object") {
+      const days = {};
+      for (let i = 0; i < 7; i++) {
+        const v = raw.days && raw.days[i];
+        days[i] = Array.isArray(v) ? __cleanTimes_(v) : def.days[i]; // قائمة فارغة = لا تنزيل في هذا اليوم
+      }
+      return { enabled: !!raw.enabled, days }; // الصيغة القديمة (work/weekend) تتحوّل للافتراضي الجديد
+    }
   } catch (_) {}
-  return { enabled: false, hhmm: "10:00" };
+  return def;
 }
-function __setBackupSchedule_(enabled, hhmm) {
+function __setBackupSchedule_(enabled, days) {
+  const clean = {};
+  for (let i = 0; i < 7; i++) clean[i] = __cleanTimes_(days && days[i]);
   try {
-    localStorage.setItem(
-      __BACKUP_SCHEDULE_KEY,
-      JSON.stringify({ enabled: !!enabled, hhmm: hhmm || "10:00" }),
-    );
+    localStorage.setItem(__BACKUP_SCHEDULE_KEY, JSON.stringify({ enabled: !!enabled, days: clean }));
   } catch (_) {}
+}
+// مواعيد اليوم الحالي.
+function __backupTodayTimes_(sched, d) {
+  return sched.days[(d || new Date()).getDay()] || [];
 }
 function __todayStr_() {
   const d = new Date();
   return (
     d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
   );
-}
-function __markBackupRanToday_() {
-  try {
-    localStorage.setItem(__BACKUP_LAST_RUN_KEY, __todayStr_());
-  } catch (_) {}
 }
 function __lastBackupRunDate_() {
   try {
@@ -6391,15 +6503,78 @@ function __lastBackupRunDate_() {
     return "";
   }
 }
+function __lastBackupRunAt_() {
+  try {
+    return localStorage.getItem(__BACKUP_LAST_AT_KEY) || "";
+  } catch (_) {
+    return "";
+  }
+}
+// المواعيد التي حان وقتها اليوم (≤ الآن).
+function __backupDueSlots_(sched) {
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  return __backupTodayTimes_(sched, now).filter((t) => __hhmmToMin_(t) <= nowMin);
+}
+// المواعيد المنفَّذة اليوم. توافق مع النسخة القديمة: لو تم تنزيل اليوم قبل هذا التحديث ولا يوجد سجل مواعيد،
+// تُعتبر كل المواعيد التي فاتت منفَّذة (حتى لا تتكرر نسخة بعد التحديث مباشرة).
+function __getDoneSlots_() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(__BACKUP_SLOTS_KEY) || "null");
+    if (raw && raw.date === __todayStr_() && Array.isArray(raw.done)) return raw.done;
+  } catch (_) {}
+  if (__lastBackupRunDate_() === __todayStr_()) return __backupDueSlots_(__getBackupSchedule_());
+  return [];
+}
+function __saveDoneSlots_(done) {
+  try {
+    localStorage.setItem(__BACKUP_SLOTS_KEY, JSON.stringify({ date: __todayStr_(), done: Array.from(new Set(done)) }));
+  } catch (_) {}
+}
+// نجاح أي تنزيل (يدوي أو تلقائي) = تُعتبر كل مواعيد اليوم التي حان وقتها منفَّذة (تنزيل واحد يكفي لما فات).
+function __markBackupRanToday_() {
+  try {
+    localStorage.setItem(__BACKUP_LAST_RUN_KEY, __todayStr_());
+    localStorage.setItem(__BACKUP_LAST_AT_KEY, new Date().toISOString());
+  } catch (_) {}
+  __saveDoneSlots_(__getDoneSlots_().concat(__backupDueSlots_(__getBackupSchedule_())));
+}
+// ★ بند 19: أمان التشغيل التلقائي —
+//  • قفل بين التبويبات (Web Locks): لو الداشبورد مفتوح في أكثر من تبويب/نافذة يُنفّذ تبويب واحد فقط.
+//  • لو فشلت المحاولة بالكامل: انتظار 10 دقائق ثم إعادة المحاولة، بحد أقصى 3 محاولات للميعاد (بدل كل نصف دقيقة).
+let __backupAutoNextTryAt_ = 0;
+const __backupAutoTries_ = {};
+function __backupPendingSlot_(sched) {
+  const done = new Set(__getDoneSlots_());
+  const pending = __backupDueSlots_(sched).filter((t) => !done.has(t));
+  return pending.length ? pending[pending.length - 1] : null; // أحدث ميعاد فات؛ تنزيل واحد يغطي ما قبله
+}
 function __backupSchedulerTick_() {
   const sched = __getBackupSchedule_();
   if (!sched.enabled || __fullBackupInflight) return;
-  if (__lastBackupRunDate_() === __todayStr_()) return;
-  const parts = String(sched.hhmm).split(":");
-  const targetMinutes = (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  if (nowMinutes >= targetMinutes) window.__downloadFullDataBackup({ auto: true });
+  if (Date.now() < __backupAutoNextTryAt_) return;
+  const slot = __backupPendingSlot_(sched);
+  if (!slot) return;
+  const key = __todayStr_() + " " + slot;
+  if ((__backupAutoTries_[key] || 0) >= 3) return;
+  const run = async () => {
+    if (__backupPendingSlot_(__getBackupSchedule_()) !== slot) return; // تبويب آخر خلّصه للتو
+    __backupAutoTries_[key] = (__backupAutoTries_[key] || 0) + 1;
+    await window.__downloadFullDataBackup({ auto: true, slot });
+    if (__backupPendingSlot_(__getBackupSchedule_()) === slot) __backupAutoNextTryAt_ = Date.now() + 10 * 60 * 1000;
+  };
+  try {
+    if (navigator.locks && navigator.locks.request) {
+      navigator.locks.request("fm_backup_auto_run_v1", { ifAvailable: true }, async (lock) => {
+        if (!lock) return;
+        try { await run(); } catch (e) { console.warn("[backup] auto", e); }
+      });
+    } else {
+      run().catch((e) => console.warn("[backup] auto", e));
+    }
+  } catch (e) {
+    console.warn("[backup] auto", e);
+  }
 }
 let __backupSchedulerTimer = null;
 if (!__backupSchedulerTimer) {
@@ -6412,6 +6587,11 @@ if (!__backupSchedulerTimer) {
   if (document.readyState === "complete") __backupFirstTick_();
   else window.addEventListener("load", __backupFirstTick_, { once: true });
   __backupSchedulerTimer = setInterval(__backupSchedulerTick_, 3e4);
+  // المتصفح يبطّئ المؤقتات في التبويب الخلفي؛ فنفحص فورًا عند العودة للتبويب/رجوع الإنترنت/التركيز.
+  const __bkSoon_ = () => setTimeout(__backupSchedulerTick_, 2000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) __bkSoon_(); });
+  window.addEventListener("online", __bkSoon_);
+  window.addEventListener("focus", __bkSoon_);
 }
 
 // يصف حالة مجلدَي الحفظ عشان تُعرَض في القائمة — بدون أي محاولة لطلب إذن جديد
@@ -6438,6 +6618,7 @@ window.__openBackupMenu = async function (ev) {
 
   const sched = __getBackupSchedule_();
   const lastRun = __lastBackupRunDate_();
+  const lastAtIso = __lastBackupRunAt_();
   const folderInfo = await __backupDescribeSaveFolders_();
   if (document.getElementById("__backupMenuOverlay")) return; // اتفتحت من ضغطة تانية أثناء الانتظار
 
@@ -6493,7 +6674,7 @@ window.__openBackupMenu = async function (ev) {
   panel.style.cssText =
     "position:fixed;left:16px;bottom:52px;z-index:99999;background:#0B2733;" +
     "border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:14px;" +
-    "width:285px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
+    "width:340px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
     "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;color:#fff;font-size:12px";
   panel.onclick = (e) => e.stopPropagation();
 
@@ -6514,13 +6695,18 @@ window.__openBackupMenu = async function (ev) {
     '<input type="checkbox" id="__backupAutoEnabled"' +
     (sched.enabled ? " checked" : "") +
     ">تفعيل التنزيل التلقائي اليومي</label>" +
-    '<input type="time" id="__backupAutoTime" value="' +
-    sched.hhmm +
-    '" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.2);' +
-    'background:#08202b;color:#fff;font-size:12px;margin-bottom:10px">' +
+    '<div id="__backupDaysBox" style="margin-bottom:6px"></div>' +
+    '<button type="button" id="__backupResetTimes" style="width:100%;padding:3px;border:none;background:transparent;' +
+    'color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;text-decoration:underline;margin-bottom:8px">استرجاع المواعيد الافتراضية</button>' +
     '<div style="font-size:10px;opacity:.55;margin-bottom:10px;line-height:1.6">' +
-    "يعمل هذا الخيار فقط عندما يكون الداشبورد مفتوحًا في المتصفح وقت الموعد المحدَّد، وينزِّل كل مصدر بيانات في ملف مستقل.<br>" +
-    (lastRun ? "آخر نسخة احتياطية: " + lastRun : "لم يُنزَّل أي نسخة من هنا بعد") +
+    "التنزيل التلقائي لا يعمل إلا لمن فعّله هنا في متصفحه، وبشرط أن يكون الداشبورد مفتوحًا في المتصفح (حتى لو في تبويب خلفي) وقت الميعاد. " +
+    "كل تنزيل يُحفظ في مجلد باسم التاريخ والساعة، ويُسجَّل في ملف «سجل_التنزيلات» داخل المجلد الأساسي.<br>" +
+    (lastRun
+      ? 'آخر نسخة احتياطية: <bdi dir="ltr">' +
+        __fmtDateDMY_(lastRun) +
+        (lastAtIso ? " — " + __fmtTime12_(new Date(lastAtIso)) : "") +
+        "</bdi>"
+      : "لم يُنزَّل أي نسخة من هنا بعد") +
     "</div>" +
     '<button type="button" id="__backupSaveBtn" style="width:100%;padding:7px;border:none;border-radius:8px;' +
     'background:rgba(255,255,255,.12);color:#fff;font-size:11px;cursor:pointer">حفظ الإعداد</button>';
@@ -6535,16 +6721,76 @@ window.__openBackupMenu = async function (ev) {
     }
   };
 
+  const inputCss =
+    "width:92px;padding:3px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.2);" +
+    "background:#08202b;color:#fff;font-size:11px";
+  const smallBtn =
+    "width:20px;height:24px;border:none;border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:11px;cursor:pointer;padding:0";
+  const dayGroups = [];
+  const daysBox = document.getElementById("__backupDaysBox");
+  const buildDay = (dayIdx) => {
+    const row = document.createElement("div");
+    row.style.cssText =
+      "display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)";
+    row.innerHTML =
+      `<div style="width:46px;font-size:11px;padding-top:5px;flex:none">${__BACKUP_DAY_NAMES[dayIdx]}</div>` +
+      '<div data-bk-times style="flex:1;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:26px"></div>' +
+      `<button type="button" data-bk-add title="إضافة ميعاد" style="${smallBtn}">＋</button>`;
+    const box = row.querySelector("[data-bk-times]");
+    const addBtn = row.querySelector("[data-bk-add]");
+    const refresh = () => {
+      const n = box.querySelectorAll("[data-bk-time]").length;
+      addBtn.style.visibility = n >= __BACKUP_MAX_TIMES ? "hidden" : "visible";
+      const hint = box.querySelector("[data-bk-empty]");
+      if (n === 0 && !hint) {
+        const h = document.createElement("span");
+        h.setAttribute("data-bk-empty", "1");
+        h.style.cssText = "font-size:10px;opacity:.5";
+        h.textContent = "بدون تنزيل";
+        box.appendChild(h);
+      } else if (n > 0 && hint) hint.remove();
+    };
+    const addTime = (val) => {
+      const chip = document.createElement("span");
+      chip.style.cssText = "display:inline-flex;align-items:center;gap:2px";
+      chip.innerHTML =
+        `<input type="time" data-bk-time value="${val}" style="${inputCss}">` +
+        '<button type="button" title="حذف هذا الميعاد" style="width:16px;height:24px;border:none;background:transparent;' +
+        'color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;padding:0">✕</button>';
+      chip.querySelector("button").onclick = () => { chip.remove(); refresh(); };
+      box.appendChild(chip);
+      refresh();
+    };
+    const get = () => __cleanTimes_(Array.from(box.querySelectorAll("[data-bk-time]")).map((i) => i.value));
+    const setTimes = (arr) => { box.innerHTML = ""; arr.forEach(addTime); refresh(); };
+    addBtn.onclick = () => {
+      const cur = get();
+      const next = Math.min(cur.length ? __hhmmToMin_(cur[cur.length - 1]) + 240 : 10 * 60, 23 * 60);
+      addTime(String(Math.floor(next / 60)).padStart(2, "0") + ":" + String(next % 60).padStart(2, "0"));
+    };
+    setTimes(sched.days[dayIdx] || []);
+    daysBox.appendChild(row);
+    return { get, setTimes };
+  };
+  for (let i = 0; i < 7; i++) dayGroups.push(buildDay(i));
+  document.getElementById("__backupResetTimes").onclick = () => {
+    dayGroups.forEach((g, i) => g.setTimes(__BACKUP_DEFAULT_DAYS[i]));
+  };
+
   document.getElementById("__backupNowBtn").onclick = () => {
     overlay.remove();
     window.__downloadFullDataBackup();
   };
   document.getElementById("__backupSaveBtn").onclick = () => {
     const enabled = document.getElementById("__backupAutoEnabled").checked;
-    const hhmm = document.getElementById("__backupAutoTime").value || "10:00";
-    __setBackupSchedule_(enabled, hhmm);
+    const days = {};
+    dayGroups.forEach((g, i) => (days[i] = g.get()));
+    __setBackupSchedule_(enabled, days);
+    // لو تم تنزيل اليوم فعلًا، أي ميعاد فات وقته لحظة الحفظ لا يُنفَّذ بأثر رجعي (تُنفَّذ المواعيد القادمة فقط)
+    if (__lastBackupRunDate_() === __todayStr_()) __saveDoneSlots_(__backupDueSlots_(__getBackupSchedule_()));
     overlay.remove();
-    toast(enabled ? `تم تفعيل التنزيل التلقائي يوميًا الساعة ${hhmm}` : "تم إيقاف التنزيل التلقائي");
+    const total = dayGroups.reduce((n, g) => n + g.get().length, 0);
+    toast(enabled ? `تم تفعيل التنزيل التلقائي — ${total} تنزيلات أسبوعيًا` : "تم إيقاف التنزيل التلقائي");
   };
 
   panel.querySelectorAll("[data-bk-act]").forEach((btn) => {

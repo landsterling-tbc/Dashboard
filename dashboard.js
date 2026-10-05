@@ -5783,11 +5783,27 @@ async function __backupGetDatedSubfolder_(baseDirHandle, dateTag) {
 }
 
 // يكتب محتوى جاهز (ArrayBuffer) كملف داخل مجلد، بدون أي نافذة "تنزيل" من المتصفح.
+// ★ 2026-10-05 (بند 17): الكتابة على دفعات (8MB) بدل write واحدة ضخمة، و abort() للملف المؤقت عند أي فشل
+// (حتى لا يبقى ملف نصف مكتوب/مقفول، وهو سبب شائع لفشل المحاولة التالية على مجلدات OneDrive/SharePoint المتزامنة).
+const __BACKUP_WRITE_CHUNK_ = 8 * 1024 * 1024;
 async function __backupWriteBufToFolder_(dirHandle, filename, buf) {
   const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
   const writable = await fileHandle.createWritable();
-  await writable.write(buf);
-  await writable.close();
+  try {
+    const u8 = buf instanceof ArrayBuffer ? new Uint8Array(buf)
+      : ArrayBuffer.isView(buf) ? new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength) : buf;
+    if (!u8 || typeof u8.byteLength !== "number" || u8.byteLength <= __BACKUP_WRITE_CHUNK_) {
+      await writable.write(buf);
+    } else {
+      for (let o = 0; o < u8.byteLength; o += __BACKUP_WRITE_CHUNK_) {
+        await writable.write(u8.subarray(o, Math.min(u8.byteLength, o + __BACKUP_WRITE_CHUNK_)));
+      }
+    }
+    await writable.close();
+  } catch (e) {
+    try { await writable.abort(); } catch (_) {}
+    throw e;
+  }
 }
 
 // (للتوافق) يكتب دفتر العمل مباشرة كملف xlsx داخل مجلد واحد.
@@ -5814,29 +5830,49 @@ function __backupDownloadBuf_(filename, buf) {
 //    دون أن يتأثر المجلد الآخر.
 //  - التنزيل العادي من المتصفح لا يُستخدم إلا إذا لم ينجح الحفظ في أي مجلد.
 // ctx = { targets: [{ slot, name, base, dir, lost, written:Set }], dateTag }
+// ★ 2026-10-05 (بند 17): سبب أجزاء البلاغات التي كانت تُنزَّل في Downloads بدل المجلد: فشل كتابة جزء كبير واحد
+// (مرتين متتاليتين فورًا) كان يُعلِّم المجلد كله "مفقودًا" (lost) فتذهب باقي الأجزاء للتنزيل العادي.
+// الآن: 3 محاولات مع انتظار متزايد (يعاد التحقق من مجلد اليوم قبل كل إعادة)، والمجلد لا يُعتبر مفقودًا إلا إذا
+// تعذّر الوصول لمجلد اليوم نفسه أو فشلت 3 ملفات متتالية؛ وفشل ملف واحد يقتصر على هذا الملف (تنزيل عبر المتصفح
+// إن لم ينجح في أي مجلد). كل فشل يُسجَّل في ctx.errors بسببه الفعلي ويظهر في رسالة الختام.
 async function __backupSaveBufResilient_(ctx, filename, buf) {
   const targets = (ctx && ctx.targets) || [];
+  if (ctx && !ctx.errors) ctx.errors = [];
   let saved = 0;
   for (const t of targets) {
     if (!t.dir || t.lost) continue;
-    try {
-      await __backupWriteBufToFolder_(t.dir, filename, buf);
+    let ok = false;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
+      try {
+        if (attempt > 1) {
+          await new Promise((r) => setTimeout(r, 1500 * (attempt - 1)));
+          try {
+            t.dir = await t.base.getDirectoryHandle(ctx.dateTag, { create: true });
+          } catch (eDir) {
+            lastErr = eDir;
+            t.dir = null;
+            t.lost = true;   // مجلد اليوم نفسه غير متاح
+            break;
+          }
+        }
+        await __backupWriteBufToFolder_(t.dir, filename, buf);
+        ok = true;
+      } catch (e) {
+        lastErr = e;
+        console.warn("[backup] فشلت كتابة " + filename + " في المجلد " + (t.slot + 1) + " (محاولة " + attempt + "/3):", e);
+      }
+    }
+    if (ok) {
       t.written.add(filename);
+      t.consecFail = 0;
       saved++;
       continue;
-    } catch (e1) {
-      console.warn("[backup] فشلت الكتابة في المجلد " + (t.slot + 1) + " — محاولة إعادة إنشاء المجلد الفرعي:", e1);
     }
-    try {
-      t.dir = await t.base.getDirectoryHandle(ctx.dateTag, { create: true });
-      await __backupWriteBufToFolder_(t.dir, filename, buf);
-      t.written.add(filename);
-      saved++;
-    } catch (e2) {
-      console.warn("[backup] تعذّر الحفظ في المجلد " + (t.slot + 1) + " — سيُتجاوز لباقي هذه النسخة:", e2);
-      t.dir = null;
-      t.lost = true;
-    }
+    t.consecFail = (t.consecFail || 0) + 1;
+    t.failedFiles = (t.failedFiles || 0) + 1;
+    if (t.consecFail >= 3) t.lost = true;
+    if (ctx) ctx.errors.push({ file: filename, slot: t.slot, msg: (lastErr && (lastErr.name || "") + (lastErr && lastErr.message ? ": " + lastErr.message : "")) || "خطأ غير معروف" });
   }
   if (saved > 0) return "folder";
   __backupDownloadBuf_(filename, buf);
@@ -5908,6 +5944,7 @@ function __backupPlanParts_(wb, chunkRows) {
   return { count, build };
 }
 
+const __BACKUP_PRESPLIT_ROWS_ = 100000; // أكثر من هذا في أي شيت = تقسيم مباشر
 const __BACKUP_SPLIT_LADDER_ = [40000, 20000, 10000]; // أقصى عدد صفوف بيانات للشيت الواحد في الجزء الواحد
 
 // يحفظ دفتر عمل: المحاولة الأولى ملف واحد كالمعتاد (نفس السلوك السابق تمامًا لكل
@@ -5918,6 +5955,15 @@ async function __backupSaveWorkbookResilient_(ctx, filename, wb) {
   ctx.lastParts = [];
   let fullErr = null;
   try {
+    // ★ 2026-10-05 (بند 17): الشيتات الضخمة جدًا (> 100 ألف صف) تُقسَّم مباشرة بدون محاولة الملف الواحد
+    // (كانت تستهلك وقتًا وذاكرة كبيرين ثم تفشل). لا حد أقصى لعدد الأجزاء: عدد الأجزاء = ceil(الصفوف ÷ 40,000).
+    const maxRows = Math.max(0, ...wb.SheetNames.map((n) => {
+      const ref = wb.Sheets[n] && wb.Sheets[n]["!ref"];
+      if (!ref) return 0;
+      const r = XLSX.utils.decode_range(ref);
+      return r.e.r - r.s.r;
+    }));
+    if (maxRows > __BACKUP_PRESPLIT_ROWS_) throw new Error("PRESPLIT: " + maxRows + " rows");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     return await __backupSaveBufResilient_(ctx, filename, buf);
   } catch (e) {
@@ -5982,6 +6028,11 @@ function __backupBuildFolderNote_(ctx, dateTag, cleanedCount) {
     note +=
       ` — تم الحفظ في مجلد بتاريخ اليوم (${dateTag}) داخل: ${ok.map(label).join("، ")}` +
       ` (استبدالًا لأي نسخة سابقة بنفس اليوم${cleanedCount ? `، وحُذف ${cleanedCount} ملف قديم متبقٍّ` : ""})`;
+  }
+  const errs = (ctx && ctx.errors) || [];
+  if (errs.length) {
+    const sample = errs.slice(0, 3).map((e) => `${e.file} (مجلد ${e.slot + 1}: ${e.msg})`).join("، ");
+    note += ` — ⚠️ تعذّر حفظ ${errs.length} ملف داخل المجلد (نُزّل عبر المتصفح إن لم يُحفظ في مجلد آخر): ${sample}${errs.length > 3 ? " …" : ""}`;
   }
   if (bad.length) {
     note +=
@@ -6261,6 +6312,7 @@ window.__downloadFullDataBackup = async function (opts) {
             isDated = false;
           }
           if (!isDated) continue;
+          if (t.failedFiles) continue;   // بند 17: لو فشل حفظ ملف في هذا المجلد لا نحذف أي ملف قديم (قد يكون نسخته السابقة)
           const stale = [];
           for await (const [name, handle] of t.dir.entries()) {
             const ours = handle.kind === "file" && (name.startsWith("نسخة_احتياطية_") || name.startsWith("دليل_الملفات_"));
@@ -20665,6 +20717,10 @@ function _srRenderBadge() {
   const iconEl = document.getElementById("sr-banner-icon");
   const pillEl = document.getElementById("sr-banner-badge-pill");
   if (iconEl) iconEl.textContent = urgent > 0 ? "🚨" : "📋";
+  // ★ 2026-10-05 (بند 16): عدّاد الفقاعة = عدد العاجل لو فيه (أحمر)، وإلا إجمالي البلاغات؛ والـ tooltip فيه التفاصيل
+  const cntEl = document.getElementById("sr-banner-count");
+  if (cntEl) cntEl.textContent = (urgent > 0 ? urgent : total) > 0 ? numFmt(urgent > 0 ? urgent : total) : "";
+  if (bannerEl) bannerEl.setAttribute("title", `بلاغات المدارس المباشرة — ${numFmt(total)} بلاغ${urgent ? ` · ${numFmt(urgent)} عاجل` : ""}`);
   if (pillEl) {
     const dot = pillEl.querySelector("#sr-banner-live-dot");
     pillEl.innerHTML = "";
@@ -20946,21 +21002,60 @@ function _srSaveSeenUrgentIds(set) {
     localStorage.setItem(SR_ALERT_SEEN_KEY, JSON.stringify(Array.from(set).slice(-1000)));
   } catch (_) {}
 }
+// ★ 2026-10-05 (بند 16): التنبيه صار لأي بلاغ جديد (مش العاجل فقط). مجموعة مُعرِّفات "كل البلاغات المُشاهَدة"
+// منفصلة عن مجموعة العاجل القديمة (SR_ALERT_SEEN_KEY). أول تشغيل بعد هذا التعديل يسجّل الموجود بصمت (بدون صوت).
+const SR_ALL_SEEN_KEY = "tbc_school_reports_seen_all_v1";
+const SR_AUTO_OPEN_ON_NEW = true;   // false = الصوت والاهتزاز فقط بدون فتح المودال تلقائيًا
+function _srLoadSeenAllIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(SR_ALL_SEEN_KEY) || "[]")); } catch (_) { return new Set(); }
+}
+function _srSaveSeenAllIds(set) {
+  try { localStorage.setItem(SR_ALL_SEEN_KEY, JSON.stringify(Array.from(set).slice(-5000))); } catch (_) {}
+}
+function _srRingBubble() {
+  const b = document.getElementById("sr-banner");
+  if (!b) return;
+  b.classList.add("sr-ring");
+  setTimeout(() => b.classList.remove("sr-ring"), 3000);
+}
 function _srCheckUrgentAlerts(rows) {
-  const isFirstRun = !localStorage.getItem(SR_ALERT_SEEN_KEY);
-  const seen = _srLoadSeenUrgentIds();
+  // (1) العاجل: نفس سلوك الكارت المنبثق السابق
+  const urgentFirstRun = !localStorage.getItem(SR_ALERT_SEEN_KEY);
+  const seenUrgent = _srLoadSeenUrgentIds();
   const urgentRows = rows.filter((r) => r.priority === "عاجل");
-  if (isFirstRun) {
-    urgentRows.forEach((r) => seen.add(_srRowId(r)));
-    _srSaveSeenUrgentIds(seen);
-    return;
+  let newUrgent = [];
+  if (urgentFirstRun) {
+    urgentRows.forEach((r) => seenUrgent.add(_srRowId(r)));
+    _srSaveSeenUrgentIds(seenUrgent);
+  } else {
+    newUrgent = urgentRows.filter((r) => !seenUrgent.has(_srRowId(r)));
+    newUrgent.forEach((r) => seenUrgent.add(_srRowId(r)));
+    if (newUrgent.length) _srSaveSeenUrgentIds(seenUrgent);
   }
-  const newUrgent = urgentRows.filter((r) => !seen.has(_srRowId(r)));
-  if (!newUrgent.length) return;
-  newUrgent.forEach((r) => seen.add(_srRowId(r)));
-  _srSaveSeenUrgentIds(seen);
-  _srShowUrgentAlert(newUrgent);
-  _srPlayAlertSound();
+
+  // (2) كل البلاغات (أي أولوية)
+  const allFirstRun = !localStorage.getItem(SR_ALL_SEEN_KEY);
+  const seenAll = _srLoadSeenAllIds();
+  let newAny = [];
+  if (allFirstRun) {
+    rows.forEach((r) => seenAll.add(_srRowId(r)));
+    _srSaveSeenAllIds(seenAll);
+  } else {
+    newAny = rows.filter((r) => !seenAll.has(_srRowId(r)));
+    newAny.forEach((r) => seenAll.add(_srRowId(r)));
+    if (newAny.length) _srSaveSeenAllIds(seenAll);
+  }
+  // (احتياط) أي بلاغ عاجل جديد يُحسب ضمن الجديد حتى لو كان مسجَّلًا في المجموعة العامة
+  const hasNew = newAny.length > 0 || newUrgent.length > 0;
+  if (!hasNew) return;
+
+  if (newUrgent.length) _srShowUrgentAlert(newUrgent);   // كارت البلاغ العاجل (كما كان)
+  _srRingBubble();                                      // اهتزاز الفقاعة
+  _srPlayAlertSound();                                  // الصوت (كما كان)
+  if (SR_AUTO_OPEN_ON_NEW) {
+    openSrModal();                                      // فتح النافذة تلقائيًا (الأحدث أولًا)
+    if (newUrgent.length && !newAny.some((r) => r.priority !== "عاجل")) srFilterBy("priority", "عاجل");
+  }
 }
 
 function _srEnsureAlertStack() {
@@ -21105,6 +21200,46 @@ function srInit() {
       #sr-banner-sub { display:none; }
       #sr-banner-arrow-wrap { display:none; }
 
+      /* ★ 2026-10-05 (بند 16): البانر بقى فقاعة دايرية عائمة (أيقونة + عدّاد) بدل الحبّة العريضة.
+         العنوان والشارة ما زالوا في الـ DOM (الدالة _srRenderBadge تحدّثهم) لكنهم مخفيّون، والتفاصيل في الـ tooltip والمودال.
+         لتغيير المكان: عدّل bottom/right هنا (أو left لو عاوزها يسار). */
+      #sr-banner {
+        width:60px; height:60px; padding:0; gap:0; justify-content:center; border-radius:50%;
+        max-width:none; overflow:visible; bottom:96px; right:16px; z-index:9600;
+        background:linear-gradient(135deg,#06B6D4,#0E7490); border:3px solid #fff;
+        box-shadow:0 10px 26px rgba(8,60,80,.35);
+      }
+      #sr-banner:hover { transform:scale(1.08); box-shadow:0 14px 32px rgba(8,60,80,.42); }
+      #sr-banner:active { transform:scale(1.02); }
+      #sr-banner-text { display:none; }
+      #sr-banner-icon-wrap { width:100%; height:100%; border-radius:50%; background:transparent !important; }
+      #sr-banner-icon { font-size:26px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+      #sr-banner-count {
+        position:absolute; top:-6px; inset-inline-start:-6px; min-width:22px; height:22px; padding:0 6px; box-sizing:border-box;
+        border-radius:99px; background:#fff; color:#0E7490; border:2px solid #0E7490;
+        font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; line-height:1;
+      }
+      #sr-banner-count:empty { display:none; }
+      #sr-banner.sr-has-urgent {
+        background:linear-gradient(135deg,#EF4444,#B91C1C); border-color:#fff; animation:sr-pulse-bubble 1.6s infinite;
+      }
+      #sr-banner.sr-has-urgent #sr-banner-count { color:#B91C1C; border-color:#B91C1C; }
+      @keyframes sr-pulse-bubble {
+        0% { box-shadow:0 0 0 0 rgba(220,38,38,.55), 0 10px 26px rgba(8,60,80,.35); }
+        70% { box-shadow:0 0 0 18px rgba(220,38,38,0), 0 10px 26px rgba(8,60,80,.35); }
+        100% { box-shadow:0 0 0 0 rgba(220,38,38,0), 0 10px 26px rgba(8,60,80,.35); }
+      }
+      /* اهتزاز + توهّج لحظة وصول بلاغ جديد (يُضاف الكلاس sr-ring لثواني ثم يُزال) */
+      #sr-banner.sr-ring { animation:sr-ring-shake .6s ease-in-out 4, sr-pulse-bubble 1.6s infinite; }
+      @keyframes sr-ring-shake {
+        0%,100% { transform:rotate(0) scale(1.12); } 20% { transform:rotate(-14deg) scale(1.12); }
+        40% { transform:rotate(12deg) scale(1.12); } 60% { transform:rotate(-8deg) scale(1.12); } 80% { transform:rotate(6deg) scale(1.12); }
+      }
+      @media (max-width:640px) {
+        #sr-banner { width:54px; height:54px; bottom:82px; right:12px; }
+        #sr-banner-icon { font-size:23px; }
+      }
+
       #sr-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:9999; align-items:center; justify-content:center; padding:20px; }
       #sr-overlay.sr-open { display:flex; }
       #sr-modal { background:#fff; border-radius:16px; max-width:1100px; width:100%; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
@@ -21130,7 +21265,10 @@ function srInit() {
     const banner = document.createElement("div");
     banner.id = "sr-banner";
     banner.setAttribute("onclick", "openSrModal()");
+    banner.setAttribute("title", "بلاغات المدارس المباشرة");
+    banner.setAttribute("role", "button");
     banner.innerHTML = `
+      <div id="sr-banner-count"></div>
       <div id="sr-banner-icon-wrap"><div id="sr-banner-icon">📋</div></div>
       <div id="sr-banner-text">
         <div id="sr-banner-title-row">

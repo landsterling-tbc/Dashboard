@@ -3070,25 +3070,81 @@ function renderStageCompareTab() {
   if(timeEmpty) timeEmpty.style.display=hasTimeData?"none":"block";
   if(timeCanvas) timeCanvas.style.display=hasTimeData?"block":"none";
   if(hasTimeData && timeCanvas){
+    // ★ 2026-10-05: (1) خط يوصّل النقاط ببعض — كل مرحلة = شهر فيها نقطة واحدة فقط،
+    // فلا يمكن توصيلها داخل نفس السلسلة؛ لذلك أُضيف خط "المتوسط العام" يمرّ بكل
+    // الشهور (متوسط كل الدرجات في الشهر) وتبقى نقاط المراحل الملوّنة فوقه.
+    // (2) توقع 3 شهور فقط (Holt عبر linearForecast) بخط متقطع بعد آخر شهر فعلي.
+    const FC_MONTHS = 3;
+    const N = chartMonthKeys.length;
+    const pad = (arr) => arr.concat(Array(FC_MONTHS).fill(null));
+
+    // الخط الواصل: متوسط كل الدرجات (كل المراحل) في كل شهر
+    const connectorSeries = chartMonthKeys.map(k=>{
+      const all=[]; allStages.forEach(s=>{ const sc=monthlyByStage[s].get(k); if(sc) all.push(...sc); });
+      return all.length ? +avg(all).toFixed(1) : null;
+    });
+    let li = -1; connectorSeries.forEach((v,i)=>{ if(v!=null) li=i; });   // آخر شهر فعلي له قيمة
+
+    // الشهور المتوقعة (3 فقط) بعد آخر شهر في الرسم
+    const fcKeys = [];
+    { let [y,m]=chartMonthKeys[N-1].split("-").map(Number);
+      for(let h=0;h<FC_MONTHS;h++){ m++; if(m>12){m=1;y++;} fcKeys.push(`${y}-${String(m).padStart(2,"0")}`); } }
+    const fcVals = (typeof linearForecast==="function") ? linearForecast(connectorSeries, FC_MONTHS) : Array(FC_MONTHS).fill(null);
+    const hasForecast = li>=0 && fcVals.every(v=>v!=null);
+
+    const labels = chartMonthKeys.map(monthLabel).concat(hasForecast ? fcKeys.map(k=>monthLabel(k)+" (توقع)") : []);
+    const extra  = hasForecast ? FC_MONTHS : 0;
+    const padTo  = (arr) => extra ? pad(arr) : arr;
+
+    const stageDatasets = allStages.map((s,i)=>{
+      const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
+      const series=chartMonthKeys.map(k=>{
+        const scores=monthlyByStage[s].get(k);
+        return scores?+avg(scores).toFixed(1):null;
+      });
+      return { label:stageLabel(s), data:padTo(series), borderColor:col.bd,
+        backgroundColor:col.bd.replace(")",",0.08)").replace("rgb","rgba"),
+        borderWidth:2.5, pointRadius:5, pointHoverRadius:8,
+        pointBackgroundColor:"#fff", pointBorderColor:col.bd, pointBorderWidth:2.5,
+        fill:false, tension:0.3, spanGaps:true, order:0 };
+    });
+
+    const lineCol = CSS_TOKENS.txMuted();
+    const connectorIdx = stageDatasets.length;
+    const connector = { label:"المتوسط العام (يربط الشهور)", data:padTo(connectorSeries), borderColor:lineCol,
+      backgroundColor:"transparent", borderWidth:2, pointRadius:0, pointHoverRadius:0,
+      fill:false, tension:0.2, spanGaps:true, order:1 };
+    const datasets = [...stageDatasets, connector];
+
+    let fcIdx = -1;
+    if(hasForecast){
+      const fcData = Array(N+FC_MONTHS).fill(null);
+      fcData[li] = connectorSeries[li];                       // نقطة الربط بآخر شهر فعلي
+      fcVals.forEach((v,h)=>{ fcData[N+h]=v; });
+      fcIdx = datasets.length;
+      datasets.push({ label:"توقع "+FC_MONTHS+" شهور (Holt)", data:fcData, borderColor:lineCol,
+        backgroundColor:"transparent", borderWidth:2, borderDash:[6,5],
+        pointRadius:fcData.map((_,i)=>i===li?0:4), pointHoverRadius:fcData.map((_,i)=>i===li?0:7),
+        pointBackgroundColor:"#fff", pointBorderColor:lineCol, pointBorderWidth:2,
+        fill:false, tension:0.2, spanGaps:true, order:2 });
+    }
+
     CHARTS["ch-stage-time"]=new Chart(timeCanvas,{
       type:"line",
-      data:{
-        labels:chartMonthKeys.map(monthLabel),
-        datasets:allStages.map((s,i)=>{
-          const col=STAGE_PALETTE[i%STAGE_PALETTE.length];
-          const series=chartMonthKeys.map(k=>{
-            const scores=monthlyByStage[s].get(k);
-            return scores?+avg(scores).toFixed(1):null;
-          });
-          return { label:stageLabel(s), data:series, borderColor:col.bd,
-            backgroundColor:col.bd.replace(")",",0.08)").replace("rgb","rgba"),
-            borderWidth:2.5, pointRadius:5, pointHoverRadius:8,
-            pointBackgroundColor:"#fff", pointBorderColor:col.bd, pointBorderWidth:2.5,
-            fill:false, tension:0.3, spanGaps:true };
-        }),
-      },
+      data:{ labels, datasets },
       options:{ maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
-        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}} },
+        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}},
+          // الخط الواصل لا يظهر في التلميح (مكرَّر مع نقطة المرحلة)، ونقطة ربط التوقع عند آخر شهر فعلي تُخفى
+          tooltip:{ filter:(item)=> item.datasetIndex!==connectorIdx && !(item.datasetIndex===fcIdx && item.dataIndex===li),
+            callbacks:{ label:(ctx)=>{
+              // التوقع يُكتب باسم الشهر المتوقع نفسه ("توقع شهر (ديسمبر): 62.39") بدل "توقع 3 شهور" في كل مرة
+              if(ctx.datasetIndex===fcIdx){
+                const fk = fcKeys[ctx.dataIndex - N];
+                const mn = fk ? MM_AR[Number(fk.split("-")[1])-1] : "";
+                return ` توقع شهر (${mn}): ${ctx.formattedValue}`;
+              }
+              return ` ${ctx.dataset.label}: ${ctx.formattedValue}`;
+            } } } },
         scales:{ x:{ticks:{font:{size:10},maxRotation:40},grid:{display:false}},
           y:{beginAtZero:false,suggestedMin:0,suggestedMax:100,ticks:{font:{size:10}},
             title:{display:true,text:"متوسط FCA",font:{size:10,weight:"700"},color:CSS_TOKENS.txMuted()}} } }

@@ -7358,6 +7358,28 @@ const KPI_QUARTER_NAMES = ["", "الربع الأول", "الربع الثاني
 const KPI_HALF_NAMES = ["", "النصف الأول", "النصف الثاني"];
 window.KPI_GRAN = window.KPI_GRAN || {};   // النمط المختار لكل رسم (chartId -> key)
 window.KPI_REDRAW = window.KPI_REDRAW || {}; // دالة إعادة الرسم لكل رسم
+// ★ 2026-10-05 (بناءً على طلب — وضوح قراءة الخطوط): التركيز على منطقة أو أكثر.
+// الضغط على اسم منطقة (في الأزرار فوق الرسم أو في وسيلة الإيضاح) يُبرز خطها
+// (الفعلي والمتوقع) ويُبهت الباقي ويقصر التلميح عليها؛ الضغط مرة أخرى يلغي
+// التركيز، و"الكل" يلغي كل التركيز. الاختيار محفوظ لكل رسم (KPI_FOCUS).
+window.KPI_FOCUS = window.KPI_FOCUS || {};       // chartId -> [regionIdx,...]
+window.KPI_FOCUS_APPLY = window.KPI_FOCUS_APPLY || {};
+window.__kpiFocus = function (chartId, idx) {
+  let f = (window.KPI_FOCUS[chartId] || []).slice();
+  if (idx < 0) f = [];
+  else if (f.includes(idx)) f = f.filter((x) => x !== idx);
+  else f.push(idx);
+  window.KPI_FOCUS[chartId] = f;
+  document.querySelectorAll('[data-kpi-chip="' + chartId + '"]').forEach((b) => {
+    const i = parseInt(b.getAttribute("data-idx"), 10);
+    const on = i < 0 ? f.length === 0 : f.includes(i);
+    const col = b.getAttribute("data-color") || "var(--teal, #0d9488)";
+    b.style.background = on ? col : "transparent";
+    b.style.color = on ? "#fff" : "var(--tx-main)";
+    b.style.borderColor = col;
+  });
+  if (typeof window.KPI_FOCUS_APPLY[chartId] === "function") window.KPI_FOCUS_APPLY[chartId]();
+};
 window.__kpiSetGran = function (chartId, key) {
   window.KPI_GRAN[chartId] = key;
   document.querySelectorAll('[data-kpi-gran="' + chartId + '"]').forEach((b) => {
@@ -7707,6 +7729,17 @@ function renderKpiTabGeneric_(opts) {
           }).join("")}
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px">
+        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">ركّز على منطقة:</span>
+        ${(() => {
+          const foc = window.KPI_FOCUS[chartId] || [];
+          const chip = (idx, label, color) => {
+            const on = idx < 0 ? foc.length === 0 : foc.includes(idx);
+            return `<button type="button" data-kpi-chip="${chartId}" data-idx="${idx}" data-color="${color}" onclick="__kpiFocus('${chartId}',${idx})" style="cursor:pointer;padding:4px 12px;font-size:12px;font-weight:700;font-family:inherit;border-radius:999px;border:2px solid ${color};background:${on ? color : "transparent"};color:${on ? "#fff" : "var(--tx-main)"}">${label}</button>`;
+          };
+          return chip(-1, "الكل", "#64748B") + data.map((r, i) => chip(i, esc(r.region) + (hasContract && r.contract ? ` · ${esc(r.contract)}` : ""), PALETTE[i % PALETTE.length])).join("");
+        })()}
+      </div>
       <div class="chart-box" style="height:380px"><canvas id="${chartId}"></canvas></div>
       <div id="${chartId}-gran-note" style="display:none;font-size:11px;color:var(--tx-muted);margin-top:8px">قيمة كل فترة = متوسط أشهرها. الفترة التي تضم أشهرًا متوقعة تُحسب من الأشهر الفعلية والمتوقعة داخلها معًا (تظهر بخط متقطع).</div>
       <div style="font-size:11px;color:var(--tx-muted);margin-top:10px;display:flex;align-items:center;gap:6px">
@@ -7756,6 +7789,11 @@ function renderKpiTabGeneric_(opts) {
     if (noteEl) noteEl.style.display = gran === "month" ? "none" : "block";
     const { buckets, regionVals, avgVals, anchorIdx } = buildBuckets(gran);
     const nB = buckets.length;
+    const focusSet = () => new Set(window.KPI_FOCUS[chartId] || []);
+    const dimmed = (i) => { const f = focusSet(); return f.size > 0 && !f.has(i); };
+    const focused = (i) => focusSet().has(i);
+    const colorOf = (i) => PALETTE[i % PALETTE.length] + (dimmed(i) ? "30" : "");
+    const widthOf = (i) => (focused(i) ? 4.5 : dimmed(i) ? 1.5 : 2.5);
     const actualOnly = (vals) => vals.map((v, bi) => (buckets[bi].isForecast ? null : v));
     const forecastSeries = (vals) => {
       const out = Array(nB).fill(null);
@@ -7770,34 +7808,37 @@ function renderKpiTabGeneric_(opts) {
         datasets: [
           ...data.map((r, i) => ({
             label: r.region,
+            regionIdx: i,
             data: actualOnly(regionVals[i]),
-            borderColor: PALETTE[i % PALETTE.length],
+            borderColor: colorOf(i),
             backgroundColor: PALETTE[i % PALETTE.length] + "22",
-            borderWidth: 2.5,
+            borderWidth: widthOf(i),
             tension: 0.3,
-            pointRadius: 4,
-            pointHoverRadius: 6,
+            pointRadius: () => (dimmed(i) ? 0 : focused(i) ? 5.5 : 4),
+            pointHoverRadius: () => (dimmed(i) ? 0 : 7),
             pointBackgroundColor: PALETTE[i % PALETTE.length],
             spanGaps: !0,
           })),
           ...data.map((r, i) => ({
             label: r.region + " (توقع)",
+            regionIdx: i,
             data: forecastSeries(regionVals[i]),
-            borderColor: PALETTE[i % PALETTE.length],
+            borderColor: colorOf(i),
             backgroundColor: "transparent",
-            borderWidth: 2.5,
+            borderWidth: widthOf(i),
             borderDash: [6, 4],
             tension: 0.3,
             // ★ 2026-10-05: أول نقطة في خط التوقع هي نقطة ربط عند آخر فترة
             // فعلية (لتتصل الخطوط فقط) — فلا تُرسم لها علامة ولا تتفاعل مع التمرير.
-            pointRadius: (ctx) => (ctx.dataIndex === anchorIdx ? 0 : 3),
+            pointRadius: (ctx) => (ctx.dataIndex === anchorIdx || dimmed(i) ? 0 : focused(i) ? 4.5 : 3),
             pointStyle: "rectRot",
-            pointHoverRadius: (ctx) => (ctx.dataIndex === anchorIdx ? 0 : 5),
+            pointHoverRadius: (ctx) => (ctx.dataIndex === anchorIdx || dimmed(i) ? 0 : 6),
             pointBackgroundColor: PALETTE[i % PALETTE.length],
             spanGaps: !0,
           })),
           {
             label: "المتوسط العام",
+            regionIdx: -1,
             data: avgVals,
             borderColor: CSS_TOKENS.txMuted(),
             borderDash: [6, 4],
@@ -7821,14 +7862,24 @@ function renderKpiTabGeneric_(opts) {
               padding: 10,
               filter: (item) => !String(item.text || "").includes("(توقع)"),
             },
+            // ★ 2026-10-05: الضغط على اسم منطقة في وسيلة الإيضاح = تركيز عليها
+            // (بدل إخفاء الخط كليًا كالسلوك الافتراضي).
+            onClick: (e, item) => {
+              const ds = CHARTS[chartId] && CHARTS[chartId].data.datasets[item.datasetIndex];
+              if (ds && ds.regionIdx >= 0) window.__kpiFocus(chartId, ds.regionIdx);
+            },
           },
           tooltip: {
             // ★ 2026-10-05 (بناءً على طلب): آخر فترة فعلية كانت تُظهر الفعلي
             // والتوقع معًا في التلميح، لأن خط التوقع يبدأ من نفس نقطتها ليتصل
             // بالخط الأصلي. يُخفى سطر "(توقع)" عند هذه النقطة فقط، ويبقى الخط
             // المتقطع متصلًا، وتظهر أسطر التوقع في الفترات المستقبلية كالمعتاد.
-            filter: (item) =>
-              !(String(item.dataset.label || "").includes("(توقع)") && item.dataIndex === anchorIdx),
+            filter: (item) => {
+              if (String(item.dataset.label || "").includes("(توقع)") && item.dataIndex === anchorIdx) return false;
+              // عند وجود تركيز: يقتصر التلميح على المناطق المركّز عليها فقط
+              const f = focusSet();
+              return f.size === 0 || f.has(item.dataset.regionIdx);
+            },
             callbacks: {
               label: (ctx) =>
                 ` ${ctx.dataset.label}: ${ctx.raw == null ? "—" : ctx.raw.toFixed(2) + "%"}`,
@@ -7840,6 +7891,20 @@ function renderKpiTabGeneric_(opts) {
         },
       },
     });
+  };
+  // تطبيق التركيز على الرسم الحالي دون إعادة بنائه
+  window.KPI_FOCUS_APPLY[chartId] = () => {
+    const ch = CHARTS[chartId];
+    if (!ch) return;
+    const f = new Set(window.KPI_FOCUS[chartId] || []);
+    ch.data.datasets.forEach((ds) => {
+      const i = ds.regionIdx;
+      if (i < 0) { ds.borderColor = f.size ? CSS_TOKENS.txMuted() + "40" : CSS_TOKENS.txMuted(); return; }
+      const dim = f.size > 0 && !f.has(i);
+      ds.borderColor = PALETTE[i % PALETTE.length] + (dim ? "30" : "");
+      ds.borderWidth = f.has(i) ? 4.5 : dim ? 1.5 : 2.5;
+    });
+    ch.update("none");
   };
   window.KPI_REDRAW[chartId] = drawChart;
   requestAnimationFrame(() => drawChart(window.KPI_GRAN[chartId] || "month"));
@@ -32894,6 +32959,66 @@ function _corrRegionTableRowsHtml(regionsSet, byRegionType) {
   return body + (regionsSet.length > 1 ? rowHtml("الإجمالي", tot, true) : "");
 }
 
+// ★ 2026-10-05 (بناءً على طلب — رسم أوضح وأجمل): رسم "الصادر والوارد حسب
+// المنطقة" صار أعمدة أفقية مجمّعة: اسم المنطقة مقروء على الجانب دون ميلان
+// (وبجانبه إجمالي المنطقة)، وعمودان لكل منطقة (صادر / وارد) برقم ظاهر عند
+// طرف كل عمود، والمناطق مرتبة من الأكثر للأقل. ومبدّل صغير فوق الرسم
+// (الكل / مفتوح / مغلق) يعرض الصادر والوارد للحالة المختارة فقط.
+// الرسم القديم (أعمدة رأسية رفيعة بأسماء مائلة) استُبدل بهذا في نفس البطاقة.
+function _corrDrawRegionChart(byRegionType, regionsSet, status) {
+  if (typeof Chart === "undefined") return;
+  const st = status || "all";
+  CORR._chartStatus = st;
+  CORR._chartCtx = { byRegionType, regionsSet };
+  const pick = (b, tp) => (st === "open" ? b[tp + "_مفتوح"] : st === "closed" ? b[tp + "_مغلق"] : b[tp]) || 0;
+  const rows = regionsSet
+    .map((rg) => { const b = byRegionType[rg] || {}; return { rg, out: pick(b, "صادر"), inn: pick(b, "وارد") }; })
+    .sort((a, b) => b.out + b.inn - (a.out + a.inn));
+  document.querySelectorAll('[data-corr-chart-status]').forEach((btn) => {
+    const on = btn.getAttribute("data-corr-chart-status") === st;
+    btn.style.background = on ? "var(--teal, #0d9488)" : "transparent";
+    btn.style.color = on ? "#fff" : "var(--tx-main)";
+  });
+  killChart("ch-corr-region-type");
+  const canvas = document.getElementById("ch-corr-region-type");
+  if (!canvas) return;
+  const cOut = CSS_TOKENS.info(), cIn = CSS_TOKENS.warning();
+  CHARTS["ch-corr-region-type"] = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: rows.map((r) => `${r.rg}  ·  ${(r.out + r.inn).toLocaleString("ar")}`),
+      datasets: [
+        { label: "صادر", data: rows.map((r) => r.out), backgroundColor: cOut + "DD", borderColor: cOut, borderWidth: 1, borderRadius: 8, barPercentage: 0.85, categoryPercentage: 0.78, maxBarThickness: 26 },
+        { label: "وارد", data: rows.map((r) => r.inn), backgroundColor: cIn + "DD", borderColor: cIn, borderWidth: 1, borderRadius: 8, barPercentage: 0.85, categoryPercentage: 0.78, maxBarThickness: 26 },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: !0,
+      maintainAspectRatio: !1,
+      layout: { padding: { top: 4, right: 46, bottom: 4, left: 6 } },
+      plugins: {
+        legend: { position: "top", labels: { usePointStyle: !0, pointStyle: "circle", font: { size: 12, weight: "700" }, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => rows[items[0].dataIndex]?.rg || "",
+            label: (ctx) => `  ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString("ar")}`,
+            afterBody: (items) => { const r = rows[items[0].dataIndex]; return r ? `  الإجمالي: ${(r.out + r.inn).toLocaleString("ar")}` : ""; },
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: !0, grid: { color: "rgba(168,195,214,.22)" }, ticks: { precision: 0 } },
+        y: { grid: { display: !1 }, ticks: { font: { size: 13, weight: "700" }, color: CSS_TOKENS.txMain ? CSS_TOKENS.txMain() : undefined, maxRotation: 0 } },
+      },
+    },
+  });
+}
+window._corrSetRegionChartStatus = function (st) {
+  const c = CORR._chartCtx;
+  if (c) _corrDrawRegionChart(c.byRegionType, c.regionsSet, st);
+};
+
 function _corrApplyFilters() {
   const rows = window.RAW_NEW_CORRESPONDENCE || [];
   CORR.filtered = rows.filter((r) => {
@@ -33160,11 +33285,17 @@ function renderCorrespondenceTab() {
     </div>
   </div>
 
-  <div class="g3 mb14">
-    <div class="card">
-      <div class="card-title">الصادر والوارد حسب المنطقة</div>
-      <div class="chart-box" style="height:260px"><canvas id="ch-corr-region-type"></canvas></div>
+  <div class="card mb14">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      <div class="card-title" style="margin:0;padding:0;border:0">الصادر والوارد حسب المنطقة</div>
+      <div style="display:inline-flex;border:1px solid var(--brd);border-radius:999px;overflow:hidden">
+        ${[["all", "الكل"], ["open", "مفتوح"], ["closed", "مغلق"]].map(([k, l]) => `<button type="button" data-corr-chart-status="${k}" onclick="_corrSetRegionChartStatus('${k}')" style="border:0;cursor:pointer;padding:5px 16px;font-size:12px;font-weight:700;font-family:inherit;background:${k === "all" ? "var(--teal, #0d9488)" : "transparent"};color:${k === "all" ? "#fff" : "var(--tx-main)"}">${l}</button>`).join("")}
+      </div>
     </div>
+    <div class="chart-box" style="height:${Math.max(240, regionsSet.length * 62 + 90)}px"><canvas id="ch-corr-region-type"></canvas></div>
+  </div>
+
+  <div class="g2 mb14">
     <div class="card">
       <div class="card-title">توزيع المراسلات حسب النوع</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-corr-type"></canvas></div>
@@ -33252,20 +33383,7 @@ function renderCorrespondenceTab() {
 
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;
-    makeVBar("ch-corr-region-type", regionsSet, [
-      {
-        label: "صادر",
-        data: regionsSet.map((rg) => byRegionType[rg]["صادر"] || 0),
-        backgroundColor: CSS_TOKENS.info() + "88",
-        borderColor: CSS_TOKENS.info(),
-      },
-      {
-        label: "وارد",
-        data: regionsSet.map((rg) => byRegionType[rg]["وارد"] || 0),
-        backgroundColor: CSS_TOKENS.warning() + "88",
-        borderColor: CSS_TOKENS.warning(),
-      },
-    ]);
+    _corrDrawRegionChart(byRegionType, regionsSet, "all");
     makeDoughnut("ch-corr-type", { صادر: outCount, وارد: inCount }, { صادر: CSS_TOKENS.info(), وارد: CSS_TOKENS.warning() });
     makeDoughnut("ch-corr-source", { "منصة أعمالي": aamaliRows.length, "خطابات أخرى": otherRows.length }, { "منصة أعمالي": "#2563EB", "خطابات أخرى": "#9CA3AF" });
     makeDoughnut("ch-corr-status", byStatus, { مفتوح: CSS_TOKENS.warning(), مغلق: CSS_TOKENS.positive() });

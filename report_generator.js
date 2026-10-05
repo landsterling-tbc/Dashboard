@@ -12,7 +12,7 @@
   // <script> شغّال عادي). ⚠️ أي تعديل على report_template.pptx لازم يتبعه إعادة
   // توليد report_template_data.js من نفس الملف، وتغيير TEMPLATE_VERSION.
   const TEMPLATE_DATA_JS = "report_template_data.js";
-  const TEMPLATE_VERSION = "20260926";
+  const TEMPLATE_VERSION = "20261003";
   const REGION_ORDER = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
   const CLEANING_CATEGORY_VALUES = ["نظافة", "النظافة", "أعمال النظافة", "بند النظافة"];
   // ── مناطق فرعية تتبع كل منطقة رئيسية (نفس BALAGH_SECTOR_TO_REGION في dashboard.js) —
@@ -100,7 +100,15 @@
     // عند حساب "أحدث تاريخ" — عشان تاريخ خاطئ في صف واحد ما يزحزحش نافذة الأسبوع كلها
     const validDates = all.map((r) => r.creationDateObj).filter((d) => d && d.getTime() <= now.getTime());
     if (!validDates.length) throw new Error("لا توجد بلاغات بتاريخ إنشاء صالح لحساب فترة التقرير");
-    const latestDate = new Date(Math.max(...validDates.map((d) => d.getTime())));
+    // ★ 2026-10-03 (بلاغ "Maximum call stack size exceeded" عند التنزيل على
+    // بيانات حقيقية 130k+ صف): Math.max(...مصفوفة ضخمة) بينهار لما عدد
+    // العناصر يتخطى حد مُعاملات الفنكشن في المحرك. نفس المشكلة والحل
+    // المستخدَم فعلاً في dashboard.js (راجع safeArrMax_ أعلى dashboard.js) —
+    // حلقة عادية بدل الـspread، بنفس النتيجة بالظبط وأداء أفضل.
+    const latestDateMs = typeof window.safeArrMax_ === "function"
+      ? window.safeArrMax_(validDates.map((d) => d.getTime()))
+      : validDates.reduce((m, d) => Math.max(m, d.getTime()), -Infinity);
+    const latestDate = new Date(latestDateMs);
 
     const bounds = computePeriodBounds_(latestDate, periodDays);
     const { curStart, curEnd, curEndFull, prevStart, prevEnd, prevEndFull } = bounds;
@@ -189,6 +197,30 @@
       current: x.count,
       previous: prevByRegionMap.get(x.region) || 0,
     }));
+
+    // ── سلايد إضافية: مقارنة 4 أسابيع متتالية (طلب صريح 2026-10-03: "عاوز صفحه
+    // تانيه خالص ويبقي بتقارن 4 مع بعض بنفس الفكره والطريقه") — دايمًا آخر 4 أسابيع
+    // كاملة (الأحد→السبت)، بغض النظر عن اختيار المستخدم 7/14 يوم (periodDays) في
+    // نافذة التنزيل، ومبنية على "all" (كل البيانات) مش periodRows — عشان نقدر نرجع
+    // 3 أسابيع إضافية لقبل الأسبوع الحالي حتى لو periodDays=7.
+    const WEEKS4_COUNT_ = 4;
+    const anchorWeekStart_ = weekStart_(latestDate);
+    const week4Bounds_ = []; // الأقدم أولاً → الأحدث آخرًا
+    for (let i = WEEKS4_COUNT_ - 1; i >= 0; i--) {
+      const s = new Date(anchorWeekStart_);
+      s.setDate(s.getDate() - 7 * i);
+      const e = new Date(s);
+      e.setDate(e.getDate() + 6);
+      week4Bounds_.push({ start: s, end: e });
+    }
+    const week4Labels = week4Bounds_.map((b) => weekRangeCompact_(b.start, b.end));
+    const week4RowsByIdx_ = week4Bounds_.map((b) => all.filter((r) => inRange(r, b.start, endOfDay_(b.end))));
+    const week4ByRegion = sortDesc(
+      REGION_ORDER.map((region) => {
+        const counts = week4RowsByIdx_.map((rows) => rows.filter((r) => r.region === region).length);
+        return { region, counts, count: counts.reduce((s, c) => s + c, 0) };
+      })
+    );
 
     // ── سلايد 7: الأولوية (روتيني/طارئ) حسب المنطقة ──
     const priorityByRegion = sortDesc(
@@ -345,7 +377,7 @@
     return {
       periodLabel, curShort, prevShort, curStart, curEnd, prevStart, prevEnd,
       overviewTotal, buildingsTotal, emergencyRows, consultantApprovalRows, overviewByRegion,
-      secTotal, secGroupsSorted, buildingsByRegion, weekCompareByRegion, priorityByRegion,
+      secTotal, secGroupsSorted, buildingsByRegion, weekCompareByRegion, week4Labels, week4ByRegion, priorityByRegion,
       overdueCount, compliantCount, compliancePct, breachPct,
       consultantByRegion, cleaningByRegion, cleaningTotal: cleaningRows.length, cleaningContractorRows,
       topSchoolsByRegion,
@@ -684,8 +716,55 @@
       });
     }
 
-    // سلايد 7: الأولوية (روتيني/طارئ)
+    // سلايد جديدة (منفصلة تمامًا عن سلايد "مقارنة الأسبوعين" أعلاه — طلب صريح
+    // 2026-10-03: "اعمل صفحه تانيه خالص ويبقي بتقارن 4 مع بعض بنفس الفكره والطريقه"):
+    // مقارنة البلاغات عبر 4 أسابيع متتالية، بنفس أسلوب جدول+تشارت لكل منطقة، لكن
+    // بـ4 أعمدة/سلاسل بدل عمودين. ترتيب أعمدة الجدول: [الفرق(الأحدث مقابل الأقدم) |
+    // الأسبوع4(الأحدث) | الأسبوع3 | الأسبوع2 | الأسبوع1(الأقدم) | المنطقة].
     await patchSlide_(zip, slides[6], (doc) => {
+      setShapeLines_(doc, 2, [`مقارنة البلاغات - 4 أسابيع متتالية (${data.week4Labels[0]} – ${data.week4Labels[3]})`]);
+      const sp = findShapeById_(doc, 80);
+      const tbl = getTableInShape_(sp);
+      if (tbl) {
+        setCell_(tbl, 0, 1, data.week4Labels[3]);
+        setCell_(tbl, 0, 2, data.week4Labels[2]);
+        setCell_(tbl, 0, 3, data.week4Labels[1]);
+        setCell_(tbl, 0, 4, data.week4Labels[0]);
+        const totals = [0, 0, 0, 0]; // بترتيب week4Labels (الأقدم → الأحدث)
+        data.week4ByRegion.forEach((x, i) => {
+          const r = i + 1;
+          const oldest = x.counts[0], newest = x.counts[3];
+          const diffPct = oldest > 0 ? (((newest - oldest) / oldest) * 100).toFixed(1) : (newest > 0 ? "100.0" : "0.0");
+          setCell_(tbl, r, 0, `${diffPct}%`);
+          setCell_(tbl, r, 1, fmtNum_(x.counts[3]));
+          setCell_(tbl, r, 2, fmtNum_(x.counts[2]));
+          setCell_(tbl, r, 3, fmtNum_(x.counts[1]));
+          setCell_(tbl, r, 4, fmtNum_(x.counts[0]));
+          setCell_(tbl, r, 5, x.region);
+          x.counts.forEach((c, wi) => { totals[wi] += c; });
+        });
+        const totDiffPct = totals[0] > 0 ? (((totals[3] - totals[0]) / totals[0]) * 100).toFixed(1) : "0.0";
+        setCell_(tbl, 5, 0, `${totDiffPct}%`);
+        setCell_(tbl, 5, 1, fmtNum_(totals[3]));
+        setCell_(tbl, 5, 2, fmtNum_(totals[2]));
+        setCell_(tbl, 5, 3, fmtNum_(totals[1]));
+        setCell_(tbl, 5, 4, fmtNum_(totals[0]));
+        setCell_(tbl, 5, 5, "الإجمالي");
+      }
+    });
+    {
+      const chartPath = await getSlideChartPath_(zip, slides[6]);
+      await patchChart_(zip, chartPath, (cdoc) => {
+        const cats = data.week4ByRegion.map((x) => x.region);
+        [0, 1, 2, 3].forEach((wi) => {
+          setSeriesName_(cdoc, wi, data.week4Labels[wi]);
+          setChartCategoriesValues_(cdoc, wi, cats, data.week4ByRegion.map((x) => x.counts[wi]));
+        });
+      });
+    }
+
+    // سلايد 7: الأولوية (روتيني/طارئ)
+    await patchSlide_(zip, slides[7], (doc) => {
       const sp = findShapeById_(doc, 80);
       const tbl = getTableInShape_(sp);
       if (tbl) {
@@ -704,7 +783,7 @@
       }
     });
     {
-      const chartPath = await getSlideChartPath_(zip, slides[6]);
+      const chartPath = await getSlideChartPath_(zip, slides[7]);
       await patchChart_(zip, chartPath, (cdoc) => {
         setChartCategoriesValues_(cdoc, 0, data.priorityByRegion.map((x) => x.region), data.priorityByRegion.map((x) => x.pct));
       });
@@ -717,13 +796,13 @@
     const slaContractor = data.manual && data.manual.slaContractor != null ? data.manual.slaContractor : data.compliancePct;
     const slaConsultant = data.manual && data.manual.slaConsultant != null ? data.manual.slaConsultant : data.compliancePct;
     const slaGap = Math.abs(slaContractor - slaConsultant);
-    await patchSlide_(zip, slides[7], (doc) => {
+    await patchSlide_(zip, slides[8], (doc) => {
       setShapeLines_(doc, 79, [fmtNum_(data.overdueCount), `بلاغات تجاوزت ال SLA  من اجمالي البلاغات بنسبة ${data.breachPct.toFixed(1)}%`]);
       setShapeLines_(doc, 81, [fmtNum_(data.compliantCount), `بلاغات ضمنSLA  من اجمالي البلاغات بنسبة ${data.compliancePct.toFixed(1)}%`]);
       setShapeLines_(doc, 86, [`%${slaGap.toFixed(1)}`, "الفجوة"]);
     });
     {
-      const chartPath = await getSlideChartPath_(zip, slides[7]);
+      const chartPath = await getSlideChartPath_(zip, slides[8]);
       await patchChart_(zip, chartPath, (cdoc) => {
         // ترتيب التمبلت: النقطة 0 = المقاول (يمين)، النقطة 1 = الاستشاري (يسار)
         setChartCategoriesValues_(cdoc, 0, ["المقاول (BMC)", "الاستشاري"], [slaContractor.toFixed(1), slaConsultant.toFixed(1)]);
@@ -731,7 +810,7 @@
     }
 
     // سلايد 9: قيد موافقة الاستشاري
-    await patchSlide_(zip, slides[8], (doc) => {
+    await patchSlide_(zip, slides[9], (doc) => {
       const sp = findShapeById_(doc, 80);
       const tbl = getTableInShape_(sp);
       if (tbl) {
@@ -752,14 +831,14 @@
       }
     });
     {
-      const chartPath = await getSlideChartPath_(zip, slides[8]);
+      const chartPath = await getSlideChartPath_(zip, slides[9]);
       await patchChart_(zip, chartPath, (cdoc) => {
         setChartCategoriesValues_(cdoc, 0, data.consultantByRegion.map((x) => x.region), data.consultantByRegion.map((x) => x.count));
       });
     }
 
     // سلايد 10: بلاغات النظافة حسب المنطقة
-    await patchSlide_(zip, slides[9], (doc) => {
+    await patchSlide_(zip, slides[10], (doc) => {
       const sp = findShapeById_(doc, 80);
       const tbl = getTableInShape_(sp);
       if (tbl) {
@@ -777,7 +856,7 @@
       }
     });
     {
-      const chartPath = await getSlideChartPath_(zip, slides[9]);
+      const chartPath = await getSlideChartPath_(zip, slides[10]);
       await patchChart_(zip, chartPath, (cdoc) => {
         setChartCategoriesValues_(cdoc, 0, data.cleaningByRegion.map((x) => x.region), data.cleaningByRegion.map((x) => x.count));
       });
@@ -788,7 +867,7 @@
     // المقاول | المحافظات | المنطقة — وصفوفه: هيدر، نمط صف أبيض، نمط صف أخضر فاتح، إجمالي.
     // وقت التشغيل: صف لكل (منطقة × مقاول)، خلية المنطقة مدموجة رأسيًا لكل صفوف نفس
     // المنطقة، ولون الخلفية بيتبادل لكل منطقة (مش لكل صف) عشان المجموعات تبان واضحة.
-    await patchSlide_(zip, slides[10], (doc) => {
+    await patchSlide_(zip, slides[11], (doc) => {
       const sp = findShapeById_(doc, 78);
       const tbl = getTableInShape_(sp);
       if (!tbl) return;
@@ -889,7 +968,7 @@
     const schoolSlideRegions = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
     for (let i = 0; i < schoolSlideRegions.length; i++) {
       const region = schoolSlideRegions[i];
-      await patchSlide_(zip, slides[11 + i], (doc) => {
+      await patchSlide_(zip, slides[12 + i], (doc) => {
         const sp = findShapeById_(doc, 78);
         const tbl = getTableInShape_(sp);
         if (!tbl) return;
@@ -1010,12 +1089,13 @@
       const reopenInputs = REGION_ORDER.map((r, i) => `
             <div>
               <label for="balagh-report-reopen-${i}" style="${lblCss}">${r}</label>
-              <input type="text" inputmode="numeric" id="balagh-report-reopen-${i}" data-region="${r}" style="${inputCss}" placeholder="العدد" autocomplete="off">
+              <input type="text" inputmode="numeric" id="balagh-report-reopen-${i}" data-region="${r}" style="${inputCss}" value="0" placeholder="العدد" autocomplete="off">
               <div data-err="reopen-${i}" style="${errCss}"></div>
             </div>`).join("");
       card.innerHTML = `
         <div style="font-size:15px;font-weight:900;color:#1E293B;margin-bottom:4px">📄 تنزيل تقرير PowerPoint</div>
         <div style="font-size:11.5px;color:#64748B;margin-bottom:12px">اختر الفترة، اكتب الأرقام اليدوية، ثم أدخل كلمة المرور للمتابعة</div>
+        <div id="balagh-report-modal-errbanner" style="display:none;background:#FEF2F2;border:1.5px solid #DC2626;color:#B91C1C;border-radius:9px;padding:9px 11px;font-size:12px;font-weight:800;margin-bottom:12px"></div>
 
         <div style="${secTitle}">فترة التقرير</div>
         <div style="display:flex;gap:16px;margin-bottom:4px">
@@ -1119,6 +1199,8 @@
       function submit() {
         let firstBad = null;
         const mark = (el) => { if (!firstBad) firstBad = el; };
+        const errBanner = $("#balagh-report-modal-errbanner");
+        if (errBanner) errBanner.style.display = "none";
         // نسب SLA: إجبارية، من 0 لـ 100
         const slaVals = [
           [slaC, "sla-contractor"],
@@ -1148,6 +1230,19 @@
           mark(pwInput);
         }
         if (firstBad) {
+          // ★ 2026-10-03 (طلب صريح بعد بلاغ المستخدم إن الزرار "مش بيحمل"):
+          // السبب الحقيقي كان إن الحقول دي (نسبتي SLA + البلاغات المعاد
+          // فتحها) إجبارية، ولو فاضية بيرفض يكمل التنزيل بصمت تقريبًا —
+          // رسالة "مطلوب" صغيرة تحت كل حقل بس، سهل جدًا إنها تفوت على
+          // حد مركّز على خانة كلمة المرور. البانر ده بيوضّح بشكل مش ممكن
+          // يتفوت إن فيه حقول محتاجة تتعبّى الأول.
+          if (errBanner) {
+            errBanner.textContent = firstBad === pwInput
+              ? "❌ كلمة المرور غير صحيحة."
+              : "⚠️ فيه حقول إجبارية لسه فاضية أو غلط (SLA% / البلاغات المعاد فتحها) — اتأكد منها تحت قبل التنزيل.";
+            errBanner.style.display = "block";
+          }
+          if (errBanner) errBanner.scrollIntoView({ block: "start" });
           firstBad.focus();
           if (firstBad.select) firstBad.select();
           return;
@@ -1181,6 +1276,7 @@
       });
       slaC.focus();
       refreshHints();
+      refreshReopenTotal(); // الحقول الأربعة معبّأة 0 افتراضيًا — نعرض الإجمالي فورًا من غير ما ننتظر أول input
     });
   }
   window.__balaghReportOpenModal_ = openReportOptionsModal_; // للاختبار فقط

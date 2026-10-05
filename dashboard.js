@@ -298,7 +298,9 @@ window.__PRESENTATION_MODE__ = true;
 // ★ 2026-09-27: أُضيفت "التكلفة" هنا كمان بناءً على طلب صريح — بنفس آلية
 // زر العين 👁 بالظبط (تختفي وهو ON، وترجع تظهر لوحدها بمجرد الضغط عليه
 // تاني لإطفاء وضع العرض)، من غير أي حذف لكود التبويب نفسه.
-var PRESENTATION_HIDDEN_TABS = ["students", "elevators", "elevator-status", "khanadeq", "spare", "cost"];
+// ★ 2026-10-04: "المصاعد" (elevators) أُزيلت من هذه القائمة بناءً على طلب
+// صريح — التبويب لازم يفضل ظاهر دايمًا من دلوقتي، حتى وضع العرض 👁 شغّال.
+var PRESENTATION_HIDDEN_TABS = ["students", "khanadeq", "spare", "cost"];
 
 // ★ 2026-09-20: تبويبات مقصورة على شعار Landsterling فقط — راجعها المستخدم
 // تبويب تبويب بالكامل (39 تبويب في الشريط الرئيسي + 7 تبويبات فرعية) وحدد
@@ -1679,7 +1681,6 @@ function showTab(name, el) {
 
     "khanadeq" === name && renderKhanadeqTab(),
     "elevators" === name && renderElevatorsTab(),
-    "elevator-status" === name && renderElevatorStatusTab(),
     "cost" === name && renderCostTab(),
     "map" === name && renderMap(),
     "spare" === name && renderSpareTab(),
@@ -1947,7 +1948,7 @@ function renderOverviewSummaryCards() {
       hasr: window.HASR, fuel: window.RAW_NEW_FUEL, vehicles: window.RAW_NEW_VEHICLES,
       orgStructure: window.RAW_NEW_ORG_STRUCTURE, lsPayments: window.RAW_NEW_LS_PAYMENTS,
       contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS, ppmMaximo: window.RAW_NEW_PPM_MAXIMO,
-      visitsMonthly: window.RAW_NEW_VISITS_MONTHLY, visitsByRegion: window.RAW_NEW_VISITS_BY_REGION,
+      visitsMonthly: window.RAW_NEW_VISITS_MONTHLY, visitsByRegion: window.RAW_NEW_VISITS_BY_REGION, visitsByRegionMonth: window.RAW_NEW_VISITS_BY_REGION_MONTH,
       pettyCashLaynada: window.RAW_NEW_PETTY_CASH_LAYNADA, pettyCashMeer: window.RAW_NEW_PETTY_CASH_MEER,
       correspondence: window.RAW_NEW_CORRESPONDENCE, kpiContractor: window.RAW_NEW_KPI_CONTRACTOR,
       kpiConsultant: window.RAW_NEW_KPI_CONSULTANT, training: window.RAW_NEW_TRAINING,
@@ -2075,6 +2076,7 @@ function renderOverviewSummaryCards() {
         sup.مدفوعات_وعقود_LS && _ovCard({ icon: "💳", title: "مدفوعات وعقود LS", tab: "ls-payments", lines: [
           { k: "نسبة السداد", v: sup.مدفوعات_وعقود_LS.نسبة_السداد_الكلية || "—" },
           { k: "المتبقي (ر.س)", v: fmt(sup.مدفوعات_وعقود_LS.المتبقي_SAR) },
+          { k: "Payment in Pipeline (ر.س)", v: fmt(sup.مدفوعات_وعقود_LS.Payment_in_Pipeline_SAR) },
         ]}),
         ctp && _ovCard({ icon: "🏗️", title: "مدفوعات وعقود المقاولين", tab: "contractor-payments", lines: [
           { k: "نسبة السداد", v: ctp.pct != null ? ctp.pct + "%" : "—" },
@@ -2967,7 +2969,7 @@ function renderStageCompareTab() {
     });
     const scored = Object.values(stageData).filter(d=>d.avg!=null);
     const overallAvg = scored.length ? avg(scored.map(d=>d.avg)) : null;
-    return { school: o.school||o.minId, minId: o.minId, sector: o.sector, city: o.city, stageData, overallAvg };
+    return { school: o.school||o.minId, minId: o.minId, sector: o.sector, city: o.city, stageData, overallAvg, coverage: scored.length };
   });
 
   /* ── بحث ── */
@@ -3012,8 +3014,12 @@ function renderStageCompareTab() {
 
   /* ── Chart 1: متوسط FCA لكل مرحلة (bar chart) ── */
   killChart("ch-stage-compare-main");
-  // Top 15 schools by lowest avg
-  const topRows = [...rows].sort((a,b)=>(a.overallAvg??1e9)-(b.overallAvg??1e9)).slice(0,15);
+  // أولوية: المدارس الأكتر تغطية (تقييم في كل الشهور، أو أكبر عدد شهور) —
+  // وبعدين الأقل متوسط بين المتساويين في التغطية. بدل ما كان بياخد الأقل
+  // متوسط بس حتى لو شهر واحد بس عندها بيانات (يطلع أغلب الأعمدة أصفار).
+  const topRows = [...rows]
+    .sort((a,b) => (b.coverage - a.coverage) || ((a.overallAvg??1e9)-(b.overallAvg??1e9)))
+    .slice(0,15);
   if(topRows.length){
     CHARTS["ch-stage-compare-main"] = new Chart(document.getElementById("ch-stage-compare-main"),{
       type:"bar",
@@ -3730,8 +3736,11 @@ let __bgRevalidatedOnce = false;
       (spareParts                  = sa(d.spareParts)),
       (fmContracts                 = sa(d.fmContracts)),
       (allSystems                  = sa(d.allSystems)),
-      (elevators                   = sa(d.elevators)),
-      (window.RAW_ELEVATOR_STATUS  = sa(d.elevatorStatus)),
+      // ⚠️ المصاعد (elevators) بقى ليها مصدر مستقل عن CFG.GAS_URL — جوجل
+      // شيت "المصاعد" الجديد عبر NEW_TEMPLATES_URL (راجع _applyNewTemplatesJson
+      // وwindow.RAW_ELEVATORS هناك). تبويب "حالة المصاعد" (elevatorStatus)
+      // حُذف نهائيًا بطلب صريح 2026-10-04 — سطرا window.RAW_ELEVATORS/
+      // window.RAW_ELEVATOR_STATUS اتشالوا من هنا عمدًا.
       // ⚠️ tajheezInventory (المخصص والاحتياج) بقى ليه ملف جوجل شيتس مستقل خاص
       // بيه (مش من CFG.GAS_URL الرئيسي بعد الآن) — شوف TAJINV_URL/loadTajheezInventoryData
       // بالأسفل قرب renderTajheezInventoryTab. سطر window.RAW_TAJHEEZ_INV اتشال من هنا عمدًا.
@@ -4378,7 +4387,9 @@ let __bgRevalidatedOnce = false;
       // التوافق (systemsFlatForUI، آخر تقييم فقط لكل مدرسة بالفورمات
       // القديم) — ما ينفعش نعيد تعيينه هنا لصفوف الشيت الخام تاني (كانت
       // بتلغي عمل الـ Adapter بالكامل وترجّع الأعمدة الإنجليزية الخام).
-      (window.RAW_ELEVATORS = elevators),
+      // ⚠️ window.RAW_ELEVATORS لم تعد تُعيَّن من هنا — راجع التعليق أعلاه
+      // قرب sa(d.elevators): مصدرها الآن NEW_TEMPLATES_URL (شيت "المصاعد"
+      // الجديد)، يُعيَّن داخل _applyNewTemplatesJson فقط.
       (window.RAW_FM_CONTRACTS = fmContracts),
       (retryCount = 0),
       setProgress(90),
@@ -4763,6 +4774,15 @@ let __bgRevalidatedOnce = false;
       window.RAW_NEW_GATEKEEPERS    = d.gatekeepers_supervisors?.sheets?.["البوابون"] || [];
       window.RAW_NEW_SUPERVISORS    = d.gatekeepers_supervisors?.sheets?.["المشرفون والمهندسون"] || [];
       window.RAW_NEW_ORG_STRUCTURE  = d.org_structure?.sheets?.["البيانات"] || [];
+      // ★ 2026-10-04 (بناءً على طلب صريح): تبويب "المصاعد" انتقل لمصدر بيانات
+      // جديد تمامًا — شيت "المصاعد" المُنظَّف (Elevator_Status_WR.xlsx بعد
+      // التنظيف والدمج) عبر نفس هذا الآب سكريبت (مفتاح CONFIG جديد:
+      // elevators)، بديلاً عن شيتَي "المصاعد"/"حالة_المصاعد" القديمين في
+      // CFG.GAS_URL الرئيسي (اللي حُذف الاعتماد عليهم نهائيًا). نفس اسم
+      // window.RAW_ELEVATORS القديم عمدًا — كل الأماكن التانية في الداشبورد
+      // (ملخص الذكاء الاصطناعي، محرك القوائم، نظرة عامة...) بتقرأ منه
+      // تلقائيًا من غير أي تعديل إضافي.
+      window.RAW_ELEVATORS = d.elevators?.sheets?.["المصاعد"] || [];
       // ★ تطبيق أي تعديلات محفوظة محليًا (من محرر ORG CHART — راجع
       // _orgAssignIdentityKeysAndApplyLocalEdits) فوق البيانات الطازة
       // اللي لسه جاية من جوجل شيت، عشان التعديلات تفضل ظاهرة بعد أي
@@ -4787,6 +4807,14 @@ let __bgRevalidatedOnce = false;
       );
       window.RAW_NEW_VISITS_MONTHLY = d.visits?.sheets?.["الملخص الشهري"] || [];
       window.RAW_NEW_VISITS_BY_REGION = d.visits?.sheets?.["الزيارات حسب المنطقة"] || [];
+      // ★ 2026-10-01 (بناءً على طلب صريح): شيت إضافي مُحتسب من الآب سكريبت
+      // (مش موجود كشيت فعلي في جوجل شيتس) — تجميع (شهر × منطقة) لشيت
+      // "Data" الخام، عشان قسم "الزيارات المكتملة حسب المنطقة" يقدر
+      // يتفلتر بالشهر. لو الآب سكريبت لسه نسخة قديمة (قبل إضافة
+      // computeVisitsByRegionMonth) هيرجع undefined، وبنتعامل معاه بأمان
+      // كمصفوفة فاضية — القسم وقتها بيرجع تلقائيًا لسلوكه القديم (إجمالي
+      // كل الفترة) لحد ما الآب سكريبت يتحدّث وينتشر.
+      window.RAW_NEW_VISITS_BY_REGION_MONTH = d.visits?.sheets?.["الزيارات حسب المنطقة والشهر"] || [];
       // ★ 2026-09-20: العهدة — شيتين منفصلين (ليندا / مير) نفس المصدر
       window.RAW_NEW_PETTY_CASH_LAYNADA = d.petty_cash?.sheets?.["ليندا"] || [];
       window.RAW_NEW_PETTY_CASH_MEER    = d.petty_cash?.sheets?.["مير"] || [];
@@ -4800,11 +4828,13 @@ let __bgRevalidatedOnce = false;
         gatekeepers   : window.RAW_NEW_GATEKEEPERS.length,
         supervisors   : window.RAW_NEW_SUPERVISORS.length,
         orgStructure  : window.RAW_NEW_ORG_STRUCTURE.length,
+        elevators     : window.RAW_ELEVATORS.length,
         lsPayments    : window.RAW_NEW_LS_PAYMENTS.length,
         contractorPayments: window.RAW_NEW_CONTRACTOR_PAYMENTS.length,
         ppmMaximo     : window.RAW_NEW_PPM_MAXIMO.length,
         visitsMonthly : window.RAW_NEW_VISITS_MONTHLY.length,
         visitsByRegion: window.RAW_NEW_VISITS_BY_REGION.length,
+        visitsByRegionMonth: window.RAW_NEW_VISITS_BY_REGION_MONTH.length,
         pettyCashLaynada: window.RAW_NEW_PETTY_CASH_LAYNADA.length,
         pettyCashMeer    : window.RAW_NEW_PETTY_CASH_MEER.length,
       });
@@ -4839,6 +4869,12 @@ let __bgRevalidatedOnce = false;
       }
       if (document.getElementById("tab-petty-cash")?.classList.contains("active")) {
         try { renderPettyCashTab(); } catch (e) { console.warn("[NEW_TEMPLATES][petty-cash render]", e); }
+      }
+      // ★ 2026-10-04: نفس مشكلة "سجل المراسلات" أعلاه — لو المستخدم فتح
+      // تبويب "المصاعد" قبل ما بيانات NEW_TEMPLATES (ومنها shimmer elevators
+      // الجديد) توصل من الشبكة، لازم يُعاد رسمه فور وصولها.
+      if (document.getElementById("tab-elevators")?.classList.contains("active")) {
+        try { renderElevatorsTab(); } catch (e) { console.warn("[NEW_TEMPLATES][elevators render]", e); }
       }
       // ⚡ (2026-09-28 — إصلاح جذري) نفس مشكلة "سجل المراسلات" أعلاه كانت
       // موجودة أيضًا لتبويبات السيارات والتدريب والوقود والبوابين
@@ -5018,6 +5054,7 @@ var NEW_TEMPLATES_TOP_LABELS = {
   ppm_maximo: "PPM_Maximo",
   visits: "الزيارات",
   petty_cash: "العهدة",
+  elevators: "المصاعد",
 };
 var NEW_TEMPLATES_URL_FALLBACK =
   "https://script.google.com/macros/s/AKfycbzjyKq_iYEh0ZoVqIZxErI5FansQjspGyPzz_JT9iCOnGz3J6fXmHPXzBSfY_LTXttz/exec";
@@ -5045,8 +5082,9 @@ function __buildBackupSources_() {
         spareParts: "قطع_الغيار",
         fmContracts: "عقود_عدا_المجال",
         allSystems: "المدارس_والأنظمة",
-        elevators: "المصاعد",
-        elevatorStatus: "حالة_المصاعد",
+        // ⚠️ elevators/elevatorStatus حُذفا من هنا عمدًا 2026-10-04 — المصاعد
+        // بقت مصدرها شيت مستقل عبر NEW_TEMPLATES_URL (راجع "nested" أسفل)،
+        // وتبويب "حالة المصاعد" حُذف نهائيًا من الداشبورد.
         tajheezInventory: "التجهيزات_منظف",
         gatekeepers: "قائمة_البوابين_منظفة",
         kpiContractor: "مؤشرات_الأداء_للمقاول",
@@ -7304,7 +7342,31 @@ const KPI_MONTH_NAME_BY_NUM = [
   "", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
-const KPI_FORECAST_MONTHS = 4; // عدد شهور التوقع القادمة في اللاين تشارت
+// ★ 2026-10-05 (بناءً على طلب): التوقع صار ثابتًا دائمًا 6 شهور قادمة (كان 4).
+const KPI_FORECAST_MONTHS = 6; // عدد شهور التوقع القادمة في اللاين تشارت
+// ★ 2026-10-05: أنماط عرض اللاين تشارت (على غرار Power BI): شهري / ربع سنوي /
+// نصف سنوي / سنوي. التوقع يُحسب دائمًا شهريًا (Holt) ثم تُجمَّع الأشهر في
+// الفترات بالمتوسط، وكل فترة تحوي شهرًا متوقعًا واحدًا على الأقل تُعامل
+// كفترة "متوقعة" وتُحسب من الأشهر الفعلية والمتوقعة داخلها معًا.
+const KPI_GRANULARITIES = [
+  { key: "month",   label: "شهري" },
+  { key: "quarter", label: "ربع سنوي" },
+  { key: "half",    label: "نصف سنوي" },
+  { key: "year",    label: "سنوي" },
+];
+const KPI_QUARTER_NAMES = ["", "الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+const KPI_HALF_NAMES = ["", "النصف الأول", "النصف الثاني"];
+window.KPI_GRAN = window.KPI_GRAN || {};   // النمط المختار لكل رسم (chartId -> key)
+window.KPI_REDRAW = window.KPI_REDRAW || {}; // دالة إعادة الرسم لكل رسم
+window.__kpiSetGran = function (chartId, key) {
+  window.KPI_GRAN[chartId] = key;
+  document.querySelectorAll('[data-kpi-gran="' + chartId + '"]').forEach((b) => {
+    const on = b.getAttribute("data-key") === key;
+    b.style.background = on ? "var(--teal, #0d9488)" : "transparent";
+    b.style.color = on ? "#fff" : "var(--tx-main)";
+  });
+  if (typeof window.KPI_REDRAW[chartId] === "function") window.KPI_REDRAW[chartId](key);
+};
 
 /* 🧹 يشيل من نهاية القائمة أي شهور "فاضية" بالكامل — موجودة كأعمدة/صفوف
    في الشيت (مثلاً قالب سنوي فيه شهور مُجهّزة مسبقًا لحد شهر 12) لكن من
@@ -7561,13 +7623,47 @@ function renderKpiTabGeneric_(opts) {
   // 🔮 حساب التوقع المستقبلي لكل منطقة
   const nFuture = KPI_FORECAST_MONTHS,
     lastMeta = monthMeta[lastIdx],
-    futureMonths = Array.from({ length: nFuture }, (_, i) => {
+    futureMeta = Array.from({ length: nFuture }, (_, i) => {
       const totalNum = lastMeta.num + i + 1, // شهر مطلق متتالي بعد آخر شهر فعلي
         num = ((totalNum - 1) % 12) + 1,
         year = lastMeta.year + Math.floor((totalNum - 1) / 12);
-      return `${KPI_MONTH_NAME_BY_NUM[num]} ${year}`;
+      return { num, year, label: `${KPI_MONTH_NAME_BY_NUM[num]} ${year}` };
     }),
+    futureMonths = futureMeta.map((m) => m.label),
     forecastByRegion = data.map((r) => linearForecast(r.values, nFuture));
+
+  // ★ 2026-10-05: تجميع الأشهر (الفعلية + المتوقعة) في فترات حسب النمط المختار.
+  const allMeta = [...monthMeta, ...futureMeta];
+  const fullByRegion = data.map((r, i) => [...r.values, ...forecastByRegion[i]]);
+  const bucketOf = (m, gran) => {
+    if (gran === "quarter") { const q = Math.ceil(m.num / 3); return { k: m.year * 10 + q, label: `${KPI_QUARTER_NAMES[q]} ${m.year}` }; }
+    if (gran === "half")    { const h = m.num <= 6 ? 1 : 2;   return { k: m.year * 10 + h, label: `${KPI_HALF_NAMES[h]} ${m.year}` }; }
+    if (gran === "year")    return { k: m.year, label: String(m.year) };
+    return { k: m.year * 100 + m.num, label: m.label };
+  };
+  const buildBuckets = (gran) => {
+    const order = [], byKey = new Map();
+    allMeta.forEach((m, idx) => {
+      const b = bucketOf(m, gran);
+      if (!byKey.has(b.k)) { const nb = { label: b.label, idxs: [] }; byKey.set(b.k, nb); order.push(nb); }
+      byKey.get(b.k).idxs.push(idx);
+    });
+    order.forEach((b) => { b.isForecast = Math.max(...b.idxs) > lastIdx; });
+    const regionVals = fullByRegion.map((vals) =>
+      order.map((b) => {
+        const known = b.idxs.map((ix) => vals[ix]).filter((v) => v !== null && v !== undefined);
+        return known.length ? +avg(known).toFixed(2) : null;
+      }),
+    );
+    const avgVals = order.map((b, bi) => {
+      if (b.isForecast) return null;
+      const known = regionVals.map((rv) => rv[bi]).filter((v) => v !== null);
+      return known.length ? +avg(known).toFixed(2) : null;
+    });
+    let anchorIdx = -1;
+    order.forEach((b, bi) => { if (!b.isForecast) anchorIdx = bi; });
+    return { buckets: order, regionVals, avgVals, anchorIdx };
+  };
 
   const contractCol = hasContract ? `<th style="min-width:120px">رقم العقد</th>` : "";
   const contractCell = (r) =>
@@ -7601,8 +7697,18 @@ function renderKpiTabGeneric_(opts) {
     </div>
 
     <div class="card mb14">
-      <div class="card-title">تطور مؤشر الأداء الشهري حسب المنطقة <span class="sub">${esc(months[0])} – ${esc(months[lastIdx])} (فعلي) + توقع ${nFuture} شهور قادمة</span></div>
+      <div class="card-title">تطور مؤشر الأداء حسب المنطقة <span class="sub">${esc(months[0])} – ${esc(months[lastIdx])} (فعلي) + توقع ${nFuture} شهور قادمة</span></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px">
+        <span style="font-size:11px;color:var(--tx-muted);font-weight:700">عرض الرسم:</span>
+        <div style="display:inline-flex;border:1px solid var(--brd);border-radius:999px;overflow:hidden">
+          ${KPI_GRANULARITIES.map((g) => {
+            const on = (window.KPI_GRAN[chartId] || "month") === g.key;
+            return `<button type="button" data-kpi-gran="${chartId}" data-key="${g.key}" onclick="__kpiSetGran('${chartId}','${g.key}')" style="border:0;cursor:pointer;padding:5px 14px;font-size:12px;font-weight:700;font-family:inherit;background:${on ? "var(--teal, #0d9488)" : "transparent"};color:${on ? "#fff" : "var(--tx-main)"}">${g.label}</button>`;
+          }).join("")}
+        </div>
+      </div>
       <div class="chart-box" style="height:380px"><canvas id="${chartId}"></canvas></div>
+      <div id="${chartId}-gran-note" style="display:none;font-size:11px;color:var(--tx-muted);margin-top:8px">قيمة كل فترة = متوسط أشهرها. الفترة التي تضم أشهرًا متوقعة تُحسب من الأشهر الفعلية والمتوقعة داخلها معًا (تظهر بخط متقطع).</div>
       <div style="font-size:11px;color:var(--tx-muted);margin-top:10px;display:flex;align-items:center;gap:6px">
         <span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #64748B"></span>
         الخط المنقّط = توقع بمعادلة Holt's Linear Exponential Smoothing (α=0.4، β=0.2) — يعطي البيانات الحديثة وزناً أكبر، وليس تأكيدًا — للمتابعة فقط
@@ -7640,18 +7746,31 @@ function renderKpiTabGeneric_(opts) {
       </div>
     </div>`;
 
-  requestAnimationFrame(() => {
+  // ★ 2026-10-05: رسم اللاين تشارت صار داخل دالة قابلة لإعادة الاستدعاء عند
+  // تغيير نمط العرض (شهري / ربع سنوي / نصف سنوي / سنوي) دون إعادة بناء التبويب.
+  const drawChart = (gran) => {
     killChart(chartId);
     const canvas = document.getElementById(chartId);
     if (!canvas) return;
+    const noteEl = document.getElementById(chartId + "-gran-note");
+    if (noteEl) noteEl.style.display = gran === "month" ? "none" : "block";
+    const { buckets, regionVals, avgVals, anchorIdx } = buildBuckets(gran);
+    const nB = buckets.length;
+    const actualOnly = (vals) => vals.map((v, bi) => (buckets[bi].isForecast ? null : v));
+    const forecastSeries = (vals) => {
+      const out = Array(nB).fill(null);
+      if (anchorIdx >= 0) out[anchorIdx] = lastNonNull(actualOnly(vals));
+      buckets.forEach((b, bi) => { if (b.isForecast) out[bi] = vals[bi]; });
+      return out;
+    };
     CHARTS[chartId] = new Chart(canvas, {
       type: "line",
       data: {
-        labels: [...months, ...futureMonths],
+        labels: buckets.map((b) => b.label),
         datasets: [
           ...data.map((r, i) => ({
             label: r.region,
-            data: [...r.values, ...Array(nFuture).fill(null)],
+            data: actualOnly(regionVals[i]),
             borderColor: PALETTE[i % PALETTE.length],
             backgroundColor: PALETTE[i % PALETTE.length] + "22",
             borderWidth: 2.5,
@@ -7663,25 +7782,23 @@ function renderKpiTabGeneric_(opts) {
           })),
           ...data.map((r, i) => ({
             label: r.region + " (توقع)",
-            data: [
-              ...Array(months.length - 1).fill(null),
-              lastNonNull(r.values),
-              ...forecastByRegion[i],
-            ],
+            data: forecastSeries(regionVals[i]),
             borderColor: PALETTE[i % PALETTE.length],
             backgroundColor: "transparent",
             borderWidth: 2.5,
             borderDash: [6, 4],
             tension: 0.3,
-            pointRadius: 3,
+            // ★ 2026-10-05: أول نقطة في خط التوقع هي نقطة ربط عند آخر فترة
+            // فعلية (لتتصل الخطوط فقط) — فلا تُرسم لها علامة ولا تتفاعل مع التمرير.
+            pointRadius: (ctx) => (ctx.dataIndex === anchorIdx ? 0 : 3),
             pointStyle: "rectRot",
-            pointHoverRadius: 5,
+            pointHoverRadius: (ctx) => (ctx.dataIndex === anchorIdx ? 0 : 5),
             pointBackgroundColor: PALETTE[i % PALETTE.length],
             spanGaps: !0,
           })),
           {
             label: "المتوسط العام",
-            data: [...monthlyAvg, ...Array(nFuture).fill(null)],
+            data: avgVals,
             borderColor: CSS_TOKENS.txMuted(),
             borderDash: [6, 4],
             borderWidth: 2,
@@ -7706,6 +7823,12 @@ function renderKpiTabGeneric_(opts) {
             },
           },
           tooltip: {
+            // ★ 2026-10-05 (بناءً على طلب): آخر فترة فعلية كانت تُظهر الفعلي
+            // والتوقع معًا في التلميح، لأن خط التوقع يبدأ من نفس نقطتها ليتصل
+            // بالخط الأصلي. يُخفى سطر "(توقع)" عند هذه النقطة فقط، ويبقى الخط
+            // المتقطع متصلًا، وتظهر أسطر التوقع في الفترات المستقبلية كالمعتاد.
+            filter: (item) =>
+              !(String(item.dataset.label || "").includes("(توقع)") && item.dataIndex === anchorIdx),
             callbacks: {
               label: (ctx) =>
                 ` ${ctx.dataset.label}: ${ctx.raw == null ? "—" : ctx.raw.toFixed(2) + "%"}`,
@@ -7717,7 +7840,9 @@ function renderKpiTabGeneric_(opts) {
         },
       },
     });
-  });
+  };
+  window.KPI_REDRAW[chartId] = drawChart;
+  requestAnimationFrame(() => drawChart(window.KPI_GRAN[chartId] || "month"));
 }
 
 function renderMagKpiTab() {
@@ -8804,6 +8929,9 @@ function renderNewSlaTab() {
       <div class="card-title">
         <span>السجل التفصيلي</span>
         <span class="sub">${fmt2(filteredTotal)} سجل</span>
+        <span style="margin-right:auto">
+          <button class="export-btn export-btn-csv" onclick="window.newSlaExportCSV()" title="يحمّل كل السجلات المطابقة للفلاتر الحالية (البحث/الأولوية/حالة الالتزام/التاريخ)، وليس فقط الصفحة الظاهرة">⬇ تحميل كل السجلات المفلترة (${fmt2(filteredTotal)})</button>
+        </span>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -8843,6 +8971,48 @@ function renderNewSlaTab() {
         </div>
       </div>
     </div>`;
+
+  // ── تصدير CSV: كل السجلات المطابقة للفلاتر الحالية (rows = قبل تقطيع
+  // الصفحة)، مش بس الصفحة الظاهرة حالياً — طلب صريح 2026-10-03: "خليه يحمل
+  // الداتا كلها من اولها لاخرها ولو انا مفلتر يجيب كل المفلتر". بيُعاد
+  // تعريفها في كل رسم عشان تفضل متزامنة مع آخر فلاتر مطبَّقة (rows بتتجدد
+  // مع كل استدعاء لـrenderNewSlaTab). ──
+  window.newSlaExportCSV = function () {
+    if (!rows.length) {
+      if (typeof showToast === "function") showToast("لا توجد بيانات مطابقة للتصدير", "error");
+      else alert("لا توجد بيانات مطابقة للتصدير");
+      return;
+    }
+    const headers = [
+      "رقم البلاغ", "تاريخ الإنشاء", "الفئة الأصلية", "الفئة الجديدة", "الأولوية الجديدة",
+      "الحالة", "مدة الحل (ساعة)", "المدة المنقضية - لا يزال مفتوحًا (ساعة)", "الهدف (ساعة)", "حالة الالتزام الجديد",
+    ];
+    const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [headers.map(csvCell).join(",")];
+    rows.forEach((r) => {
+      csv.push([
+        r.recordNo,
+        r.creationDate,
+        r.subCategory,
+        r.newSlaCategory,
+        r.newSlaPriority,
+        window.balaghStatusLabel(r.status),
+        r.slaDurationHours != null ? r.slaDurationHours.toFixed(1) : "",
+        r.newSlaOpenElapsedHours != null ? r.newSlaOpenElapsedHours.toFixed(1) : "",
+        r.newSlaHoursTarget != null ? r.newSlaHoursTarget : "",
+        evalStatusLabel(r.newSlaEvalStatus),
+      ].map(csvCell).join(","));
+    });
+    const blob = new Blob(["﻿" + csv.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `NEW_SLA_السجل_التفصيلي_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 150);
+  };
 
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;
@@ -14835,46 +15005,64 @@ window.addEventListener("load", __scheduleCostPaymentsAutoLoad, { once: true });
    ║  🛗  JS تبويب: المصاعد
    ║  (tab-elevators) — الدوال الخاصة بهذا التبويب تبدأ هنا
    ║
-   ║  📝 2026-08-29: شيت المصاعد اتبدّل بملف أغنى بكتير (المستخدم رفع
-   ║     "المصاعد.xlsx" وبدّل بيه شيت جوجل شيتس نفسه). التغييرات الجوهرية:
-   ║     • "حالة المصعد" البسيطة (يعمل/لا يعمل/متعطل) بقت "الحالة الموحدة"
-   ║       بـ10 تصنيفات تفصيلية (حالات توريد/تركيب/صيانة مختلفة).
-   ║       باتفاق المستخدم: بنجمّعها في 4 فئات رئيسية عن طريق
-   ║       window.classifyElevatorStatus() (مطابقة بكلمات مفتاحية، مش
-   ║       نص حرفي كامل، عشان تفضل صامدة لأي تنسيق مختلف في الشيت —
-   ║       نفس درس "شهر 4" في مقارنة مراحل FCA).
-   ║     • "عمر المصعد" اتشال، بدالها "سنة التركيب بالهجري" — باتفاق
-   ║       المستخدم بنعرضها كما هي من غير حساب عمر تقريبي.
-   ║     • "المدينة" بقت مقسومة لمستويين: "المنطقة" (أوسع) و"المحافظة"
-   ║       (الأقرب لمفهوم "المدينة" القديم) — الفلتر الأساسي بقى
-   ║       بالمحافظة، ومضاف فلتر منطقة كمان.
-   ║     • أعمدة جديدة لمتابعة توريد/تركيب مصاعد قيد التنفيذ (حالة
-   ║       الإنجاز، تاريخ بدء التشغيل المتوقع، مدة أعمال التركيب،
-   ║       ملاحظات التشغيل) — باتفاق المستخدم عملنالها قسم منفصل تحت.
+   ║  📝 2026-10-04: إعادة بناء كاملة بطلب صريح من المستخدم — مصدر
+   ║     البيانات القديم (شيتَا "المصاعد" و"حالة المصاعد"، إجمالي
+   ║     تبويبين) استُبدل بملف واحد منظّف "Elevator_Status_WR.xlsx"
+   ║     (4 مناطق: جدة، مكة المكرمة، المدينة المنورة، الطائف — كل
+   ║     مصعد سطر مستقل بعد تفكيك الصفوف المدموجة)، مرفوع كجوجل شيت
+   ║     واحد باسم "المصاعد" في نفس مجلد الدرايف الخاص بباقي الملفات.
+   ║     تبويب "حالة المصاعد" (التجميعي القديم) حُذف نهائيًا بطلب
+   ║     المستخدم — راجع نقطة البيانات الآن تُشتق كلها من هنا فقط.
+   ║     • الأعمدة الجديدة: المنطقة، المحافظة، الرقم الوزاري، اسم
+   ║       المدرسة، عدد المصاعد بالمبنى، نوع المصاعد (المُصنع)،
+   ║       سنة التركيب، حالة المصعد، حالة إضافية/ملاحظات الحالة،
+   ║       الضمانات (متوفرة لجدة فقط).
+   ║     • قسم "متابعة توريد وتركيب المصاعد" القديم حُذف نهائيًا —
+   ║       أعمدته (حالة الإنجاز، تاريخ التشغيل المتوقع، مدة التركيب،
+   ║       ملاحظات التشغيل) غير موجودة في الملف الجديد، وبطلب المستخدم
+   ║       لم تُستبدل بشيء (راجع AskUserQuestion في نفس الجلسة).
+   ║     • التصنيف لـ4 فئات رئيسية (يعمل/لا يعمل/بحاجة صيانة/قيد
+   ║       التوريد أو التركيب) باقٍ بنفس آلية window.classifyElevatorStatus()
+   ║       (مطابقة كلمات مفتاحية)، بعد تحديثها لتغطي صيغ الملف الجديد
+   ║       (إنجليزية مثل "good condition"، وكلمات زي "مغلق"/"تالف").
    ║     الدوال العامة (classifyElevatorStatus وأخواتها) معرّفة على
    ║     window عشان تُستخدم بنفس المنطق في كل مكان تاني بالداشبورد
    ║     (ملخص الذكاء الاصطناعي، محرك القوائم...) — مفيش تكرار منطق.
    ╚════════════════════════════════════════════════════════════╝ */
 
-// 🔑 القيمة الخام لحالة المصعد — "الحالة الموحدة" أولاً، وفي حال غيابها
-// (بيانات قديمة مخزّنة محليًا مثلاً) نرجع لأسماء الأعمدة القديمة.
+// 🔑 القيمة الخام لحالة المصعد — بتجمع كل الأعمدة اللي ممكن تحمل إشارة
+// للحالة (القديمة "الحالة الموحدة"/"الحالة الأصلية" لو لسه موجودة في بيانات
+// محلية قديمة، والجديدة "حالة المصعد" + "حالة إضافية/ملاحظات الحالة" من
+// ملف Elevator_Status_WR.xlsx) في نص واحد، عشان classifyElevatorStatus()
+// تشوف كل الإشارات مجتمعة (مثلاً "حالة المصعد"="good condition" لكن
+// "ملاحظات الحالة"="مغلق" — لازم "مغلق" تغلب).
 window.getElevatorStatusRaw = function (r) {
   if (!r) return "";
-  const v = r["الحالة الموحدة"] ?? r["حالة المصعد"] ?? r["الحالة الأصلية"];
-  return v == null ? "" : String(v).trim();
+  const parts = [
+    r["الحالة الموحدة"],
+    r["حالة المصعد"],
+    r["الحالة الأصلية"],
+    r["حالة إضافية / ملاحظات الحالة"] ?? r["ملاحظات الحالة"],
+  ]
+    .filter((v) => v != null && String(v).trim() !== "")
+    .map((v) => String(v).trim());
+  return parts.join(" | ");
 };
 
 // 🔑 تصنيف نص الحالة الخام إلى واحدة من 4 فئات رئيسية، بمطابقة كلمات
-// مفتاحية (لا حساسية لصيغة النص الكاملة). ترتيب الفحص يهم: "صيانة/عطل"
+// مفتاحية (لا حساسية لصيغة النص الكاملة). ترتيب الفحص يهم: "صيانة/عطل/تالف"
 // أولاً (حتى لو الحالة "يعمل (بحاجة صيانة)")، بعدين كلمات التوريد/التركيب
-// (حتى لو بدأت بـ"لا يعمل (...)")، بعدين "لا يعمل" الصريحة، وأخيرًا "يعمل".
+// (حتى لو بدأت بـ"لا يعمل (...)")، بعدين "لا يعمل/مغلق" الصريحة، بعدين
+// "يعمل" الصريحة، وأخيرًا مرادفات إنجليزية ("good condition"/"new") شايعة
+// في ملف Elevator_Status_WR.xlsx الجديد.
 window.classifyElevatorStatus = function (rawStatus) {
   const s = String(rawStatus || "").trim();
   if (!s) return "غير محدد";
-  if (/صيانة|عطل/.test(s)) return "بحاجة صيانة";
-  if (/توريد|تركيب|تشغيل|عرض|اعتماد|مراجعة|جديد|قيد|بانتظار/.test(s)) return "قيد التوريد أو التركيب";
-  if (/لا\s*يعمل/.test(s)) return "لا يعمل";
+  if (/صيانة|عطل|تالف|damaged/i.test(s)) return "بحاجة صيانة";
+  if (/توريد|تركيب|تشغيل|عرض|اعتماد|تعميد|انتظار|مراجعة|جديد|قيد/.test(s)) return "قيد التوريد أو التركيب";
+  if (/لا\s*يعمل|مغلق|closed/i.test(s)) return "لا يعمل";
   if (/يعمل/.test(s)) return "يعمل";
+  if (/good\s*condition|^good$|^new$/i.test(s)) return "يعمل";
   return "غير محدد";
 };
 window.getElevatorStatusBucket = function (r) {
@@ -14924,7 +15112,7 @@ window.renderElevatorsTab = function () {
   const getCity = (r) => gv(r, ["المحافظة", "المدينة_الرئيسية", "المدينة"]);
   const getName = (r) => gv(r, ["اسم_المدرسة", "اسم المدرسة"]);
   const getMinId = (r) => gv(r, ["رقم_وزاري", "الرقم الوزاري"]);
-  const getInstallYear = (r) => gv(r, ["سنة التركيب بالهجري"]);
+  const getInstallYear = (r) => gv(r, ["سنة التركيب بالهجري", "سنة التركيب"]);
   const getCount = (r) => gv(r, ["عدد المصاعد بالمبنى"]);
   const getType = (r) => {
     for (const k of Object.keys(r)) {
@@ -14932,14 +15120,33 @@ window.renderElevatorsTab = function () {
     }
     return "—";
   };
-  const getStatusRaw = (r) => { const v = window.getElevatorStatusRaw(r); return v || "—"; };
-  const getStatusNote = (r) => gv(r, ["ملاحظات الحالة"]);
-  const getSupplyStatus = (r) => gv(r, ["حالة الإنجاز (تحديث التوريد)"]);
-  const getExpectedStart = (r) => gv(r, ["تاريخ بدء التشغيل المتوقع"]);
-  const getInstallDuration = (r) => gv(r, ["مدة أعمال التركيب"]);
-  const getOpsNote = (r) => gv(r, ["ملاحظات التشغيل (تحديث)"]);
+  const getStatusNote = (r) => gv(r, ["حالة إضافية / ملاحظات الحالة", "ملاحظات الحالة"]);
+  const getWarranty = (r) => gv(r, ["الضمانات", "الضمان"]);
   const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
   const norm = (v) => String(v == null ? "" : v).trim();
+
+  // 🏢 2026-10-04 (بناءً على طلب صريح): كارت "المباني" (كان اسمه "المدارس")
+  // لازم يحسب كل مبنى فعليًا — بما فيه حالات زي "A4"/"B2" في مجمع مدينة
+  // طيبة اللي بيتكرر اسمها بس كل واحدة مبنى مستقل برقم وزاري مختلف (العدّ
+  // بالاسم القديم كان بيدمجهم غلط في مبنى واحد). المفتاح: الرقم الوزاري لو
+  // موجود وفعلي (مش فاضي أو "-")، وده بيفرّق كمان بين المباني اللي ليها
+  // نفس الاسم — وإلا بالاسم+المنطقة+المحافظة، وده برضو بيدمج صح الحالات
+  // اللي صف واحد للمبنى منقسم لأكتر من صف لتعدد المصاعد بنفس المبنى (زي
+  // "عبدالله الثقفي الثانوية" و"الحادية والتسعون بعد المئة" اللي كل واحدة
+  // ليها صفين لعدد مصاعد المبنى نفسه).
+  const getMinIdRaw = (r) => {
+    for (const k of ["رقم_وزاري", "الرقم الوزاري"]) {
+      const v = r[k];
+      const s = v == null ? "" : String(v).trim();
+      if (s && s !== "—" && s !== "-") return s;
+    }
+    return "";
+  };
+  const getBuildingKey = (r) => {
+    const minId = getMinIdRaw(r);
+    if (minId) return "MIN:" + minId;
+    return "NAME:" + norm(getRegion(r)) + "|" + norm(getCity(r)) + "|" + norm(getName(r));
+  };
 
   const regions = [...new Set(rows.map((r) => norm(getRegion(r))).filter((v) => v && v !== "—"))].sort(
     (a, b) => a.localeCompare(b, "ar"),
@@ -14958,8 +15165,7 @@ window.renderElevatorsTab = function () {
     return true;
   });
 
-  const totalSchools = new Set(filteredRows.map((r) => getName(r)).filter((v) => v && v !== "—"))
-    .size;
+  const totalBuildings = new Set(filteredRows.map(getBuildingKey)).size;
   const totalElevators = filteredRows.reduce((s, r) => s + (num(getCount(r)) || 0), 0);
 
   // 🔑 توزيع الفئات الأربع (باتفاق المستخدم) — كل صف يُصنَّف مرة واحدة فقط
@@ -14984,14 +15190,6 @@ window.renderElevatorsTab = function () {
     )
     .join("");
 
-  // ── قسم متابعة التوريد والتركيب: أي صف فيه بيانات في أعمدة المتابعة ──
-  const supplyRows = filteredRows.filter((r) => getSupplyStatus(r) !== "—");
-  const supplyStatusCounts = {};
-  supplyRows.forEach((r) => {
-    const s = norm(getSupplyStatus(r));
-    supplyStatusCounts[s] = (supplyStatusCounts[s] || 0) + 1;
-  });
-
   el.innerHTML = `
     <div class="filters-row" style="margin-bottom:16px">
       <div class="fg" style="min-width:180px">
@@ -15010,9 +15208,9 @@ window.renderElevatorsTab = function () {
 
     <div class="kpi-grid">
       <div class="kpi kc-blue">
-        <div class="kpi-val">${totalSchools.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">المدارس</div>
-        <div class="kpi-sub">مدرسة تحتوي على بيانات مصاعد</div>
+        <div class="kpi-val">${totalBuildings.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">المباني</div>
+        <div class="kpi-sub">إجمالي عدد المباني التي تحتوي على مصاعد</div>
       </div>
       <div class="kpi kc-navy">
         <div class="kpi-val">${totalElevators.toLocaleString("en-US")}</div>
@@ -15052,56 +15250,6 @@ window.renderElevatorsTab = function () {
       </div>
     </div>
 
-    ${
-      supplyRows.length
-        ? `
-    <div class="card mb14">
-      <div class="card-title">
-        🚧 متابعة توريد وتركيب المصاعد
-        <span class="sub">${supplyRows.length.toLocaleString("en-US")} مصعد قيد المتابعة</span>
-      </div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px">
-        ${Object.entries(supplyStatusCounts)
-          .map(
-            ([s, c]) => `<div class="kpi kc-info">
-              <div class="kpi-val">${c.toLocaleString("en-US")}</div>
-              <div class="kpi-lbl">${esc(s)}</div>
-            </div>`,
-          )
-          .join("")}
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr>
-            <th>المدرسة</th>
-            <th>المحافظة</th>
-            <th>الحالة الموحدة</th>
-            <th>حالة الإنجاز (توريد)</th>
-            <th>تاريخ بدء التشغيل المتوقع</th>
-            <th>مدة أعمال التركيب</th>
-            <th>ملاحظات التشغيل</th>
-          </tr></thead>
-          <tbody>
-            ${supplyRows
-              .map(
-                (r) => `<tr>
-              <td style="text-align:right">${esc(getName(r))}</td>
-              <td>${esc(getCity(r))}</td>
-              <td>${esc(getStatusRaw(r))}</td>
-              <td style="font-weight:700">${esc(getSupplyStatus(r))}</td>
-              <td>${esc(getExpectedStart(r))}</td>
-              <td>${esc(getInstallDuration(r))}</td>
-              <td style="font-size:11px;color:var(--tx-muted)">${esc(getOpsNote(r))}</td>
-            </tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>`
-        : ""
-    }
-
     <div class="card">
       <div class="card-title">
         تفاصيل المصاعد
@@ -15120,13 +15268,14 @@ window.renderElevatorsTab = function () {
               <th>نوع المصاعد (المُصنع)</th>
               <th>الحالة</th>
               <th>ملاحظات الحالة</th>
+              <th>الضمان</th>
             </tr>
           </thead>
           <tbody>
             ${filteredRows
               .map((r) => {
-                const st = getStatusRaw(r);
-                const bucketColor = window.ELEVATOR_BUCKET_COLOR(window.getElevatorStatusBucket(r));
+                const bucket = window.getElevatorStatusBucket(r);
+                const bucketColor = window.ELEVATOR_BUCKET_COLOR(bucket);
                 return `
               <tr>
                 <td>${esc(getRegion(r))}</td>
@@ -15136,8 +15285,9 @@ window.renderElevatorsTab = function () {
                 <td>${esc(getInstallYear(r))}</td>
                 <td>${esc(getCount(r))}</td>
                 <td>${esc(getType(r))}</td>
-                <td><span class="badge" style="background:${bucketColor}18;color:${bucketColor};border:1px solid ${bucketColor}33">${esc(st)}</span></td>
+                <td><span class="badge" style="background:${bucketColor}18;color:${bucketColor};border:1px solid ${bucketColor}33">${esc(bucket)}</span></td>
                 <td style="font-size:11px;color:var(--tx-muted)">${esc(getStatusNote(r))}</td>
+                <td style="font-size:11px;color:var(--tx-muted)">${esc(getWarranty(r))}</td>
               </tr>`;
               })
               .join("")}
@@ -15212,187 +15362,6 @@ window.renderElevatorsTab = function () {
   });
 };
 
-
-/* ╔════════════════════════════════════════════════════════════╗
-   ║  🚦  JS تبويب: حالة المصاعد (تجميعي حسب المنطقة)
-   ║  (tab-elevator-status) — يقرأ من شيت "حالة_المصاعد"
-   ║  الأعمدة: المنطقة | اجمالي عدد المصاعد | حالة العمل | حالة الصيانة
-   ╚════════════════════════════════════════════════════════════╝ */
-window.renderElevatorStatusTab = function () {
-  const el = document.getElementById("elevator-status-content");
-  if (!el) return;
-
-  const rows = window.RAW_ELEVATOR_STATUS || [];
-  if (!rows.length) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:48px 24px">
-      <div style="font-size:48px;margin-bottom:12px">🚦</div>
-      <div style="font-size:16px;font-weight:700;color:var(--tx-main)">لا توجد بيانات حالة مصاعد</div>
-      <div style="font-size:12px;color:var(--tx-muted);margin-top:8px">تأكد من وجود بيانات في شيت "حالة_المصاعد" وأن الـ Apps Script يقرأها</div>
-    </div>`;
-    return;
-  }
-
-  const gv = (r, keys) => {
-    for (const k of keys) {
-      const v = r[k];
-      if (v != null && v !== "" && v !== "—") return v;
-    }
-    return "—";
-  };
-  const num = (v) => {
-    const x = parseFloat(String(v ?? "").replace(/,/g, ""));
-    return isNaN(x) ? 0 : x;
-  };
-
-  const getRegion  = (r) => gv(r, ["المنطقة"]);
-  const getTotal   = (r) => num(gv(r, ["اجمالي عدد المصاعد", "إجمالي عدد المصاعد"]));
-  const getWorking = (r) => num(gv(r, ["حالة العمل"]));
-  const getMaint   = (r) => num(gv(r, ["حالة الصيانة"]));
-
-  const data = rows
-    .filter((r) => String(getRegion(r) || "").trim() && getRegion(r) !== "—")
-    .map((r) => ({
-      region: String(getRegion(r)).trim(),
-      total: getTotal(r),
-      working: getWorking(r),
-      maint: getMaint(r),
-    }));
-
-  const totalElevators = data.reduce((s, r) => s + r.total, 0);
-  const totalWorking   = data.reduce((s, r) => s + r.working, 0);
-  const totalMaint     = data.reduce((s, r) => s + r.maint, 0);
-  const workingPct     = totalElevators ? (totalWorking / totalElevators) * 100 : 0;
-
-  const sorted = [...data].sort((a, b) => b.total - a.total);
-
-  el.innerHTML = `
-    <div class="kpi-grid">
-      <div class="kpi kc-navy">
-        <div class="kpi-val">${totalElevators.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">إجمالي المصاعد</div>
-        <div class="kpi-sub">${data.length.toLocaleString("en-US")} منطقة</div>
-      </div>
-      <div class="kpi kc-green">
-        <div class="kpi-val">${totalWorking.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">حالة العمل</div>
-        <div class="kpi-sub">${workingPct.toFixed(1)}% من الإجمالي</div>
-      </div>
-      <div class="kpi kc-red">
-        <div class="kpi-val">${totalMaint.toLocaleString("en-US")}</div>
-        <div class="kpi-lbl">حالة الصيانة</div>
-        <div class="kpi-sub">${totalElevators ? ((totalMaint / totalElevators) * 100).toFixed(1) : "0"}% من الإجمالي</div>
-      </div>
-      <div class="kpi kc-blue">
-        <div class="kpi-val">${sorted[0] ? sorted[0].region : "—"}</div>
-        <div class="kpi-lbl">أعلى منطقة عدداً</div>
-        <div class="kpi-sub">${sorted[0] ? sorted[0].total.toLocaleString("en-US") + " مصعد" : ""}</div>
-      </div>
-    </div>
-
-    <div class="g2 mb14">
-      <div class="card">
-        <div class="card-title">توزيع المصاعد حسب المنطقة <span class="sub">عامل / صيانة</span></div>
-        <div class="chart-box" style="height:320px"><canvas id="ch-elev-status-region"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">نسبة الجاهزية <span class="sub">حسب المنطقة</span></div>
-        <div class="chart-box" style="height:320px"><canvas id="ch-elev-status-ready"></canvas></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        تفاصيل حالة المصاعد حسب المنطقة
-        <span class="sub">${data.length.toLocaleString("en-US")} صف</span>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>المنطقة</th>
-              <th>إجمالي عدد المصاعد</th>
-              <th>حالة العمل</th>
-              <th>حالة الصيانة</th>
-              <th>نسبة الجاهزية</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${sorted
-              .map((r) => {
-                const pct = r.total ? ((r.working / r.total) * 100).toFixed(1) : "0.0";
-                const color = pct >= 90 ? CSS_TOKENS.positive() : pct >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
-                return `
-              <tr>
-                <td style="text-align:right;font-weight:600">${esc(r.region)}</td>
-                <td>${r.total.toLocaleString("en-US")}</td>
-                <td>${r.working.toLocaleString("en-US")}</td>
-                <td>${r.maint.toLocaleString("en-US")}</td>
-                <td><span class="badge" style="background:${color}18;color:${color};border:1px solid ${color}33">${pct}%</span></td>
-              </tr>`;
-              })
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  requestAnimationFrame(() => {
-    const cRegion = document.getElementById("ch-elev-status-region");
-    if (cRegion && typeof Chart !== "undefined") {
-      killChart("ch-elev-status-region");
-      CHARTS["ch-elev-status-region"] = new Chart(cRegion, {
-        type: "bar",
-        data: {
-          labels: sorted.map((r) => r.region),
-          datasets: [
-            { label: "حالة العمل", data: sorted.map((r) => r.working), backgroundColor: CSS_TOKENS.α(CSS_TOKENS.positive(), 0.75), borderColor: CSS_TOKENS.positive(), borderWidth: 1, borderRadius: 4 },
-            { label: "حالة الصيانة", data: sorted.map((r) => r.maint), backgroundColor: CSS_TOKENS.α(CSS_TOKENS.danger(), 0.75), borderColor: CSS_TOKENS.danger(), borderWidth: 1, borderRadius: 4 },
-          ],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { position: "top", labels: { font: { family: "Tajawal,sans-serif", size: 10 } } } },
-          scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
-            y: { stacked: true, beginAtZero: true, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
-          },
-        },
-      });
-    }
-
-    const cReady = document.getElementById("ch-elev-status-ready");
-    if (cReady && typeof Chart !== "undefined") {
-      killChart("ch-elev-status-ready");
-      const readyPct = sorted.map((r) => (r.total ? +((r.working / r.total) * 100).toFixed(1) : 0));
-      CHARTS["ch-elev-status-ready"] = new Chart(cReady, {
-        type: "bar",
-        data: {
-          labels: sorted.map((r) => r.region),
-          datasets: [{
-            label: "نسبة الجاهزية %",
-            data: readyPct,
-            backgroundColor: readyPct.map((p) => CSS_TOKENS.α(p >= 90 ? CSS_TOKENS.positive() : p >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger(), 0.75)),
-            borderColor: readyPct.map((p) => (p >= 90 ? CSS_TOKENS.positive() : p >= 75 ? CSS_TOKENS.warning() : CSS_TOKENS.danger())),
-            borderWidth: 1,
-            borderRadius: 4,
-          }],
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => `  ${ctx.raw}%` } },
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 } } },
-            y: { beginAtZero: true, max: 100, grid: { color: "rgba(8,45,60,.04)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, callback: (v) => v + "%" } },
-          },
-        },
-      });
-    }
-  });
-};
 
 
 (function () {
@@ -23021,6 +22990,9 @@ function exportNashatExcel(rows) {
     // المرسِل، المرسَل إليه، المنطقة (أكواد: JED/MAK/TAF/MAD/WR)،
     // تاريخ الخطاب، الموضوع، الأولوية، الحالة...
     // ★ 2026-09-21: أُضيف لسياق الـ AI بناءً على طلب صريح.
+    // ★ 2026-10-03: "رقم أعمالي" بقى مستخدم فعليًا — أي قيمة فيه تعني
+    // إن الخطاب جاي من منصة أعمالي الحكومية (التبويب نفسه بقى مقسّم
+    // "خطابات منصة أعمالي" و"الخطابات الأخرى" على أساسه).
     // ════════════════════════════════════════════════════════════════
     try {
       const corrRows = Array.isArray(window.RAW_NEW_CORRESPONDENCE) ? window.RAW_NEW_CORRESPONDENCE : [];
@@ -23028,6 +23000,7 @@ function exportNashatExcel(rows) {
         const regionLabels = { JED: "جدة", MAK: "مكة المكرمة", TAF: "الطائف", MAD: "المدينة المنورة", WR: "WR" };
         const regionLabel = c => regionLabels[String(c || "").trim()] || String(c || "").trim() || "غير محدد";
         const byType = {}, byRegion = {}, byStatus = {}, byPriority = {};
+        let aamaliCount = 0;
         corrRows.forEach(r => {
           const type = String(r["النوع"] || "غير محدد").trim() || "غير محدد";
           const region = regionLabel(r["المنطقة"]);
@@ -23037,12 +23010,18 @@ function exportNashatExcel(rows) {
           byRegion[region] = (byRegion[region] || 0) + 1;
           byStatus[status] = (byStatus[status] || 0) + 1;
           byPriority[priority] = (byPriority[priority] || 0) + 1;
+          // ★ 2026-10-03: أي صف فيه قيمة في "رقم أعمالي" = خطاب جاي من
+          // منصة أعمالي الحكومية، غير كده خطاب عادي — نفس قاعدة التصنيف
+          // المستخدمة في التبويب نفسه (قسم "خطابات منصة أعمالي").
+          if (String(r["رقم أعمالي"] == null ? "" : r["رقم أعمالي"]).trim()) aamaliCount++;
         });
         summary.سجل_المراسلات = {
           مصدر: "تبويب سجل المراسلات",
           إجمالي_المراسلات: corrRows.length,
           صادر: byType["صادر"] || 0,
           وارد: byType["وارد"] || 0,
+          خطابات_منصة_أعمالي: aamaliCount,
+          الخطابات_الأخرى: corrRows.length - aamaliCount,
           توزيع_حسب_المنطقة: byRegion,
           توزيع_حسب_الحالة: byStatus,
           توزيع_حسب_الأولوية: byPriority,
@@ -23052,41 +23031,6 @@ function exportNashatExcel(rows) {
       }
     } catch (e) {
       summary.سجل_المراسلات = { تنبيه: "تعذّر تلخيص بيانات سجل المراسلات: " + (e?.message || e) };
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // 🚦 تبويب حالة المصاعد (RAW_ELEVATOR_STATUS) — ملخص إجمالي حسب
-    // المنطقة، مختلف عن تبويب "المصاعد" التفصيلي لكل مبنى (لا تخلط بينهم)
-    // أُضيف لسياق الـ AI في 2026-08-23
-    // ════════════════════════════════════════════════════════════════
-    try {
-      const esRows = Array.isArray(window.RAW_ELEVATOR_STATUS) ? window.RAW_ELEVATOR_STATUS : [];
-      const numE = v => { const x = parseFloat(String(v??"").replace(/,/g,"")); return isNaN(x)?0:x; };
-      const dataE = esRows
-        .map(r => ({
-          region: String(r["المنطقة"]||"").trim(),
-          total: numE(r["اجمالي عدد المصاعد"] ?? r["إجمالي عدد المصاعد"]),
-          working: numE(r["حالة العمل"]),
-          maint: numE(r["حالة الصيانة"]),
-        }))
-        .filter(r => r.region);
-      if (dataE.length) {
-        const totalElevators = dataE.reduce((s,r)=>s+r.total,0);
-        const totalWorking = dataE.reduce((s,r)=>s+r.working,0);
-        const totalMaint = dataE.reduce((s,r)=>s+r.maint,0);
-        summary.حالة_المصاعد = {
-          مصدر: "تبويب حالة المصاعد — شيت حالة_المصاعد (ملخص إجمالي حسب المنطقة)",
-          إجمالي_عدد_المصاعد: totalElevators,
-          إجمالي_حالة_العمل: totalWorking,
-          إجمالي_حالة_الصيانة: totalMaint,
-          نسبة_حالة_العمل: totalElevators ? +((totalWorking/totalElevators)*100).toFixed(1) : null,
-          توزيع_حسب_المنطقة: dataE.sort((a,b)=>b.total-a.total).map(r=>({المنطقة:r.region, الإجمالي:r.total, حالة_العمل:r.working, حالة_الصيانة:r.maint})),
-        };
-      } else {
-        summary.حالة_المصاعد = { تنبيه: "لم تُحمَّل بيانات حالة المصاعد بعد أو التبويب لم يُفتح بعد." };
-      }
-    } catch (e) {
-      summary.حالة_المصاعد = { تنبيه: "تعذّر تلخيص بيانات حالة المصاعد: " + (e?.message || e) };
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -29758,7 +29702,6 @@ ${panelHTML}
     { key:"RAW_SYSTEMS_NORM", label:"سجل زيارات الأنظمة", singular:"زيارة", icon:"🧪", rows:()=>window.RAW_SYSTEMS_NORM },
     { key:"RAW_FCA_HISTORY", label:"تاريخ تقييمات FCA", singular:"تقييم", icon:"📈", rows:()=>window.RAW_FCA_HISTORY },
     { key:"RAW_ELEVATORS", label:"المصاعد", singular:"مصعد", icon:"🛗", rows:()=>window.RAW_ELEVATORS },
-    { key:"RAW_ELEVATOR_STATUS", label:"حالة المصاعد", singular:"مصعد", icon:"🔧", rows:()=>window.RAW_ELEVATOR_STATUS },
     { key:"RAW_COST_ROWS", label:"التكلفة", singular:"بند تكلفة", icon:"💰", rows:()=>window.RAW_COST_STATE?.rows },
     { key:"RAW_PAYMENTS", label:"المدفوعات والفواتير", singular:"فاتورة", icon:"💳", rows:()=>window.RAW_PAYMENTS },
     { key:"RAW_FM_CONTRACTS", label:"العقود", singular:"عقد", icon:"📋", rows:()=>window.RAW_FM_CONTRACTS },
@@ -32847,9 +32790,26 @@ function renderVehiclesTab() {
    ║  MAD/WR)، تاريخ الخطاب، تاريخ الاستلام أو الإرسال، الموضوع،
    ║  الأولوية، الحالة، حالة الاعتماد، ملاحظات، إذن الإصدار،
    ║  اسم المعتمد، الرد.
+   ║  ★ 2026-10-03 (بناءً على طلب صريح): التبويب بقى مقسّم قسمين تحت
+   ║  "النظرة العامة" (اللي فضلت زي ما هي — إجمالي/صادر/وارد/مناطق):
+   ║  "📋 خطابات منصة أعمالي" و"✉️ الخطابات الأخرى". التصنيف تلقائي
+   ║  بالكامل من عمود "رقم أعمالي" — أي قيمة فيه (غير فاضية بعد trim)
+   ║  = خطاب منصة أعمالي (رقم أعمالي = رقم الخطاب هناك فعليًا)، فاضي
+   ║  = خطاب عادي. كل قسم من القسمين ليه فلاتر منطقة/نوع وجدول تفصيلي
+   ║  وتصدير CSV مستقلين تمامًا — راجع CORR.groups / _corrGroupSectionHtml.
+   ║  ★ 2026-10-05 (بناءً على طلب صريح): جدول الصادر والوارد لكل منطقة
+   ║  (العام + كل قسم) صار يعرض المفتوح والمغلق لكل بند (صادر / وارد /
+   ║  الإجمالي) مع صف إجمالي — راجع _corrIsClosed و_corrBuildByRegionType
+   ║  و_corrRegionTableHeadHtml و_corrRegionTableRowsHtml.
    ╚════════════════════════════════════════════════════════════╝ */
 const CORR_REGION_LABELS = { JED: "جدة", MAK: "مكة المكرمة", TAF: "الطائف", MAD: "المدينة المنورة", WR: "WR" };
-const CORR = { _region: "", _type: "", filtered: [] };
+// ★ 2026-10-03 (بناءً على طلب صريح): التبويب بقى مقسّم قسمين تحت
+// "نظرة عامة" العامة: "خطابات منصة أعمالي" و"الخطابات الأخرى" —
+// التصنيف بيتحدد تلقائيًا من عمود "رقم أعمالي" (لو فيه قيمة = خطاب
+// جاي من منصة أعمالي الحكومية، لو فاضي = خطاب عادي). كل قسم ليه
+// فلاتر منطقة/نوع وجدول تفصيلي وتصدير CSV مستقلين تمامًا عن التاني
+// وعن الجدول العام، تحت CORR.groups.aamali / CORR.groups.other.
+const CORR = { _region: "", _type: "", _source: "", filtered: [], groups: { aamali: { region: "", type: "", filtered: [] }, other: { region: "", type: "", filtered: [] } } };
 window.CORR = CORR;
 
 function _corrRegionLabel(code) {
@@ -32865,21 +32825,111 @@ function _corrFmtDate(v) {
 function _corrEsc(v) {
   return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+// ★ 2026-10-03: قاعدة التصنيف الوحيدة المطلوبة — أي قيمة غير فاضية
+// (بعد trim) في عمود "رقم أعمالي" تعني إن الخطاب ده جاي من منصة
+// أعمالي الحكومية (رقم أعمالي = رقم الخطاب نفسه هناك).
+function _corrIsAamali(r) {
+  return !!String(r["رقم أعمالي"] == null ? "" : r["رقم أعمالي"]).trim();
+}
+// ★ 2026-10-05 (بناءً على طلب صريح): تفصيل المفتوح والمغلق لكل بند
+// (صادر / وارد) داخل كل منطقة، بنفس أسلوب جدول الصادر والوارد لكل
+// منطقة. قاعدة الإغلاق هي نفسها المعتمدة في توزيع الحالة (2026-10-03):
+// مغلق = "مغلق" أو "تمت المعالجة (مغلق)" أو "تم الرد"، وما سواها مفتوح.
+function _corrIsClosed(r) {
+  const s = String(r["الحالة"] == null ? "" : r["الحالة"]).trim();
+  return s === "مغلق" || s === "تمت المعالجة (مغلق)" || s === "تم الرد";
+}
+// توزيع صادر/وارد (والمفتوح/المغلق لكل منهما) حسب المنطقة لأي مجموعة
+// صفوف (مُعاد استخدامها للإجمالي العام ولكل قسم من القسمين). المفاتيح
+// القديمة (صادر/وارد) باقية كما هي لأن الرسم البياني يعتمد عليها.
+function _corrNewRegionBucket() {
+  return { صادر: 0, وارد: 0, صادر_مفتوح: 0, صادر_مغلق: 0, وارد_مفتوح: 0, وارد_مغلق: 0 };
+}
+function _corrBuildByRegionType(rows, regionsSet) {
+  const byRegionType = {};
+  regionsSet.forEach((rg) => { byRegionType[rg] = _corrNewRegionBucket(); });
+  rows.forEach((r) => {
+    const rg = _corrRegionLabel(r["المنطقة"]);
+    const tp = String(r["النوع"] || "").trim();
+    if (!byRegionType[rg]) byRegionType[rg] = _corrNewRegionBucket();
+    if (tp === "صادر" || tp === "وارد") {
+      byRegionType[rg][tp]++;
+      byRegionType[rg][tp + (_corrIsClosed(r) ? "_مغلق" : "_مفتوح")]++;
+    }
+  });
+  return byRegionType;
+}
+// ★ 2026-10-05 (تبسيط بناءً على طلب): جدول بصف عناوين واحد بلا دمج خلايا —
+// المنطقة | صادر مفتوح | صادر مغلق | وارد مفتوح | وارد مغلق | الإجمالي.
+// المفتوح بلون التحذير والمغلق بلون الإيجابي، والصفر يظهر بلون باهت.
+function _corrRegionTableHeadHtml() {
+  const th = (t, color, align) => `<th style="padding:8px 10px;text-align:${align || "center"};${color ? `color:${color};` : ""}white-space:nowrap">${t}</th>`;
+  return `<thead><tr style="background:var(--bg2)">
+    ${th("المنطقة", "", "right")}
+    ${th("صادر مفتوح", CSS_TOKENS.warning())}${th("صادر مغلق", CSS_TOKENS.positive())}
+    ${th("وارد مفتوح", CSS_TOKENS.warning())}${th("وارد مغلق", CSS_TOKENS.positive())}
+    ${th("الإجمالي")}
+  </tr></thead>`;
+}
+function _corrRegionTableRowsHtml(regionsSet, byRegionType) {
+  const cell = (v, color, bold) => {
+    const n = v || 0;
+    return `<td style="padding:7px 10px;text-align:center;font-weight:${bold || n ? 700 : 400};color:${n ? color : "var(--tx-muted)"}">${n.toLocaleString("ar")}</td>`;
+  };
+  const tx = "var(--tx-main)";
+  const tot = _corrNewRegionBucket();
+  const rowHtml = (label, b, isTotal) => `<tr style="border-bottom:1px solid var(--brd)${isTotal ? ";background:var(--bg2)" : ""}">
+    <td style="padding:7px 10px;font-weight:${isTotal ? 800 : 700}">${isTotal ? label : _corrEsc(label)}</td>
+    ${cell(b.صادر_مفتوح, CSS_TOKENS.warning())}${cell(b.صادر_مغلق, CSS_TOKENS.positive())}
+    ${cell(b.وارد_مفتوح, CSS_TOKENS.warning())}${cell(b.وارد_مغلق, CSS_TOKENS.positive())}
+    ${cell(b.صادر + b.وارد, tx, true)}
+  </tr>`;
+  const body = regionsSet
+    .map((rg) => {
+      const b = byRegionType[rg] || _corrNewRegionBucket();
+      Object.keys(tot).forEach((k) => { tot[k] += b[k] || 0; });
+      return rowHtml(rg, b, false);
+    })
+    .join("");
+  return body + (regionsSet.length > 1 ? rowHtml("الإجمالي", tot, true) : "");
+}
 
 function _corrApplyFilters() {
   const rows = window.RAW_NEW_CORRESPONDENCE || [];
   CORR.filtered = rows.filter((r) => {
     const region = _corrRegionLabel(r["المنطقة"]);
     const type = String(r["النوع"] || "").trim();
-    return (!CORR._region || region === CORR._region) && (!CORR._type || type === CORR._type);
+    const isAamali = _corrIsAamali(r);
+    const sourceOk = !CORR._source || (CORR._source === "aamali" ? isAamali : !isAamali);
+    return (!CORR._region || region === CORR._region) && (!CORR._type || type === CORR._type) && sourceOk;
   });
   _corrRenderTable();
 }
 
+// ★ 2026-10-03: نفس منطق _corrApplyFilters بس لقسم واحد بس من القسمين
+// الجديدين (aamali/other) — بيشتغل على صفوف القسم ده بس (محدّد مسبقًا
+// حسب _corrIsAamali)، وفلاتره (منطقة/نوع) منفصلة تمامًا عن فلاتر
+// الجدول العام فوق وعن فلاتر القسم التاني.
+function _corrApplyGroupFilters(groupKey) {
+  const g = CORR.groups[groupKey];
+  if (!g) return;
+  const rows = window.RAW_NEW_CORRESPONDENCE || [];
+  const groupRows = rows.filter((r) => _corrIsAamali(r) === (groupKey === "aamali"));
+  g.filtered = groupRows.filter((r) => {
+    const region = _corrRegionLabel(r["المنطقة"]);
+    const type = String(r["النوع"] || "").trim();
+    return (!g.region || region === g.region) && (!g.type || type === g.type);
+  });
+  _corrRenderGroupTable(groupKey);
+}
+window._corrApplyGroupFilters = _corrApplyGroupFilters;
+
 function _corrRowHtml(r) {
   const type = String(r["النوع"] || "").trim();
   const typeColor = type === "صادر" ? CSS_TOKENS.info() : CSS_TOKENS.warning();
+  const aamaliNo = String(r["رقم أعمالي"] == null ? "" : r["رقم أعمالي"]).trim();
   return `<tr style="border-bottom:1px solid var(--brd)">
+    <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${aamaliNo ? _corrEsc(aamaliNo) : "—"}</td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_corrEsc(r["الرقم المرجعي"]) || "—"}</td>
     <td style="padding:6px 10px;text-align:center"><span style="background:${CSS_TOKENS.α(typeColor,0.12)};color:${typeColor};border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700">${_corrEsc(type) || "—"}</span></td>
     <td style="padding:6px 10px;font-size:11px">${_corrEsc(r["المرسِل"]) || "—"}</td>
@@ -32897,15 +32947,28 @@ function _corrRenderTable() {
   if (!tbody) return;
   tbody.innerHTML =
     CORR.filtered.map((r) => _corrRowHtml(r)).join("") ||
-    `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+    `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
   const countEl = document.getElementById("corr-count");
   if (countEl) countEl.textContent = CORR.filtered.length.toLocaleString("ar");
+}
+
+function _corrRenderGroupTable(groupKey) {
+  const g = CORR.groups[groupKey];
+  if (!g) return;
+  const tbody = document.getElementById(`corr-${groupKey}-tbody`);
+  if (tbody) {
+    tbody.innerHTML =
+      g.filtered.map((r) => _corrRowHtml(r)).join("") ||
+      `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
+  }
+  const countEl = document.getElementById(`corr-${groupKey}-count`);
+  if (countEl) countEl.textContent = g.filtered.length.toLocaleString("ar");
 }
 
 function _corrExportCSV() {
   const src = CORR.filtered.length ? CORR.filtered : window.RAW_NEW_CORRESPONDENCE || [];
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["الرقم المرجعي", "النوع", "المرسِل", "المرسَل إليه", "المنطقة", "تاريخ الخطاب", "الموضوع", "الأولوية", "الحالة"];
+  const headers = ["رقم أعمالي", "الرقم المرجعي", "النوع", "المرسِل", "المرسَل إليه", "المنطقة", "تاريخ الخطاب", "الموضوع", "الأولوية", "الحالة"];
   const getVal = (r, h) => {
     if (h === "المنطقة") return _corrRegionLabel(r["المنطقة"]);
     if (h === "تاريخ الخطاب") return _corrFmtDate(r[h]);
@@ -32917,6 +32980,109 @@ function _corrExportCSV() {
     download: "سجل_المراسلات.csv",
   });
   a.click();
+}
+
+// ★ 2026-10-03: نفس تصدير CSV بس مقصور على قسم واحد (aamali/other) —
+// بيصدّر الصفوف المفلترة حاليًا في القسم ده (أو كل صفوف القسم لو مفيش
+// فلتر مطبّق)، باسم ملف مختلف لكل قسم.
+function _corrExportGroupCSV(groupKey) {
+  const g = CORR.groups[groupKey];
+  if (!g) return;
+  const allGroupRows = (window.RAW_NEW_CORRESPONDENCE || []).filter((r) => _corrIsAamali(r) === (groupKey === "aamali"));
+  const src = g.filtered.length ? g.filtered : allGroupRows;
+  if (!src.length) { alert("لا توجد بيانات"); return; }
+  const headers = ["رقم أعمالي", "الرقم المرجعي", "النوع", "المرسِل", "المرسَل إليه", "المنطقة", "تاريخ الخطاب", "الموضوع", "الأولوية", "الحالة"];
+  const getVal = (r, h) => {
+    if (h === "المنطقة") return _corrRegionLabel(r["المنطقة"]);
+    if (h === "تاريخ الخطاب") return _corrFmtDate(r[h]);
+    return r[h];
+  };
+  const rows = src.map((r) => headers.map((h) => `"${String(getVal(r, h) ?? "").replace(/"/g, '""')}"`).join(","));
+  const fname = groupKey === "aamali" ? "خطابات_منصة_اعمالي.csv" : "الخطابات_الاخرى.csv";
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
+    download: fname,
+  });
+  a.click();
+}
+window._corrExportGroupCSV = _corrExportGroupCSV;
+
+// ★ 2026-10-03: الـHTML الكامل لقسم واحد من القسمين الجديدين (مصغّرة
+// KPI + جدول حسب المنطقة + جدول تفصيلي مفلتر بتصدير CSV خاص بيه) —
+// بتُستدعى مرتين بعد بعض (aamali ثم other) من renderCorrespondenceTab.
+function _corrGroupSectionHtml(groupKey, groupRows, opts) {
+  const total = groupRows.length;
+  const outCount = groupRows.filter((r) => String(r["النوع"] || "").trim() === "صادر").length;
+  const inCount = groupRows.filter((r) => String(r["النوع"] || "").trim() === "وارد").length;
+  const regionsSet = [...new Set(groupRows.map((r) => _corrRegionLabel(r["المنطقة"])))].filter(Boolean).sort();
+  const byRegionType = _corrBuildByRegionType(groupRows, regionsSet);
+
+  return `
+  <div class="card mb14" style="border-right:4px solid ${opts.accentColor}">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <span style="font-size:20px">${opts.icon}</span>
+      <div style="font-size:15px;font-weight:800;color:var(--tx-main)">${opts.title}</div>
+      <span style="font-size:12px;color:var(--tx-muted)">(${total.toLocaleString("ar")} خطاب)</span>
+    </div>
+
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="kpi ${opts.kpiClass}">
+        <div class="kpi-val">${total.toLocaleString("ar")}</div>
+        <div class="kpi-lbl">الإجمالي</div>
+      </div>
+      <div class="kpi kc-green">
+        <div class="kpi-val">${outCount.toLocaleString("ar")}</div>
+        <div class="kpi-lbl">صادر</div>
+        <div class="kpi-sub">${total ? ((outCount / total) * 100).toFixed(1) : 0}%</div>
+      </div>
+      <div class="kpi kc-purple">
+        <div class="kpi-val">${inCount.toLocaleString("ar")}</div>
+        <div class="kpi-lbl">وارد</div>
+        <div class="kpi-sub">${total ? ((inCount / total) * 100).toFixed(1) : 0}%</div>
+      </div>
+    </div>
+
+    ${regionsSet.length ? `
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0);margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        ${_corrRegionTableHeadHtml()}
+        <tbody>${_corrRegionTableRowsHtml(regionsSet, byRegionType)}</tbody>
+      </table>
+    </div>` : ""}
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700;color:var(--tx-main)">قائمة الخطابات <span class="sub" id="corr-${groupKey}-count">${total}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="corr-${groupKey}-filter-region" onchange="CORR.groups.${groupKey}.region=this.value;_corrApplyGroupFilters('${groupKey}')" style="font-size:11px">
+          <option value="">— كل المناطق —</option>
+          ${regionsSet.map((rg) => `<option value="${_corrEsc(rg)}">${_corrEsc(rg)}</option>`).join("")}
+        </select>
+        <select class="fsel" id="corr-${groupKey}-filter-type" onchange="CORR.groups.${groupKey}.type=this.value;_corrApplyGroupFilters('${groupKey}')" style="font-size:11px">
+          <option value="">— كل الأنواع —</option>
+          <option value="صادر">صادر</option>
+          <option value="وارد">وارد</option>
+        </select>
+        <button class="export-btn export-btn-csv" onclick="_corrExportGroupCSV('${groupKey}')" style="font-size:11px">⬇ تصدير CSV</button>
+      </div>
+    </div>
+    <div style="overflow:auto;max-height:360px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">رقم أعمالي</th>
+          <th style="padding:8px 10px;text-align:right">الرقم المرجعي</th>
+          <th style="padding:8px 10px;text-align:center">النوع</th>
+          <th style="padding:8px 10px;text-align:right">المرسِل</th>
+          <th style="padding:8px 10px;text-align:right">المرسَل إليه</th>
+          <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:right">تاريخ الخطاب</th>
+          <th style="padding:8px 10px;text-align:right">الموضوع</th>
+          <th style="padding:8px 10px;text-align:center">الأولوية</th>
+          <th style="padding:8px 10px;text-align:center">الحالة</th>
+        </tr></thead>
+        <tbody id="corr-${groupKey}-tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 function renderCorrespondenceTab() {
@@ -32938,21 +33104,23 @@ function renderCorrespondenceTab() {
   const regionsSet = [...new Set(rows.map((r) => _corrRegionLabel(r["المنطقة"])))].filter(Boolean).sort();
 
   // توزيع الصادر/الوارد حسب المنطقة — الهدف الأساسي من هذا التبويب
-  const byRegionType = {};
-  regionsSet.forEach((rg) => { byRegionType[rg] = { صادر: 0, وارد: 0 }; });
+  const byRegionType = _corrBuildByRegionType(rows, regionsSet);
+
+  // توزيع حسب الحالة — موحّدة لحالتين بس (طلب صريح 2026-10-03):
+  // مغلق = مغلق / تمت المعالجة (مغلق) / تم الرد — مفتوح = الباقي.
+  const byStatus = { مفتوح: 0, مغلق: 0 };
   rows.forEach((r) => {
-    const rg = _corrRegionLabel(r["المنطقة"]);
-    const tp = String(r["النوع"] || "").trim();
-    if (!byRegionType[rg]) byRegionType[rg] = { صادر: 0, وارد: 0 };
-    if (tp === "صادر" || tp === "وارد") byRegionType[rg][tp]++;
+    const s = String(r["الحالة"] || "").trim();
+    if (s === "مغلق" || s === "تمت المعالجة (مغلق)" || s === "تم الرد") byStatus["مغلق"]++;
+    else byStatus["مفتوح"]++;
   });
 
-  // توزيع حسب الحالة
-  const byStatus = {};
-  rows.forEach((r) => {
-    const s = String(r["الحالة"] || "").trim() || "غير محدد";
-    byStatus[s] = (byStatus[s] || 0) + 1;
-  });
+  // ★ 2026-10-03 (بناءً على طلب صريح): التصنيف الجديد — لو عمود "رقم
+  // أعمالي" فيه قيمة، الخطاب جاي من منصة أعمالي الحكومية؛ غير كده
+  // فهو خطاب عادي ("الخطابات الأخرى"). التبويب بقى مقسّم قسمين تحت
+  // نفس "النظرة العامة" دي، كل واحد منهم مبني تحت (_corrGroupSectionHtml).
+  const aamaliRows = rows.filter((r) => _corrIsAamali(r));
+  const otherRows = rows.filter((r) => !_corrIsAamali(r));
 
   el.innerHTML = `
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
@@ -32978,7 +33146,21 @@ function renderCorrespondenceTab() {
     </div>
   </div>
 
-  <div class="g2 mb14">
+  <div class="card mb14" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:14px 18px">
+    <div style="font-size:12px;font-weight:700;color:var(--tx-muted)">تصنيف المراسلات حسب المصدر:</div>
+    <div style="display:flex;align-items:center;gap:8px;background:#EFF6FF;border-radius:999px;padding:6px 14px">
+      <span style="font-size:14px">📋</span>
+      <span style="font-size:13px;font-weight:800;color:#1D4ED8">${aamaliRows.length.toLocaleString("ar")}</span>
+      <span style="font-size:12px;color:var(--tx-muted)">منصة أعمالي (${total ? ((aamaliRows.length / total) * 100).toFixed(1) : 0}%)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#F3F4F6;border-radius:999px;padding:6px 14px">
+      <span style="font-size:14px">✉️</span>
+      <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${otherRows.length.toLocaleString("ar")}</span>
+      <span style="font-size:12px;color:var(--tx-muted)">خطابات أخرى (${total ? ((otherRows.length / total) * 100).toFixed(1) : 0}%)</span>
+    </div>
+  </div>
+
+  <div class="g3 mb14">
     <div class="card">
       <div class="card-title">الصادر والوارد حسب المنطقة</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-corr-region-type"></canvas></div>
@@ -32986,6 +33168,10 @@ function renderCorrespondenceTab() {
     <div class="card">
       <div class="card-title">توزيع المراسلات حسب النوع</div>
       <div class="chart-box" style="height:260px"><canvas id="ch-corr-type"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">منصة أعمالي مقابل الخطابات الأخرى</div>
+      <div class="chart-box" style="height:260px"><canvas id="ch-corr-source"></canvas></div>
     </div>
   </div>
 
@@ -32995,36 +33181,24 @@ function renderCorrespondenceTab() {
   </div>
 
   <div class="card mb14">
-    <div class="card-title">جدول الصادر والوارد لكل منطقة (أرقام دقيقة)</div>
+    <div class="card-title">الصادر والوارد لكل منطقة — المفتوح والمغلق</div>
     <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:var(--bg2)">
-          <th style="padding:8px 10px;text-align:right">المنطقة</th>
-          <th style="padding:8px 10px;text-align:center">صادر</th>
-          <th style="padding:8px 10px;text-align:center">وارد</th>
-          <th style="padding:8px 10px;text-align:center">الإجمالي</th>
-        </tr></thead>
-        <tbody>
-          ${regionsSet
-            .map((rg) => {
-              const o = byRegionType[rg]["صادر"] || 0, i = byRegionType[rg]["وارد"] || 0;
-              return `<tr style="border-bottom:1px solid var(--brd)">
-                <td style="padding:6px 10px;font-weight:700">${_corrEsc(rg)}</td>
-                <td style="padding:6px 10px;text-align:center">${o.toLocaleString("ar")}</td>
-                <td style="padding:6px 10px;text-align:center">${i.toLocaleString("ar")}</td>
-                <td style="padding:6px 10px;text-align:center;font-weight:700">${(o + i).toLocaleString("ar")}</td>
-              </tr>`;
-            })
-            .join("")}
-        </tbody>
+        ${_corrRegionTableHeadHtml()}
+        <tbody>${_corrRegionTableRowsHtml(regionsSet, byRegionType)}</tbody>
       </table>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card mb14">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <div class="card-title" style="margin:0;padding:0;border:0">قائمة المراسلات <span class="sub" id="corr-count">${total}</span></div>
+      <div class="card-title" style="margin:0;padding:0;border:0">قائمة كل المراسلات <span class="sub" id="corr-count">${total}</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="fsel" id="corr-filter-source" onchange="CORR._source=this.value;_corrApplyFilters()" style="font-size:11px">
+          <option value="">— الكل (أعمالي + أخرى) —</option>
+          <option value="aamali">منصة أعمالي فقط</option>
+          <option value="other">الخطابات الأخرى فقط</option>
+        </select>
         <select class="fsel" id="corr-filter-region" onchange="CORR._region=this.value;_corrApplyFilters()" style="font-size:11px">
           <option value="">— كل المناطق —</option>
           ${regionsSet.map((rg) => `<option value="${_corrEsc(rg)}">${_corrEsc(rg)}</option>`).join("")}
@@ -33040,6 +33214,7 @@ function renderCorrespondenceTab() {
     <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="corr-table">
         <thead><tr style="background:var(--bg2)">
+          <th style="padding:8px 10px;text-align:right">رقم أعمالي</th>
           <th style="padding:8px 10px;text-align:right">الرقم المرجعي</th>
           <th style="padding:8px 10px;text-align:center">النوع</th>
           <th style="padding:8px 10px;text-align:right">المرسِل</th>
@@ -33053,12 +33228,27 @@ function renderCorrespondenceTab() {
         <tbody id="corr-tbody"></tbody>
       </table>
     </div>
-  </div>`;
+  </div>
+
+  ${_corrGroupSectionHtml("aamali", aamaliRows, { icon: "📋", title: "خطابات منصة أعمالي", accentColor: "#2563EB", kpiClass: "kc-blue" })}
+  ${_corrGroupSectionHtml("other", otherRows, { icon: "✉️", title: "الخطابات الأخرى", accentColor: "#6B7280", kpiClass: "kc-navy" })}
+  `;
 
   CORR._region = "";
   CORR._type = "";
+  CORR._source = "";
   CORR.filtered = rows.slice();
   _corrRenderTable();
+
+  CORR.groups.aamali.region = "";
+  CORR.groups.aamali.type = "";
+  CORR.groups.aamali.filtered = aamaliRows.slice();
+  _corrRenderGroupTable("aamali");
+
+  CORR.groups.other.region = "";
+  CORR.groups.other.type = "";
+  CORR.groups.other.filtered = otherRows.slice();
+  _corrRenderGroupTable("other");
 
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;
@@ -33077,7 +33267,8 @@ function renderCorrespondenceTab() {
       },
     ]);
     makeDoughnut("ch-corr-type", { صادر: outCount, وارد: inCount }, { صادر: CSS_TOKENS.info(), وارد: CSS_TOKENS.warning() });
-    makeDoughnut("ch-corr-status", byStatus, {});
+    makeDoughnut("ch-corr-source", { "منصة أعمالي": aamaliRows.length, "خطابات أخرى": otherRows.length }, { "منصة أعمالي": "#2563EB", "خطابات أخرى": "#9CA3AF" });
+    makeDoughnut("ch-corr-status", byStatus, { مفتوح: CSS_TOKENS.warning(), مغلق: CSS_TOKENS.positive() });
   });
 }
 
@@ -34819,6 +35010,11 @@ function renderOrgStructureTab() {
    ║  Base Value, Updated Value, Paid, Payment %, Remaining, Notes.
    ║  بعض القيم بتوصل كنص "-" بدل رقم (يعني مفيش قيمة محدّثة/متبقي
    ║  مسجّلة)، فلازم نتعامل معاها كـ0 مش نكسر عليها.
+   ║  ★ 2026-10-05 (بناءً على طلب صريح): عمود "Notes" صار يُعامل كـ
+   ║  Payment in Pipeline — أي محتوى فيه = دفعة قيد الإجراء، والرقم
+   ║  داخله = قيمتها (ريال). راجع _lspPipeline و_lspPipelineAmount؛
+   ║  ظهر كعمود في الجدول وبطاقة KPI وسلسلة في الرسم البياني والتصدير
+   ║  وبطاقة النظرة العامة وملخص المساعد الذكي.
    ╚════════════════════════════════════════════════════════════╝ */
 const LSP = { _region: "", filtered: [] };
 window.LSP = LSP;
@@ -34834,6 +35030,29 @@ function _lspEffectiveValue(r) {
   const updated = _lspNum(r["Updated Value"]);
   return updated !== null ? updated : (_lspNum(r["Base Value"]) || 0);
 }
+// ★ 2026-10-05 (بناءً على طلب صريح): أي محتوى في عمود "Notes" يعني أن
+// العقد لديه Payment in Pipeline، والرقم الموجود في الملاحظة هو قيمة هذه
+// الدفعة (ريال). القواعد:
+//   - الملاحظة الفارغة أو "-" أو "—" أو "N/A" أو "لا يوجد" = لا توجد دفعة.
+//   - أي ملاحظة غير ذلك = دفعة قيد الإجراء (isPipeline = true).
+//   - القيمة = أول رقم في الملاحظة (يُقبل الفاصل ، أو , والأرقام الهندية).
+//   - ملاحظة بلا رقم تُحتسب دفعة قيد الإجراء بقيمة غير محددة (amount = null)
+//     ولا تدخل في مجموع القيمة، وتظهر في الجدول بنص الملاحظة.
+function _lspPipeline(r) {
+  const raw = String(r["Notes"] == null ? "" : r["Notes"]).trim();
+  if (!raw || /^(-+|—|–|n\/?a|لا\s*يوجد|لا\s*شيء)$/i.test(raw)) return { isPipeline: false, amount: null, note: "" };
+  const norm = raw
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/،/g, ",");
+  const m = norm.match(/\d[\d,]*(?:\.\d+)?/);
+  const n = m ? parseFloat(m[0].replace(/,/g, "")) : NaN;
+  return { isPipeline: true, amount: isNaN(n) ? null : n, note: raw };
+}
+function _lspPipelineAmount(r) {
+  const pl = _lspPipeline(r);
+  return pl.isPipeline && pl.amount !== null ? pl.amount : 0;
+}
 function _lspApplyFilters() {
   const rows = window.RAW_NEW_LS_PAYMENTS || [];
   LSP.filtered = rows.filter((r) => !LSP._region || String(r["Region"] || "").trim() === LSP._region);
@@ -34847,6 +35066,7 @@ function _lspRowHtml(r) {
   const pctRaw = _lspNum(r["Payment %"]);
   const pct = pctRaw === null ? null : (pctRaw <= 1 ? pctRaw * 100 : pctRaw);
   const pctColor = pct === null ? CSS_TOKENS.txMuted() : pct >= 80 ? CSS_TOKENS.positive() : pct >= 40 ? CSS_TOKENS.warning() : CSS_TOKENS.danger();
+  const pl = _lspPipeline(r);
   return `<tr style="border-bottom:1px solid var(--brd)">
     <td style="padding:6px 10px;font-weight:700;color:${CSS_TOKENS.info()};white-space:nowrap">${_lspEsc(r["Contract No."]) || "—"}</td>
     <td style="padding:6px 10px;font-size:11px;white-space:nowrap">${_lspEsc(r["Region"]) || "—"}</td>
@@ -34856,7 +35076,11 @@ function _lspRowHtml(r) {
     <td style="padding:6px 10px;text-align:center;font-size:11px">${paid.toLocaleString("en-US")}</td>
     <td style="padding:6px 10px;text-align:center"><span style="color:${pctColor};font-weight:700;font-size:11px">${pct === null ? "—" : pct.toFixed(1) + "%"}</span></td>
     <td style="padding:6px 10px;text-align:center;font-size:11px">${remaining !== null ? remaining.toLocaleString("en-US") : "—"}</td>
-    <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted);max-width:200px">${_lspEsc(r["Notes"]) || "—"}</td>
+    <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap" title="${_lspEsc(pl.note)}">${
+      !pl.isPipeline ? "—"
+      : pl.amount !== null ? `<span style="color:${CSS_TOKENS.warning()};font-weight:700">${pl.amount.toLocaleString("en-US")}</span>`
+      : `<span style="color:${CSS_TOKENS.warning()};font-weight:700">قيد الإجراء</span> <span style="color:var(--tx-muted)">(${_lspEsc(pl.note)})</span>`
+    }</td>
   </tr>`;
 }
 function _lspRenderTable() {
@@ -34871,8 +35095,15 @@ function _lspRenderTable() {
 function _lspExportCSV() {
   const src = LSP.filtered.length ? LSP.filtered : window.RAW_NEW_LS_PAYMENTS || [];
   if (!src.length) { alert("لا توجد بيانات"); return; }
-  const headers = ["Contract No.", "Region", "Category", "Base Value", "Updated Value", "Paid", "Payment %", "Remaining", "Notes"];
-  const rows = src.map((r) => headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","));
+  // ★ 2026-10-05: عمود "Notes" صار يُصدَّر كـ "Payment in Pipeline" (القيمة
+  // المستخرجة من الملاحظة، أو نص الملاحظة إن لم تحتوِ رقمًا).
+  const headers = ["Contract No.", "Region", "Category", "Base Value", "Updated Value", "Paid", "Payment %", "Remaining", "Payment in Pipeline"];
+  const getVal = (r, h) => {
+    if (h !== "Payment in Pipeline") return r[h];
+    const pl = _lspPipeline(r);
+    return !pl.isPipeline ? "" : pl.amount !== null ? pl.amount : pl.note;
+  };
+  const rows = src.map((r) => headers.map((h) => `"${String(getVal(r, h) ?? "").replace(/"/g, '""')}"`).join(","));
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob(["﻿" + [headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" })),
     download: "مدفوعات_وعقود_LS.csv",
@@ -34900,16 +35131,21 @@ function renderLsPaymentsTab() {
   const regionsSet = [...new Set(rows.map((r) => String(r["Region"] || "").trim()))].filter(Boolean).sort();
 
   const byRegion = {};
-  regionsSet.forEach((rg) => { byRegion[rg] = { value: 0, paid: 0 }; });
+  regionsSet.forEach((rg) => { byRegion[rg] = { value: 0, paid: 0, pipeline: 0 }; });
   rows.forEach((r) => {
     const rg = String(r["Region"] || "").trim();
-    if (!byRegion[rg]) byRegion[rg] = { value: 0, paid: 0 };
+    if (!byRegion[rg]) byRegion[rg] = { value: 0, paid: 0, pipeline: 0 };
     byRegion[rg].value += _lspEffectiveValue(r);
     byRegion[rg].paid += _lspNum(r["Paid"]) || 0;
+    byRegion[rg].pipeline += _lspPipelineAmount(r);
   });
+  // ★ 2026-10-05: Payment in Pipeline — عدد العقود التي لها ملاحظة ومجموع القيم المستخرجة منها
+  const pipelineRows = rows.filter((r) => _lspPipeline(r).isPipeline);
+  const totalPipeline = rows.reduce((s, r) => s + _lspPipelineAmount(r), 0);
+  const pipelineNoAmount = pipelineRows.filter((r) => _lspPipeline(r).amount === null).length;
 
   el.innerHTML = `
-  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
     <div class="kpi kc-blue">
       <div class="kpi-val">${total.toLocaleString("ar")}</div>
       <div class="kpi-lbl">إجمالي العقود</div>
@@ -34929,6 +35165,11 @@ function renderLsPaymentsTab() {
       <div class="kpi-val">${Math.round(totalRemaining).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي المتبقي</div>
       <div class="kpi-sub">ريال سعودي</div>
+    </div>
+    <div class="kpi kc-amber">
+      <div class="kpi-val">${Math.round(totalPipeline).toLocaleString("en-US")}</div>
+      <div class="kpi-lbl">Payment in Pipeline</div>
+      <div class="kpi-sub">${pipelineRows.length.toLocaleString("ar")} عقد${pipelineNoAmount ? ` (منها ${pipelineNoAmount.toLocaleString("ar")} بلا قيمة محددة)` : ""}</div>
     </div>
   </div>
 
@@ -34959,7 +35200,7 @@ function renderLsPaymentsTab() {
           <th style="padding:8px 10px;text-align:center">المدفوع</th>
           <th style="padding:8px 10px;text-align:center">نسبة السداد</th>
           <th style="padding:8px 10px;text-align:center">المتبقي</th>
-          <th style="padding:8px 10px;text-align:right">ملاحظات</th>
+          <th style="padding:8px 10px;text-align:center">Payment in Pipeline</th>
         </tr></thead>
         <tbody id="lsp-tbody"></tbody>
       </table>
@@ -34975,6 +35216,7 @@ function renderLsPaymentsTab() {
     makeVBar("ch-lsp-region", regionsSet, [
       { label: "القيمة", data: regionsSet.map((rg) => Math.round(byRegion[rg].value)), backgroundColor: CSS_TOKENS.info() + "88", borderColor: CSS_TOKENS.info() },
       { label: "المدفوع", data: regionsSet.map((rg) => Math.round(byRegion[rg].paid)), backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive() },
+      { label: "Payment in Pipeline", data: regionsSet.map((rg) => Math.round(byRegion[rg].pipeline)), backgroundColor: CSS_TOKENS.warning() + "88", borderColor: CSS_TOKENS.warning() },
     ]);
   });
 }
@@ -35559,11 +35801,23 @@ function renderPpmMaximoTab() {
    ║  🚚  JS تبويب: الزيارات
    ║  (tab-visits)
    ║  المصدر: شيتان صغيران فقط من ملف "قالب الزيارات" (بقرار من
-   ║  المستخدم، وليس شيت الـData الضخم):
+   ║  المستخدم، وليس شيت الـData الضخم) + شيت ثالث مُحتسب من الآب سكريبت:
    ║    window.RAW_NEW_VISITS_MONTHLY  ← شيت "الملخص الشهري"
    ║      أعمدة: الشهر (بصيغة YYYY-MM)، مكتملة (COMPLETED)، مسندة (ASSIGNED)
    ║    window.RAW_NEW_VISITS_BY_REGION ← شيت "الزيارات حسب المنطقة"
-   ║      أعمدة: المنطقة، عدد الزيارات المكتملة
+   ║      أعمدة: المنطقة، عدد الزيارات المكتملة (إجمالي كل الفترة، بدون شهر)
+   ║    window.RAW_NEW_VISITS_BY_REGION_MONTH ← "شيت" مُحتسب اسمه "الزيارات
+   ║      حسب المنطقة والشهر" (مش موجود فعليًا في جوجل شيتس — الآب سكريبت
+   ║      بيجمّعه من شيت Data الضخم ويرجّع بس الناتج الصغير)
+   ║      أعمدة: الشهر، المنطقة، مسندة (ASSIGNED)، مكتملة (COMPLETED)
+   ║      تعريف محسوب في الآب سكريبت (من شيت Data): "مكتملة" = Status
+   ║      = COMPLETED، "مسندة" = كل صف ماعدا CANCELLED (EXPIRED محسوبة
+   ║      ضمن "مسندة"). ★ اتأكد من التعريف ده فعليًا بمطابقته مع بيانات
+   ║      حقيقية من المستخدم مقابل شيت "الملخص الشهري" الجاهز — طابق
+   ║      بالظبط في كل الشهور المقفولة.
+   ║      ★ 2026-10-01: لو الآب سكريبت المنشور لسه قديم (قبل إضافة هذا
+   ║      الشيت المُحتسب) هترجع مصفوفة فاضية، وقسم "حسب المنطقة" وقتها
+   ║      بيرجع تلقائيًا لسلوكه القديم (إجمالي كل الفترة، بدون فلتر شهر).
    ║  ⚠️ ملحوظة: تسمية المناطق هنا مستقلة عن باقي الملفات (مثلاً
    ║  "المدينة" هنا مقابل "المدينة المنورة" في ملفات أخرى) — التبويب
    ║  مستقل تمامًا بدون أي مقارنة أو دمج مع تبويبات أخرى.
@@ -35621,6 +35875,7 @@ function _visSetRangeMode(mode) {
   _visUpdateRangeToggleUI();
   _visRenderKpiSection();
   _visRenderMonthlySection();
+  _visRenderRegionSection();
 }
 window._visSetRangeMode = _visSetRangeMode;
 // بيحدّد أي زرار من التبديلة (آخر شهر / كل الفترة) لازم يبان "نشط" —
@@ -35638,35 +35893,82 @@ function _visUpdateRangeToggleUI() {
 }
 window._visUpdateRangeToggleUI = _visUpdateRangeToggleUI;
 
+// ★ 2026-10-01 (بناءً على طلب صريح): القسم بقى يتفلتر بنفس مدى الشهور
+// المختار فوق (VIS._monthFrom/_monthTo — "آخر شهر" بشكل افتراضي، زي
+// قسم "الاتجاه الشهري" فوقه بالظبط) لما تكون window.RAW_NEW_VISITS_BY_REGION_MONTH
+// (الشيت المُحتسب من الآب سكريبت) متاحة. لو لسه مش متاحة (آب سكريبت
+// قديم قبل التحديث) بيرجع تلقائيًا للسلوك القديم (إجمالي كل الفترة،
+// بدون عمود "مسندة"/"نسبة الإنجاز").
 function _visRenderRegionSection() {
-  const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
-  const regionsSorted = byRegion.slice().sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0));
-  const totalCompletedByRegion = regionsSorted.reduce((s, r) => s + (_visNum(r["عدد الزيارات المكتملة"]) || 0), 0);
-  const shown = VIS._region ? regionsSorted.filter((r) => String(r["المنطقة"] || "").trim() === VIS._region) : regionsSorted;
+  const byRegionMonth = window.RAW_NEW_VISITS_BY_REGION_MONTH || [];
+  const hasMonthlyRegionData = byRegionMonth.length > 0;
+
+  let regionsSorted, rangeNoteText;
+
+  if (hasMonthlyRegionData) {
+    let filtered = byRegionMonth;
+    if (VIS._monthFrom) filtered = filtered.filter((r) => String(r["الشهر"] || "") >= VIS._monthFrom);
+    if (VIS._monthTo) filtered = filtered.filter((r) => String(r["الشهر"] || "") <= VIS._monthTo);
+
+    const byRegionMap = new Map();
+    filtered.forEach((r) => {
+      const region = String(r["المنطقة"] || "").trim();
+      if (!region) return;
+      if (!byRegionMap.has(region)) byRegionMap.set(region, { region, assigned: 0, completed: 0 });
+      const e = byRegionMap.get(region);
+      e.assigned += _visNum(r["مسندة (ASSIGNED)"]) || 0;
+      e.completed += _visNum(r["مكتملة (COMPLETED)"]) || 0;
+    });
+    regionsSorted = [...byRegionMap.values()].sort((a, b) => b.completed - a.completed);
+
+    const rangeLabel =
+      VIS._monthFrom && VIS._monthFrom === VIS._monthTo
+        ? _visFmtMonth(VIS._monthFrom)
+        : VIS._monthFrom || VIS._monthTo
+        ? `${_visFmtMonth(VIS._monthFrom) || "البداية"} ← ${_visFmtMonth(VIS._monthTo) || "النهاية"}`
+        : "كل الفترة";
+    rangeNoteText = `ℹ️ معروض عن: ${rangeLabel} — نفس "الفترة المعروضة" أعلى الصفحة.`;
+  } else {
+    const byRegion = window.RAW_NEW_VISITS_BY_REGION || [];
+    regionsSorted = byRegion
+      .slice()
+      .sort((a, b) => (_visNum(b["عدد الزيارات المكتملة"]) || 0) - (_visNum(a["عدد الزيارات المكتملة"]) || 0))
+      .map((r) => ({ region: String(r["المنطقة"] || "").trim(), assigned: null, completed: _visNum(r["عدد الزيارات المكتملة"]) || 0 }));
+    rangeNoteText = 'ℹ️ هذا القسم يعرض إجمالي كل الفترة دائمًا (مصدره لا يحتوي على تقسيم شهري)، بغض النظر عن اختيار "الفترة المعروضة" بالأعلى.';
+  }
+
+  const shown = VIS._region ? regionsSorted.filter((r) => r.region === VIS._region) : regionsSorted;
+
+  const noteEl = document.getElementById("vis-region-note");
+  if (noteEl) noteEl.textContent = rangeNoteText;
 
   const tbody = document.getElementById("vis-region-tbody");
   if (tbody) {
     tbody.innerHTML =
       shown
         .map((r) => {
-          const v = _visNum(r["عدد الزيارات المكتملة"]) || 0;
-          const pct = totalCompletedByRegion ? (v / totalCompletedByRegion) * 100 : 0;
+          const rate = r.assigned ? (r.completed / r.assigned) * 100 : null;
           return `<tr style="border-bottom:1px solid var(--brd)">
-            <td style="padding:6px 10px;font-weight:700">${_visEsc(r["المنطقة"]) || "—"}</td>
-            <td style="padding:6px 10px;text-align:center">${v.toLocaleString("ar")}</td>
-            <td style="padding:6px 10px;text-align:center">${pct.toFixed(1)}%</td>
+            <td style="padding:6px 10px;font-weight:700">${_visEsc(r.region) || "—"}</td>
+            <td style="padding:6px 10px;text-align:center">${r.assigned != null ? r.assigned.toLocaleString("ar") : "—"}</td>
+            <td style="padding:6px 10px;text-align:center">${r.completed.toLocaleString("ar")}</td>
+            <td style="padding:6px 10px;text-align:center">${rate != null ? rate.toFixed(1) + "%" : "—"}</td>
           </tr>`;
         })
-        .join("") || `<tr><td colspan="3" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد بيانات مطابقة</td></tr>`;
+        .join("") || `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد بيانات مطابقة</td></tr>`;
   }
   const countEl = document.getElementById("vis-region-count");
   if (countEl) countEl.textContent = shown.length.toLocaleString("ar");
 
   requestAnimationFrame(() => {
     if (typeof Chart === "undefined") return;
-    makeVBar("ch-vis-region", shown.map((r) => r["المنطقة"] || "—"), [
-      { label: "الزيارات المكتملة", data: shown.map((r) => _visNum(r["عدد الزيارات المكتملة"]) || 0), backgroundColor: CSS_TOKENS.special() + "88", borderColor: CSS_TOKENS.special() },
-    ]);
+    const datasets = [
+      { label: "الزيارات المكتملة", data: shown.map((r) => r.completed), backgroundColor: CSS_TOKENS.positive() + "88", borderColor: CSS_TOKENS.positive() },
+    ];
+    if (hasMonthlyRegionData) {
+      datasets.push({ label: "الزيارات المسندة", data: shown.map((r) => r.assigned || 0), backgroundColor: CSS_TOKENS.info() + "88", borderColor: CSS_TOKENS.info() });
+    }
+    makeVBar("ch-vis-region", shown.map((r) => r.region || "—"), datasets);
   });
 }
 function _visApplyRegionFilter() {
@@ -35700,6 +36002,7 @@ function _visRenderMonthlySection() {
 function _visApplyMonthFilter() {
   _visRenderMonthlySection();
   _visRenderKpiSection();
+  _visRenderRegionSection();
   _visUpdateRangeToggleUI();
 }
 
@@ -35826,14 +36129,15 @@ function renderVisitsTab() {
         </select>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--tx-muted);margin-bottom:8px">ℹ️ هذا القسم يعرض إجمالي كل الفترة دائمًا (مصدره لا يحتوي على تقسيم شهري)، بغض النظر عن اختيار "الفترة المعروضة" بالأعلى.</div>
+    <div id="vis-region-note" style="font-size:11px;color:var(--tx-muted);margin-bottom:8px"></div>
     <div class="chart-box" style="height:260px;margin-bottom:14px"><canvas id="ch-vis-region"></canvas></div>
     <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
+          <th style="padding:8px 10px;text-align:center">عدد الزيارات المسندة</th>
           <th style="padding:8px 10px;text-align:center">عدد الزيارات المكتملة</th>
-          <th style="padding:8px 10px;text-align:center">النسبة من الإجمالي</th>
+          <th style="padding:8px 10px;text-align:center">نسبة الإنجاز</th>
         </tr></thead>
         <tbody id="vis-region-tbody"></tbody>
       </table>
@@ -36367,7 +36671,8 @@ function _trainExportCSV() {
 
           const lspTotalValue = lspRows.reduce(function(s,r){ return s + (typeof _lspEffectiveValue === 'function' ? _lspEffectiveValue(r) : 0); }, 0);
           const lspTotalPaid  = lspRows.reduce(function(s,r){ return s + ((typeof _lspNum === 'function' ? _lspNum(r["Paid"]) : 0) || 0); }, 0);
-          const lspData  = lspRows.length  ? `\n- بيانات مدفوعات وعقود LS: ${lspRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(lspTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(lspTotalPaid).toLocaleString()} ريال` : '';
+          const lspPipeline = lspRows.reduce(function(s,r){ return s + (typeof _lspPipelineAmount === 'function' ? _lspPipelineAmount(r) : 0); }, 0);
+          const lspData  = lspRows.length  ? `\n- بيانات مدفوعات وعقود LS: ${lspRows.length.toLocaleString()} عقد، إجمالي القيمة ${Math.round(lspTotalValue).toLocaleString()} ريال، المدفوع ${Math.round(lspTotalPaid).toLocaleString()} ريال، Payment in Pipeline (من عمود الملاحظات) ${Math.round(lspPipeline).toLocaleString()} ريال` : '';
 
           const ctpTotalValue = ctpRows.reduce(function(s,r){ return s + (typeof _ctpEffectiveValue === 'function' ? _ctpEffectiveValue(r) : 0); }, 0);
           const ctpDistinctContracts = new Set(ctpRows.map(function(r){ return String(r["Contract No."]||"").trim(); }).filter(Boolean)).size;
@@ -39340,7 +39645,6 @@ document.addEventListener('DOMContentLoaded', function () {
   bind(26, 'click', function (event) { showTab('sys-main',this) });
   bind(27, 'click', function (event) { showTab('sys-detail',this) });
   bind(28, 'click', function (event) { showTab('elevators',this) });
-  bind(29, 'click', function (event) { showTab('elevator-status',this) });
   bind(30, 'click', function (event) { showTab('khanadeq',this) });
   bind(32, 'click', function (event) { showTab('balagh',this) });
   bind(33, 'click', function (event) { showTab('security-safety',this) });
@@ -39566,7 +39870,6 @@ document.addEventListener("DOMContentLoaded", function () {
     ["recruitment",     function(){ if (typeof renderRecruitmentTab === "function") renderRecruitmentTab(); }],
     ["khanadeq",        function(){ renderKhanadeqTab(); }],
     ["elevators",       function(){ renderElevatorsTab(); }],
-    ["elevator-status", function(){ renderElevatorStatusTab(); }],
     ["cost",            function(){ renderCostTab(); }],
     ["spare",           function(){ renderSpareTab(); }],
     ["students",        function(){ renderStudentsTab(); }],
@@ -39756,7 +40059,6 @@ var PORTAL_CATEGORIES = {
     icon: "🔧",
     tabs: [
       { name: "elevators",       label: "المصاعد" },
-      { name: "elevator-status", label: "حالة المصاعد" },
       { name: "khanadeq",        label: "خنادق الصرف" },
       { name: "spare",           label: "قطع الغيار" },
       { name: "ppm-maximo",      label: "الصيانة الوقائية (Maximo)" }
@@ -41737,6 +42039,7 @@ setTimeout(function tellUserStillTrying() {
       rawPpmMaximo:          window.RAW_NEW_PPM_MAXIMO          || [],
       rawVisitsMonthly:      window.RAW_NEW_VISITS_MONTHLY      || [],
       rawVisitsByRegion:     window.RAW_NEW_VISITS_BY_REGION    || [],
+      rawVisitsByRegionMonth: window.RAW_NEW_VISITS_BY_REGION_MONTH || [],
       // ★ 2026-09-21: بناءً على طلب صريح ("خلي الذكاء الاصطناعي يبقى عارف
       // كل شيء") — إضافة كل مصادر "الملفات الجديدة" المتبقية اللي كانت
       // ناقصة من هنا تمامًا (العهدة وسجل المراسلات ماكانوش موجودين حتى في
@@ -42347,6 +42650,9 @@ setTimeout(function tellUserStillTrying() {
         إجمالي_المدفوع_SAR: Math.round(lspTotalPaid),
         نسبة_السداد_الكلية: lspTotalValue ? (Math.round(lspTotalPaid / lspTotalValue * 1000) / 10 + "%") : null,
         المتبقي_SAR:        Math.round(Math.max(lspTotalValue - lspTotalPaid, 0)),
+        // ★ 2026-10-05: Payment in Pipeline من عمود Notes (راجع _lspPipeline)
+        Payment_in_Pipeline_SAR:   typeof _lspPipelineAmount === "function" ? Math.round(lsp.reduce(function(s,r){ return s + _lspPipelineAmount(r); }, 0)) : null,
+        عدد_العقود_ذات_Pipeline:   typeof _lspPipeline === "function" ? lsp.filter(function(r){ return _lspPipeline(r).isPipeline; }).length : null,
       };
     }
 
@@ -43032,8 +43338,7 @@ setTimeout(srInit, 1300);
     "asol": { d: "تقييم منصة أصول: المباني الحرجة وغير الحرجة حسب المدينة والمرحلة وقائمة المباني الحرجة", s: ["اصول", "مباني حرجة", "منصة اصول"], data: ["RAW"] },
     "ayen": { d: "تقييم عاين: متوسط التقييم وتوزيع المدارس على فئات الحالة", s: ["عاين", "تقييم عاين"], data: ["RAW"] },
     "env": { d: "البيئة المدرسية: التوزيع، مقارنتها مع FCA، المتوسط حسب الحي، أفضل وأسوأ 10 مدارس", s: ["بيئة", "البيئه المدرسيه", "بيئة مدرسية"], data: ["RAW"] },
-    "elevators": { d: "حصر المصاعد: العدد بالمبنى، النوع، سنة التركيب، حالة التوريد والتركيب", s: ["مصعد", "مصاعد", "اسانسير", "توريد مصاعد", "تركيب"], data: ["RAW_ELEVATORS"] },
-    "elevator-status": { d: "حالة تشغيل المصاعد (عامل/صيانة/متوقف) ونسبة الجاهزية حسب المنطقة", s: ["مصعد معطل", "جاهزية المصاعد", "صيانة المصاعد", "مصعد متوقف"], data: ["RAW_ELEVATOR_STATUS"] },
+    "elevators": { d: "حصر المصاعد: العدد بالمبنى، النوع، سنة التركيب، وحالة كل مصعد (يعمل/لا يعمل) حسب المنطقة والمحافظة", s: ["مصعد", "مصاعد", "اسانسير", "مصعد معطل", "مصعد لا يعمل"], data: ["RAW_ELEVATORS"] },
     "khanadeq": { d: "خنادق الصرف لكل مدينة وعدد المدارس ومتوسط الخنادق لكل مدرسة", s: ["خندق", "خنادق", "صرف", "صرف صحي"], data: ["RAW_KHANADEQ_CITY_DATA"] },
     "spare": { d: "قطع الغيار: الكميات والقيم لكل مدرسة وصنف وحسب المرحلة والحي", s: ["قطع غيار", "اصناف", "سعر الوحدة"], data: ["RAW_SPARE_PARTS"] },
     "ppm-maximo": { d: "الصيانة الوقائية PPM من ماكسيمو: المستهدف والمنجز ونسب الإنجاز لكل منطقة", s: ["صيانة وقائية", "ppm", "ماكسيمو", "maximo", "مهام الصيانة"], data: ["RAW_NEW_PPM_MAXIMO"] },
@@ -43047,7 +43352,7 @@ setTimeout(srInit, 1300);
     "vehicles": { d: "السيارات والمركبات: الأنواع والحالة والتوزيع حسب المنطقة", s: ["سيارة", "مركبات", "مركبة", "اسطول"], data: ["RAW_NEW_VEHICLES"] },
     "correspondence": { d: "سجل المراسلات الصادرة والواردة حسب المنطقة والنوع والحالة", s: ["مراسلات", "خطابات", "صادر", "وارد"], data: ["RAW_NEW_CORRESPONDENCE"] },
     "org-structure": { d: "الهيكل الوظيفي: الوظائف المشغولة والشاغرة ونسبة السعودة حسب المنطقة ونوع الفريق والمسمى", s: ["هيكل", "وظائف", "شواغر", "سعودة", "موظفين", "توظيف", "نوع الفريق"], data: ["RAW_NEW_ORG_STRUCTURE"] },
-    "visits": { d: "الزيارات المسندة والمكتملة شهرياً ونسبة الإنجاز حسب المنطقة", s: ["زيارة", "زيارات", "زيارات ميدانية", "جولات"], data: ["RAW_NEW_VISITS_MONTHLY", "RAW_NEW_VISITS_BY_REGION"] },
+    "visits": { d: "الزيارات المسندة والمكتملة شهرياً ونسبة الإنجاز حسب المنطقة (ولآخر شهر لكل منطقة)", s: ["زيارة", "زيارات", "زيارات ميدانية", "جولات"], data: ["RAW_NEW_VISITS_MONTHLY", "RAW_NEW_VISITS_BY_REGION", "RAW_NEW_VISITS_BY_REGION_MONTH"] },
     "tajheez-contracts": { d: "عقود التجهيزات: الموردون وقيم العقود والمصروف وحالة الإنجاز وأوامر الإيقاف", s: ["تجهيزات", "عقود التوريد", "موردين", "اوامر عمل"], data: ["TAJCON"] },
     "tajheez": { d: "المخصص مقابل الاحتياج من التجهيزات والفائض/العجز حسب القسم والصنف والمدينة", s: ["مخصص", "احتياج", "عجز", "فائض", "اثاث"], data: ["RAW_TAJHEEZ_INV"] },
     "tajheez-supplies": { d: "التوريدات الفعلية: التعاقد والمخصص والمورَّد لكل صنف ومورد ومنطقة", s: ["توريد", "توريدات", "اصناف موردة"], data: ["TAJSUP"] },
@@ -43639,7 +43944,6 @@ setTimeout(srInit, 1300);
     { key: "RAW_SYSTEMS_NORM", label: "سجل زيارات تقييم الأنظمة (كل الزيارات تاريخياً)", profile: true, rowsOn: /زيار|سجل التقييم|سجل الانظمه|تاريخ التقييم|اخر تقييم/, schoolRows: true },
     { key: "RAW_FCA_HISTORY", label: "تاريخ تقييمات FCA (المراحل)" },
     { key: "RAW_ELEVATORS", label: "حصر المصاعد" },
-    { key: "RAW_ELEVATOR_STATUS", label: "حالة المصاعد" },
     { key: "RAW_SPARE_PARTS", label: "قطع الغيار" },
     { key: "RAW_KHANADEQ_CITY_DATA", label: "خنادق الصرف لكل مدينة", profile: true, full: true },
     { key: "RAW_TAJHEEZ_INV", label: "المخصص والاحتياج (التجهيزات)" },
@@ -43663,6 +43967,7 @@ setTimeout(srInit, 1300);
     { key: "RAW_NEW_ORG_STRUCTURE", label: "الهيكل الوظيفي" },
     { key: "RAW_NEW_VISITS_MONTHLY", label: "الزيارات الشهرية" },
     { key: "RAW_NEW_VISITS_BY_REGION", label: "الزيارات حسب المنطقة" },
+    { key: "RAW_NEW_VISITS_BY_REGION_MONTH", label: "الزيارات حسب المنطقة والشهر" },
     { key: "RAW_NEW_PPM_MAXIMO", label: "الصيانة الوقائية PPM" },
     { key: "RAW_NEW_KPI_CONTRACTOR", label: "مؤشرات أداء المقاول" },
     { key: "RAW_NEW_KPI_CONSULTANT", label: "مؤشرات أداء الاستشاري" },
@@ -43786,7 +44091,7 @@ setTimeout(srInit, 1300);
       out += "\n\n══════════════════════════════════════════════════════\n" +
         "خريطة تبويبات اللوحة (أسماء التبويبات الحقيقية — استخدمها لتوجيه المستخدم)\n" +
         "══════════════════════════════════════════════════════\n" + tabMapText() +
-        "\n\n🔘 قاعدة زر \"افتح التبويب\": لو إجابتك ليها تبويب في اللوحة بيعرض تفاصيلها، أو المستخدم سأل «فين ألاقي…/أوصل لـ…/أي تبويب…»، اكتب في آخر ردك سطر مستقل فيه وسم التبويب بالصيغة الحرفية [[tab:اسم_التبويب]] (الاسم الإنجليزي من الخريطة فوق بالظبط، مثال: [[tab:elevator-status]])، بحد أقصى وسمين في الرد. الواجهة بتحوّل الوسم تلقائياً لزرار يفتح التبويب — ما تشرحش الوسم ولا تكتب اسم غير موجود في الخريطة، ولا تحطه جوه جدول أو كود.";
+        "\n\n🔘 قاعدة زر \"افتح التبويب\": لو إجابتك ليها تبويب في اللوحة بيعرض تفاصيلها، أو المستخدم سأل «فين ألاقي…/أوصل لـ…/أي تبويب…»، اكتب في آخر ردك سطر مستقل فيه وسم التبويب بالصيغة الحرفية [[tab:اسم_التبويب]] (الاسم الإنجليزي من الخريطة فوق بالظبط، مثال: [[tab:elevators]])، بحد أقصى وسمين في الرد. الواجهة بتحوّل الوسم تلقائياً لزرار يفتح التبويب — ما تشرحش الوسم ولا تكتب اسم غير موجود في الخريطة، ولا تحطه جوه جدول أو كود.";
 
       var cat = [];
       DATASETS.forEach(function (ds) {

@@ -3075,6 +3075,7 @@ function renderStageCompareTab() {
     // الشهور (متوسط كل الدرجات في الشهر) وتبقى نقاط المراحل الملوّنة فوقه.
     // (2) توقع 3 شهور فقط (Holt عبر linearForecast) بخط متقطع بعد آخر شهر فعلي.
     const FC_MONTHS = 3;
+    const SHOW_STAGE_LEGEND = false;   // true = تظهر أسماء المراحل جنب "التوقع" في وسيلة الإيضاح
     const N = chartMonthKeys.length;
     const pad = (arr) => arr.concat(Array(FC_MONTHS).fill(null));
 
@@ -3085,7 +3086,10 @@ function renderStageCompareTab() {
     });
     let li = -1; connectorSeries.forEach((v,i)=>{ if(v!=null) li=i; });   // آخر شهر فعلي له قيمة
 
-    // الشهور المتوقعة (3 فقط) بعد آخر شهر في الرسم
+    // الشهور المتوقعة (3 فقط) بعد آخر شهر في الرسم.
+    // ★ 2026-10-05 (بند 14): الشهور المتوقعة "متدحرجة" تلقائيًا — chartMonthKeys تنتهي دائمًا عند آخر شهر فيه بيانات فعلية،
+    // فلما يتضاف شهر جديد (مثل نوفمبر) بتقييمات: يصير فعليًا (نقطة ملوّنة)، ويختفي من التوقع، والتوقع (3 شهور) يبدأ بعده
+    // ويُحسب من جديد بـ Holt على السلسلة شاملة الشهر الجديد. لا حاجة لأي تعديل يدوي.
     const fcKeys = [];
     { let [y,m]=chartMonthKeys[N-1].split("-").map(Number);
       for(let h=0;h<FC_MONTHS;h++){ m++; if(m>12){m=1;y++;} fcKeys.push(`${y}-${String(m).padStart(2,"0")}`); } }
@@ -3122,7 +3126,8 @@ function renderStageCompareTab() {
       fcData[li] = connectorSeries[li];                       // نقطة الربط بآخر شهر فعلي
       fcVals.forEach((v,h)=>{ fcData[N+h]=v; });
       fcIdx = datasets.length;
-      datasets.push({ label:"توقع "+FC_MONTHS+" شهور (Holt)", data:fcData, borderColor:lineCol,
+      // ★ 2026-10-05 (بند 14): اسم الخط في وسيلة الإيضاح صار "التوقع" فقط (كان "توقع 3 شهور (Holt)")
+      datasets.push({ label:"التوقع", data:fcData, borderColor:lineCol,
         backgroundColor:"transparent", borderWidth:2, borderDash:[6,5],
         pointRadius:fcData.map((_,i)=>i===li?0:4), pointHoverRadius:fcData.map((_,i)=>i===li?0:7),
         pointBackgroundColor:"#fff", pointBorderColor:lineCol, pointBorderWidth:2,
@@ -3133,7 +3138,11 @@ function renderStageCompareTab() {
       type:"line",
       data:{ labels, datasets },
       options:{ maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
-        plugins:{ legend:{position:"top",labels:{font:{size:10,weight:"700"},boxWidth:10}},
+        // ★ 2026-10-05 (بند 14): وسيلة الإيضاح فيها عنصر واحد فقط = "التوقع". أُخفي "المتوسط العام (يربط الشهور)"
+        // وأسماء المراحل (أسماء الشهور ظاهرة على المحور الأفقي وفي التلميح). لإرجاع أسماء المراحل: SHOW_STAGE_LEGEND = true
+        plugins:{ legend:{ display:hasForecast, position:"top",
+            labels:{ font:{size:10,weight:"700"}, boxWidth:10,
+              filter:(item)=> item.datasetIndex===fcIdx || (SHOW_STAGE_LEGEND && item.datasetIndex<stageDatasets.length) } },
           // الخط الواصل لا يظهر في التلميح (مكرَّر مع نقطة المرحلة)، ونقطة ربط التوقع عند آخر شهر فعلي تُخفى
           tooltip:{ filter:(item)=> item.datasetIndex!==connectorIdx && !(item.datasetIndex===fcIdx && item.dataIndex===li),
             callbacks:{ label:(ctx)=>{
@@ -28629,20 +28638,39 @@ ${(() => {
   hook();
 
   function mean(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : null; }
-  function tCol(v) { try { return (window.tierColor && window.tierColor(v)) || CSS_TOKENS.txMuted(); } catch (_) { return CSS_TOKENS.txMuted(); } }
+  // ★ 2026-10-05 (بند 14): سبب الرمادي — tierColor معرّفة بـ const على مستوى الملف (مش على window)، فكان
+  // window.tierColor = undefined ويرجع دائمًا لون txMuted الرمادي. الآن تُستدعى مباشرة.
+  function tCol(v) { try { return tierColor(v) || CSS_TOKENS.info(); } catch (_) { return CSS_TOKENS.info(); } }
+  // شفافية آمنة لأي لون (hex أو غيره) — بدل لصق "B3" على النص
+  function mxA(c, a) { try { return /^#[0-9a-f]{6}$/i.test(c) ? CSS_TOKENS.α(c, a) : c; } catch (_) { return c; } }
+  // لوحة ألوان متنوعة للرسوم الفئوية (ملكية/جنس/محافظة…)
+  function mxPal() { return [CSS_TOKENS.info(), CSS_TOKENS.special(), CSS_TOKENS.positive(), CSS_TOKENS.accent(), CSS_TOKENS.danger(), "#2563eb", "#db2777", CSS_TOKENS.warning()]; }
   function kill(id) { try { window.killChart && window.killChart(id); } catch (_) {} try { if (window.CHARTS && window.CHARTS[id]) { window.CHARTS[id].destroy(); delete window.CHARTS[id]; } } catch (_) {} }
 
+  // ★ 2026-10-05 (بند 15): توحيد الفئات المكررة (مثل "مشترك أساسي" / "اساسي مشترك" / "مشترك اساسي"،
+  // و"مستقل" / "مستقلة"): مفتاح التجميع = النص بعد توحيد الهمزات والتاء المربوطة والتشكيل وترتيب الكلمات.
+  // الاسم المعروض = أكثر صيغة تكرارًا بين الصيغ المدموجة. "مشترك مستقل" يبقى فئة مستقلة عن "مستقل".
+  function mxNormKey(s) {
+    return String(s).replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي")
+      .replace(/ة/g, "ه").replace(/\s+/g, " ").trim().toLowerCase().split(" ")
+      .map(function (w) { return w.length > 3 ? w.replace(/ه$/, "") : w; }).sort().join(" ");   // "مستقلة" = "مستقل"
+  }
   function groupAvg(D, key) {
-    var m = {};
+    var m = {}, names = {};
     D.forEach(function (r) {
       var k = r[key], f = r.fca;
       if (k == null || f == null) return;
       k = String(k).trim();
       if (!k || k === "—" || k === "#N/A") return;
-      (m[k] || (m[k] = [])).push(f);
+      var nk = mxNormKey(k);
+      (m[nk] || (m[nk] = [])).push(f);
+      var nm = names[nk] || (names[nk] = {});
+      nm[k] = (nm[k] || 0) + 1;
     });
-    return Object.keys(m).map(function (k) { return { k: k, a: mean(m[k]), n: m[k].length }; })
-      .sort(function (a, b) { return b.a - a.a; });
+    return Object.keys(m).map(function (nk) {
+      var best = Object.keys(names[nk]).sort(function (a, b) { return names[nk][b] - names[nk][a]; })[0];
+      return { k: best, a: mean(m[nk]), n: m[nk].length };
+    }).sort(function (a, b) { return b.a - a.a; });
   }
 
   function setCardVisible(canvasId, visible) {
@@ -28683,9 +28711,9 @@ ${(() => {
     // (أ) توزيع مستويات FCA — دائماً متاح
     var tiers = [
       { lbl: "حرج · 0–24%",     f: function (v) { return v < 25; },            c: CSS_TOKENS.danger() },
-      { lbl: "متوسط · 25–49%",  f: function (v) { return v >= 25 && v < 50; }, c: CSS_TOKENS.accent() },
-      { lbl: "جيد · 50–74%",    f: function (v) { return v >= 50 && v < 75; }, c: CSS_TOKENS.info2() },
-      { lbl: "جيد جداً · 75–100%", f: function (v) { return v >= 75; },        c: CSS_TOKENS.info2() },
+      { lbl: "متوسط · 25–49%",  f: function (v) { return v >= 25 && v < 50; }, c: CSS_TOKENS.warning() },
+      { lbl: "جيد · 50–74%",    f: function (v) { return v >= 50 && v < 75; }, c: CSS_TOKENS.positive() },
+      { lbl: "جيد جداً · 75–100%", f: function (v) { return v >= 75; },        c: CSS_TOKENS.info() },
     ];
     cards.push({
       title: "توزيع مستويات FCA", sub: withF.length.toLocaleString() + " مدرسة", h: 280,
@@ -28697,8 +28725,9 @@ ${(() => {
             labels: tiers.map(function (t) { return t.lbl; }),
             datasets: [{
               data: tiers.map(function (t) { return withF.filter(function (r) { return t.f(r.fca); }).length; }),
-              backgroundColor: tiers.map(function (t) { return t.c + "CC"; }),
-              borderColor: "#fff", borderWidth: 2,
+              backgroundColor: tiers.map(function (t) { return mxA(t.c, 0.9); }),
+              hoverBackgroundColor: tiers.map(function (t) { return t.c; }),
+              borderColor: "#fff", borderWidth: 3, hoverOffset: 8,
             }],
           },
           options: {
@@ -28721,7 +28750,8 @@ ${(() => {
           data: {
             labels: bins.map(function (_, i) { return (10 * i) + "–" + (10 * i + 10) + "%"; }),
             datasets: [{ label: "عدد المدارس", data: bins,
-              backgroundColor: bins.map(function (_, i) { return tCol(10 * i + 5) + "B3"; }),
+              backgroundColor: bins.map(function (_, i) { return mxA(tCol(10 * i + 5), 0.88); }),
+              borderColor: bins.map(function (_, i) { return tCol(10 * i + 5); }), borderWidth: 1.5,
               borderRadius: 8, borderSkipped: false, maxBarThickness: 48 }],
           },
           options: {
@@ -28752,7 +28782,9 @@ ${(() => {
             data: {
               labels: g.map(function (x) { return x.k; }),
               datasets: [{ label: "متوسط FCA", data: g.map(function (x) { return +x.a.toFixed(1); }),
-                backgroundColor: g.map(function (x) { return tCol(x.a) + "B3"; }),
+                // ألوان متنوعة لكل فئة (بدل الرمادي الموحّد)
+                backgroundColor: g.map(function (_, i) { return mxA(mxPal()[i % mxPal().length], 0.88); }),
+                borderColor: g.map(function (_, i) { return mxPal()[i % mxPal().length]; }), borderWidth: 1.5,
                 borderRadius: 8, borderSkipped: false, maxBarThickness: 52 }],
             },
             options: {
@@ -28776,6 +28808,7 @@ ${(() => {
         if (!c) return;
         var id = "mx-fca-x" + (i + j);
         c._id = id;
+        // ★ بند 15: أُزيل الشريط العلوي الملوّن ولون العنوان — البطاقة بنفس شكل بقية التبويبات
         html += '<div class="card"><div class="card-title">' + c.title +
           (c.sub ? ' <span class="sub">' + c.sub + "</span>" : "") +
           '</div><div class="chart-box" style="height:' + c.h + 'px"><canvas id="' + id + '"></canvas></div></div>';

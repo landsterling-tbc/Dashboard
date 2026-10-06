@@ -22252,16 +22252,12 @@ function _nashatRenderAll() {
         </div>
       </div>
     </div>`;
-  // ── الكارت العام (كل الشركات مجتمعة) بيتعرض فوق الأول — نظرة عامة سريعة قبل
-  // التفصيل لكل شركة لوحدها، زي ما طلب المستخدم بالظبط ──
-  const generalCardHtml = dsTotalRow ? _dsCardHTML(dsTotalRow, true, "كل الشركات (الإجمالي العام)") : "";
+  // ★ 2026-10-06 (بناءً على طلب صريح): كارت "كل الشركات (الإجمالي العام)" اتشال
+  // نهائيًا من هذا التبويب — جمع نسب الإنجاز عبر كل الشركات غير صحيح، فبنعرض
+  // كارت مستقل لكل شركة فقط (dsTotalRow لسه بيتقرأ فوق لكن مش بيتعرض).
   const perCompanyCardsHtml = dsCompanyRows.map((r) => _dsCardHTML(r, false)).join("");
-  const deliveryCardsHtml = dsCompanyRows.length || dsTotalRow
-    ? generalCardHtml +
-      (dsCompanyRows.length
-        ? `<div style="font-weight:700;font-size:13px;color:${CSS_TOKENS.txMuted()};margin:4px 0 -2px">لكل شركة على حدة</div>` +
-          perCompanyCardsHtml
-        : "")
+  const deliveryCardsHtml = dsCompanyRows.length
+    ? perCompanyCardsHtml
     : `<div class="card" style="text-align:center;padding:24px;color:${CSS_TOKENS.txMuted()}">لا توجد بيانات في شيت "ملخص_الإنجاز_والتوصيل" بعد</div>`;
 
   el.innerHTML = `
@@ -22344,7 +22340,6 @@ function _nashatRenderAll() {
   <div class="card-title" style="margin-bottom:10px">
     <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/></svg></span>
     الأربعة مؤشرات الأهم — ملخص الإنجاز والتوصيل (حسب الشركة)
-    <span class="sub">منقولة حرفيًا من قسم "الملخص" الجاهز آخر كل شيت شركة في الملف الخام</span>
   </div>
   <div class="mb14" style="display:flex;flex-direction:column;gap:12px">
     ${deliveryCardsHtml}

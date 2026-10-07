@@ -3928,6 +3928,35 @@ let __bgRevalidatedOnce = false;
     })();
 
     // ══════════════════════════════════════════════════════════════════════
+    // 🆕 2026-10-06: سحب تلقائي من TFMP بدل نسخ الـ CSV يدويًا إلى شيت
+    // "المدارس_والأنظمة". مهمة GitHub Actions ("Sync TFMP Systems") تكتب
+    // data/tfmp/systems.json بنفس أعمدة ملف "ca-scorecard-all-wide" بالظبط
+    // (headers + rows). القاعدة: صفوف TFMP تفوز بالكامل حسب "Work Order #"،
+    // وأي صف قديم في الشيت رقم أمر عمله غير موجود في TFMP يبقى كما هو (لا
+    // يضيع شيء). لو الملف غير موجود/فاضي/فشل تحميله → الشيت كما كان تمامًا.
+    // ══════════════════════════════════════════════════════════════════════
+    try {
+      const __ctl = new AbortController();
+      const __to = setTimeout(() => __ctl.abort(), 20000);
+      const __tr = await fetch("data/tfmp/systems.json?t=" + Date.now(), { cache: "no-store", signal: __ctl.signal });
+      clearTimeout(__to);
+      if (__tr.ok) {
+        const __tj = await __tr.json();
+        if (__tj && Array.isArray(__tj.headers) && Array.isArray(__tj.rows) && __tj.rows.length) {
+          const __H = __tj.headers;
+          const __tfmpRows = __tj.rows.map((r) => { const o = {}; for (let i = 0; i < __H.length; i++) o[__H[i]] = r[i]; return o; });
+          const __woSet = new Set(__tfmpRows.map((r) => String(r["Work Order #"] || "").trim()));
+          const __keep = allSystems.filter((r) => r && !__woSet.has(String(r["Work Order #"] || "").trim()));
+          allSystems = __tfmpRows.concat(__keep);
+          window.TFMP_SYSTEMS_META = { fetched_at: __tj.fetched_at || null, count: __tfmpRows.length, keptFromSheet: __keep.length };
+          console.log("[TFMP] الأنظمة: " + __tfmpRows.length + " زيارة من TFMP + " + __keep.length + " من الشيت (آخر سحب " + (__tj.fetched_at || "؟") + ")");
+        }
+      }
+    } catch (e) {
+      console.warn("[TFMP] تعذّر تحميل data/tfmp/systems.json — يُستخدم شيت المدارس_والأنظمة كما هو:", e && e.message);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // 🆕 2026-08-23: ملف الأنظمة الرئيسية/التفصيلية الجديد (شيت المدارس_والأنظمة)
     // بقى بفورمات مختلف تمامًا عن القديم: صف واحد = زيارة تفتيش كاملة (Work
     // Order) لمدرسة، وفيه عمود Rating/Band/Priority/Weighted Score/Cost لكل
@@ -12996,6 +13025,7 @@ function _sysDownloadFile(filename, content, mime) {
           linkedSchoolName:  linkedSchool ? linkedSchool.name        : "",
           linkedSector:      linkedSchool ? linkedSchool.sector      : "",
           linkedCity:        linkedSchool ? linkedSchool.city        : "",
+          linkedDistrict:    linkedSchool ? (linkedSchool.district || "") : "", // ★ 2026-10-06: يُستخدم في تعبئة مقاول النظافة (نفس الحي)
           isLinked:          !!linkedSchool,
           location:          norm(r["المحافظة التابع لها المدرسة"]),
           region:            balaghRegionFromSector_(norm(r["المحافظة التابع لها المدرسة"])),
@@ -13860,57 +13890,148 @@ function _sysDownloadFile(filename, content, mime) {
     // المحافظة (تعارض بيانات)، بناخد الأكثر تكرارًا كـ"الافتراضي" للتعبئة
     // بس بنعرض تنبيه صريح بكل المحافظات دي عشان تُراجَع — مفيش أي تخمين
     // صامت هنا.
+    // ★ 2026-10-06: تعبئة المقاول الفارغ في بلاغات النظافة بالترتيب: (1) مقاول نفس المدرسة الأقرب زمنيًا
+    // (لأن المقاول قد يتغير بانتهاء عقده)، ثم (2) نفس الحي في نفس المحافظة خلال ±60 يومًا، ثم (3) المحافظة
+    // إذا غلب عليها مقاول واحد (95% فأكثر). غير ذلك يبقى "غير محدد" بدل التخمين.
+    // تغيّر مقاول المدرسة مرة واحدة عبر الزمن (أ ثم ب) يُعدّ تبديل مقاول طبيعيًا، وتنبيه المراجعة
+    // لا يخص إلا المدارس التي يتبادل عليها مقاولان أو أكثر (أ ثم ب ثم أ).
     const CLEANING_CATEGORY_VALUES_ = ["نظافة", "النظافة", "أعمال النظافة", "بند النظافة"];
+    const CLEANING_DISTRICT_WINDOW_MS_ = 60 * 86400000;
+    const CLEANING_LOCATION_DOMINANCE_ = 0.95;
     const cleaningRows_ = all.filter((r) => CLEANING_CATEGORY_VALUES_.includes(norm(r.category)));
 
-    const cleaningContractorByLocation_ = new Map(); // location -> Map(contractor -> count)
-    cleaningRows_.forEach((r) => {
-      const loc = r.location || "";
-      const c = r.contractor || "";
-      if (!loc || !c) return;
-      if (!cleaningContractorByLocation_.has(loc)) cleaningContractorByLocation_.set(loc, new Map());
-      const m = cleaningContractorByLocation_.get(loc);
-      m.set(c, (m.get(c) || 0) + 1);
-    });
+    const cleaningTime_ = (r) => {
+      const d = r.creationDateObj;
+      const t = d instanceof Date ? d.getTime() : NaN;
+      return Number.isFinite(t) ? t : null;
+    };
+    const cleaningDateText_ = (t) => {
+      const d = new Date(t);
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    };
+    const cleaningDistrictKey_ = (r) => {
+      const d = norm(r.linkedDistrict);
+      return r.location && d && d !== "—" && d !== "#N/A" ? r.location + "||" + d : "";
+    };
+    const cleaningPush_ = (map, key, item) => {
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    };
+    const cleaningTopOfList_ = (list) => {
+      const m = new Map();
+      list.forEach((x) => m.set(x.c, (m.get(x.c) || 0) + 1));
+      return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    };
+    // أقرب سجل زمنيًا؛ وبلا تاريخ يؤخذ الأحدث
+    const cleaningNearest_ = (list, t) => {
+      if (t === null) {
+        const dated = list.filter((x) => x.t !== null);
+        return dated.length ? dated.reduce((a, b) => (b.t > a.t ? b : a)).c : list[list.length - 1].c;
+      }
+      let best = null, bestGap = Infinity;
+      list.forEach((x) => {
+        const gap = x.t === null ? Infinity : Math.abs(x.t - t);
+        if (best === null || gap < bestGap) { best = x; bestGap = gap; }
+      });
+      return best.c;
+    };
 
-    const cleaningKnownContractorByLocation_ = new Map();
-    const cleaningConflicts_ = []; // { location, dominant, contractors:[{name,count}] }
-    cleaningContractorByLocation_.forEach((m, loc) => {
-      const entries = [...m.entries()].sort((a, b) => b[1] - a[1]);
-      cleaningKnownContractorByLocation_.set(loc, entries[0][0]);
-      if (entries.length > 1) {
-        cleaningConflicts_.push({
-          location: loc,
-          dominant: entries[0][0],
-          contractors: entries.map(([name, count]) => ({ name, count })),
-        });
+    const cleaningBySchool_ = new Map();   // مفتاح المدرسة -> [{c,t}]
+    const cleaningByDistrict_ = new Map(); // محافظة||حي -> [{c,t}]
+    const cleaningByLocation_ = new Map(); // المحافظة -> Map(مقاول -> عدد)
+    const cleaningSchoolLabel_ = new Map();
+    cleaningRows_.forEach((r) => {
+      const c = r.contractor || "";
+      if (!c) return;
+      const item = { c, t: cleaningTime_(r) };
+      cleaningPush_(cleaningBySchool_, r.schoolKey, item);
+      cleaningPush_(cleaningByDistrict_, cleaningDistrictKey_(r), item);
+      if (r.location) {
+        if (!cleaningByLocation_.has(r.location)) cleaningByLocation_.set(r.location, new Map());
+        const m = cleaningByLocation_.get(r.location);
+        m.set(c, (m.get(c) || 0) + 1);
+      }
+      if (!cleaningSchoolLabel_.has(r.schoolKey)) {
+        cleaningSchoolLabel_.set(r.schoolKey, (r.linkedSchoolName || r.schoolName || "").trim() + (r.schoolNumber ? " (" + r.schoolNumber + ")" : ""));
       }
     });
 
+    // محافظات فيها أكثر من مقاول نظافة (معلومة للاطلاع)
+    const cleaningMultiLocations_ = [];
+    cleaningByLocation_.forEach((m, loc) => {
+      if (m.size > 1 && loc !== "-") cleaningMultiLocations_.push({ location: loc, contractors: [...m.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })) });
+    });
+
+    // تحليل زمني لكل مدرسة: تبديل مقاول (أ ثم ب) = طبيعي، وتبادل (أ ثم ب ثم أ) = مراجعة
+    const cleaningHandovers_ = []; // { label, steps:[{name, from}] }
+    const cleaningConflicts_ = []; // { label, contractors:[{name,count}] }
+    cleaningBySchool_.forEach((list, key) => {
+      const distinct = new Set(list.map((x) => x.c));
+      if (distinct.size < 2) return;
+      const dated = list.filter((x) => x.t !== null).sort((a, b) => a.t - b.t);
+      const segs = [];
+      dated.forEach((x) => {
+        const last = segs[segs.length - 1];
+        if (last && last.name === x.c) last.n++;
+        else segs.push({ name: x.c, from: x.t, n: 1 });
+      });
+      const names = segs.map((s) => s.name);
+      const alternates = new Set(names).size !== names.length;
+      const counts = new Map();
+      list.forEach((x) => counts.set(x.c, (counts.get(x.c) || 0) + 1));
+      const label = cleaningSchoolLabel_.get(key) || key;
+      if (!alternates && segs.length === distinct.size && segs.length > 1) {
+        cleaningHandovers_.push({ label, steps: segs.map((s) => ({ name: s.name, from: s.from })) });
+      } else {
+        cleaningConflicts_.push({
+          label,
+          contractors: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })),
+        });
+      }
+    });
+    cleaningConflicts_.sort((a, b) => b.contractors.reduce((s, x) => s + x.count, 0) - a.contractors.reduce((s, x) => s + x.count, 0));
+    cleaningHandovers_.sort((a, b) => b.steps[b.steps.length - 1].from - a.steps[a.steps.length - 1].from);
+
     let cleaningBackfilledCount_ = 0;
+    let cleaningBackfilledBySchool_ = 0;
+    let cleaningBackfilledByDistrict_ = 0;
+    let cleaningBackfilledByLocation_ = 0;
     let cleaningUndeterminedCount_ = 0;
     const cleaningContractorCounts_ = new Map();
     cleaningRows_.forEach((r) => {
       let c = r.contractor || "";
       if (!c) {
-        const known = r.location ? cleaningKnownContractorByLocation_.get(r.location) : null;
-        if (known) {
-          c = known;
-          cleaningBackfilledCount_++;
-        } else {
+        const t = cleaningTime_(r);
+        const schoolList = cleaningBySchool_.get(r.schoolKey);
+        const dKey = cleaningDistrictKey_(r);
+        const districtList = dKey && t !== null
+          ? (cleaningByDistrict_.get(dKey) || []).filter((x) => x.t !== null && Math.abs(x.t - t) <= CLEANING_DISTRICT_WINDOW_MS_)
+          : [];
+        const locMap = r.location ? cleaningByLocation_.get(r.location) : null;
+        let locTotal = 0, locTop = 0, locTopName = "";
+        if (locMap) locMap.forEach((v, k) => { locTotal += v; if (v > locTop) { locTop = v; locTopName = k; } });
+        if (schoolList && schoolList.length) {
+          c = cleaningNearest_(schoolList, t);
+          cleaningBackfilledBySchool_++;
+        } else if (districtList.length) {
+          c = cleaningTopOfList_(districtList);
+          cleaningBackfilledByDistrict_++;
+        } else if (locTotal && locTop / locTotal >= CLEANING_LOCATION_DOMINANCE_) {
+          c = locTopName;
+          cleaningBackfilledByLocation_++;
+        }
+        if (c) cleaningBackfilledCount_++;
+        else {
           c = "غير محدد (لا توجد بيانات كافية لتحديد المقاول)";
           cleaningUndeterminedCount_++;
         }
       }
       cleaningContractorCounts_.set(c, (cleaningContractorCounts_.get(c) || 0) + 1);
     });
-    // 🗺️ (2026-09-22) لكل مقاول: كل المحافظات اللي ظهر فيها فعليًا باسمه
-    // صراحةً في بلاغات النظافة (مش بس المحافظة اللي هو "الأكثر تكرارًا"
-    // فيها) — مبنية من نفس cleaningContractorByLocation_ فوق (معكوسة)،
-    // عشان عمود "المحافظة المسؤول عنها" في الجدول يعكس البيانات الفعلية
-    // بالظبط من غير أي تخمين إضافي.
-    const cleaningContractorToLocations_ = new Map(); // contractor -> Set(location)
-    cleaningContractorByLocation_.forEach((m, loc) => {
+    // لكل مقاول: المحافظات التي ظهر فيها باسمه فعليًا في بلاغات النظافة
+    const cleaningContractorToLocations_ = new Map();
+    cleaningByLocation_.forEach((m, loc) => {
       m.forEach((count, contractor) => {
         if (!cleaningContractorToLocations_.has(contractor)) cleaningContractorToLocations_.set(contractor, new Set());
         cleaningContractorToLocations_.get(contractor).add(loc);
@@ -14364,23 +14485,44 @@ function _sysDownloadFile(filename, content, mime) {
           <span>ترتيب المقاولين — بند النظافة</span>
           <span class="sub">${fmt(cleaningTotal_)} بلاغ نظافة إجمالاً</span>
         </div>
-        <div style="padding:0 14px 6px;font-size:11px;color:var(--tx-muted);line-height:1.9">
-          يشمل فقط بلاغات "الفئة الرئيسية" = نظافة، بصرف النظر عن أي فلتر آخر مفعّل حالياً في الشاشة.
-          ${cleaningBackfilledCount_ ? `<span style="color:#0891B2;font-weight:700"> · ${fmt(cleaningBackfilledCount_)} بلاغ كانت خانة "المقاول" فيه فارغة، فتم إسناده تلقائيًا لمقاول النظافة المعروف لنفس المحافظة.</span>` : ""}
-          ${cleaningUndeterminedCount_ ? `<span style="color:#DC2626;font-weight:700"> · ${fmt(cleaningUndeterminedCount_)} بلاغ فضل بلا مقاول محدد (لا توجد أي بيانات مقاول مسجّلة لنفس المحافظة في بند النظافة للاستدلال منها).</span>` : ""}
+        <div style="padding:0 14px 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--tx-muted)">
+          <span>الفئة الرئيسية = نظافة فقط، بصرف النظر عن الفلاتر.</span>
+          ${cleaningBackfilledCount_ ? `<span title="بحسب المدرسة: ${fmt(cleaningBackfilledBySchool_)} — بحسب الحي: ${fmt(cleaningBackfilledByDistrict_)} — بحسب المحافظة: ${fmt(cleaningBackfilledByLocation_)}" style="background:#ECFEFF;color:#0E7490;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningBackfilledCount_)} أُسند تلقائيًا</span>` : ""}
+          ${cleaningUndeterminedCount_ ? `<span title="لا توجد بيانات كافية في نفس المدرسة أو الحي، والمحافظة فيها أكثر من مقاول" style="background:#FEF2F2;color:#B91C1C;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningUndeterminedCount_)} بلا مقاول محدد</span>` : ""}
         </div>
         ${
-          cleaningConflicts_.length
-            ? `<div style="margin:10px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px">
-                <div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:6px">⚠️ محافظات مسجَّل لها أكثر من مقاول نظافة مختلف — تستحق المراجعة (تم اعتماد الأكثر تكرارًا للتعبئة التلقائية فقط):</div>
-                <div style="display:flex;flex-direction:column;gap:6px">
-                  ${cleaningConflicts_.map((cf) => `
-                    <div style="font-size:11px;color:#78350F">
-                      <strong>${escText(cf.location)}</strong> — المعتمد: ${escText(cf.dominant)} —
-                      كل المقاولين المسجَّلين: ${cf.contractors.map((x) => `${escText(x.name)} (${fmt(x.count)})`).join("، ")}
-                    </div>`).join("")}
+          cleaningHandovers_.length
+            ? `<details style="margin:0 14px 8px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:8px 12px">
+                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#0369A1">🔄 مدارس تغيّر مقاولها (${fmt(cleaningHandovers_.length)}) — وضع طبيعي عند انتهاء العقد</summary>
+                <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:220px;overflow:auto">
+                  ${cleaningHandovers_.slice(0, 15).map((h) => `
+                    <div style="font-size:11px;color:#0C4A6E;line-height:1.7"><strong>${escText(h.label)}</strong><div style="padding-inline-start:10px">${h.steps.map((s) => `<bdi>${escText(s.name)}</bdi> <span style="color:#64748B">(منذ ${cleaningDateText_(s.from)})</span>`).join(" ← ")}</div></div>`).join("")}
+                  ${cleaningHandovers_.length > 15 ? `<div style="font-size:11px;color:#64748B">… و${fmt(cleaningHandovers_.length - 15)} مدرسة أخرى.</div>` : ""}
                 </div>
-              </div>`
+              </details>`
+            : ""
+        }
+        ${
+          cleaningConflicts_.length
+            ? `<details style="margin:0 14px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px 12px">
+                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#92400E">⚠️ مدارس للمراجعة (${fmt(cleaningConflicts_.length)}) — تبادل مقاولين على نفس المدرسة</summary>
+                <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:220px;overflow:auto">
+                  ${cleaningConflicts_.slice(0, 15).map((cf) => `
+                    <div style="font-size:11px;color:#78350F;line-height:1.7"><strong>${escText(cf.label)}</strong><div style="padding-inline-start:10px">${cf.contractors.map((x) => `<bdi>${escText(x.name)}</bdi> (${fmt(x.count)})`).join("، ")}</div></div>`).join("")}
+                  ${cleaningConflicts_.length > 15 ? `<div style="font-size:11px;color:#92400E">… و${fmt(cleaningConflicts_.length - 15)} مدرسة أخرى.</div>` : ""}
+                </div>
+              </details>`
+            : ""
+        }
+        ${
+          cleaningMultiLocations_.length
+            ? `<details style="margin:0 14px 8px;background:var(--bg-soft,#F8FAFC);border:1px solid var(--bd-light);border-radius:10px;padding:8px 12px">
+                <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--tx-sec)">ℹ️ محافظات يعمل فيها أكثر من مقاول نظافة (${fmt(cleaningMultiLocations_.length)})</summary>
+                <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
+                  ${cleaningMultiLocations_.map((m) => `
+                    <div style="font-size:11px;color:var(--tx-muted);line-height:1.7"><strong>${escText(m.location)}</strong><div style="padding-inline-start:10px">${m.contractors.map((x) => `<bdi>${escText(x.name)}</bdi> (${fmt(x.count)})`).join("، ")}</div></div>`).join("")}
+                </div>
+              </details>`
             : ""
         }
         ${
@@ -45084,3 +45226,4 @@ setTimeout(srInit, 1300);
   };
 })();
 /* ══ نهاية Nav v5 ══ */
+

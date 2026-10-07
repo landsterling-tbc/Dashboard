@@ -3956,6 +3956,21 @@ let __bgRevalidatedOnce = false;
       console.warn("[TFMP] تعذّر تحميل data/tfmp/systems.json — يُستخدم شيت المدارس_والأنظمة كما هو:", e && e.message);
     }
 
+    // ⭐ 2026-10-07: بطلب صريح من المستخدم — أي زيارة أنظمة درجتها النهائية
+    // (Submission Total Score %) أقل من 20% لا تُؤخذ في الاعتبار إطلاقًا
+    // (تقييم غير مكتمل غالبًا). تُطبَّق على كل صفوف الأنظمة (TFMP + الشيت).
+    // لتغيير الحد: عدّل الرقم التالي فقط. صف بلا درجة رقمية يُستبعد أيضًا.
+    const SYS_MIN_SCORE_PCT = 20;
+    {
+      const __before = allSystems.length;
+      allSystems = allSystems.filter((r) => {
+        const v = parseFloat(r && r["Submission Total Score %"]);
+        return !isNaN(v) && v >= SYS_MIN_SCORE_PCT;
+      });
+      window.SYS_SCORE_FILTER_META = { minScorePct: SYS_MIN_SCORE_PCT, before: __before, after: allSystems.length, excluded: __before - allSystems.length };
+      if (__before !== allSystems.length) console.log("[الأنظمة] استُبعدت " + (__before - allSystems.length) + " زيارة درجتها أقل من " + SYS_MIN_SCORE_PCT + "% (من " + __before + ")");
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // 🆕 2026-08-23: ملف الأنظمة الرئيسية/التفصيلية الجديد (شيت المدارس_والأنظمة)
     // بقى بفورمات مختلف تمامًا عن القديم: صف واحد = زيارة تفتيش كاملة (Work

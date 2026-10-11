@@ -9433,20 +9433,35 @@ function renderNewSlaTab() {
   const dateFromObj = ST.dateFrom ? new Date(ST.dateFrom + "T00:00:00") : null;
   const dateToObj = ST.dateTo ? new Date(ST.dateTo + "T23:59:59") : null;
   // __NEW_SLA_REGION_FILTER__ — فلتر المنطقة (المحافظات التابعة تحت منطقتها الأم عبر r.region)، يُطبَّق على كل الأقسام
+  // __NEW_SLA_MULTI_GEO__ — اختيار متعدد للمنطقة والمحافظة (أزرار). المحافظة = r.location (قبل التجميع تحت المنطقة الأم)
+  ST.regions = Array.isArray(ST.regions) ? ST.regions : [];
+  ST.govs = Array.isArray(ST.govs) ? ST.govs : [];
   const regionOptions = (() => {
     const set = new Set();
     rawAllRows.forEach((r) => { if (r.region) set.add(r.region); });
     const pref = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
     return [...pref.filter((x) => set.has(x)), ...[...set].filter((x) => !pref.includes(x)).sort()];
   })();
-  const allRows = rawAllRows.filter((r) => {
-    if (ST.region && r.region !== ST.region) return false;
+  const govParent = new Map(); // محافظة → منطقتها
+  rawAllRows.forEach((r) => { if (r.location && r.region && !govParent.has(r.location)) govParent.set(r.location, r.region); });
+  const govOptions = [...govParent.keys()]
+    .filter((g) => !ST.regions.length || ST.regions.indexOf(govParent.get(g)) >= 0)
+    .sort((a, b) => {
+      const ra = regionOptions.indexOf(govParent.get(a)), rb = regionOptions.indexOf(govParent.get(b));
+      return (ra - rb) || ((govParent.get(a) === a ? 0 : 1) - (govParent.get(b) === b ? 0 : 1)) || a.localeCompare(b, "ar");
+    });
+  ST.regions = ST.regions.filter((x) => regionOptions.indexOf(x) >= 0);
+  ST.govs = ST.govs.filter((g) => govOptions.indexOf(g) >= 0); // محافظة خارج المناطق المختارة تُزال
+  const passGeo_ = (r) => (!ST.regions.length || ST.regions.indexOf(r.region) >= 0) && (!ST.govs.length || ST.govs.indexOf(r.location) >= 0);
+  const passDate_ = (r) => {
     if (!dateFromObj && !dateToObj) return true;
     if (!r.creationDateObj) return false; // لو الفلتر مفعّل، البلاغات بتاريخ غير مقروء تُستبعد بدل ما تظهر بشكل مضلِّل
     if (dateFromObj && r.creationDateObj.getTime() < dateFromObj.getTime()) return false;
     if (dateToObj && r.creationDateObj.getTime() > dateToObj.getTime()) return false;
     return true;
-  });
+  };
+  const dateOnlyRows = rawAllRows.filter(passDate_); // __NEW_SLA_REGION_CHART__ — مقارنة المناطق تتجاهل فلتر المنطقة
+  const allRows = rawAllRows.filter((r) => passGeo_(r) && passDate_(r));
   const matchedRows = allRows.filter((r) => r.newSlaMatched);
   const p1to4Rows = matchedRows.filter((r) => !r.newSlaIsP5);
   const p5Rows = matchedRows.filter((r) => r.newSlaIsP5);
@@ -9461,6 +9476,85 @@ function renderNewSlaTab() {
   // لكنه تجاوز فعليًا الوقت المستهدف من تاريخ إنشائه (راجع openIsOverdue في
   // normalizeRows) — بهذه الطريقة لا يُستثنى أي بلاغ من الحساب لمجرد بقائه مفتوحًا.
   const isBreachStatus = (s) => s === "breach" || s === "breach_open";
+
+  // ── مقارنة المناطق: الالتزام والاختراق (P1-P4 المطابقة، بفلتر التاريخ فقط) ──
+  const regionStats = (() => {
+    const m = new Map();
+    dateOnlyRows.forEach((r) => {
+      if (!r.newSlaMatched || r.newSlaIsP5 || !r.region) return;
+      const o = m.get(r.region) || { region: r.region, total: 0, compliant: 0, breachClosed: 0, breachOpen: 0, pending: 0 };
+      o.total++;
+      if (r.newSlaEvalStatus === "compliant") o.compliant++;
+      else if (r.newSlaEvalStatus === "breach") o.breachClosed++;
+      else if (r.newSlaEvalStatus === "breach_open") o.breachOpen++;
+      else if (r.newSlaEvalStatus === "pending") o.pending++;
+      m.set(r.region, o);
+    });
+    const pref = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
+    const list = [...m.values()].map((o) => {
+      o.breach = o.breachClosed + o.breachOpen;
+      o.evaluated = o.compliant + o.breach;
+      o.compPct = o.evaluated ? (o.compliant / o.evaluated) * 100 : null;
+      o.breachPct = o.evaluated ? (o.breach / o.evaluated) * 100 : null;
+      return o;
+    });
+    list.sort((a, b) => (pref.indexOf(a.region) < 0 ? 99 : pref.indexOf(a.region)) - (pref.indexOf(b.region) < 0 ? 99 : pref.indexOf(b.region)) || a.region.localeCompare(b.region, "ar"));
+    return list;
+  })();
+  const regionRanked = [...regionStats].sort((a, b) => (b.compPct == null ? -1 : b.compPct) - (a.compPct == null ? -1 : a.compPct) || b.evaluated - a.evaluated);
+
+  // __NEW_SLA_REGION_TABS__ — تحليل تفصيلي لكل منطقة (تبويبات فرعية). يتجاهل فلتر المنطقة والمحافظة، يتبع فلتر التاريخ فقط.
+  const regionTabNames = regionStats.map((o) => o.region);
+  const regionTabSel = regionTabNames.indexOf(ST.regionTab) >= 0 ? ST.regionTab
+    : (regionTabNames.indexOf(ST.regions[0]) >= 0 ? ST.regions[0] : regionTabNames[0]);
+  const regionDetail = (() => {
+    if (!regionTabSel) return null;
+    const mk = () => ({ total: 0, compliant: 0, breachClosed: 0, breachOpen: 0, pending: 0 });
+    const add = (o, r) => {
+      o.total++;
+      if (r.newSlaEvalStatus === "compliant") o.compliant++;
+      else if (r.newSlaEvalStatus === "breach") o.breachClosed++;
+      else if (r.newSlaEvalStatus === "breach_open") o.breachOpen++;
+      else if (r.newSlaEvalStatus === "pending") o.pending++;
+    };
+    const fin = (o) => { o.breach = o.breachClosed + o.breachOpen; o.evaluated = o.compliant + o.breach; o.compPct = o.evaluated ? (o.compliant / o.evaluated) * 100 : null; return o; };
+    const rr = dateOnlyRows.filter((r) => r.newSlaMatched && !r.newSlaIsP5 && r.region === regionTabSel);
+    const all = mk(); const byPri = new Map(), byGov = new Map(), byCat = new Map(), byCon = new Map();
+    const bump = (m, k, r) => { if (!k) return; if (!m.has(k)) m.set(k, Object.assign(mk(), { key: k })); add(m.get(k), r); };
+    rr.forEach((r) => { add(all, r); bump(byPri, r.newSlaPriority, r); bump(byGov, r.location, r); bump(byCat, r.newSlaCategory, r); bump(byCon, r.contractor, r); });
+    const out = (m) => [...m.values()].map(fin);
+    const rank = regionRanked.findIndex((o) => o.region === regionTabSel);
+    return {
+      region: regionTabSel, all: fin(all), rank: rank >= 0 && regionRanked[rank].compPct != null ? rank + 1 : null, of: regionRanked.length,
+      pri: out(byPri).sort((a, b) => String(a.key).localeCompare(String(b.key))),
+      gov: out(byGov).sort((a, b) => b.total - a.total),
+      cat: out(byCat).sort((a, b) => b.breach - a.breach || b.total - a.total).slice(0, 8),
+      con: out(byCon).sort((a, b) => b.breach - a.breach || b.total - a.total).slice(0, 6),
+    };
+  })();
+  // __NEW_SLA_REGION_TABS_V2__ — مساعدات عرض القسم (قوائم أعمدة بدل الجداول). الشريط على أساس المُقيَّم فقط (ملتزم + اختراق)، و«قيد التنفيذ» خارجه ولونه برتقالي.
+  const rdBar_ = (o) => {
+    const ev = o.evaluated;
+    if (!ev) return '<div class="nsla-rd-bar"><i style="width:100%;background:#E2E8F0"></i></div>';
+    const g = (o.compliant / ev) * 100, c = (o.breachClosed / ev) * 100, b = (o.breachOpen / ev) * 100;
+    return '<div class="nsla-rd-bar"><i style="width:' + g + '%;background:#059669"></i><i style="width:' + c + '%;background:#DC2626"></i><i style="width:' + b + '%;background:#7F1D1D"></i></div>';
+  };
+  const rdPct_ = (o) => o.compPct != null ? '<bdi dir="ltr">' + o.compPct.toFixed(1) + "%</bdi>" : "—";
+  const rdList_ = (title, hint, list, empty) => `
+    <div class="nsla-rd-box">
+      <div class="nsla-rd-h"><b>${title}</b>${hint ? `<span>${hint}</span>` : ""}</div>
+      <div class="nsla-rd-list">
+        ${list.length ? list.map((o) => `
+          <div class="nsla-rd-row">
+            <div class="nsla-rd-top">
+              <span class="nsla-rd-name" title="${esc(o.key).replace(/"/g, "&quot;")}">${esc(o.key)}</span>
+              <span class="nsla-rd-val"><b>${rdPct_(o)}</b><em>نسبة الالتزام</em></span>
+            </div>
+            ${rdBar_(o)}
+            <div class="nsla-rd-sub"><span><i style="background:#059669"></i>ملتزم ${fmt2(o.compliant)}</span><span><i style="background:#DC2626"></i>اختراق مغلق ${fmt2(o.breachClosed)}</span><span><i style="background:#7F1D1D"></i>اختراق مفتوح ${fmt2(o.breachOpen)}</span><span><i style="background:#F59E0B"></i>قيد التنفيذ ${fmt2(o.pending)}</span><span style="margin-inline-start:auto;color:#475569">الإجمالي ${fmt2(o.total)}</span></div>
+          </div>`).join("") : `<div class="nsla-rd-empty">${empty}</div>`}
+      </div>
+    </div>`;
 
   // ── لوحة KPI عامة: على أساس P1-P4 المطابقة فقط (P5 مُستثناة تمامًا هنا) ──
   const totalP1to4 = p1to4Rows.length;
@@ -9567,13 +9661,20 @@ function renderNewSlaTab() {
           <input type="date" class="finp" value="${esc(ST.dateTo)}"
             onchange="window.__NEW_SLA_STATE__.dateTo=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
         </div>
-        <div class="fg">
-          <div class="fg-lbl">المنطقة</div>
-          <select class="fsel" onchange="window.__NEW_SLA_STATE__.region=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
-            <option value="">الكل</option>
-            ${regionOptions.map((r) => `<option value="${esc(r)}" ${ST.region === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
-          </select>
+        <style>.nsla-chip{padding:5px 13px;border-radius:999px;border:1px solid #BAE6FD;background:#fff;color:#0B6B7E;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}.nsla-chip.on{background:#0891B2;border-color:#0891B2;color:#fff}.nsla-chips{display:flex;gap:6px;flex-wrap:wrap}</style>
+        <div class="fg" style="flex:1 1 100%">
+          <div class="fg-lbl">المنطقة <span style="font-weight:600;color:var(--tx-muted)">(يمكن اختيار أكثر من واحدة — بدون اختيار = الكل)</span></div>
+          <div class="nsla-chips">
+            ${regionOptions.map((r) => `<button type="button" class="nsla-chip${ST.regions.indexOf(r) >= 0 ? " on" : ""}" data-v="${esc(r).replace(/"/g, "&quot;")}" onclick="window.__nslaToggleGeo('region',this.dataset.v)">${esc(r)}</button>`).join("")}
+          </div>
         </div>
+        <div class="fg" style="flex:1 1 100%">
+          <div class="fg-lbl">المحافظة <span style="font-weight:600;color:var(--tx-muted)">(${ST.regions.length ? "المحافظات التابعة للمناطق المختارة" : "كل المحافظات"} — يمكن اختيار أكثر من واحدة)</span></div>
+          <div class="nsla-chips">
+            ${govOptions.map((g) => `<button type="button" class="nsla-chip${ST.govs.indexOf(g) >= 0 ? " on" : ""}" data-v="${esc(g).replace(/"/g, "&quot;")}" onclick="window.__nslaToggleGeo('gov',this.dataset.v)">${esc(g)}</button>`).join("")}
+          </div>
+        </div>
+        ${ST.regions.length || ST.govs.length ? `<button class="f-clear" onclick="window.__nslaClearGeo()">✕ مسح المنطقة والمحافظة</button>` : ""}
         <button class="f-clear" onclick="window.__NEW_SLA_STATE__.dateFrom='';window.__NEW_SLA_STATE__.dateTo='';window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">✕ عرض كل التواريخ</button>
       </div>
     </div>
@@ -9668,6 +9769,174 @@ function renderNewSlaTab() {
           </div>`;
         }).join("")}
       </div>
+    </div>
+
+    <div class="g2 mb14">
+      <div class="card">
+        <div class="card-title">
+          <span>الالتزام والاختراق حسب المنطقة (P1-P4)</span>
+          <span class="sub">يتجاهل فلتر المنطقة والمحافظة</span>
+        </div>
+        ${regionStats.length ? `<div class="chart-box" style="height:${Math.max(220, 70 + regionStats.length * 56)}px"><canvas id="ch-newsla-regions"></canvas></div>`
+          : `<div style="padding:40px 12px;text-align:center;color:var(--tx-muted);font-size:13px">لا توجد بلاغات مطابقة في الفترة المختارة</div>`}
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <span>ترتيب المناطق — الأفضل التزامًا</span>
+          <span class="sub">من المُقيَّم (ملتزم + اختراق)</span>
+        </div>
+        <div class="tbl-wrap">
+          <style>#nsla-region-rank th,#nsla-region-rank td{padding:8px 6px;font-size:12px;white-space:nowrap;text-align:center}</style>
+          <table id="nsla-region-rank">
+            <thead><tr><th>الترتيب</th><th>المنطقة</th><th>المُقيَّم</th><th>ملتزم</th><th>اختراق</th><th>نسبة الاختراق</th><th>نسبة الالتزام</th></tr></thead>
+            <tbody>
+              ${regionRanked.length ? regionRanked.map((o, i) => `
+                <tr${ST.regions.indexOf(o.region) >= 0 ? ' style="background:#F0F9FF"' : ""}>
+                  <td style="font-weight:800">${o.compPct != null ? (i === 0 ? "🏆 1" : i + 1) : "—"}</td>
+                  <td style="font-weight:700">${esc(o.region)}</td>
+                  <td>${fmt2(o.evaluated)}</td>
+                  <td style="color:#059669;font-weight:700">${fmt2(o.compliant)}</td>
+                  <td style="color:#DC2626;font-weight:700">${fmt2(o.breach)}</td>
+                  <td>${o.breachPct != null ? o.breachPct.toFixed(1) + "%" : "—"}</td>
+                  <td style="font-weight:800;color:${i === 0 && o.compPct != null ? "#059669" : "inherit"}">${o.compPct != null ? o.compPct.toFixed(1) + "%" : "—"}</td>
+                </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--tx-muted)">لا توجد بيانات</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:11px;color:var(--tx-muted);padding:8px 4px 0;line-height:1.7">«اختراق» = مغلق تجاوز الهدف + لا يزال مفتوحًا وتجاوز الهدف. «قيد التنفيذ» غير محسوب في النسب. الترتيب بنسبة الالتزام (وليس بالعدد) لأن حجم البلاغات يختلف بين المناطق.</div>
+      </div>
+    </div>
+
+    <div class="card mb14" id="nsla-region-detail">
+      <div class="card-title">
+        <span>التحليل التفصيلي لكل منطقة (P1–P4)</span>
+        <span class="sub">لا يتأثر باختيار المنطقة أو المحافظة</span>
+      </div>
+      <style>
+        #nsla-region-detail .nsla-rd-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+        #nsla-region-detail .nsla-rd-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:12px;border:1.5px solid #D5E6EC;background:#fff;color:#0B6B7E;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+        #nsla-region-detail .nsla-rd-tab small{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#EAF6FA;color:#0B6B7E}
+        #nsla-region-detail .nsla-rd-tab:hover{border-color:#0B6B7E}
+        #nsla-region-detail .nsla-rd-tab.on{background:#0B6B7E;border-color:#0B6B7E;color:#fff;box-shadow:0 4px 12px rgba(11,107,126,.25)}
+        #nsla-region-detail .nsla-rd-tab.on small{background:rgba(255,255,255,.22);color:#fff}
+        #nsla-region-detail .nsla-rd-guide{padding:12px 16px 13px;border-radius:14px;background:#F4FAFC;border:1px solid #DCEBF0;margin:0 0 18px}
+        #nsla-region-detail .nsla-rd-guide .gt{font-size:13.5px;font-weight:800;color:#0D2F40;margin-bottom:8px}
+        #nsla-region-detail .nsla-rd-guide .gk{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px 18px}
+        #nsla-region-detail .nsla-rd-guide .gk>div{display:flex;align-items:flex-start;gap:8px}
+        #nsla-region-detail .nsla-rd-guide .gk i{width:14px;height:14px;border-radius:4px;flex:none;margin-top:3px}
+        #nsla-region-detail .nsla-rd-guide .gk span{font-size:12px;color:#475569;line-height:1.6}
+        #nsla-region-detail .nsla-rd-guide .gk b{display:block;font-size:12.5px;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-guide .gf{margin-top:10px;padding-top:9px;border-top:1px dashed #CFE2E9;font-size:12px;color:#334E5C;line-height:1.8}
+        #nsla-region-detail .nsla-rd-guide .gf b{color:#0D2F40}
+        #nsla-region-detail .nsla-rd-keys i,#nsla-region-detail .nsla-rd-stat i,#nsla-region-detail .nsla-rd-sub i,#nsla-region-detail .nsla-rd-pm i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
+        #nsla-region-detail .nsla-rd-hero{display:flex;flex-wrap:wrap;gap:22px;align-items:center;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,#F4FAFC,#fff);border:1px solid #E2EEF1;margin:0 0 18px}
+        #nsla-region-detail .nsla-rd-dwrap{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
+        #nsla-region-detail .nsla-rd-donut{width:148px;height:148px;border-radius:50%;display:grid;place-items:center}
+        #nsla-region-detail .nsla-rd-donut>div{width:104px;height:104px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px #EEF3F5;text-align:center}
+        #nsla-region-detail .nsla-rd-donut b{font-size:24px;line-height:1.2;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-donut span{font-size:11px;color:#475569;line-height:1.4}
+        #nsla-region-detail .nsla-rd-rank{font-size:12px;font-weight:700;color:#0B6B7E;background:#EAF6FA;border-radius:999px;padding:3px 12px}
+        #nsla-region-detail .nsla-rd-stats{flex:1 1 360px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+        @media (max-width:640px){#nsla-region-detail .nsla-rd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        #nsla-region-detail .nsla-rd-stat{background:#fff;border:1px solid #E2EEF1;border-radius:12px;padding:10px 14px}
+        #nsla-region-detail .nsla-rd-stat b{display:block;font-size:22px;line-height:1.25}
+        #nsla-region-detail .nsla-rd-stat span{font-size:12px;color:#475569;display:flex;align-items:center;gap:6px;line-height:1.5}
+        #nsla-region-detail .nsla-rd-sec{font-size:15px;font-weight:800;color:#0D2F40;margin:4px 2px 4px;display:flex;align-items:center;gap:8px}
+        #nsla-region-detail .nsla-rd-sec:before{content:"";width:4px;height:16px;border-radius:3px;background:#0B6B7E}
+        #nsla-region-detail .nsla-rd-secsub{font-size:12px;color:#64748B;margin:0 14px 10px}
+        #nsla-region-detail .nsla-rd-pri{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:0 0 20px}
+        #nsla-region-detail .nsla-rd-pcard{border:1px solid #E2EEF1;border-radius:14px;padding:12px 14px 12px;background:#fff}
+        #nsla-region-detail .nsla-rd-pcard .ph{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+        #nsla-region-detail .nsla-rd-pcard .pp{font-size:12px;font-weight:800;color:#fff;padding:2px 11px;border-radius:999px}
+        #nsla-region-detail .nsla-rd-pcard .pn{font-size:11.5px;color:#475569}
+        #nsla-region-detail .nsla-rd-pcard .pv{display:flex;align-items:baseline;gap:8px;font-size:26px;font-weight:800;line-height:1.35;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-pcard .pv small,#nsla-region-detail .nsla-rd-val em{font-size:11.5px;font-weight:700;color:#047857;font-style:normal}
+        #nsla-region-detail .nsla-rd-pm{display:flex;flex-direction:column;margin-top:2px}
+        #nsla-region-detail .nsla-rd-pm div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 2px;border-top:1px dashed #E8EFF2}
+        #nsla-region-detail .nsla-rd-pm div:first-child{border-top:0}
+        #nsla-region-detail .nsla-rd-pm span{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569}
+        #nsla-region-detail .nsla-rd-pm b{font-size:14px;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-ptot{font-size:11.5px;color:#475569;margin-top:8px;text-align:center}
+        #nsla-region-detail .nsla-rd-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#EDF2F4;margin:6px 0 8px}
+        #nsla-region-detail .nsla-rd-bar i{display:block;height:100%}
+        #nsla-region-detail .nsla-rd-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;align-items:start}
+        #nsla-region-detail .nsla-rd-box{border:1px solid #E2EEF1;border-radius:14px;padding:12px 14px;background:#fff;min-width:0}
+        #nsla-region-detail .nsla-rd-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+        #nsla-region-detail .nsla-rd-h b{font-size:14px;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-h span{font-size:11px;color:#64748B}
+        #nsla-region-detail .nsla-rd-list{max-height:440px;overflow:auto;display:flex;flex-direction:column;padding-inline-end:2px}
+        #nsla-region-detail .nsla-rd-row{padding:9px 0;border-bottom:1px dashed #E8EFF2}
+        #nsla-region-detail .nsla-rd-row:last-child{border-bottom:0}
+        #nsla-region-detail .nsla-rd-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+        #nsla-region-detail .nsla-rd-name{font-size:13px;font-weight:600;color:#17394A;line-height:1.5}
+        #nsla-region-detail .nsla-rd-val{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+        #nsla-region-detail .nsla-rd-val b{font-size:14px;color:#0D2F40}
+        #nsla-region-detail .nsla-rd-sub{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:#475569}
+        #nsla-region-detail .nsla-rd-sub span{display:inline-flex;align-items:center;gap:5px}
+        #nsla-region-detail .nsla-rd-empty{padding:18px 6px;text-align:center;color:#64748B;font-size:12px}
+      </style>
+      ${regionDetail ? (() => {
+        const a = regionDetail.all;
+        const ev = a.evaluated;
+        const gp = ev ? (a.compliant / ev) * 100 : 0, cp = ev ? gp + (a.breachClosed / ev) * 100 : 0;
+        const donut = ev ? `conic-gradient(#059669 0 ${gp}%, #DC2626 ${gp}% ${cp}%, #7F1D1D ${cp}% 100%)` : "conic-gradient(#E2E8F0 0 100%)";
+        const PRI_BG = { P1: "#0B3C5D", P2: "#1D6F94", P3: "#4FA3C7", P4: "#7FB9D3" };
+        const ORD = ["", "الأولى", "الثانية", "الثالثة", "الرابعة"];
+        return `
+      <div class="nsla-rd-tabs">
+        ${regionTabNames.map((r) => {
+          const o = regionStats.find((x) => x.region === r);
+          return `<button type="button" class="nsla-rd-tab${r === regionTabSel ? " on" : ""}" data-v="${esc(r).replace(/"/g, "&quot;")}" onclick="window.__nslaRegionTab(this.dataset.v)">${esc(r)}<small>التزام ${o && o.compPct != null ? '<bdi dir="ltr">' + o.compPct.toFixed(1) + "%</bdi>" : "—"}</small></button>`;
+        }).join("")}
+      </div>
+      <div class="nsla-rd-guide">
+        <div class="gt">دليل قراءة الألوان والنسب</div>
+        <div class="gk">
+          <div><i style="background:#059669"></i><span><b>ملتزم</b>بلاغ أُنجز ضمن المدة المستهدفة.</span></div>
+          <div><i style="background:#DC2626"></i><span><b>اختراق في بلاغ مغلق</b>بلاغ أُغلق بعد تجاوز المدة المستهدفة.</span></div>
+          <div><i style="background:#7F1D1D"></i><span><b>اختراق في بلاغ مفتوح</b>بلاغ ما زال مفتوحًا وقد تجاوز المدة المستهدفة.</span></div>
+          <div><i style="background:#F59E0B"></i><span><b>قيد التنفيذ</b>بلاغ مفتوح لم يتجاوز المدة المستهدفة بعد، ولا يدخل في النسبة.</span></div>
+        </div>
+      </div>
+      <div class="nsla-rd-hero">
+        <div class="nsla-rd-dwrap">
+          <div class="nsla-rd-donut" style="background:${donut}"><div><b>${rdPct_(a)}</b><span>نسبة الالتزام</span></div></div>
+        </div>
+        <div class="nsla-rd-stats">
+          <div class="nsla-rd-stat"><b>${fmt2(a.total)}</b><span>إجمالي البلاغات</span></div>
+          <div class="nsla-rd-stat"><b>${fmt2(a.evaluated)}</b><span>البلاغات المُقيَّمة (ملتزمة + مخترِقة)</span></div>
+          <div class="nsla-rd-stat"><b style="color:#059669">${fmt2(a.compliant)}</b><span><i style="background:#059669"></i>بلاغات ملتزمة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#DC2626">${fmt2(a.breachClosed)}</b><span><i style="background:#DC2626"></i>اختراق في بلاغات مغلقة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#7F1D1D">${fmt2(a.breachOpen)}</b><span><i style="background:#7F1D1D"></i>اختراق في بلاغات مفتوحة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#B45309">${fmt2(a.pending)}</b><span><i style="background:#F59E0B"></i>قيد التنفيذ</span></div>
+        </div>
+      </div>
+
+      <div class="nsla-rd-sec">التوزيع حسب الأولوية</div>
+      <div class="nsla-rd-pri">
+        ${regionDetail.pri.length ? regionDetail.pri.map((o) => {
+          const ps = priorityStats.find((x) => x.priority === o.key);
+          return `<div class="nsla-rd-pcard">
+            <div class="ph"><span class="pp" style="background:${PRI_BG[o.key] || "#64748B"}">${esc(o.key)}</span><span class="pn">${ps && ps.hoursTarget ? "المدة المستهدفة: " + ps.hoursTarget + " ساعة" : ""}</span></div>
+            <div class="pv">${rdPct_(o)}<small>نسبة الالتزام</small></div>
+            ${rdBar_(o)}
+            <div class="nsla-rd-pm">
+              <div><span><i style="background:#059669"></i>ملتزم</span><b>${fmt2(o.compliant)}</b></div>
+              <div><span><i style="background:#DC2626"></i>اختراق في بلاغ مغلق</span><b>${fmt2(o.breachClosed)}</b></div>
+              <div><span><i style="background:#7F1D1D"></i>اختراق في بلاغ مفتوح</span><b>${fmt2(o.breachOpen)}</b></div>
+              <div><span><i style="background:#F59E0B"></i>قيد التنفيذ</span><b>${fmt2(o.pending)}</b></div>
+            </div>
+            <div class="nsla-rd-ptot">إجمالي البلاغات: ${fmt2(o.total)}</div>
+          </div>`;
+        }).join("") : `<div class="nsla-rd-empty">لا تتوفر بيانات</div>`}
+      </div>
+
+      <div class="nsla-rd-cols">
+        ${rdList_("التوزيع حسب المحافظة", "", regionDetail.gov, "لا تتوفر بيانات للمحافظات")}
+        ${rdList_("الفئات الأكثر اختراقًا", "", regionDetail.cat, "لا تتوفر بيانات للفئات")}
+        ${rdList_("المقاولون الأكثر اختراقًا", "", regionDetail.con, "لا تتوفر بيانات للمقاولين")}
+      </div>`;
+      })() : `<div style="padding:30px 12px;text-align:center;color:var(--tx-muted);font-size:13px">لا توجد بلاغات مطابقة ضمن الفترة المختارة</div>`}
     </div>
 
     <div class="g2 mb14">
@@ -9822,6 +10091,24 @@ function renderNewSlaTab() {
   // الداتا كلها من اولها لاخرها ولو انا مفلتر يجيب كل المفلتر". بيُعاد
   // تعريفها في كل رسم عشان تفضل متزامنة مع آخر فلاتر مطبَّقة (rows بتتجدد
   // مع كل استدعاء لـrenderNewSlaTab). ──
+  window.__nslaToggleGeo = function (kind, v) {
+    const S = window.__NEW_SLA_STATE__, key = kind === "region" ? "regions" : "govs";
+    const arr = Array.isArray(S[key]) ? S[key] : [];
+    S[key] = arr.indexOf(v) >= 0 ? arr.filter((x) => x !== v) : arr.concat(v);
+    S.page = 0;
+    renderNewSlaTab();
+  };
+  window.__nslaClearGeo = function () {
+    const S = window.__NEW_SLA_STATE__;
+    S.regions = []; S.govs = []; S.page = 0;
+    renderNewSlaTab();
+  };
+  window.__nslaRegionTab = function (v) {
+    const y = window.scrollY || 0;
+    window.__NEW_SLA_STATE__.regionTab = v;
+    renderNewSlaTab();
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  };
   window.newSlaExportCSV = function () {
     if (!rows.length) {
       if (typeof showToast === "function") showToast("لا توجد بيانات مطابقة للتصدير", "error");
@@ -9863,15 +10150,134 @@ function renderNewSlaTab() {
     if (typeof Chart === "undefined") return;
     const PAL = CSS_TOKENS.palette();
 
-    if (document.getElementById("ch-newsla-category")) {
+    if (document.getElementById("ch-newsla-category")) { // __NEW_SLA_CAT_CHART__ (2026-10-11): ألوان حسب الأولوية + نسبة/عدد على الأعمدة + تسميات متعددة الأسطر
       const nonZero = categoryStats.filter((c) => c.total > 0);
       const dataEntries = (nonZero.length ? nonZero : categoryStats).slice(0, 20);
-      const colors = dataEntries.map((_, i) => PAL[i % PAL.length] + "DD");
-      // ★ 2026-09-30 (بناءً على طلب صريح): نسبة كل فئة من إجمالي P1-P4
-      // المطابقة (نفس أساس نسبة الالتزام العامة فوق) — بتظهر في الـ
-      // tooltip جنب العدد الخام، من غير ما تغيّر ترتيب/ارتفاع الأعمدة
-      const pctValues = dataEntries.map((c) => (totalP1to4 ? pct2(c.total, totalP1to4) : "0.0"));
-      makeHBar("ch-newsla-category", dataEntries.map((c) => c.category), dataEntries.map((c) => c.total), colors, null, null, pctValues);
+      const PRI_COLORS = { P1: "#0B3C5D", P2: "#1D6F94", P3: "#4FA3C7", P4: "#9BCBE0" }; // تدرّج واحد: الأغمق = الأعلى أولوية
+      const priColor = (pr) => PRI_COLORS[pr] || "#7C93A1";
+      const catCanvas = document.getElementById("ch-newsla-category");
+      const catBox = catCanvas.closest(".chart-box");
+      if (catBox) catBox.style.height = Math.max(340, dataEntries.length * 38 + 70) + "px";
+      // مفتاح الألوان (الأولوية + هدف الساعات + عدد البلاغات)
+      if (catBox && catBox.parentNode) {
+        const old = catBox.parentNode.querySelector(".nsla-cat-legend");
+        if (old) old.remove();
+        const lg = document.createElement("div");
+        lg.className = "nsla-cat-legend";
+        lg.style.cssText = "display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;margin:2px 4px 10px;color:var(--tx-muted)";
+        lg.innerHTML = ["P1", "P2", "P3", "P4"].filter((k) => dataEntries.some((c) => c.priority === k)).map((k) => {
+          const ps = priorityStats.find((x) => x.priority === k);
+          const n = dataEntries.filter((c) => c.priority === k).reduce((a, c) => a + c.total, 0);
+          return '<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:3px;background:' + priColor(k) + ';display:inline-block"></i><b style="color:var(--tx)">' + k + '</b>' + (ps && ps.hoursTarget ? ' · ' + ps.hoursTarget + ' ساعة' : '') + ' · ' + n.toLocaleString("en-US") + ' بلاغ</span>';
+        }).join("");
+        catBox.parentNode.insertBefore(lg, catBox);
+      }
+      const wrapLbl = (txt, max = 30) => {
+        const out = []; let line = "";
+        String(txt).split(/\s+/).forEach((w) => {
+          if (line && (line + " " + w).length > max) { out.push(line); line = w; } else line = line ? line + " " + w : w;
+        });
+        if (line) out.push(line);
+        return out;
+      };
+      const pctOfCat = (c) => (totalP1to4 ? pct2(c.total, totalP1to4) : "0.0");
+      const maxV = Math.max(1, ...dataEntries.map((c) => c.total));
+      killChart("ch-newsla-category");
+      CHARTS["ch-newsla-category"] = new Chart(catCanvas, {
+        type: "bar",
+        data: {
+          labels: dataEntries.map((c) => wrapLbl(c.priority + " · " + c.category)),
+          datasets: [{
+            data: dataEntries.map((c) => c.total),
+            backgroundColor: dataEntries.map((c) => priColor(c.priority)),
+            borderRadius: { topRight: 6, bottomRight: 6 },
+            borderSkipped: "left",
+            barPercentage: 0.72, categoryPercentage: 0.9,
+          }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 78 } },
+          plugins: {
+            legend: { display: false },
+            tbcPremiumValueLabels: false,
+            tooltip: {
+              callbacks: {
+                title: (items) => { const c = dataEntries[items[0].dataIndex]; return c ? c.category : ""; },
+                label: (ctx) => {
+                  const c = dataEntries[ctx.dataIndex];
+                  const out = ["  العدد: " + Number(c.total).toLocaleString("en-US") + " (" + pctOfCat(c) + "% من P1-P4)", "  الأولوية: " + c.priority + (c.hoursTarget ? " — الهدف " + c.hoursTarget + " ساعة" : "")];
+                  if (c.compliancePct != null && (c.compliant + c.breach) > 0) out.push("  ملتزم " + c.compliant + " / اختراق " + c.breach + " — نسبة الالتزام " + Number(c.compliancePct).toFixed(1) + "%");
+                  return out;
+                },
+              },
+            },
+          },
+          scales: {
+            x: { beginAtZero: true, suggestedMax: maxV, grid: { color: "rgba(8,45,60,.05)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, color: CSS_TOKENS.txMuted(), callback: (v) => Number(v).toLocaleString("en-US") } },
+            y: {
+              grid: { display: false },
+              ticks: { font: { family: "Tajawal,sans-serif", size: 11, weight: "600" }, color: CSS_TOKENS.primary(), maxRotation: 0, autoSkip: false },
+              afterFit: (sc) => { sc.width = Math.max(sc.width, 190); },
+            },
+          },
+          animation: { duration: 450 },
+        },
+        plugins: [{
+          id: "nslaCatEndLabels",
+          afterDatasetsDraw(chart) {
+            const ctx = chart.ctx, meta = chart.getDatasetMeta(0);
+            ctx.save();
+            ctx.textBaseline = "middle"; ctx.textAlign = "left";
+            meta.data.forEach((bar, i) => {
+              const c = dataEntries[i]; if (!c) return;
+              ctx.font = "700 12px Tajawal,sans-serif"; ctx.fillStyle = CSS_TOKENS.primary();
+              const n = Number(c.total).toLocaleString("en-US");
+              ctx.fillText(n, bar.x + 7, bar.y);
+              const w = ctx.measureText(n).width;
+              ctx.font = "500 10.5px Tajawal,sans-serif"; ctx.fillStyle = CSS_TOKENS.txMuted();
+              ctx.fillText(pctOfCat(c) + "%", bar.x + 7 + w + 5, bar.y);
+            });
+            ctx.restore();
+          },
+        }],
+      });
+    }
+
+    if (document.getElementById("ch-newsla-regions") && regionStats.length) {
+      killChart("ch-newsla-regions");
+      CHARTS["ch-newsla-regions"] = new Chart(document.getElementById("ch-newsla-regions"), {
+        type: "bar",
+        data: {
+          labels: regionStats.map((o) => o.region),
+          datasets: [
+            { label: "ملتزم", data: regionStats.map((o) => o.compliant), backgroundColor: "#059669CC", borderColor: "#059669", borderWidth: 1 },
+            { label: "اختراق (مغلق)", data: regionStats.map((o) => o.breachClosed), backgroundColor: "#DC2626CC", borderColor: "#DC2626", borderWidth: 1 },
+            { label: "اختراق حالي (مفتوح)", data: regionStats.map((o) => o.breachOpen), backgroundColor: "#7F1D1DCC", borderColor: "#7F1D1D", borderWidth: 1 },
+          ],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { font: { family: "Tajawal,sans-serif", size: 11 } } },
+            tooltip: {
+              mode: "index", intersect: false,
+              callbacks: {
+                label: (ctx) => `  ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString("en-US")}`,
+                afterBody: (items) => {
+                  const o = regionStats[items[0].dataIndex];
+                  return o && o.compPct != null ? [`نسبة الالتزام: ${o.compPct.toFixed(1)}% — نسبة الاختراق: ${o.breachPct.toFixed(1)}%`, `المُقيَّم: ${o.evaluated.toLocaleString("en-US")}`] : [];
+                },
+              },
+            },
+            tbcPremiumValueLabels: false,
+          },
+          scales: {
+            x: { stacked: true, beginAtZero: true, grid: { color: "rgba(8,45,60,.05)" }, ticks: { font: { family: "Tajawal,sans-serif", size: 10 }, callback: (v) => Number(v).toLocaleString("en-US") } },
+            y: { stacked: true, grid: { display: false }, ticks: { font: { family: "Tajawal,sans-serif", size: 11, weight: "700" }, maxRotation: 0 } },
+          },
+        },
+      });
     }
 
     if (document.getElementById("ch-newsla-status")) {
@@ -13391,7 +13797,8 @@ function _sysDownloadFile(filename, content, mime) {
     return esc(v);
   }
 
-  function renderBarList(items, total, color, labelFormatter) {
+  function renderBarList(items, total, color, labelFormatter, labelW) {
+    const lw_ = labelW || 120; // __BALAGH_SCHOOL_ACTION_BUTTONS__ عرض عمود الاسم (افتراضي 120)
     if (!items.length) return '<div class="empty-msg" style="padding:18px">لا توجد بيانات</div>';
     return items
       .map((it) => {
@@ -13404,7 +13811,7 @@ function _sysDownloadFile(filename, content, mime) {
           : escText(String(it.k ?? ""));
         return `
         <div class="school-row" style="align-items:flex-start">
-          <div style="min-width:120px;flex:0 0 120px;font-size:12px;font-weight:700;color:var(--tx-main)">${labelHtml}</div>
+          <div style="min-width:${lw_}px;flex:0 0 ${lw_}px;font-size:12px;font-weight:700;color:var(--tx-main)">${labelHtml}</div>
           <div style="flex:1">
             <div class="mini-track"><div class="mini-fill" style="width:${w}%;background:${color}"></div></div>
           </div>
@@ -13822,6 +14229,33 @@ function _sysDownloadFile(filename, content, mime) {
       }
     });
     const schoolCounts = topCounts(rows, "schoolKey", STATE.topSchoolN || 10);
+    // __BALAGH_TOP_SLA_SCHOOLS__ — أكثر المدارس اختراقًا لـ SLA (بنفس الفلاتر الحالية). عدد الصفوف (N-4) يتبع «عدد المدارس» ليتوازن ارتفاع العمودين.
+    const breachMap_ = new Map();
+    rows.forEach((r) => {
+      const k = norm(r.schoolKey);
+      if (!k) return;
+      let o = breachMap_.get(k);
+      if (!o) { o = { k, total: 0, over: 0 }; breachMap_.set(k, o); }
+      o.total++;
+      if (r.isOverdue) o.over++;
+    });
+    const breachAll_ = [...breachMap_.values()].filter((o) => o.over > 0).sort((a, b) => b.over - a.over || b.total - a.total);
+    const breachTop_ = breachAll_.slice(0, Math.max(3, (STATE.topSchoolN || 10) - 4));
+    const breachMax_ = breachTop_.length ? breachTop_[0].over : 1;
+    // __BALAGH_SCHOOL_PANEL_LINK__ — اسم المدرسة يفتح بانل المدرسة (لو المدرسة موجودة في قائمة المدارس) + أيقونة 🔎 للفلترة؛ لو غير معروفة يبقى الضغط للفلترة كما كان.
+    // __BALAGH_SCHOOL_ACTION_BUTTONS__ — الاسم نص عادي (لا يتفاعل)، وتحته زرّان واضحان ومتباعدان: «عرض البيانات» و«فلترة».
+    const schoolLinkHtml_ = (sn, name) => {
+      const safeAttr = escText(sn), safeName = escText(name);
+      const mid = String(sn).indexOf("ID::") === 0 ? String(sn).slice(4) : "";
+      let sc = null;
+      try { sc = mid && typeof window.__IXFindSchoolByMinId === "function" ? window.__IXFindSchoolByMinId(mid) : null; } catch (e) { sc = null; }
+      const btn = "font-family:inherit;font-size:11px;font-weight:700;line-height:1;padding:6px 10px;border-radius:999px;cursor:pointer;white-space:nowrap;";
+      const viewBtn = sc
+        ? `<button type="button" class="bal-school-view" data-min="${escText(mid)}" onclick="event.stopPropagation();window.__IXOpenSchoolByMinId(this.dataset.min)" title="فتح بيانات المدرسة" style="${btn}border:1px solid var(--bd-light);background:var(--bg-2);color:var(--tx-main)">عرض البيانات</button>`
+        : "";
+      const filterBtn = `<button type="button" data-balagh-filter="${safeAttr}" data-balagh-label="${safeName}" title="عرض بلاغات هذه المدرسة فقط" style="${btn}border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8">🔎 فلترة</button>`;
+      return `<div style="line-height:1.5;cursor:default;user-select:text">${safeName}</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">${viewBtn}${filterBtn}</div>`;
+    };
     const categoryCounts = topCounts(rows, "category", 6);
     const priorityCounts = topCounts(rows, "priority", 6);
     const locationCounts = topCounts(rows, "location", 6);
@@ -14204,7 +14638,7 @@ function _sysDownloadFile(filename, content, mime) {
       </div>
 
       ${balaghSecHead(3, "🧭", "التوزيعات الرئيسية", "المدارس، الأولوية، الفئات، والمناطق الأكثر تكراراً")}
-      <div class="g21" style="align-items:start">
+      <div class="g21" style="align-items:stretch">
         <div class="card">
           <div class="card-title">
             <span class="card-title-icon" style="background:#FEF3C7;color:#B45309"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
@@ -14222,15 +14656,38 @@ function _sysDownloadFile(filename, content, mime) {
             // نستخدم data-sn بدل onclick inline لتفادي كسر الـ JS لو كان sn يحتوي '
             const safeAttr = escText(sn);
             const safeName = escText(name);
-            return `<span data-balagh-filter="${safeAttr}" data-balagh-label="${safeName}" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="فلترة بهذه المدرسة">${safeName}</span>`;
-          })}
+            return schoolLinkHtml_(sn, name);
+          }, 200)}
         </div>
-        <div class="card">
+        <div style="display:flex;flex-direction:column;gap:16px;min-width:260px">
+        <div class="card" style="margin:0">
           <div class="card-title">
             <span class="card-title-icon" style="background:#FEE2E2;color:#B91C1C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
             <span>الأولوية</span>
           </div>
           ${renderBarList(priorityCounts, totalForBars, CSS_TOKENS.danger(), balaghPriorityLabel)}
+        </div>
+        <div class="card" style="margin:0;flex:1 1 auto">
+          <div class="card-title">
+            <span class="card-title-icon" style="background:#FFEDD5;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <span>أكثر المدارس اختراقًا لـ SLA</span>
+          </div>
+          <div style="font-size:11px;color:var(--tx-muted);margin:-4px 2px 6px">عدد البلاغات المخترقة من إجمالي بلاغات كل مدرسة</div>
+          ${breachTop_.length ? breachTop_.map((o) => {
+            const name = schoolNumberNameMap[o.k] || o.k;
+            const w = Math.max(6, (o.over / breachMax_) * 100);
+            const rate = o.total ? Math.round((o.over / o.total) * 100) : 0;
+            return `
+            <div class="school-row" style="align-items:flex-start">
+              <div style="min-width:200px;flex:0 0 200px;font-size:12px;font-weight:700;color:var(--tx-main)">${schoolLinkHtml_(o.k, name)}</div>
+              <div style="flex:1"><div class="mini-track"><div class="mini-fill" style="width:${w}%;background:${CSS_TOKENS.danger()}"></div></div></div>
+              <div style="min-width:78px;text-align:left;font-variant-numeric:tabular-nums">
+                <div style="font-weight:800;color:${CSS_TOKENS.danger()}">${fmt(o.over)}</div>
+                <div style="font-size:10.5px;color:var(--tx-muted);font-weight:600">من ${fmt(o.total)} (${rate}%)</div>
+              </div>
+            </div>`;
+          }).join("") : '<div class="empty-msg" style="padding:18px">لا توجد بلاغات مخترقة لـ SLA ضمن الفلاتر الحالية</div>'}
+        </div>
         </div>
       </div>
 
@@ -31177,14 +31634,77 @@ ${panelHTML}
     return _IX_VALUE_MAP[key] || v;
   }
 
-  function _ixRenderRecordCard(row, idx, singular){
+  // __IX_PERSON_CARDS__ — دمج «الدور - الاسم» و«الدور - جوال» (و«- إيميل») في كارت شخص واحد (لبانل المشرفين فقط)
+  function _ixPersonKey_(k){
+    const m = String(k).match(/^(.*?)\s*[-\u2013\u2014:]\s*(الاسم|اسم|جوال|الجوال|هاتف|موبايل|رقم الجوال|إيميل|ايميل|البريد|البريد الإلكتروني|الإيميل)\s*$/);
+    if (!m) return null;
+    const t = m[2];
+    const kind = /^(الاسم|اسم)$/.test(t) ? "name" : /(إيميل|ايميل|البريد|الإيميل)/.test(t) ? "email" : "phone";
+    return { base: m[1].trim(), kind: kind };
+  }
+  function _ixPhoneHref_(raw){
+    const d = String(raw || "").replace(/[^0-9]/g, "");
+    if (!d) return null;
+    let intl = d;
+    if (d.indexOf("966") === 0) intl = d;
+    else if (d.indexOf("05") === 0 && d.length === 10) intl = "966" + d.slice(1);
+    else if (d.indexOf("5") === 0 && d.length === 9) intl = "966" + d;
+    return { tel: "+" + intl, wa: intl };
+  }
+  function _ixEnsurePersonStyle_(){
+    if (document.getElementById("ix-person-style")) return;
+    const st = document.createElement("style");
+    st.id = "ix-person-style";
+    st.textContent = ".ix-person .ix-person-name{font-size:12.5px}" +
+      ".ix-person-line{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;font-variant-numeric:tabular-nums}" +
+      ".ix-person-line a{color:#0b6b7e;font-weight:800;text-decoration:none}" +
+      ".ix-person-line a:hover{text-decoration:underline}" +
+      ".ix-person-line .ix-person-wa{margin-inline-start:auto;font-size:10px;font-weight:800;background:#e7f8ef;color:#047857;border:1px solid #05966933;border-radius:999px;padding:1px 9px;text-decoration:none}";
+    document.head.appendChild(st);
+  }
+  function _ixPersonCardHTML_(base, p){
+    const ph = p.phone ? _ixPhoneHref_(p.phone) : null;
+    return `
+            <div class="ix-profile-record-item ix-person">
+              <div class="ix-profile-record-label">${esc(base)}</div>
+              ${p.name ? `<div class="ix-profile-record-value ix-person-name">${esc(_ixTranslateValue(p.name))}</div>` : ""}
+              ${p.phone ? `<div class="ix-person-line"><span aria-hidden="true">📞</span>${ph ? `<a href="tel:${esc(ph.tel)}" dir="ltr" title="اتصال">${esc(p.phone)}</a><a class="ix-person-wa" href="https://wa.me/${esc(ph.wa)}" target="_blank" rel="noopener" title="واتساب">واتساب</a>` : `<span dir="ltr">${esc(p.phone)}</span>`}</div>` : ""}
+              ${p.email ? `<div class="ix-person-line"><span aria-hidden="true">✉️</span><a href="mailto:${esc(p.email)}" dir="ltr">${esc(p.email)}</a></div>` : ""}
+            </div>`;
+  }
+  function _ixRenderRecordCard(row, idx, singular, groupPeople){
     const entries = _ixRelevantEntries(row);
     if (!entries.length) return "";
+    let items = null;
+    if (groupPeople){
+      _ixEnsurePersonStyle_();
+      const people = new Map();
+      entries.forEach(([k, v]) => {
+        const pk = _ixPersonKey_(k);
+        if (!pk) return;
+        if (!people.has(pk.base)) people.set(pk.base, {});
+        people.get(pk.base)[pk.kind] = v;
+      });
+      const done = new Set();
+      items = entries.map(([k, v]) => {
+        const pk = _ixPersonKey_(k);
+        if (pk && people.has(pk.base)){
+          if (done.has(pk.base)) return "";
+          done.add(pk.base);
+          return _ixPersonCardHTML_(pk.base, people.get(pk.base));
+        }
+        return `
+            <div class="ix-profile-record-item">
+              <div class="ix-profile-record-label">${esc(_ixDisplayKey(k))}</div>
+              <div class="ix-profile-record-value">${esc(_ixTranslateValue(v))}</div>
+            </div>`;
+      }).join("");
+    }
     return `
       <details class="ix-profile-record">
         <summary><span>${esc(_ixRecordTitle(row, idx, singular))}</span><span>عرض التفاصيل</span></summary>
         <div class="ix-profile-record-grid">
-          ${entries.map(([k,v]) => `
+          ${items !== null ? items : entries.map(([k,v]) => `
             <div class="ix-profile-record-item">
               <div class="ix-profile-record-label">${esc(_ixDisplayKey(k))}</div>
               <div class="ix-profile-record-value">${esc(_ixTranslateValue(v))}</div>
@@ -31233,7 +31753,7 @@ ${panelHTML}
     return `
       ${summary}
       ${def.key === "RAW_BALAGH" && typeof window.__bscPanelButtons === "function" ? window.__bscPanelButtons(rows) : ""}
-      ${shown.slice(0,6).map((row, idx) => _ixRenderRecordCard(row, idx, def.singular)).join("")}
+      ${shown.slice(0,6).map((row, idx) => _ixRenderRecordCard(row, idx, def.singular, def.key === "RAW_NEW_SUPERVISORS")).join("")}
       ${rows.length > 6 ? `<div class="ix-profile-more">يوجد ${rows.length - 6} ${def.singular || "سجل"} إضافي — افتح التبويب الأصلي لعرض القائمة الكاملة.</div>` : ""}
       ${extra}`;
   }

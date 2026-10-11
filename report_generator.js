@@ -1,396 +1,192 @@
-/* report_generator.js — توليد تقرير PowerPoint (نفس تمبلت "_تقرير_متابعة_البلاغات") من بيانات
-   تبويب البلاغات الحيّة. بيشتغل بالكامل جوه المتصفح (بدون سيرفر): بيجيب report_template.pptx
-   الثابت، يعدّل نصوص/جداول/تشارتات سلايدات محددة بأرقام الفترة الحالية، وينزّل ملف .pptx.
-   الشعارات/الألوان/التخطيط زي ما هي بالظبط — الملف الأصلي مش بيتلمس غير في القيم. */
+/* report_generator.js — التقرير الأسبوعي لمتابعة البلاغات (4 مناطق × 5 شرائح) بصيغة PowerPoint.
+   (2026-10-10) استُبدل التقرير القطاعي الشهري القديم بتقرير أسبوعي لكل منطقة على حدة:
+   غلاف المنطقة ← نظرة عامة ← اتجاه البلاغات والأولوية ← جودة الخدمة وزيارات الاستشاري
+   ← الصيانة الوقائية (PPM Maximo) ← أعلى 10 مدارس. ثم شريحة ختام واحدة للتقرير كله.
+   يعمل بالكامل داخل المتصفح: يحمّل report_template.pptx (25 شريحة جاهزة بنفس الشعارات والألوان)
+   ويعدّل القيم فقط ثم ينزّل الملف.
+   الفترة: الأسبوع من الأحد إلى السبت المنتهي بالتاريخ المختار (افتراضيًا آخر سبت) + 4 أسابيع للخلف.
+   التراكمي والصيانة الوقائية: من أول الشهر إلى نهاية الأسبوع المختار.
+   قيم يدوية (لا مصدر لها في الداشبورد): الرضا ومتوسط التقييم، المعاد فتحها (تكرار 1 / 2–3)،
+   وزيارات TFMP (المخطط والمكتمل لأسبوعين) — تُدخل في نافذة واحدة وتُحفظ في المتصفح. */
 
 (function () {
   "use strict";
 
   const TEMPLATE_URL = "report_template.pptx";
-  // نسخة من نفس التمبلت كـbase64 جوه ملف JS — بتتحمّل بس لو fetch فشل (أهمها: لو
-  // الداشبورد مفتوح كملف محلي file:// — المتصفح بيمنع fetch للملفات المحلية، بينما
-  // <script> شغّال عادي). ⚠️ أي تعديل على report_template.pptx لازم يتبعه إعادة
-  // توليد report_template_data.js من نفس الملف، وتغيير TEMPLATE_VERSION.
+  // نسخة base64 من نفس القالب تُستخدم فقط إن فشل fetch (مثلًا فتح الداشبورد كملف file://).
+  // ⚠️ أي تعديل على report_template.pptx يستلزم إعادة توليد report_template_data.js وتغيير TEMPLATE_VERSION.
   const TEMPLATE_DATA_JS = "report_template_data.js";
-  const TEMPLATE_VERSION = "20261003";
+  const TEMPLATE_VERSION = "20261010c";
   const REGION_ORDER = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
-  const CLEANING_CATEGORY_VALUES = ["نظافة", "النظافة", "أعمال النظافة", "بند النظافة"];
-  // ── مناطق فرعية تتبع كل منطقة رئيسية (نفس BALAGH_SECTOR_TO_REGION في dashboard.js) —
-  // مهمة لسلايد "توزيع بلاغات النظافة على المقاولين": المحافظة الفرعية ممكن يكون
-  // ليها مقاول نظافة مختلف عن المحافظة الرئيسية اللي بتتبعها.
-  const PRIMARY_LOCATION_BY_REGION = { "جدة": "جدة", "مكة المكرمة": "مكة المكرمة", "المدينة المنورة": "المدينة المنورة", "الطائف": "الطائف" };
-  const SUB_LOCATIONS_BY_REGION = { "مكة المكرمة": ["القنفذة", "الليث"], "المدينة المنورة": ["ينبع", "العلا", "المهد"], "جدة": [], "الطائف": [] };
-
-  // ── كلمة مرور تنزيل التقرير — بنفس كلمة مرور دخول شعار Land Sterling (LANDSTERLING_PASSWORD
-  // في index.html) عشان تبقى كلمة مرور واحدة يتذكرها المستخدم بدل اتنين. غيّرها هنا لو
-  // عايز كلمة منفصلة لاحقًا (لازم تفضل نفس القيمة اللي في index.html لو عايز تفضل موحّدة).
+  const SLIDES_PER_REGION = 6; // غلاف + 5 شرائح
+  // كلمة مرور تنزيل التقرير = نفس كلمة دخول Land Sterling (LANDSTERLING_PASSWORD في index.html)
   const REPORT_DOWNLOAD_PASSWORD = "1248";
+  const MANUAL_STORE_KEY = "balaghWeeklyReportManual_v1";
+  const SAFETY_GROUP_ORDER = ["المصاعد", "مخارج الطوارئ", "أنظمة الأمن والسلامة", "اعمال الكهرباء"];
+  const SAFETY_GROUP_LABEL = { "اعمال الكهرباء": "أعمال الكهرباء" };
+  // ألوان القالب
+  const C_ORANGE_TXT = "C07F2A", C_ORANGE_BAR = "E0A95E", C_GREEN_BAR = "89A895", C_NAVY = "17355C";
+  const C_UP = "F2C27B", C_DOWN = "A8D5B5";
 
-  function norm_(v) {
-    return String(v == null ? "" : v).trim();
+  // ═════════════════════════ دوال عامة ═════════════════════════
+  function norm_(v) { return String(v == null ? "" : v).trim(); }
+  function fmtNum_(n) { return Math.round(n || 0).toLocaleString("en-US"); }
+  function pct1_(n, d) { return d > 0 ? ((n / d) * 100).toFixed(1) : "0.0"; }
+  // "العدد (النسبة%)" والصفر يُكتب "0" فقط
+  function cntPct_(n, d) { n = Math.round(n || 0); return n > 0 ? `${fmtNum_(n)} (${pct1_(n, d)}%)` : "0"; }
+  // "طارئ" = الأولوية "حرج/Critical" فقط. "روتيني" = أي شيء آخر.
+  function isEmergencyPriority_(p) { const v = norm_(p).toLowerCase(); return v === "حرج" || v === "critical"; }
+  function isConsultantApproval_(r) {
+    const s = norm_(r.status);
+    return s === "Consultant Approval In Progress" || s === "موافقة الاستشاري قيد التنفيذ";
   }
-  function fmtNum_(n) {
-    return Math.round(n || 0).toLocaleString("en-US");
+  // تقويم ميلادي صريحًا (ar-SA الافتراضي قد يكون هجريًا)
+  const AR_LOCALE = "ar-SA-u-ca-gregory-nu-latn";
+  function dayMonth_(d) { return d.toLocaleDateString(AR_LOCALE, { day: "numeric", month: "long" }); }
+  function monthName_(d) { return d.toLocaleDateString(AR_LOCALE, { month: "long" }); }
+  function rangeLabel_(s, e, withYear) {
+    const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
+    const a = sameMonth ? String(s.getDate()) : dayMonth_(s);
+    return `${a} – ${dayMonth_(e)}${withYear ? " " + e.getFullYear() : ""}`;
   }
-  function pct1_(n, d) {
-    return d > 0 ? ((n / d) * 100).toFixed(1) : "0.0";
+  function startOfDay_(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function endOfDay_(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+  function addDays_(d, n) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
+  function iso_(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+  // السبت الذي ينتهي به أسبوع (أحد→سبت) يحوي التاريخ d
+  function saturdayOfWeek_(d) {
+    const x = startOfDay_(d);
+    const toSat = (6 - x.getDay() + 7) % 7; // getDay(): الأحد=0 … السبت=6
+    return addDays_(x, toSat);
   }
-  // (طلب صريح 2026-09-26) "أي رقم ينفع نكتب جنبه نسبة" → "العدد (النسبة%)". الصفر
-  // بيتكتب "0" لوحده من غير نسبة عشان الجداول ماتبقاش زحمة بـ"0 (0.0%)".
-  function cntPct_(n, d) {
-    n = Math.round(n || 0);
-    return n > 0 ? `${fmtNum_(n)} (${pct1_(n, d)}%)` : "0";
+  // آخر سبت لا يتجاوز اليوم (لو اليوم سبت فهو اليوم)
+  function defaultWeekEnd_() {
+    const t = startOfDay_(new Date());
+    return addDays_(t, -((t.getDay() + 1) % 7));
   }
-  // ⚠️ (طلب صريح) "طارئ" = الأولوية "حرج/Critical" فقط. "روتيني" = أي حاجة تانية
-  // (متوسط/مرتفع/منخفض...إلخ) — مختلف عن window.isHighRiskPriority العام المستخدم في
-  // باقي الداشبورد (اللي بيحسب حرج+مرتفع سوا)، خصيصًا لتعريف روتيني/طارئ في هذا التقرير.
-  function isEmergencyPriority_(p) {
-    const v = norm_(p).toLowerCase();
-    return v === "حرج" || v === "critical";
+  function signedPct_(cur, base) {
+    if (!base) return null;
+    const v = ((cur - base) / base) * 100;
+    return (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+  }
+  function pctNum_(v) { // نسبة مخزّنة 0..1 أو 0..100
+    const n = typeof v === "number" ? v : parseFloat(String(v == null ? "" : v).replace(/[,%]/g, ""));
+    if (!isFinite(n)) return null;
+    return n <= 1 ? n * 100 : n;
+  }
+  function plainNum_(v) {
+    if (v === null || v === undefined || v === "" || v === "_" || v === "-") return null;
+    const n = parseFloat(String(v).replace(/,/g, ""));
+    return isNaN(n) ? null : n;
+  }
+  // تاريخ بداية الصيانة الوقائية بالعربية: «1 أكتوبر 2026» (النمط 01-Oct-26 كان يظهر مقلوبًا «-01Oct-26» في PowerPoint داخل خلايا RTL)
+  function ppmDate_(v) {
+    if (!v) return "";
+    let d = null;
+    if (v instanceof Date) d = v;
+    else {
+      const m = String(v).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(String(v));
+    }
+    if (!d || isNaN(d.getTime())) return String(v);
+    return `${d.getDate()} ${monthName_(d)} ${d.getFullYear()}`;
   }
 
-  // ── الأسبوع (الأحد → السبت) — طلب صريح من المستخدم (2026-09-26): أسبوع التقرير
-  // دايمًا من الأحد لغاية السبت (مثال: "20 سبتمبر – 26 سبتمبر 2026"، الأحد للسبت)
-  // — مختلف عمدًا عن الأسبوع (سبت→جمعة) المستخدم في كارت "مقارنة يومية وأسبوعية"
-  // بتبويب البلاغات نفسه (renderBalaghTab/balaghWeekStart_)، واللي فضل زي ما هو من
-  // غير تغيير لأنه مش جزء من التقرير المطلوب تعديله هنا.
-  function weekStart_(d) {
-    const back = d.getDay(); // getDay(): الأحد=0 ... السبت=6
-    const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    s.setDate(s.getDate() - back);
-    return s;
-  }
-  function endOfDay_(d) {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  }
-  // حدود الفترة: 7 أيام (أسبوع واحد، مربوط على الأحد) أو 14 يوم (أسبوعين متتاليين)
-  // + فترة المقارنة (نفس الطول قبلها مباشرة) لسلايد المقارنة
-  function computePeriodBounds_(latestDate, periodDays) {
-    const anchorWeekStart = weekStart_(latestDate);
-    const curStart = new Date(anchorWeekStart);
-    if (periodDays === 14) curStart.setDate(curStart.getDate() - 7);
-    const curEnd = new Date(curStart);
-    curEnd.setDate(curEnd.getDate() + periodDays - 1);
-    const prevStart = new Date(curStart);
-    prevStart.setDate(prevStart.getDate() - periodDays);
-    const prevEnd = new Date(curStart);
-    prevEnd.setDate(prevEnd.getDate() - 1);
-    return { curStart, curEnd, curEndFull: endOfDay_(curEnd), prevStart, prevEnd, prevEndFull: endOfDay_(prevEnd) };
-  }
-  // ⚠️ نجبر التقويم الميلادي صراحةً (calendar: "gregory") — "ar-SA" افتراضيًا
-  // بيستخدم التقويم الهجري في بعض المتصفحات، بينما التمبلت الأصلي وكل تواريخ
-  // البلاغات ميلادية (زي "15 أغسطس - 15 سبتمبر 2026" في التقرير المرجعي)
-  function arDate_(d) {
-    return d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long" });
-  }
-  function arDateShort_(d) {
-    return d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short" });
+  // نسبة رضا المستفيد = متوسط تقييم الحالة ÷ 5 × 100 (تُحسب تلقائيًا ولا تُدخل يدويًا)؛ تكرار 4 إلى 8 افتراضيًا 0
+  function normalizeManual_(m) {
+    if (!m) return null;
+    const o = Object.assign({}, m);
+    o.rep3 = o.rep3 == null ? 0 : o.rep3;
+    o.sat = o.rating != null ? (Number(o.rating) / 5) * 100 : null;
+    return o;
   }
 
-  // ═══════════════════════════════ حساب بيانات التقرير ═══════════════════════════════
-  // periodDays: 7 (آخر أسبوع فقط) أو 14 (آخر أسبوعين مجمّعين) — افتراضي 7
-  function computeReportData(periodDays) {
-    periodDays = periodDays === 14 ? 14 : 7;
+  // ═════════════════════════ حساب بيانات التقرير ═════════════════════════
+  // weekEnd: سبت (Date). manual: {region:{rating, rep1, rep2, rep3, tfmp:{pp,pd,cp,cd}}}
+  function computeReportData(weekEnd, manual) {
     if (typeof window.__balaghNormalizeRows !== "function") {
       throw new Error("بيانات البلاغات غير محمّلة بعد — انتظر اكتمال التحميل ثم أعد المحاولة");
     }
     const all = window.__balaghNormalizeRows();
-    const now = new Date();
-    // ⚠️ حماية دفاعية: أي "تاريخ إنشاء" في المستقبل (بيانات تالفة/خطأ إدخال) بنتجاهله
-    // عند حساب "أحدث تاريخ" — عشان تاريخ خاطئ في صف واحد ما يزحزحش نافذة الأسبوع كلها
-    const validDates = all.map((r) => r.creationDateObj).filter((d) => d && d.getTime() <= now.getTime());
-    if (!validDates.length) throw new Error("لا توجد بلاغات بتاريخ إنشاء صالح لحساب فترة التقرير");
-    // ★ 2026-10-03 (بلاغ "Maximum call stack size exceeded" عند التنزيل على
-    // بيانات حقيقية 130k+ صف): Math.max(...مصفوفة ضخمة) بينهار لما عدد
-    // العناصر يتخطى حد مُعاملات الفنكشن في المحرك. نفس المشكلة والحل
-    // المستخدَم فعلاً في dashboard.js (راجع safeArrMax_ أعلى dashboard.js) —
-    // حلقة عادية بدل الـspread، بنفس النتيجة بالظبط وأداء أفضل.
-    const latestDateMs = typeof window.safeArrMax_ === "function"
-      ? window.safeArrMax_(validDates.map((d) => d.getTime()))
-      : validDates.reduce((m, d) => Math.max(m, d.getTime()), -Infinity);
-    const latestDate = new Date(latestDateMs);
-
-    const bounds = computePeriodBounds_(latestDate, periodDays);
-    const { curStart, curEnd, curEndFull, prevStart, prevEnd, prevEndFull } = bounds;
-
+    const E = startOfDay_(weekEnd);
+    const weeks = []; // الأقدم أولًا (4 أسابيع، آخرها الحالي)
+    for (let i = 3; i >= 0; i--) {
+      const s = addDays_(E, -6 - 7 * i), e = addDays_(E, -7 * i);
+      weeks.push({ start: s, end: e, endFull: endOfDay_(e) });
+    }
+    const cur = weeks[3];
+    const monthStart = new Date(E.getFullYear(), E.getMonth(), 1);
     const inRange = (r, s, e) => r.creationDateObj && r.creationDateObj >= s && r.creationDateObj <= e;
-    const periodRows = all.filter((r) => inRange(r, curStart, curEndFull));
-    const prevPeriodRows = all.filter((r) => inRange(r, prevStart, prevEndFull));
+    const regionSet = new Set(REGION_ORDER);
+    const rows4 = all.filter((r) => regionSet.has(r.region) && inRange(r, weeks[0].start, cur.endFull));
+    const rowsMonth = all.filter((r) => regionSet.has(r.region) && inRange(r, monthStart, cur.endFull));
 
-    const periodLabel = `${arDate_(curStart)} – ${arDate_(curEnd)} ${curEnd.getFullYear()}`;
-    // تسمية مختصرة (لعناوين الجداول/التشارت الضيقة): شهر واحد فقط لو الأسبوع
-    // ما بيعديش من شهر لشهر، بدل تكرار اسم الشهر مرتين وتكسير عرض الخانة
-    function weekRangeCompact_(s, e) {
-      const sameMonth = s.getMonth() === e.getMonth();
-      if (sameMonth) return `${s.getDate()}-${e.getDate()} ${arDate_(e).split(" ").slice(1).join(" ")}`;
-      return `${arDateShort_(s)} – ${arDateShort_(e)}`;
-    }
-    const curShort = weekRangeCompact_(curStart, curEnd);
-    const prevShort = weekRangeCompact_(prevStart, prevEnd);
+    const secAll = typeof window.getSecuritySafetyBalaghRows === "function" ? window.getSecuritySafetyBalaghRows() : [];
+    const secWeek = secAll.filter((r) => regionSet.has(r.region) && inRange(r, cur.start, cur.endFull));
+    const groupOf = (r) =>
+      typeof window.securitySafetyCategoryGroup_ === "function" ? window.securitySafetyCategoryGroup_(r.subCategory) : "أخرى";
+    const secSectorTotal = secWeek.length;
 
-    // ── مساعد: تجميع صفوف حسب المنطقة (الترتيب الثابت REGION_ORDER) ──
-    function byRegion(rows) {
-      const m = new Map(REGION_ORDER.map((r) => [r, []]));
-      rows.forEach((r) => {
-        if (m.has(r.region)) m.get(r.region).push(r);
-      });
-      return m;
-    }
-    function regionCounts(rows) {
-      const m = byRegion(rows);
-      return REGION_ORDER.map((r) => ({ region: r, count: m.get(r).length }));
-    }
-    function sortDesc(list) {
-      return [...list].sort((a, b) => b.count - a.count);
-    }
+    const ppmAll = Array.isArray(window.RAW_NEW_PPM_MAXIMO) ? window.RAW_NEW_PPM_MAXIMO : [];
 
-    // ── سلايد 3: بلاغات الأمن والسلامة — حسب القسم × المنطقة ──
-    const secRowsAll = typeof window.getSecuritySafetyBalaghRows === "function" ? window.getSecuritySafetyBalaghRows() : [];
-    const secRows = secRowsAll.filter((r) => inRange(r, curStart, curEndFull));
-    const groupsOrder = ["المصاعد", "مخارج الطوارئ", "أنظمة الأمن والسلامة", "اعمال الكهرباء"];
-    const secByGroup = new Map(groupsOrder.map((g) => [g, { group: g, total: 0, byRegion: new Map(REGION_ORDER.map((r) => [r, 0])) }]));
-    secRows.forEach((r) => {
-      const grp = typeof window.securitySafetyCategoryGroup_ === "function" ? window.securitySafetyCategoryGroup_(r.subCategory) : "أخرى";
-      const entry = secByGroup.get(grp);
-      if (!entry) return;
-      entry.total++;
-      if (entry.byRegion.has(r.region)) entry.byRegion.set(r.region, entry.byRegion.get(r.region) + 1);
-    });
-    const secGroupsSorted = [...secByGroup.values()].sort((a, b) => b.total - a.total);
-    const secTotal = secRows.length;
-
-    // ── سلايد 4: نظرة عامة ──
-    const overviewTotal = periodRows.length;
-    const consultantApprovalRows = periodRows.filter((r) => {
-      const s = norm_(r.status);
-      return s === "Consultant Approval In Progress" || s === "موافقة الاستشاري قيد التنفيذ";
-    });
-    const emergencyRows = periodRows.filter((r) => isEmergencyPriority_(r.priority));
-    const buildingsTotal = Array.isArray(window.RAW) ? window.RAW.length : null;
-    const overviewByRegion = sortDesc(
-      REGION_ORDER.map((region) => {
-        const rows = periodRows.filter((r) => r.region === region);
-        return {
-          region,
-          total: rows.length,
-          reopened: 0, // ⚠️ لا يوجد عمود/حالة "معاد فتحها" في نموذج البيانات الحالي — راجع ملاحظة التسليم
-          consultantApproval: rows.filter((r) => {
-            const s = norm_(r.status);
-            return s === "Consultant Approval In Progress" || s === "موافقة الاستشاري قيد التنفيذ";
-          }).length,
-        };
-      }),
-      "total"
-    ).map((x) => ({ ...x, count: x.total })); // توحيد مفتاح الفرز
-
-    // ── سلايد 5: توزيع المباني (الفريدة) اللي عندها بلاغات — حسب المنطقة ──
-    const buildingsByRegion = REGION_ORDER.map((region) => {
-      const keys = new Set(periodRows.filter((r) => r.region === region).map((r) => r.schoolKey));
-      return { region, count: keys.size };
-    });
-
-    // ── سلايد 6: مقارنة الأسبوع الحالي بالأسبوع السابق ──
-    const curByRegion = regionCounts(periodRows);
-    const prevByRegionMap = new Map(regionCounts(prevPeriodRows).map((x) => [x.region, x.count]));
-    const weekCompareByRegion = sortDesc(curByRegion).map((x) => ({
-      region: x.region,
-      current: x.count,
-      previous: prevByRegionMap.get(x.region) || 0,
-    }));
-
-    // ── سلايد إضافية: مقارنة 4 أسابيع متتالية (طلب صريح 2026-10-03: "عاوز صفحه
-    // تانيه خالص ويبقي بتقارن 4 مع بعض بنفس الفكره والطريقه") — دايمًا آخر 4 أسابيع
-    // كاملة (الأحد→السبت)، بغض النظر عن اختيار المستخدم 7/14 يوم (periodDays) في
-    // نافذة التنزيل، ومبنية على "all" (كل البيانات) مش periodRows — عشان نقدر نرجع
-    // 3 أسابيع إضافية لقبل الأسبوع الحالي حتى لو periodDays=7.
-    const WEEKS4_COUNT_ = 4;
-    const anchorWeekStart_ = weekStart_(latestDate);
-    const week4Bounds_ = []; // الأقدم أولاً → الأحدث آخرًا
-    for (let i = WEEKS4_COUNT_ - 1; i >= 0; i--) {
-      const s = new Date(anchorWeekStart_);
-      s.setDate(s.getDate() - 7 * i);
-      const e = new Date(s);
-      e.setDate(e.getDate() + 6);
-      week4Bounds_.push({ start: s, end: e });
-    }
-    const week4Labels = week4Bounds_.map((b) => weekRangeCompact_(b.start, b.end));
-    const week4RowsByIdx_ = week4Bounds_.map((b) => all.filter((r) => inRange(r, b.start, endOfDay_(b.end))));
-    const week4ByRegion = sortDesc(
-      REGION_ORDER.map((region) => {
-        const counts = week4RowsByIdx_.map((rows) => rows.filter((r) => r.region === region).length);
-        return { region, counts, count: counts.reduce((s, c) => s + c, 0) };
-      })
-    );
-
-    // ── سلايد 7: الأولوية (روتيني/طارئ) حسب المنطقة ──
-    const priorityByRegion = sortDesc(
-      REGION_ORDER.map((region) => {
-        const rows = periodRows.filter((r) => r.region === region);
-        const emergency = rows.filter((r) => isEmergencyPriority_(r.priority)).length;
-        return { region, count: emergency, emergency, routine: rows.length - emergency, pct: pct1_(emergency, rows.length) };
-      })
-    );
-
-    // ── سلايد 8: الالتزام بـ SLA (العام) — نفس الحقل المستخدم فعليًا في renderBalaghTab (isOverdue) ──
-    const overdueCount = periodRows.filter((r) => r.isOverdue).length;
-    const compliantCount = overviewTotal - overdueCount;
-    const compliancePct = overviewTotal > 0 ? (compliantCount / overviewTotal) * 100 : 0;
-    const breachPct = overviewTotal > 0 ? (overdueCount / overviewTotal) * 100 : 0;
-
-    // ── سلايد 9: حالة قيد موافقة الاستشاري — حسب المنطقة ──
-    const consultantByRegion = sortDesc(
-      REGION_ORDER.map((region) => ({
-        region,
-        count: periodRows.filter((r) => r.region === region && (() => {
-          const s = norm_(r.status);
-          return s === "Consultant Approval In Progress" || s === "موافقة الاستشاري قيد التنفيذ";
-        })()).length,
-      }))
-    );
-
-    // ── سلايد 10/11: بلاغات النظافة ──
-    const cleaningRows = periodRows.filter((r) => CLEANING_CATEGORY_VALUES.includes(norm_(r.category)));
-    const cleaningByRegion = sortDesc(
-      REGION_ORDER.map((region) => ({ region, count: cleaningRows.filter((r) => r.region === region).length }))
-    );
-
-    // ═══ سلايد 11: توزيع بلاغات النظافة على المقاولين (مراجعة 2026-09-26) ═══
-    // (اختيار صريح من المستخدم) كل بلاغ نظافة بيتحسب على المقاول المكتوب فيه فعلاً
-    // (عمود Package ← "المقاول")، والبلاغ اللي خانة المقاول فيه فاضية بس هو اللي بيتعبى
-    // بمقاول المحافظة "الحالي". الصفوف = (منطقة × مقاول)، ومعاها عمود منفصل بالمحافظات
-    // اللي المقاول ده غطاها — وكل محافظة بتظهر حتى لو ملهاش بلاغات في الفترة (بعدد 0).
-    //
-    // ⚠️ ليه "الحالي" مش "الأغلب على مدار السنة": فحص البيانات الحقيقية أثبت إن المقاول
-    // بيتغير (مثال: نظافة المدينة المنورة كانت Gulf Development لغاية مايو، وبقت Gulf
-    // Advanced من يونيو). فمقاول المحافظة بيتحدد بالترتيب ده:
-    //   1) الأغلب في بلاغات نفس المحافظة جوه فترة التقرير نفسها
-    //   2) وإلا الأغلب في آخر 90 يوم قبل نهاية الفترة
-    //   3) وإلا آخر مقاول ظهر فعلاً في المحافظة دي (أحدث تاريخ)
-    //   4) وإلا "غير محدد"
-    const CLEANING_UNKNOWN_CONTRACTOR_ = "غير محدد";
-    const cleaningRowsAll_ = all.filter((r) => CLEANING_CATEGORY_VALUES.includes(norm_(r.category)));
-    const recentStart_ = new Date(curStart);
-    recentStart_.setDate(recentStart_.getDate() - 90);
-    const cleaningKnownByLoc_ = new Map(); // location -> [{c, t}] (بلاغات نظافة فيها مقاول مكتوب فعلاً)
-    cleaningRowsAll_.forEach((r) => {
-      const loc = norm_(r.location);
-      const c = norm_(r.contractor);
-      if (!loc || !c || !r.creationDateObj) return;
-      if (!cleaningKnownByLoc_.has(loc)) cleaningKnownByLoc_.set(loc, []);
-      cleaningKnownByLoc_.get(loc).push({ c, t: r.creationDateObj.getTime() });
-    });
-    function dominantOf_(list) {
-      if (!list.length) return null;
-      const m = new Map();
-      list.forEach((x) => m.set(x.c, (m.get(x.c) || 0) + 1));
-      return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
-    }
-    const currentContractorCache_ = new Map();
-    function currentCleaningContractor_(loc) {
-      if (currentContractorCache_.has(loc)) return currentContractorCache_.get(loc);
-      const list = cleaningKnownByLoc_.get(loc) || [];
-      const inPeriod = list.filter((x) => x.t >= curStart.getTime() && x.t <= curEndFull.getTime());
-      const recent = list.filter((x) => x.t >= recentStart_.getTime() && x.t <= curEndFull.getTime());
-      const upToEnd = list.filter((x) => x.t <= curEndFull.getTime());
-      const latest = upToEnd.length ? upToEnd.reduce((a, b) => (b.t > a.t ? b : a)).c : null;
-      const c = dominantOf_(inPeriod) || dominantOf_(recent) || latest || CLEANING_UNKNOWN_CONTRACTOR_;
-      currentContractorCache_.set(loc, c);
-      return c;
-    }
-
-    // تجميع بلاغات الفترة: (منطقة × مقاول فعلي) مع عدد كل محافظة جوه المجموعة
-    const cleaningGroups_ = new Map(); // `${region}||${contractor}` -> {region, contractor, count, locs: Map(loc -> count)}
-    const cleaningLocsWithRows_ = new Set();
-    function cleaningGroup_(region, contractor) {
-      const key = `${region}||${contractor}`;
-      if (!cleaningGroups_.has(key)) cleaningGroups_.set(key, { region, contractor, count: 0, locs: new Map() });
-      return cleaningGroups_.get(key);
-    }
-    cleaningRows.forEach((r) => {
-      if (!REGION_ORDER.includes(r.region)) return;
-      const loc = norm_(r.location) || r.region;
-      const contractor = norm_(r.contractor) || currentCleaningContractor_(loc);
-      const g = cleaningGroup_(r.region, contractor);
-      g.count++;
-      g.locs.set(loc, (g.locs.get(loc) || 0) + 1);
-      cleaningLocsWithRows_.add(loc);
-    });
-    // كل محافظة لازم تظهر بمقاولها حتى لو ملهاش بلاغات نظافة في الفترة (عددها 0)
+    const perRegion = {};
     REGION_ORDER.forEach((region) => {
-      const locs = [PRIMARY_LOCATION_BY_REGION[region] || region, ...(SUB_LOCATIONS_BY_REGION[region] || [])];
-      locs.forEach((loc) => {
-        if (cleaningLocsWithRows_.has(loc)) return;
-        const g = cleaningGroup_(region, currentCleaningContractor_(loc));
-        if (!g.locs.has(loc)) g.locs.set(loc, 0);
-      });
-    });
-
-    const cleaningContractorRows = [];
-    REGION_ORDER.forEach((region) => {
-      const locOrder = [PRIMARY_LOCATION_BY_REGION[region] || region, ...(SUB_LOCATIONS_BY_REGION[region] || [])];
-      const groups = [...cleaningGroups_.values()].filter((g) => g.region === region);
-      const regionTotal = groups.reduce((s, g) => s + g.count, 0);
-      groups
-        .sort((a, b) => b.count - a.count || a.contractor.localeCompare(b.contractor))
-        .forEach((g) => {
-          const locs = [...g.locs.keys()].sort((a, b) => {
-            const ia = locOrder.indexOf(a), ib = locOrder.indexOf(b);
-            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
-          });
-          cleaningContractorRows.push({
-            region,
-            governorates: locs.join("، "),
-            contractor: g.contractor,
-            count: g.count,
-            pct: pct1_(g.count, regionTotal),
-          });
-        });
-    });
-
-    // ── سلايد 12-15: أعلى 10 مدارس لكل منطقة ──
-    function topSchoolsForRegion(region) {
-      const rows = periodRows.filter((r) => r.region === region);
-      const bySchool = new Map(); // schoolKey -> {name, minId, count, emergency}
-      rows.forEach((r) => {
-        const key = r.schoolKey;
-        if (!bySchool.has(key)) {
-          bySchool.set(key, {
-            name: r.linkedSchoolName || r.schoolName || "—",
-            minId: r.linkedMinId || r.schoolNumber || "—",
-            count: 0,
-            emergency: 0,
-          });
+      const rr = rows4.filter((r) => r.region === region);
+      const wk = weeks.map((w) => rr.filter((r) => inRange(r, w.start, w.endFull)));
+      const counts = wk.map((x) => x.length);
+      const curRows = wk[3];
+      const emergency = curRows.filter((r) => isEmergencyPriority_(r.priority)).length;
+      const overdue = curRows.filter((r) => r.isOverdue).length;
+      const sec = secWeek.filter((r) => r.region === region);
+      const secGroups = SAFETY_GROUP_ORDER.map((g, i) => ({
+        group: g, label: SAFETY_GROUP_LABEL[g] || g, order: i,
+        count: sec.filter((r) => groupOf(r) === g).length,
+      })).sort((a, b) => b.count - a.count || a.order - b.order);
+      // أعلى 10 مدارس
+      const bySchool = new Map();
+      curRows.forEach((r) => {
+        if (!bySchool.has(r.schoolKey)) {
+          bySchool.set(r.schoolKey, { name: r.linkedSchoolName || r.schoolName || "—", minId: r.linkedMinId || r.schoolNumber || "—", count: 0, emergency: 0 });
         }
-        const e = bySchool.get(key);
+        const e = bySchool.get(r.schoolKey);
         e.count++;
         if (isEmergencyPriority_(r.priority)) e.emergency++;
       });
-      return [...bySchool.values()].sort((a, b) => b.count - a.count).slice(0, 10);
-    }
-    const topSchoolsByRegion = {
-      "جدة": topSchoolsForRegion("جدة"),
-      "مكة المكرمة": topSchoolsForRegion("مكة المكرمة"),
-      "المدينة المنورة": topSchoolsForRegion("المدينة المنورة"),
-      "الطائف": topSchoolsForRegion("الطائف"),
-    };
-
+      const top = [...bySchool.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+      // الصيانة الوقائية
+      const ppmRows = ppmAll.filter((r) => norm_(r["المنطقة"]) === region);
+      perRegion[region] = {
+        region, counts, cur: counts[3], prev: counts[2], first: counts[0], total4: counts.reduce((s, c) => s + c, 0),
+        month: rowsMonth.filter((r) => r.region === region).length,
+        emergency, routine: curRows.length - emergency,
+        overdue, slaPct: curRows.length ? ((curRows.length - overdue) / curRows.length) * 100 : 0,
+        consultant: curRows.filter(isConsultantApproval_).length,
+        buildings: new Set(curRows.map((r) => r.schoolKey)).size,
+        secTotal: sec.length, secGroups, top, ppmRows,
+        manual: normalizeManual_(manual && manual[region]),
+      };
+    });
+    const sectorWeek = REGION_ORDER.reduce((s, r) => s + perRegion[r].cur, 0);
+    // أقل رضا بين المناطق (من القيم اليدوية)
+    let lowest = null;
+    REGION_ORDER.forEach((r) => {
+      const m = perRegion[r].manual;
+      if (m && m.sat != null && (lowest === null || m.sat < perRegion[lowest].manual.sat)) lowest = r;
+    });
     return {
-      periodLabel, curShort, prevShort, curStart, curEnd, prevStart, prevEnd,
-      overviewTotal, buildingsTotal, emergencyRows, consultantApprovalRows, overviewByRegion,
-      secTotal, secGroupsSorted, buildingsByRegion, weekCompareByRegion, week4Labels, week4ByRegion, priorityByRegion,
-      overdueCount, compliantCount, compliancePct, breachPct,
-      consultantByRegion, cleaningByRegion, cleaningTotal: cleaningRows.length, cleaningContractorRows,
-      topSchoolsByRegion,
+      weekEnd: E, weeks, monthStart, perRegion, sectorWeek, secSectorTotal, lowestSatRegion: lowest,
+      periodLabel: rangeLabel_(cur.start, cur.end, true),
+      fourWeeksRange: rangeLabel_(weeks[0].start, cur.end, false),
+      fourWeeksRangeY: rangeLabel_(weeks[0].start, cur.end, true),
+      monthLabel: `${monthName_(E)} ${E.getFullYear()}`,
+      monthName: monthName_(E),
+      monthRange: `1 – ${E.getDate()} ${monthName_(E)} ${E.getFullYear()}`,
     };
   }
 
-  // ═══════════════════════════════ أدوات XML عامة (DOMParser) ═══════════════════════════════
-  function parseXml_(str) {
-    return new DOMParser().parseFromString(str, "application/xml");
-  }
-  function serializeXml_(doc) {
-    return new XMLSerializer().serializeToString(doc);
-  }
+  // ═════════════════════════ أدوات XML ═════════════════════════
+  function parseXml_(str) { return new DOMParser().parseFromString(str, "application/xml"); }
+  function serializeXml_(doc) { return new XMLSerializer().serializeToString(doc); }
   function findShapeById_(doc, id) {
     const cNvPrs = doc.getElementsByTagName("p:cNvPr");
     for (let i = 0; i < cNvPrs.length; i++) {
@@ -402,6 +198,7 @@
     }
     return null;
   }
+  // أسطر: فقرة واحدة لكل عنصر (النص يوضع في أول a:t ويُفرَّغ الباقي)
   function setParagraphText_(pEl, text) {
     const ts = pEl.getElementsByTagName("a:t");
     if (!ts.length) return;
@@ -411,69 +208,93 @@
   function setShapeLines_(doc, shapeId, lines) {
     const sp = findShapeById_(doc, shapeId);
     if (!sp) return;
-    const txBody = sp.getElementsByTagName("p:txBody")[0];
-    if (!txBody) return;
-    const ps = txBody.getElementsByTagName("a:p");
+    const ps = sp.getElementsByTagName("a:p");
     for (let i = 0; i < ps.length; i++) setParagraphText_(ps[i], i < lines.length ? String(lines[i]) : "");
   }
-  // مثل setShapeLines_ لكن للحالة اللي الأسطر جوه نفس الـ <a:p> الواحدة
-  // ومفصولة بـ <a:br/> بدل فقرات منفصلة (زي عنوان سلايد 1)
+  // مقاطع (a:r) داخل الفقرة الأولى — لأشكال مثل «208  بلاغات طارئة (8.2%)» (رقم كبير + شرح بتنسيقين)
+  function setShapeRuns_(doc, shapeId, runsTexts) {
+    const sp = findShapeById_(doc, shapeId);
+    if (!sp) return;
+    const p = sp.getElementsByTagName("a:p")[0];
+    if (!p) return;
+    const runs = Array.from(p.childNodes).filter((n) => n.nodeName === "a:r");
+    runs.forEach((r, i) => {
+      const t = r.getElementsByTagName("a:t")[0];
+      if (t) t.textContent = i < runsTexts.length ? String(runsTexts[i]) : "";
+    });
+  }
+  // نص مفصول بـ<a:br/> داخل فقرة واحدة (عنوان شريحة الغلاف)
   function setShapeBrSegments_(doc, shapeId, lines) {
     const sp = findShapeById_(doc, shapeId);
     if (!sp) return;
-    const txBody = sp.getElementsByTagName("p:txBody")[0];
-    if (!txBody) return;
-    const p = txBody.getElementsByTagName("a:p")[0];
+    const p = sp.getElementsByTagName("a:p")[0];
     if (!p) return;
-    const children = Array.from(p.childNodes).filter((n) => n.nodeName === "a:r" || n.nodeName === "a:br");
     const segments = [];
-    let cur = [];
-    children.forEach((n) => {
-      if (n.nodeName === "a:br") { segments.push(cur); cur = []; }
-      else cur.push(n);
+    let curSeg = [];
+    Array.from(p.childNodes).filter((n) => n.nodeName === "a:r" || n.nodeName === "a:br").forEach((n) => {
+      if (n.nodeName === "a:br") { segments.push(curSeg); curSeg = []; } else curSeg.push(n);
     });
-    segments.push(cur);
+    segments.push(curSeg);
     segments.forEach((seg, i) => {
       if (!seg.length) return;
       const text = i < lines.length ? String(lines[i]) : "";
-      const firstT = seg[0].getElementsByTagName("a:t")[0];
-      if (firstT) firstT.textContent = text;
-      for (let j = 1; j < seg.length; j++) {
-        const t = seg[j].getElementsByTagName("a:t")[0];
-        if (t) t.textContent = "";
-      }
+      const t0 = seg[0].getElementsByTagName("a:t")[0];
+      if (t0) t0.textContent = text;
+      for (let j = 1; j < seg.length; j++) { const t = seg[j].getElementsByTagName("a:t")[0]; if (t) t.textContent = ""; }
     });
   }
-  function getTableInShape_(shapeEl) {
-    return shapeEl ? shapeEl.getElementsByTagName("a:tbl")[0] : null;
+  function setRunColor_(doc, shapeId, hex) {
+    const sp = findShapeById_(doc, shapeId);
+    if (!sp) return;
+    Array.from(sp.getElementsByTagName("a:rPr")).forEach((rp) => {
+      const c = rp.getElementsByTagName("a:srgbClr")[0];
+      if (c) c.setAttribute("val", hex);
+    });
   }
-  function setCell_(tbl, rowIdx, colIdx, text) {
-    const trs = tbl.getElementsByTagName("a:tr");
-    const tr = trs[rowIdx];
-    if (!tr) return;
-    const tcs = tr.getElementsByTagName("a:tc");
-    const tc = tcs[colIdx];
+  function setShapeFill_(doc, shapeId, hex) {
+    const sp = findShapeById_(doc, shapeId);
+    if (!sp) return;
+    const spPr = sp.getElementsByTagName("p:spPr")[0];
+    const c = spPr && spPr.getElementsByTagName("a:srgbClr")[0];
+    if (c) c.setAttribute("val", hex);
+  }
+  function xfrmOf_(sp) {
+    const x = sp.getElementsByTagName("a:xfrm")[0];
+    return { off: x.getElementsByTagName("a:off")[0], ext: x.getElementsByTagName("a:ext")[0] };
+  }
+  // شريط تقدّم: المقبض (fill) محاذٍ لحافة المسار (track) اليمنى (اتجاه عربي)
+  function setBar_(doc, trackId, fillId, pct) {
+    const tr = findShapeById_(doc, trackId), fl = findShapeById_(doc, fillId);
+    if (!tr || !fl) return;
+    const t = xfrmOf_(tr), f = xfrmOf_(fl);
+    const tx = parseInt(t.off.getAttribute("x"), 10), tw = parseInt(t.ext.getAttribute("cx"), 10);
+    const p = Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
+    const w = Math.round((tw * p) / 100);
+    f.ext.setAttribute("cx", String(w));
+    f.off.setAttribute("x", String(tx + tw - w));
+  }
+  function removeShape_(doc, id) {
+    const sp = findShapeById_(doc, id);
+    if (sp && sp.parentNode) sp.parentNode.removeChild(sp);
+  }
+  function getTableInShape_(sp) { return sp ? sp.getElementsByTagName("a:tbl")[0] : null; }
+  // اتجاه الفقرة داخل الخلية من اليمين لليسار (للنص العربي المختلط بأرقام مثل التواريخ)
+  function setCellRtl_(tr, colIdx) {
+    const tc = tr.getElementsByTagName("a:tc")[colIdx];
+    const p = tc && tc.getElementsByTagName("a:p")[0];
+    const pPr = p && p.getElementsByTagName("a:pPr")[0];
+    if (pPr) pPr.setAttribute("rtl", "1");
+  }
+  function setCell_(tr, colIdx, text) {
+    const tc = tr.getElementsByTagName("a:tc")[colIdx];
     if (!tc) return;
     const p = tc.getElementsByTagName("a:p")[0];
     if (p) setParagraphText_(p, String(text));
   }
-  function setDynamicDataRows_(tbl, dataRows, fillRowFn) {
-    const trs = Array.from(tbl.getElementsByTagName("a:tr"));
-    if (trs.length < 2) return;
-    const templateRow = trs[1].cloneNode(true);
-    trs.slice(1).forEach((r) => r.parentNode.removeChild(r));
-    dataRows.forEach((rowData, i) => {
-      const newRow = templateRow.cloneNode(true);
-      fillRowFn(newRow, rowData, i);
-      tbl.appendChild(newRow);
-    });
-  }
   function setChartCategoriesValues_(chartDoc, seriesIdx, categories, values) {
-    const sers = chartDoc.getElementsByTagName("c:ser");
-    const ser = sers[seriesIdx];
+    const ser = chartDoc.getElementsByTagName("c:ser")[seriesIdx];
     if (!ser) return;
-    const cat = ser.getElementsByTagName("c:cat")[0];
-    const val = ser.getElementsByTagName("c:val")[0];
+    const cat = ser.getElementsByTagName("c:cat")[0], val = ser.getElementsByTagName("c:val")[0];
     if (cat && categories) {
       const pts = cat.getElementsByTagName("c:pt");
       for (let i = 0; i < pts.length && i < categories.length; i++) {
@@ -489,520 +310,294 @@
       }
     }
   }
-  // ⚠️ (اكتُشف أثناء اختبار هذه الجولة) بعض التشارتات في التمبلت الأصلي (تحديدًا
-  // تشارت سلايد 5 "توزيع المباني...") بتحتوي على تراكيب "<c:dLbl>" لكل نقطة —
-  // نص ثابت (rich text) مكتوب حرفيًا زي "1,097 (31.2%)" وقت تصميم التمبلت، منفصل
-  // تمامًا عن قيم السلسلة الفعلية (<c:v> جوه <c:val>). تعديل القيم وحدها (عبر
-  // setChartCategoriesValues_) مش كفاية هنا — الليبل الظاهر على العمود فعليًا
-  // بيفضل ثابت على رقم التمبلت القديم لأنه نص مكتوب صراحة مش مربوط بالقيمة.
-  // الدالة دي بتحدّث نص كل Data Label بترتيب idx (0..N-1) — نفس ترتيب النقاط
-  // اللي بتتحدث بيه setChartCategoriesValues_، فمفيش داعي لمطابقة أسماء.
-  function setChartDataLabelTexts_(chartDoc, seriesIdx, texts) {
-    const sers = chartDoc.getElementsByTagName("c:ser");
-    const ser = sers[seriesIdx];
-    if (!ser) return;
-    const dLbls = ser.getElementsByTagName("c:dLbls")[0];
-    if (!dLbls) return;
-    Array.from(dLbls.getElementsByTagName("c:dLbl")).forEach((dLbl) => {
-      const idxEl = dLbl.getElementsByTagName("c:idx")[0];
-      const idx = idxEl ? parseInt(idxEl.getAttribute("val"), 10) : -1;
-      if (idx < 0 || idx >= texts.length) return;
-      const tNodes = dLbl.getElementsByTagName("a:t");
-      if (tNodes.length) tNodes[0].textContent = String(texts[idx]);
-    });
-  }
-  function setSeriesName_(chartDoc, seriesIdx, name) {
-    const sers = chartDoc.getElementsByTagName("c:ser");
-    const ser = sers[seriesIdx];
-    if (!ser) return;
-    const tx = ser.getElementsByTagName("c:tx")[0];
-    if (!tx) return;
-    const v = tx.getElementsByTagName("c:v")[0];
-    if (v) v.textContent = name;
+  function setChartAxisMax_(chartDoc, max) {
+    const va = chartDoc.getElementsByTagName("c:valAx")[0];
+    const mx = va && va.getElementsByTagName("c:max")[0];
+    if (mx) mx.setAttribute("val", String(max));
   }
 
   async function resolveDeckSlidePaths_(zip) {
-    const presXml = await zip.file("ppt/presentation.xml").async("string");
-    const presDoc = parseXml_(presXml);
-    const relsXml = await zip.file("ppt/_rels/presentation.xml.rels").async("string");
-    const relsDoc = parseXml_(relsXml);
+    const presDoc = parseXml_(await zip.file("ppt/presentation.xml").async("string"));
+    const relsDoc = parseXml_(await zip.file("ppt/_rels/presentation.xml.rels").async("string"));
     const relMap = {};
-    Array.from(relsDoc.getElementsByTagName("Relationship")).forEach((r) => {
-      relMap[r.getAttribute("Id")] = r.getAttribute("Target");
-    });
-    const sldIds = Array.from(presDoc.getElementsByTagName("p:sldId"));
-    return sldIds.map((s) => "ppt/" + relMap[s.getAttribute("r:id")]);
+    Array.from(relsDoc.getElementsByTagName("Relationship")).forEach((r) => { relMap[r.getAttribute("Id")] = r.getAttribute("Target"); });
+    return Array.from(presDoc.getElementsByTagName("p:sldId")).map((s) => "ppt/" + relMap[s.getAttribute("r:id")]);
   }
-  async function getSlideChartPath_(zip, slidePath) {
-    const parts = slidePath.split("/");
+  async function getRelTarget_(zip, partPath, typePart) {
+    const parts = partPath.split("/");
     const fname = parts.pop();
-    const relsPath = parts.join("/") + "/_rels/" + fname + ".rels";
-    const relsFile = zip.file(relsPath);
+    const relsFile = zip.file(parts.join("/") + "/_rels/" + fname + ".rels");
     if (!relsFile) return null;
     const relsDoc = parseXml_(await relsFile.async("string"));
-    const rel = Array.from(relsDoc.getElementsByTagName("Relationship")).find((r) => (r.getAttribute("Type") || "").indexOf("/chart") !== -1);
+    const rel = Array.from(relsDoc.getElementsByTagName("Relationship")).find((r) => (r.getAttribute("Type") || "").indexOf(typePart) !== -1);
     if (!rel) return null;
-    return "ppt/" + rel.getAttribute("Target").replace(/^\.\.\//, "");
+    const t = rel.getAttribute("Target");
+    const base = parts.slice();
+    t.split("/").forEach((seg) => { if (seg === "..") base.pop(); else if (seg !== ".") base.push(seg); });
+    return base.join("/");
   }
-
-  // ═══════════════════════════════ تعديل كل سلايد ═══════════════════════════════
-  async function patchSlide_(zip, slidePath, patchFn) {
-    const xml = await zip.file(slidePath).async("string");
-    const doc = parseXml_(xml);
-    await patchFn(doc);
+  async function patchSlide_(zip, slidePath, fn) {
+    const doc = parseXml_(await zip.file(slidePath).async("string"));
+    await fn(doc);
     zip.file(slidePath, serializeXml_(doc));
   }
-  async function patchChart_(zip, chartPath, patchFn) {
+  // يحدّث بيانات التشارت + المصنف المضمّن (حتى لا تعود الأرقام القديمة عند «تحرير البيانات» في PowerPoint)
+  async function patchChartPart_(zip, slidePath, values, maxAxis) {
+    const chartPath = await getRelTarget_(zip, slidePath, "/chart");
     if (!chartPath || !zip.file(chartPath)) return;
-    const xml = await zip.file(chartPath).async("string");
-    const doc = parseXml_(xml);
-    patchFn(doc);
-    zip.file(chartPath, serializeXml_(doc));
+    const cdoc = parseXml_(await zip.file(chartPath).async("string"));
+    setChartCategoriesValues_(cdoc, 0, null, values);
+    setChartAxisMax_(cdoc, maxAxis);
+    zip.file(chartPath, serializeXml_(cdoc));
+    const xlsxPath = await getRelTarget_(zip, chartPath, "/package");
+    if (!xlsxPath || !zip.file(xlsxPath)) return;
+    try {
+      const inner = await JSZip.loadAsync(await zip.file(xlsxPath).async("uint8array"));
+      const shPath = "xl/worksheets/sheet1.xml";
+      let xml = await inner.file(shPath).async("string");
+      values.forEach((v, i) => {
+        const ref = "B" + (i + 2);
+        xml = xml.replace(new RegExp(`(<c r="${ref}"[^>]*>\\s*<v>)[^<]*(</v>)`), `$1${v}$2`);
+      });
+      inner.file(shPath, xml);
+      zip.file(xlsxPath, await inner.generateAsync({ type: "uint8array", compression: "DEFLATE" }));
+    } catch (_) { /* التشارت نفسه تحدّث؛ المصنف المضمّن اختياري */ }
   }
 
   function loadScriptOnce_(src) {
     return new Promise((resolve, reject) => {
       const el = document.createElement("script");
-      el.src = src;
-      el.onload = () => resolve();
-      el.onerror = () => reject(new Error("load failed: " + src));
+      el.src = src; el.onload = () => resolve(); el.onerror = () => reject(new Error("load failed: " + src));
       document.head.appendChild(el);
     });
   }
-  // تحميل التمبلت: (1) النسخة المضمّنة لو اتحمّلت قبل كده، (2) fetch لو الصفحة شغالة
-  // على http/https، (3) وإلا تحميل report_template_data.js كـ<script> (بيشتغل حتى من file://)
+  // تحميل القالب: (1) النسخة المضمّنة لو سبق تحميلها (2) fetch على http/https (3) report_template_data.js كـ<script> (يعمل من file://)
   async function loadTemplateZip_() {
-    if (window.__BALAGH_REPORT_TEMPLATE_B64__) {
-      return JSZip.loadAsync(window.__BALAGH_REPORT_TEMPLATE_B64__, { base64: true });
-    }
+    if (window.__BALAGH_REPORT_TEMPLATE_B64__) return JSZip.loadAsync(window.__BALAGH_REPORT_TEMPLATE_B64__, { base64: true });
     if (location.protocol !== "file:") {
       try {
         const r = await fetch(`${TEMPLATE_URL}?v=${TEMPLATE_VERSION}`);
         if (r.ok) return JSZip.loadAsync(await r.arrayBuffer());
-      } catch (_) { /* نكمّل على النسخة المضمّنة */ }
+      } catch (_) { /* نكمل على النسخة المضمّنة */ }
     }
-    try {
-      await loadScriptOnce_(`${TEMPLATE_DATA_JS}?v=${TEMPLATE_VERSION}`);
-    } catch (_) { /* الرسالة تحت */ }
-    if (window.__BALAGH_REPORT_TEMPLATE_B64__) {
-      return JSZip.loadAsync(window.__BALAGH_REPORT_TEMPLATE_B64__, { base64: true });
-    }
-    throw new Error("تعذّر تحميل قالب التقرير — تأكد إن report_template.pptx و report_template_data.js موجودين جنب index.html");
+    try { await loadScriptOnce_(`${TEMPLATE_DATA_JS}?v=${TEMPLATE_VERSION}`); } catch (_) { /* الرسالة بالأسفل */ }
+    if (window.__BALAGH_REPORT_TEMPLATE_B64__) return JSZip.loadAsync(window.__BALAGH_REPORT_TEMPLATE_B64__, { base64: true });
+    throw new Error("تعذّر تحميل قالب التقرير — تأكد أن report_template.pptx و report_template_data.js موجودان بجانب index.html");
+  }
+
+  // ═════════════════════════ تعبئة شرائح منطقة واحدة ═════════════════════════
+  async function fillRegion_(zip, slides, regionIdx, data) {
+    const region = REGION_ORDER[regionIdx];
+    const R = data.perRegion[region];
+    const M = R.manual || { sat: 0, rating: 0, rep1: 0, rep2: 0, rep3: 0, tfmp: { pp: 0, pd: 0, cp: 0, cd: 0 } };
+    const base = regionIdx * SLIDES_PER_REGION;
+    const [sCover, sOver, sTrend, sQual, sPpm, sTop] = [0, 1, 2, 3, 4, 5].map((k) => slides[base + k]);
+    const period = `الفترة: ${data.periodLabel}`;
+
+    // ── الغلاف ──
+    await patchSlide_(zip, sCover, (doc) => {
+      setShapeBrSegments_(doc, 2, [`تقرير متابعة البلاغات – منطقة ${region}`, data.periodLabel]);
+    });
+
+    // ── 1) نظرة عامة ──
+    await patchSlide_(zip, sOver, (doc) => {
+      setShapeLines_(doc, 78, [`نظرة عامة على البلاغات – ${region}`]);
+      setShapeLines_(doc, 79, [period]);
+      setShapeLines_(doc, 82, [fmtNum_(R.cur)]);
+      setShapeLines_(doc, 83, ["البلاغات الأسبوعية", `${pct1_(R.cur, data.sectorWeek)}% من إجمالي القطاع`]);
+      setShapeLines_(doc, 86, [fmtNum_(R.month)]);
+      setShapeLines_(doc, 87, ["التراكمي من بداية الشهر", "إجمالي البلاغات منذ بداية الشهر"]);
+      setShapeLines_(doc, 90, [R.cur ? R.slaPct.toFixed(1) + "%" : "—"]);
+      setShapeLines_(doc, 91, ["الالتزام بمستوى الخدمة SLA", "نسبة البلاغات ضمن SLA"]);
+      setShapeLines_(doc, 94, [M.sat != null ? M.sat.toFixed(1) + "%" : "—"]);
+      setShapeLines_(doc, 95, ["نسبة رضا المستفيد", `متوسط التقييم ${M.rating != null ? Number(M.rating).toFixed(2) : "—"} / 5`]);
+      const reopenedTotal = (M.rep1 || 0) + (M.rep2 || 0) + (M.rep3 || 0);
+      setShapeRuns_(doc, 97, [fmtNum_(R.emergency) + "  ", `بلاغات طارئة (${pct1_(R.emergency, R.cur)}%)`]);
+      setShapeRuns_(doc, 99, [fmtNum_(reopenedTotal) + "  ", `بلاغات أُعيد فتحها (${pct1_(reopenedTotal, R.cur)}%)`]);
+      setShapeRuns_(doc, 101, [fmtNum_(R.consultant) + "  ", `قيد موافقة الاستشاري (${pct1_(R.consultant, R.cur)}%)`]);
+      setShapeRuns_(doc, 103, [fmtNum_(R.buildings) + "  ", "عدد المباني التعليمية"]);
+      setShapeRuns_(doc, 104, [
+        "بلاغات الأمن والسلامة",
+        `     ${fmtNum_(R.secTotal)} بلاغ  ·  ${pct1_(R.secTotal, data.secSectorTotal)}% من بلاغات الأمن والسلامة في القطاع`,
+      ]);
+      const cardIds = [[106, 107, 108, 109, 110], [112, 113, 114, 115, 116], [118, 119, 120, 121, 122], [124, 125, 126, 127, 128]];
+      R.secGroups.forEach((g, i) => {
+        const [vId, lId, tId, fId, pId] = cardIds[i];
+        const p = R.secTotal ? (g.count / R.secTotal) * 100 : 0;
+        setShapeLines_(doc, vId, [fmtNum_(g.count)]);
+        setShapeLines_(doc, lId, [g.label]);
+        setBar_(doc, tId, fId, p);
+        setShapeLines_(doc, pId, [`${p.toFixed(1)}% من بلاغات الأمن والسلامة بالمنطقة`]);
+      });
+    });
+
+    // ── 2) اتجاه البلاغات والأولوية ──
+    await patchSlide_(zip, sTrend, (doc) => {
+      setShapeLines_(doc, 78, [`اتجاه البلاغات والأولوية – ${region}`]);
+      setShapeLines_(doc, 79, [`آخر 4 أسابيع: ${data.fourWeeksRangeY}`]);
+      setShapeRuns_(doc, 82, ["عدد البلاغات أسبوعياً", `   ${data.fourWeeksRange}`]);
+      // أولوية الأسبوع الحالي: قطعتان في شريط واحد (روتيني + طارئ)
+      const tot = R.cur;
+      const tr = findShapeById_(doc, 87), em = findShapeById_(doc, 88);
+      if (tr && em) {
+        const tx = xfrmOf_(tr), ex = xfrmOf_(em);
+        const emOffX = parseInt(ex.off.getAttribute("x"), 10);
+        const T = parseInt(tx.ext.getAttribute("cx"), 10) + parseInt(ex.ext.getAttribute("cx"), 10);
+        const emW = tot ? Math.round((T * R.emergency) / tot) : 0;
+        ex.ext.setAttribute("cx", String(emW));
+        tx.ext.setAttribute("cx", String(T - emW));
+        tx.off.setAttribute("x", String(emOffX + emW));
+      }
+      setShapeRuns_(doc, 89, [fmtNum_(R.routine), `  روتيني (${pct1_(R.routine, R.cur)}%)`]);
+      setShapeRuns_(doc, 90, [fmtNum_(R.emergency), `  طارئ (${pct1_(R.emergency, R.cur)}%)`]);
+      const dPrev = signedPct_(R.cur, R.prev), dFirst = signedPct_(R.cur, R.first);
+      setShapeLines_(doc, 93, [dPrev == null ? "—" : dPrev]);
+      setRunColor_(doc, 93, dPrev != null && dPrev.charAt(0) === "-" ? C_DOWN : C_UP);
+      setShapeLines_(doc, 94, ["التغير عن الأسبوع السابق", `${fmtNum_(R.cur)} مقابل ${fmtNum_(R.prev)} بلاغ`]);
+      setShapeLines_(doc, 97, [dFirst == null ? "—" : dFirst]);
+      setRunColor_(doc, 97, dFirst != null && dFirst.charAt(0) === "-" ? C_DOWN : C_UP);
+      setShapeLines_(doc, 98, ["التغير عن الأسبوع الأول", `${fmtNum_(R.cur)} مقابل ${fmtNum_(R.first)} بلاغ`]);
+      setShapeLines_(doc, 101, [fmtNum_(R.total4)]);
+      setShapeLines_(doc, 102, ["إجمالي آخر 4 أسابيع", data.fourWeeksRange]);
+    });
+    await patchChartPart_(zip, sTrend, R.counts, Math.max(10, Math.round(Math.max.apply(null, R.counts) * 1.25)));
+
+    // ── 3) جودة الخدمة وزيارات الاستشاري ──
+    await patchSlide_(zip, sQual, (doc) => {
+      const reopenedTotal = (M.rep1 || 0) + (M.rep2 || 0) + (M.rep3 || 0);
+      const p1 = reopenedTotal ? (M.rep1 / reopenedTotal) * 100 : 0;
+      const p2 = reopenedTotal ? (M.rep2 / reopenedTotal) * 100 : 0;
+      const p3 = reopenedTotal ? ((M.rep3 || 0) / reopenedTotal) * 100 : 0;
+      setShapeLines_(doc, 78, [`جودة الخدمة وزيارات الاستشاري – ${region}`]);
+      setShapeLines_(doc, 79, [period]);
+      setShapeLines_(doc, 83, [fmtNum_(reopenedTotal)]);
+      setShapeLines_(doc, 84, ["بلاغ أُعيد فتحه", `${pct1_(reopenedTotal, R.cur)}% من بلاغات المنطقة`]);
+      setShapeLines_(doc, 86, [`${fmtNum_(M.rep1)}  (${Math.round(p1)}%)`]);
+      setBar_(doc, 87, 88, p1);
+      setShapeLines_(doc, 90, [`${fmtNum_(M.rep2)}  (${Math.round(p2)}%)`]);
+      setBar_(doc, 91, 92, p2);
+      setShapeLines_(doc, 116, [`${fmtNum_(M.rep3 || 0)}  (${Math.round(p3)}%)`]);
+      setBar_(doc, 117, 118, p3);
+      // الرضا: الأقل بين المناطق بلون برتقالي + شارة، وغيره أخضر/كحلي
+      const isLow = data.lowestSatRegion === region;
+      setShapeLines_(doc, 96, [M.sat != null ? M.sat.toFixed(1) + "%" : "—"]);
+      setRunColor_(doc, 96, isLow ? C_ORANGE_TXT : C_NAVY);
+      setBar_(doc, 98, 99, M.sat || 0);
+      setShapeFill_(doc, 99, isLow ? C_ORANGE_BAR : C_GREEN_BAR);
+      setShapeRuns_(doc, 101, [M.rating != null ? Number(M.rating).toFixed(2) : "—", "  من 5"]);
+      if (!isLow) { removeShape_(doc, 103); removeShape_(doc, 104); }
+      // TFMP
+      setShapeRuns_(doc, 107, ["الزيارات الميدانية للاستشاري على نظام TFMP", `   الزيارات التفتيشية – ${data.monthLabel}`]);
+      const T = M.tfmp || { pp: 0, pd: 0, cp: 0, cd: 0 };
+      const pctPrev = T.pp ? (T.pd / T.pp) * 100 : 0, pctCur = T.cp ? (T.cd / T.cp) * 100 : 0;
+      const tbl = getTableInShape_(findShapeById_(doc, 108));
+      if (tbl) {
+        const trs = tbl.getElementsByTagName("a:tr");
+        [[trs[1], T.pp, T.pd, pctPrev, "الأسبوع السابق"], [trs[2], T.cp, T.cd, pctCur, "الأسبوع الحالي"]].forEach(([tr, planned, done, pct, label]) => {
+          if (!tr) return;
+          setCell_(tr, 0, pct.toFixed(1) + "%");
+          setCell_(tr, 1, fmtNum_(Math.max(planned - done, 0)));
+          setCell_(tr, 2, fmtNum_(done));
+          setCell_(tr, 3, fmtNum_(planned));
+          setCell_(tr, 4, label);
+        });
+      }
+      const ok = pctCur >= 100;
+      setShapeLines_(doc, 110, ["نسبة إنجاز الأسبوع الحالي"]);
+      setShapeLines_(doc, 111, [pctCur.toFixed(1) + "%"]);
+      setRunColor_(doc, 111, ok ? C_NAVY : C_ORANGE_TXT);
+      setBar_(doc, 112, 113, pctCur);
+      setShapeFill_(doc, 113, ok ? C_GREEN_BAR : C_ORANGE_BAR);
+      const diff = pctCur - pctPrev;
+      setShapeLines_(doc, 114, [
+        Math.abs(diff) < 0.05 ? "دون تغيير عن الأسبوع السابق" : `${diff > 0 ? "ارتفاع" : "انخفاض"} ${Math.abs(diff).toFixed(1)} نقطة عن الأسبوع السابق`,
+      ]);
+    });
+
+    // ── 4) الصيانة الوقائية (PPM Maximo) ──
+    await patchSlide_(zip, sPpm, (doc) => {
+      setShapeLines_(doc, 78, [`خطة الصيانة الوقائية لمقدم الخدمة – ${data.monthName} – ${region}`]);
+      setShapeLines_(doc, 79, [`تقرير متابعة أعمال الصيانة الوقائية  ·  الفترة: ${data.monthRange}`]);
+      const tbl = getTableInShape_(findShapeById_(doc, 80));
+      if (!tbl) return;
+      const trs = Array.from(tbl.getElementsByTagName("a:tr"));
+      const totalRow = trs[trs.length - 1];
+      const dataTemplates = [trs[1], trs[2] || trs[1]];
+      trs.slice(1, trs.length - 1).forEach((r) => r.parentNode.removeChild(r));
+      const list = R.ppmRows.slice(0, 12);
+      const n = Math.max(list.length, 1);
+      let sumTC = 0, sumAC = 0, sumTT = 0;
+      const pctTxt = (v) => (v == null ? "" : v.toFixed(1) + "%");
+      for (let i = 0; i < n; i++) {
+        const row = dataTemplates[i % 2].cloneNode(true);
+        const r = list[i];
+        if (r) {
+          const tc = plainNum_(r["المستهدف التراكمي"]), ac = plainNum_(r["المحقق التراكمي"]), tt = plainNum_(r["اجمالي المستهدف"]);
+          sumTC += tc || 0; sumAC += ac || 0; sumTT += tt || 0;
+          setCell_(row, 0, pctTxt(pctNum_(r["نسبة الإنجاز الكلي"])));
+          setCell_(row, 1, tt == null ? "" : fmtNum_(tt));
+          setCell_(row, 2, pctTxt(pctNum_(r["نسبة الإنجاز التراكمي"])));
+          setCell_(row, 3, ac == null ? "" : fmtNum_(ac));
+          setCell_(row, 4, tc == null ? "" : fmtNum_(tc));
+          setCell_(row, 5, ppmDate_(r["تاريخ البداية"]));
+          setCellRtl_(row, 5);
+          setCell_(row, 6, norm_(r["اسم المهمة"]));
+        } else {
+          [0, 1, 2, 3, 4, 5].forEach((c) => setCell_(row, c, ""));
+          setCell_(row, 6, "لا توجد بيانات صيانة وقائية لهذه المنطقة");
+        }
+        tbl.insertBefore(row, totalRow);
+      }
+      if (list.length) {
+        setCell_(totalRow, 0, pctTxt(sumTT ? (sumAC / sumTT) * 100 : null) || "");
+        setCell_(totalRow, 1, fmtNum_(sumTT));
+        setCell_(totalRow, 2, pctTxt(sumTC ? (sumAC / sumTC) * 100 : null) || "");
+        setCell_(totalRow, 3, fmtNum_(sumAC));
+        setCell_(totalRow, 4, fmtNum_(sumTC));
+        setCell_(totalRow, 5, "");
+      }
+      // ارتفاع إطار الجدول = مجموع صفوف الجدول الفعلي
+      const sp = findShapeById_(doc, 80);
+      const fx = sp && sp.getElementsByTagName("p:xfrm")[0];
+      const ext = fx && fx.getElementsByTagName("a:ext")[0];
+      if (ext) {
+        const h = Array.from(tbl.getElementsByTagName("a:tr")).reduce((s, r) => s + (parseInt(r.getAttribute("h"), 10) || 0), 0);
+        ext.setAttribute("cy", String(h));
+      }
+    });
+
+    // ── 5) أعلى 10 مدارس ──
+    await patchSlide_(zip, sTop, (doc) => {
+      setShapeLines_(doc, 78, [`أعلى 10 مدارس رفعت بلاغات – ${region}`]);
+      setShapeLines_(doc, 79, [period]);
+      const tbl = getTableInShape_(findShapeById_(doc, 80));
+      if (!tbl) return;
+      const trs = tbl.getElementsByTagName("a:tr");
+      for (let i = 0; i < 10; i++) {
+        const tr = trs[i + 1];
+        if (!tr) continue;
+        const s = R.top[i];
+        if (s) {
+          setCell_(tr, 0, cntPct_(s.emergency, s.count));
+          setCell_(tr, 1, cntPct_(s.count, R.cur));
+          setCell_(tr, 2, s.name);
+          setCell_(tr, 3, s.minId);
+        } else {
+          setCell_(tr, 0, "0"); setCell_(tr, 1, "0"); setCell_(tr, 2, "—"); setCell_(tr, 3, "—");
+        }
+        setCell_(tr, 4, String(i + 1));
+      }
+    });
   }
 
   async function buildReportZip_(data) {
     const zip = await loadTemplateZip_();
-    const slides = await resolveDeckSlidePaths_(zip); // 16 مسار بترتيب العرض الفعلي
-
-    // سلايد 1: العنوان (سطرين جوه نفس الفقرة، مفصولين بـ <a:br/>)
-    await patchSlide_(zip, slides[0], (doc) => {
-      setShapeBrSegments_(doc, 2, ["تقرير متابعة البلاغات", data.periodLabel]);
-    });
-
-    // سلايد 3: بلاغات الأمن والسلامة
-    await patchSlide_(zip, slides[2], (doc) => {
-      const kpiIds = [78, 80, 82, 84]; // من الأقل للأكبر (يمين→يسار = الأكبر أولاً)
-      const sortedAsc = [...data.secGroupsSorted].reverse();
-      sortedAsc.forEach((g, i) => {
-        setShapeLines_(doc, kpiIds[i], [fmtNum_(g.total), `${g.group} (${pct1_(g.total, data.secTotal)}%)`]);
-      });
-      const sp = findShapeById_(doc, 86);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        data.secGroupsSorted.forEach((g, rowIdx) => {
-          const r = rowIdx + 1;
-          setCell_(tbl, r, 0, `${fmtNum_(g.total)} (${pct1_(g.total, data.secTotal)}%)`);
-          // النسبة جنب كل منطقة = نصيب المنطقة من إجمالي نفس التصنيف (مجموع الصف = 100%)
-          setCell_(tbl, r, 1, cntPct_(g.byRegion.get("الطائف"), g.total));
-          setCell_(tbl, r, 2, cntPct_(g.byRegion.get("المدينة المنورة"), g.total));
-          setCell_(tbl, r, 3, cntPct_(g.byRegion.get("مكة المكرمة"), g.total));
-          setCell_(tbl, r, 4, cntPct_(g.byRegion.get("جدة"), g.total));
-          setCell_(tbl, r, 5, g.group);
-        });
-        setCell_(tbl, 5, 0, `${fmtNum_(data.secTotal)} (100%)`);
-        // صف الإجمالي: نصيب كل منطقة من إجمالي بلاغات الأمن والسلامة
-        setCell_(tbl, 5, 1, cntPct_(REGION_ORDER_SUM_(data.secGroupsSorted, "الطائف"), data.secTotal));
-        setCell_(tbl, 5, 2, cntPct_(REGION_ORDER_SUM_(data.secGroupsSorted, "المدينة المنورة"), data.secTotal));
-        setCell_(tbl, 5, 3, cntPct_(REGION_ORDER_SUM_(data.secGroupsSorted, "مكة المكرمة"), data.secTotal));
-        setCell_(tbl, 5, 4, cntPct_(REGION_ORDER_SUM_(data.secGroupsSorted, "جدة"), data.secTotal));
-        setCell_(tbl, 5, 5, "الإجمالي");
-      }
-    });
-
-    // سلايد 4: نظرة عامة
-    await patchSlide_(zip, slides[3], (doc) => {
-      setShapeLines_(doc, 2, [`نظرة عامة على البلاغات - الفترة: ${data.periodLabel}`]);
-      // البلاغات المعاد فتحها: مفيش لها داتا في الداشبورد — المستخدم بيكتبها لكل منطقة
-      // في نافذة التنزيل (data.manual). لو مش متوفرة (استدعاء برمجي) بتتكتب "—".
-      const reopenedMap = data.manual ? data.manual.reopenedByRegion : null;
-      const reopenedOf = (region) => (reopenedMap && reopenedMap[region] != null ? reopenedMap[region] : null);
-      const reopenedKnown = REGION_ORDER.every((r) => reopenedOf(r) !== null);
-      const reopenedTotal = reopenedKnown ? REGION_ORDER.reduce((s, r) => s + reopenedOf(r), 0) : null;
-      setShapeLines_(doc, 78, reopenedTotal === null
-        ? ["—", "بلاغات أُعيد فتحها"]
-        : [fmtNum_(reopenedTotal), `بلاغات أُعيد فتحها (${pct1_(reopenedTotal, data.overviewTotal)}%)`]);
-      setShapeLines_(doc, 80, [fmtNum_(data.consultantApprovalRows.length), `قيد موافقة الاستشاري (${pct1_(data.consultantApprovalRows.length, data.overviewTotal)}%)`]);
-      setShapeLines_(doc, 82, [data.buildingsTotal != null ? fmtNum_(data.buildingsTotal) : "—", "عدد المباني المدرسة"]);
-      setShapeLines_(doc, 84, [fmtNum_(data.emergencyRows.length), `بلاغات طارئة (${pct1_(data.emergencyRows.length, data.overviewTotal)}%)`]);
-      setShapeLines_(doc, 86, [fmtNum_(data.overviewTotal), "إجمالي البلاغات"]);
-      const sp = findShapeById_(doc, 88);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        data.overviewByRegion.forEach((x, i) => {
-          const r = i + 1;
-          setCell_(tbl, r, 0, `${pct1_(x.total, data.overviewTotal)}%`);
-          // النسبة جنب "قيد موافقة الاستشاري" و"المعاد فتحها" = من إجمالي بلاغات المنطقة نفسها
-          setCell_(tbl, r, 1, cntPct_(x.consultantApproval, x.total));
-          setCell_(tbl, r, 2, reopenedOf(x.region) === null ? "—" : cntPct_(reopenedOf(x.region), x.total));
-          setCell_(tbl, r, 3, fmtNum_(x.total));
-          setCell_(tbl, r, 4, x.region);
-        });
-        setCell_(tbl, 5, 0, "100.0%");
-        setCell_(tbl, 5, 1, cntPct_(data.consultantApprovalRows.length, data.overviewTotal));
-        setCell_(tbl, 5, 2, reopenedTotal === null ? "—" : cntPct_(reopenedTotal, data.overviewTotal));
-        setCell_(tbl, 5, 3, fmtNum_(data.overviewTotal));
-        setCell_(tbl, 5, 4, "الإجمالي");
-      }
-    });
-
-    // سلايد 5: توزيع المباني اللي عندها بلاغات
-    await patchSlide_(zip, slides[4], (doc) => {});
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[4]);
-      const sortedB = [...data.buildingsByRegion].sort((a, b) => b.count - a.count);
-      const totalB = sortedB.reduce((s, x) => s + x.count, 0);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        setChartCategoriesValues_(cdoc, 0, sortedB.map((x) => x.region), sortedB.map((x) => x.count));
-        // 🛠️ (إصلاح جوهري) الليبلات الظاهرة على كل عمود نص ثابت من التمبلت الأصلي —
-        // لازم تُحدَّث صراحة، غير كده هتفضل عارضة أرقام التمبلت القديمة زي "1,097"
-        // بغض النظر عن بيانات الفترة الفعلية (راجع تعليق setChartDataLabelTexts_)
-        setChartDataLabelTexts_(cdoc, 0, sortedB.map((x) => `${fmtNum_(x.count)} (${pct1_(x.count, totalB)}%)`));
-      });
+    const slides = await resolveDeckSlidePaths_(zip);
+    if (slides.length < REGION_ORDER.length * SLIDES_PER_REGION) {
+      throw new Error("قالب التقرير غير مطابق (عدد الشرائح أقل من المتوقع) — أعد رفع report_template.pptx الجديد");
     }
-
-    // سلايد 6: مقارنة الأسبوعين
-    await patchSlide_(zip, slides[5], (doc) => {
-      setShapeLines_(doc, 2, [`مقارنة البلاغات - ${data.curShort} مقابل ${data.prevShort}`]);
-      const sp = findShapeById_(doc, 80);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        setCell_(tbl, 0, 1, data.curShort);
-        setCell_(tbl, 0, 2, data.prevShort);
-        let totCur = 0, totPrev = 0;
-        data.weekCompareByRegion.forEach((x, i) => {
-          const r = i + 1;
-          const diffPct = x.previous > 0 ? (((x.current - x.previous) / x.previous) * 100).toFixed(1) : (x.current > 0 ? "100.0" : "0.0");
-          setCell_(tbl, r, 0, `${diffPct}%`);
-          setCell_(tbl, r, 1, fmtNum_(x.current));
-          setCell_(tbl, r, 2, fmtNum_(x.previous));
-          setCell_(tbl, r, 3, x.region);
-          totCur += x.current; totPrev += x.previous;
-        });
-        const totDiffPct = totPrev > 0 ? (((totCur - totPrev) / totPrev) * 100).toFixed(1) : "0.0";
-        setCell_(tbl, 5, 0, `${totDiffPct}%`);
-        setCell_(tbl, 5, 1, fmtNum_(totCur));
-        setCell_(tbl, 5, 2, fmtNum_(totPrev));
-        setCell_(tbl, 5, 3, "الإجمالي");
-      }
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[5]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        const cats = data.weekCompareByRegion.map((x) => x.region);
-        setSeriesName_(cdoc, 0, data.prevShort);
-        setSeriesName_(cdoc, 1, data.curShort);
-        setChartCategoriesValues_(cdoc, 0, cats, data.weekCompareByRegion.map((x) => x.previous));
-        setChartCategoriesValues_(cdoc, 1, cats, data.weekCompareByRegion.map((x) => x.current));
-      });
-    }
-
-    // سلايد جديدة (منفصلة تمامًا عن سلايد "مقارنة الأسبوعين" أعلاه — طلب صريح
-    // 2026-10-03: "اعمل صفحه تانيه خالص ويبقي بتقارن 4 مع بعض بنفس الفكره والطريقه"):
-    // مقارنة البلاغات عبر 4 أسابيع متتالية، بنفس أسلوب جدول+تشارت لكل منطقة، لكن
-    // بـ4 أعمدة/سلاسل بدل عمودين. ترتيب أعمدة الجدول: [الفرق(الأحدث مقابل الأقدم) |
-    // الأسبوع4(الأحدث) | الأسبوع3 | الأسبوع2 | الأسبوع1(الأقدم) | المنطقة].
-    await patchSlide_(zip, slides[6], (doc) => {
-      setShapeLines_(doc, 2, [`مقارنة البلاغات - 4 أسابيع متتالية (${data.week4Labels[0]} – ${data.week4Labels[3]})`]);
-      const sp = findShapeById_(doc, 80);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        setCell_(tbl, 0, 1, data.week4Labels[3]);
-        setCell_(tbl, 0, 2, data.week4Labels[2]);
-        setCell_(tbl, 0, 3, data.week4Labels[1]);
-        setCell_(tbl, 0, 4, data.week4Labels[0]);
-        const totals = [0, 0, 0, 0]; // بترتيب week4Labels (الأقدم → الأحدث)
-        data.week4ByRegion.forEach((x, i) => {
-          const r = i + 1;
-          const oldest = x.counts[0], newest = x.counts[3];
-          const diffPct = oldest > 0 ? (((newest - oldest) / oldest) * 100).toFixed(1) : (newest > 0 ? "100.0" : "0.0");
-          setCell_(tbl, r, 0, `${diffPct}%`);
-          setCell_(tbl, r, 1, fmtNum_(x.counts[3]));
-          setCell_(tbl, r, 2, fmtNum_(x.counts[2]));
-          setCell_(tbl, r, 3, fmtNum_(x.counts[1]));
-          setCell_(tbl, r, 4, fmtNum_(x.counts[0]));
-          setCell_(tbl, r, 5, x.region);
-          x.counts.forEach((c, wi) => { totals[wi] += c; });
-        });
-        const totDiffPct = totals[0] > 0 ? (((totals[3] - totals[0]) / totals[0]) * 100).toFixed(1) : "0.0";
-        setCell_(tbl, 5, 0, `${totDiffPct}%`);
-        setCell_(tbl, 5, 1, fmtNum_(totals[3]));
-        setCell_(tbl, 5, 2, fmtNum_(totals[2]));
-        setCell_(tbl, 5, 3, fmtNum_(totals[1]));
-        setCell_(tbl, 5, 4, fmtNum_(totals[0]));
-        setCell_(tbl, 5, 5, "الإجمالي");
-      }
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[6]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        const cats = data.week4ByRegion.map((x) => x.region);
-        [0, 1, 2, 3].forEach((wi) => {
-          setSeriesName_(cdoc, wi, data.week4Labels[wi]);
-          setChartCategoriesValues_(cdoc, wi, cats, data.week4ByRegion.map((x) => x.counts[wi]));
-        });
-      });
-    }
-
-    // سلايد 7: الأولوية (روتيني/طارئ)
-    await patchSlide_(zip, slides[7], (doc) => {
-      const sp = findShapeById_(doc, 80);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        let totE = 0, totR = 0;
-        data.priorityByRegion.forEach((x, i) => {
-          const r = i + 1;
-          // النسبة = من إجمالي بلاغات المنطقة (روتيني + طارئ = 100%)
-          setCell_(tbl, r, 0, cntPct_(x.emergency, x.emergency + x.routine));
-          setCell_(tbl, r, 1, cntPct_(x.routine, x.emergency + x.routine));
-          setCell_(tbl, r, 2, x.region);
-          totE += x.emergency; totR += x.routine;
-        });
-        setCell_(tbl, 5, 0, cntPct_(totE, totE + totR));
-        setCell_(tbl, 5, 1, cntPct_(totR, totE + totR));
-        setCell_(tbl, 5, 2, "الإجمالي");
-      }
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[7]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        setChartCategoriesValues_(cdoc, 0, data.priorityByRegion.map((x) => x.region), data.priorityByRegion.map((x) => x.pct));
-      });
-    }
-
-    // سلايد 8: الالتزام بـ SLA
-    // (طلب صريح 2026-09-26) تشارت "المقاول (BMC) مقابل الاستشاري": النسبتين بيكتبهم
-    // المستخدم في نافذة التنزيل، والفجوة = الكبير − الصغير. القسم الأول (عدد البلاغات
-    // ضمن/متجاوزة SLA) فاضل محسوب من البيانات زي ما هو.
-    const slaContractor = data.manual && data.manual.slaContractor != null ? data.manual.slaContractor : data.compliancePct;
-    const slaConsultant = data.manual && data.manual.slaConsultant != null ? data.manual.slaConsultant : data.compliancePct;
-    const slaGap = Math.abs(slaContractor - slaConsultant);
-    await patchSlide_(zip, slides[8], (doc) => {
-      setShapeLines_(doc, 79, [fmtNum_(data.overdueCount), `بلاغات تجاوزت ال SLA  من اجمالي البلاغات بنسبة ${data.breachPct.toFixed(1)}%`]);
-      setShapeLines_(doc, 81, [fmtNum_(data.compliantCount), `بلاغات ضمنSLA  من اجمالي البلاغات بنسبة ${data.compliancePct.toFixed(1)}%`]);
-      setShapeLines_(doc, 86, [`%${slaGap.toFixed(1)}`, "الفجوة"]);
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[8]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        // ترتيب التمبلت: النقطة 0 = المقاول (يمين)، النقطة 1 = الاستشاري (يسار)
-        setChartCategoriesValues_(cdoc, 0, ["المقاول (BMC)", "الاستشاري"], [slaContractor.toFixed(1), slaConsultant.toFixed(1)]);
-      });
-    }
-
-    // سلايد 9: قيد موافقة الاستشاري
-    await patchSlide_(zip, slides[9], (doc) => {
-      const sp = findShapeById_(doc, 80);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        // ⚠️ (تصحيح) النسبة = من إجمالي بلاغات المنطقة نفسها — نفس تعريف التقرير الأصلي
-        // (جدة 183 من 13,719 = 1.3%). قبل كده كانت بتتحسب من إجمالي كل المناطق بالغلط.
-        const regionTotalOf = new Map(data.overviewByRegion.map((o) => [o.region, o.total]));
-        let tot = 0;
-        data.consultantByRegion.forEach((x, i) => {
-          const r = i + 1;
-          setCell_(tbl, r, 0, `${pct1_(x.count, regionTotalOf.get(x.region) || 0)}%`);
-          setCell_(tbl, r, 1, fmtNum_(x.count));
-          setCell_(tbl, r, 2, x.region);
-          tot += x.count;
-        });
-        setCell_(tbl, 5, 0, `${pct1_(tot, data.overviewTotal)}%`);
-        setCell_(tbl, 5, 1, fmtNum_(tot));
-        setCell_(tbl, 5, 2, "الإجمالي");
-      }
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[9]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        setChartCategoriesValues_(cdoc, 0, data.consultantByRegion.map((x) => x.region), data.consultantByRegion.map((x) => x.count));
-      });
-    }
-
-    // سلايد 10: بلاغات النظافة حسب المنطقة
-    await patchSlide_(zip, slides[10], (doc) => {
-      const sp = findShapeById_(doc, 80);
-      const tbl = getTableInShape_(sp);
-      if (tbl) {
-        let tot = 0;
-        data.cleaningByRegion.forEach((x, i) => {
-          const r = i + 1;
-          setCell_(tbl, r, 0, `${pct1_(x.count, data.cleaningTotal)}%`);
-          setCell_(tbl, r, 1, fmtNum_(x.count));
-          setCell_(tbl, r, 2, x.region);
-          tot += x.count;
-        });
-        setCell_(tbl, 5, 0, "100%");
-        setCell_(tbl, 5, 1, fmtNum_(tot));
-        setCell_(tbl, 5, 2, "الإجمالي");
-      }
-    });
-    {
-      const chartPath = await getSlideChartPath_(zip, slides[10]);
-      await patchChart_(zip, chartPath, (cdoc) => {
-        setChartCategoriesValues_(cdoc, 0, data.cleaningByRegion.map((x) => x.region), data.cleaningByRegion.map((x) => x.count));
-      });
-    }
-
-    // سلايد 11: توزيع بلاغات النظافة على المقاولين
-    // تمبلت الجدول (5 أعمدة، من الشمال لليمين): النسبة داخل المنطقة | عدد البلاغات |
-    // المقاول | المحافظات | المنطقة — وصفوفه: هيدر، نمط صف أبيض، نمط صف أخضر فاتح، إجمالي.
-    // وقت التشغيل: صف لكل (منطقة × مقاول)، خلية المنطقة مدموجة رأسيًا لكل صفوف نفس
-    // المنطقة، ولون الخلفية بيتبادل لكل منطقة (مش لكل صف) عشان المجموعات تبان واضحة.
-    await patchSlide_(zip, slides[11], (doc) => {
-      const sp = findShapeById_(doc, 78);
-      const tbl = getTableInShape_(sp);
-      if (!tbl) return;
-      const rowsData = data.cleaningContractorRows;
-      const cols = tbl.getElementsByTagName("a:gridCol").length;
-      const trs = Array.from(tbl.getElementsByTagName("a:tr"));
-      const setText = (tr, idx, text) => {
-        const tcs = Array.from(tr.getElementsByTagName("a:tc"));
-        const p = tcs[idx] && tcs[idx].getElementsByTagName("a:p")[0];
-        if (p) setParagraphText_(p, String(text));
-      };
-      const setRowId = (tr, id) => {
-        const rid = tr.getElementsByTagName("a16:rowId")[0];
-        if (rid) rid.setAttribute("val", String(id));
-      };
-
-      if (cols === 5 && trs.length >= 4) {
-        const patA = trs[1].cloneNode(true);
-        const patB = trs[2].cloneNode(true);
-        const totalRow = trs[trs.length - 1].cloneNode(true);
-        const headerH = Number(trs[0].getAttribute("h")) || 438994;
-        const totalH = Number(totalRow.getAttribute("h")) || 438994;
-        trs.slice(1).forEach((r) => r.parentNode.removeChild(r));
-        // ارتفاع الصفوف: نملأ نفس مساحة جداول باقي السلايدات (4,389,948 EMU)، بحد
-        // أدنى وأقصى عشان الجدول مايبقاش مضغوط ولا مفروط
-        const AREA = 4389948;
-        const n = Math.max(rowsData.length, 1);
-        const rowH = Math.max(300000, Math.min(520000, Math.floor((AREA - headerH - totalH) / n)));
-        let group = -1;
-        let prevRegion = null;
-        const built = [];
-        rowsData.forEach((rd, i) => {
-          if (rd.region !== prevRegion) { group++; prevRegion = rd.region; }
-          const tr = (group % 2 === 0 ? patA : patB).cloneNode(true);
-          tr.setAttribute("h", String(rowH));
-          setRowId(tr, 10001 + i);
-          setText(tr, 0, `${rd.pct}%`);
-          setText(tr, 1, fmtNum_(rd.count));
-          setText(tr, 2, rd.contractor);
-          setText(tr, 3, rd.governorates);
-          setText(tr, 4, rd.region);
-          tbl.appendChild(tr);
-          built.push({ tr, region: rd.region });
-        });
-        // دمج خلية "المنطقة" رأسيًا لكل صفوف نفس المنطقة (rowSpan + vMerge)
-        for (let i = 0; i < built.length; ) {
-          let j = i;
-          while (j + 1 < built.length && built[j + 1].region === built[i].region) j++;
-          const span = j - i + 1;
-          if (span > 1) {
-            const first = Array.from(built[i].tr.getElementsByTagName("a:tc"))[4];
-            first.setAttribute("rowSpan", String(span));
-            for (let k = i + 1; k <= j; k++) {
-              const cell = Array.from(built[k].tr.getElementsByTagName("a:tc"))[4];
-              cell.setAttribute("vMerge", "1");
-              const p = cell.getElementsByTagName("a:p")[0];
-              if (p) setParagraphText_(p, "");
-            }
-          }
-          i = j + 1;
-        }
-        // صف الإجمالي
-        const total = rowsData.reduce((s, r) => s + r.count, 0);
-        totalRow.setAttribute("h", String(totalH));
-        setRowId(totalRow, 10001 + rowsData.length);
-        setText(totalRow, 0, total > 0 ? "100.0%" : "0.0%");
-        setText(totalRow, 1, fmtNum_(total));
-        setText(totalRow, 2, `عدد المقاولين: ${new Set(rowsData.filter((r) => r.count > 0).map((r) => r.contractor)).size}`);
-        setText(totalRow, 3, "");
-        setText(totalRow, 4, "الإجمالي");
-        tbl.appendChild(totalRow);
-        // ارتفاع إطار الجدول = مجموع الصفوف الفعلي
-        const ext = sp.getElementsByTagName("a:ext");
-        for (const e of Array.from(ext)) {
-          if (e.getAttribute("cx") && e.getAttribute("cy")) {
-            e.setAttribute("cy", String(headerH + totalH + rowH * rowsData.length));
-            break;
-          }
-        }
-      } else {
-        // احتياطي: تمبلت قديم (4 أعمدة) — المحافظات بين قوسين جنب المنطقة
-        const rowsLegacy = rowsData.slice(0, 9);
-        setDynamicDataRows_(tbl, rowsLegacy, () => {});
-        const trs2 = tbl.getElementsByTagName("a:tr");
-        rowsLegacy.forEach((rd, i) => {
-          const tr = trs2[i + 1];
-          if (!tr) return;
-          setRowId(tr, 10001 + i);
-          setText(tr, 0, `${rd.pct}%`);
-          setText(tr, 1, fmtNum_(rd.count));
-          setText(tr, 2, rd.contractor);
-          setText(tr, 3, rd.governorates && rd.governorates !== rd.region ? `${rd.region} (${rd.governorates})` : rd.region);
-        });
-      }
-    });
-
-    // سلايد 12-15: أعلى 10 مدارس لكل منطقة
-    const schoolSlideRegions = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
-    for (let i = 0; i < schoolSlideRegions.length; i++) {
-      const region = schoolSlideRegions[i];
-      await patchSlide_(zip, slides[12 + i], (doc) => {
-        const sp = findShapeById_(doc, 78);
-        const tbl = getTableInShape_(sp);
-        if (!tbl) return;
-        const trs = tbl.getElementsByTagName("a:tr");
-        const list = data.topSchoolsByRegion[region] || [];
-        const regionTotal = (data.overviewByRegion.find((o) => o.region === region) || { total: 0 }).total;
-        for (let rIdx = 0; rIdx < 10; rIdx++) {
-          const tr = trs[rIdx + 1];
-          if (!tr) continue;
-          const tcs = tr.getElementsByTagName("a:tc");
-          const setTc = (idx, text) => {
-            const p = tcs[idx] && tcs[idx].getElementsByTagName("a:p")[0];
-            if (p) setParagraphText_(p, String(text));
-          };
-          const s = list[rIdx];
-          if (s) {
-            // "منها طارئة" = نسبة من بلاغات المدرسة نفسها، "عدد البلاغات" = نسبة من بلاغات المنطقة
-            setTc(0, cntPct_(s.emergency, s.count));
-            setTc(1, cntPct_(s.count, regionTotal));
-            setTc(2, s.name);
-            setTc(3, s.minId);
-            setTc(4, String(rIdx + 1));
-          } else {
-            setTc(0, "0"); setTc(1, "0"); setTc(2, "—"); setTc(3, "—"); setTc(4, String(rIdx + 1));
-          }
-        }
-      });
-    }
-
+    for (let i = 0; i < REGION_ORDER.length; i++) await fillRegion_(zip, slides, i, data);
     return zip;
-  }
-
-  function REGION_ORDER_SUM_(groups, region) {
-    return groups.reduce((s, g) => s + (g.byRegion.get(region) || 0), 0);
   }
 
   async function downloadReportPptx_(zip, data) {
@@ -1010,127 +605,263 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const stamp = `${data.curStart.getFullYear()}-${String(data.curStart.getMonth() + 1).padStart(2, "0")}-${String(data.curStart.getDate()).padStart(2, "0")}`;
-    a.download = `تقرير_متابعة_البلاغات_${stamp}.pptx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.download = `تقرير_متابعة_البلاغات_الأسبوعي_${iso_(data.weekEnd)}.pptx`;
+    document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  // ── الأرقام اليدوية اللي المستخدم بيكتبها في نافذة التنزيل (مفيش لها مصدر في
-  // الداشبورد): نسبة التزام المقاول والاستشاري بـSLA (لتشارت المقارنة + الفجوة)،
-  // وعدد البلاغات المعاد فتحها لكل منطقة. بنطبّعها هنا لشكل ثابت؛ لو مش متوفرة
-  // (استدعاء برمجي من غير النافذة) بترجع null وكل سلايد بيتعامل معاها بأمان.
-  function normalizeManual_(manual) {
-    if (!manual || typeof manual !== "object") return null;
-    const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
-    const reopened = {};
-    REGION_ORDER.forEach((r) => {
-      const v = manual.reopenedByRegion ? num(manual.reopenedByRegion[r]) : null;
-      reopened[r] = v === null ? null : Math.max(0, Math.round(v));
-    });
-    return {
-      slaContractor: num(manual.slaContractor),
-      slaConsultant: num(manual.slaConsultant),
-      reopenedByRegion: reopened,
-    };
-  }
-
-  // periodDays: 7 أو 14 — manual: {slaContractor, slaConsultant, reopenedByRegion:{جدة:..}}
-  window.generateBalaghReportPptx = async function generateBalaghReportPptx(periodDays, manual) {
-    if (typeof JSZip === "undefined") {
-      throw new Error("مكتبة JSZip لم تُحمَّل بعد — تأكد من اتصال الإنترنت وأعد المحاولة");
-    }
-    const data = computeReportData(periodDays);
-    data.manual = normalizeManual_(manual);
+  // مدخلات يدوية → شكل ثابت. manual[region] = {rating, rep1, rep2, rep3, tfmp:{pp,pd,cp,cd}}
+  window.generateBalaghReportPptx = async function generateBalaghReportPptx(weekEnd, manual) {
+    if (typeof JSZip === "undefined") throw new Error("مكتبة JSZip لم تُحمَّل بعد — تأكد من اتصال الإنترنت وأعد المحاولة");
+    const data = computeReportData(weekEnd || defaultWeekEnd_(), manual);
     const zip = await buildReportZip_(data);
     await downloadReportPptx_(zip, data);
     return data;
   };
-  window.__balaghReportComputeData_ = computeReportData; // للاختبار فقط
+  window.__balaghReportComputeData_ = computeReportData; // للاختبار
+  window.__balaghReportBuildZip_ = async function (weekEnd, manual) { const d = computeReportData(weekEnd, manual); return { zip: await buildReportZip_(d), data: d }; }; // للاختبار
 
-  // ═══════════════ نافذة التنزيل: الفترة + الأرقام اليدوية + كلمة المرور ═══════════════
-  // (طلب صريح) الزرار لازم "يبقى بباسورد" قبل التنزيل، ويدّي اختيار بين "آخر أسبوع
-  // فقط" و"آخر أسبوعين". (طلب صريح 2026-09-26) في نفس النافذة: خانات يكتب فيها
-  // المستخدم نسبة التزام المقاول والاستشاري بـSLA (الفجوة = الكبير − الصغير)، وعدد
-  // البلاغات المعاد فتحها لكل منطقة — كلها إجبارية (الصفر مسموح) عشان التقرير ما
-  // يطلعش بأرقام ناقصة. نافذة بعناصر DOM عادية من غير أي مكتبة خارجية؛ بترجع
-  // Promise<{password, periodDays, manual} | null> (null = المستخدم ألغى).
-
-  // تحويل أي رقم مكتوب (أرقام عربية ٠-٩ / فارسية ۰-۹، فاصلة عشرية "٫" أو ","، علامة %)
-  // لرقم عادي. بيرجع null لو النص مش رقم صالح.
+  // ═════════════════════════ نافذة التنزيل ═════════════════════════
   function parseUserNumber_(raw) {
     let t = String(raw == null ? "" : raw).trim();
     if (!t) return null;
-    t = t
-      .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660))
-      .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0))
-      .replace(/[٫,]/g, ".")
-      .replace(/[%٪\s]/g, "");
+    t = t.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0))
+      .replace(/[٫,]/g, ".").replace(/[%٪\s]/g, "");
     if (!/^\d+(\.\d+)?$/.test(t)) return null;
     return Number(t);
+  }
+  // ── استيراد جدول «المعاد فتحها + تقييم الاستبيان» من Excel ──
+  // الأعمدة (بالترتيب أو بأي ترتيب، تُعرف بعناوينها): المنطقة | المعاد فتحها (إجمالي) | Time 1 | Time 2-3 | Time 4-8 | الاستبيان - متوسط تقييم الحالة
+  // الخلايا قد تكون «67 (87%)» فيُؤخذ العدد قبل القوس. صف «الإجمالي» (أو أي اسم لا يطابق منطقة) يُتجاهل.
+  function normAr_(t) {
+    return String(t == null ? "" : t).trim().replace(/[\u064B-\u0652\u0640]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ");
+  }
+  function cellNum_(v) {
+    if (v == null || v === "") return null;
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    const t = String(v).replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/[٫,]/g, ".");
+    const m = t.match(/\d+(?:\.\d+)?/);
+    return m ? Number(m[0]) : null;
+  }
+  function parseReopenedAoa_(aoa) {
+    const res = { values: {}, warnings: [], regionsFound: [] };
+    let hi = -1, cols = null;
+    for (let i = 0; i < Math.min(aoa.length, 15) && hi < 0; i++) {
+      const row = (aoa[i] || []).map(normAr_);
+      const c = { region: -1, total: -1, t1: -1, t2: -1, t3: -1, rating: -1 };
+      row.forEach((h, j) => {
+        const lh = h.toLowerCase();
+        if (/^المنطقه/.test(h)) c.region = j;
+        else if (/time\s*1\b|تكرار\s*1\b/.test(lh) && !/time\s*1\d/.test(lh)) c.t1 = j;
+        else if (/time\s*2|تكرار\s*2/.test(lh)) c.t2 = j;
+        else if (/time\s*4|تكرار\s*4/.test(lh)) c.t3 = j;
+        else if (/تقييم|الاستبيان/.test(h)) c.rating = j;
+        else if (/المعاد/.test(h)) c.total = j;
+      });
+      if (c.region >= 0 && (c.t1 >= 0 || c.rating >= 0)) { hi = i; cols = c; }
+    }
+    if (hi < 0) { res.warnings.push("لم أجد صف العناوين (المنطقة / Time 1 / Time 2-3 / Time 4-8 / الاستبيان)."); return res; }
+    const regionNorm = REGION_ORDER.map((r) => ({ r, n: normAr_(r) }));
+    for (let i = hi + 1; i < aoa.length; i++) {
+      const row = aoa[i] || [];
+      const name = normAr_(row[cols.region]);
+      if (!name) continue;
+      const hit = regionNorm.find((x) => x.n === name) || regionNorm.find((x) => name.indexOf(x.n) >= 0) || (name.length >= 3 ? regionNorm.find((x) => x.n.indexOf(name) === 0) : null);
+      if (!hit) continue; // الإجمالي أو غيره
+      const v = {};
+      if (cols.t1 >= 0) v.rep1 = cellNum_(row[cols.t1]);
+      if (cols.t2 >= 0) v.rep2 = cellNum_(row[cols.t2]);
+      if (cols.t3 >= 0) v.rep3 = cellNum_(row[cols.t3]);
+      if (cols.rating >= 0) v.rating = cellNum_(row[cols.rating]);
+      if (v.rep3 == null && cols.t3 < 0) v.rep3 = 0;
+      const tot = cols.total >= 0 ? cellNum_(row[cols.total]) : null;
+      if (tot != null && v.rep1 != null && v.rep2 != null && tot !== v.rep1 + v.rep2 + (v.rep3 || 0)) {
+        res.warnings.push(`${hit.r}: إجمالي المعاد فتحها في الملف (${tot}) لا يساوي مجموع Time 1 + 2-3 + 4-8 (${v.rep1 + v.rep2 + (v.rep3 || 0)}) — راجع الأرقام.`);
+      }
+      if (v.rating != null && v.rating > 5) res.warnings.push(`${hit.r}: التقييم أكبر من 5 — تم تجاهله.`), (v.rating = null);
+      res.values[hit.r] = v; res.regionsFound.push(hit.r);
+    }
+    REGION_ORDER.forEach((r) => { if (res.regionsFound.indexOf(r) < 0) res.warnings.push(`لم أجد صف منطقة ${r} في الملف.`); });
+    return res;
+  }
+  async function readSheetFile_(file) {
+    if (typeof XLSX === "undefined") throw new Error("مكتبة قراءة Excel لم تُحمَّل بعد — تأكد من الاتصال وأعد المحاولة");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  }
+  window.__balaghReportParseReopened_ = parseReopenedAoa_; // للاختبار
+
+  // ── لصق زيارات TFMP (أسبوع واحد) كما تصل: صف عنوان «المكتمل / المخطط / نسبة الإنجاز» ثم صف لكل منطقة ──
+  // يتحمّل الأسطر والتبويبات الزائدة (الخلايا متعددة الأسطر)، ويتجاهل اسم الأسبوع وعمود «المدينة» في العنوان (لا أرقام بعده).
+  // ترتيب العددين يُؤخذ من العنوان، ويُتحقق منه بنسبة الإنجاز (لو لا تطابق يُعكس تلقائيًا).
+  const TFMP_ALIASES = [
+    { r: "جدة", re: "جده" }, { r: "مكة المكرمة", re: "مكه(?: المكرمه)?" },
+    { r: "المدينة المنورة", re: "المدينه(?: المنوره)?" }, { r: "الطائف", re: "الطائف|الطايف" },
+  ];
+  function parseTfmpPaste_(text) {
+    const res = { values: {}, found: [], warnings: [] };
+    const t = normAr_(String(text || "").replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/[٫]/g, "."));
+    if (!t) { res.warnings.push("المربع فارغ."); return res; }
+    const iDone = t.indexOf("المكتمل"), iPlan = t.indexOf("المخطط");
+    const firstIsDone = iDone >= 0 && iPlan >= 0 ? iDone < iPlan : true;
+    const rx = new RegExp(TFMP_ALIASES.map((a) => "(" + a.re + ")").join("|"), "g");
+    const hits = [];
+    let m;
+    while ((m = rx.exec(t))) {
+      const k = m.slice(1).findIndex((x) => x != null);
+      hits.push({ r: TFMP_ALIASES[k].r, start: m.index, end: m.index + m[0].length });
+    }
+    hits.forEach((h, i) => {
+      const seg = t.slice(h.end, i + 1 < hits.length ? hits[i + 1].start : t.length);
+      const nums = [], pcts = [];
+      const nr = /(\d+(?:\.\d+)?)\s*(%?)/g;
+      let n;
+      while ((n = nr.exec(seg))) (n[2] ? pcts : nums).push(Number(n[1]));
+      if (nums.length < 2) return; // عنوان الجدول أو سطر لا يخصّ منطقة
+      let a = nums[0], b = nums[1];            // a = العدد الأول، b = الثاني
+      let done = firstIsDone ? a : b, planned = firstIsDone ? b : a;
+      const pct = pcts.length ? pcts[0] : nums.length > 2 ? nums[2] : null;
+      if (pct != null && planned > 0) {
+        const ok = (d, p) => p > 0 && Math.abs((d / p) * 100 - pct) <= 1.5;
+        if (!ok(done, planned)) {
+          if (ok(planned, done)) { const x = done; done = planned; planned = x; }
+          else res.warnings.push(`${h.r}: نسبة الإنجاز في اللصق (${pct}%) لا تطابق ${done}/${planned} — راجع الأرقام.`);
+        }
+      }
+      res.values[h.r] = { done, planned };
+    });
+    res.found = REGION_ORDER.filter((r) => res.values[r]);
+    REGION_ORDER.forEach((r) => { if (!res.values[r]) res.warnings.push(`لم أجد منطقة ${r} في النص الملصوق.`); });
+    return res;
+  }
+  window.__balaghReportParseTfmp_ = parseTfmpPaste_; // للاختبار
+
+  // ── ذاكرة زيارات TFMP: سجل لكل أسبوع (مفتاحه سبت نهاية الأسبوع) = {المنطقة:{planned, done}} ──
+  // الأسبوع «السابق» في أي تقرير يُؤخذ تلقائيًا من سجل الأسبوع الذي قبله. البذرة أدناه من تقرير 27 سبتمبر – 3 أكتوبر 2026 (الأسبوع الرابع).
+  const TFMP_HIST_KEY = "balaghTfmpHistory_v1";
+  const TFMP_SEED = {
+    "2026-10-03": {
+      "جدة": { planned: 238, done: 119 }, "مكة المكرمة": { planned: 487, done: 600 },
+      "المدينة المنورة": { planned: 281, done: 66 }, "الطائف": { planned: 256, done: 265 },
+    },
+  };
+  function loadTfmpHist_() {
+    let h = {};
+    try { h = JSON.parse(localStorage.getItem(TFMP_HIST_KEY) || "{}") || {}; } catch (_) { h = {}; }
+    return Object.assign({}, TFMP_SEED, h); // ما سجّله المستخدم يغلب البذرة
+  }
+  function isoToDate_(iso) { const [y, m, d] = String(iso).split("-").map(Number); return new Date(y, m - 1, d); }
+  function saveTfmpHist_(weekIso, manual) {
+    try {
+      let h = {};
+      try { h = JSON.parse(localStorage.getItem(TFMP_HIST_KEY) || "{}") || {}; } catch (_) { h = {}; }
+      const prevIso = iso_(addDays_(isoToDate_(weekIso), -7));
+      const cur = {}, prev = {};
+      REGION_ORDER.forEach((r) => {
+        const T = manual[r] && manual[r].tfmp;
+        if (!T) return;
+        cur[r] = { planned: T.cp, done: T.cd }; prev[r] = { planned: T.pp, done: T.pd };
+      });
+      h[weekIso] = cur; h[prevIso] = prev;
+      const keys = Object.keys(h).sort();
+      while (keys.length > 60) delete h[keys.shift()];
+      localStorage.setItem(TFMP_HIST_KEY, JSON.stringify(h));
+    } catch (_) { /* التخزين اختياري */ }
+  }
+  window.__balaghReportTfmpHist_ = loadTfmpHist_; // للاختبار
+
+  function loadSaved_() {
+    try { return JSON.parse(localStorage.getItem(MANUAL_STORE_KEY) || "null") || { last: null, byWeek: {} }; } catch (_) { return { last: null, byWeek: {} }; }
+  }
+  function saveManual_(weekIso, vals) {
+    try {
+      const s = loadSaved_();
+      s.last = vals; s.byWeek = s.byWeek || {}; s.byWeek[weekIso] = vals;
+      saveTfmpHist_(weekIso, vals);
+      const keys = Object.keys(s.byWeek).sort();
+      while (keys.length > 30) delete s.byWeek[keys.shift()];
+      localStorage.setItem(MANUAL_STORE_KEY, JSON.stringify(s));
+    } catch (_) { /* التخزين اختياري */ }
+  }
+  // الحقول (الصف) × المناطق (الأعمدة). key: مسار داخل القيم
+  const FIELDS = [
+    { key: "rating", label: "رضا المستفيد — متوسط تقييم الحالة (من 5)", ph: "مثال: 2.58", dec: true, max: 5 },
+    { key: "rep1", label: "المعاد فتحها — تكرار 1", ph: "العدد", dec: false },
+    { key: "rep2", label: "المعاد فتحها — تكرار 2 إلى 3", ph: "العدد", dec: false },
+    { key: "rep3", label: "المعاد فتحها — تكرار 4 إلى 8", ph: "العدد", dec: false },
+    { key: "tfmp.pp", label: "زيارات TFMP — الأسبوع السابق: المخطط", ph: "العدد", dec: false },
+    { key: "tfmp.pd", label: "زيارات TFMP — الأسبوع السابق: المكتمل", ph: "العدد", dec: false },
+    { key: "tfmp.cp", label: "زيارات TFMP — الأسبوع الحالي: المخطط", ph: "العدد", dec: false },
+    { key: "tfmp.cd", label: "زيارات TFMP — الأسبوع الحالي: المكتمل", ph: "العدد", dec: false },
+  ];
+  function getPath_(o, path) { return path.split(".").reduce((x, k) => (x == null ? undefined : x[k]), o); }
+  function setPath_(o, path, v) {
+    const ks = path.split(".");
+    ks.slice(0, -1).reduce((x, k) => (x[k] = x[k] || {}), o)[ks[ks.length - 1]] = v;
   }
 
   function openReportOptionsModal_() {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.id = "balagh-report-modal-overlay";
-      overlay.style.cssText =
-        "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:inherit;padding:12px;box-sizing:border-box";
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:inherit;padding:12px;box-sizing:border-box";
       const card = document.createElement("div");
-      card.style.cssText =
-        "background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3);padding:20px 22px;width:430px;max-width:100%;max-height:100%;overflow:auto;direction:rtl;text-align:right;box-sizing:border-box";
+      card.style.cssText = "background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3);padding:20px 22px;width:760px;max-width:100%;max-height:100%;overflow:auto;direction:rtl;text-align:right;box-sizing:border-box";
       const secTitle = "font-size:12px;font-weight:800;color:#334155;margin-bottom:6px";
-      const inputCss = "width:100%;box-sizing:border-box;border:1.5px solid #CBD5E1;border-radius:9px;padding:7px 9px;font-size:13px;font-family:inherit;direction:ltr;text-align:center";
-      const lblCss = "display:block;font-size:11.5px;font-weight:700;color:#475569;margin-bottom:4px";
-      const errCss = "min-height:14px;font-size:10.5px;font-weight:700;color:#DC2626;margin-top:3px";
+      const inputCss = "width:100%;box-sizing:border-box;border:1.5px solid #CBD5E1;border-radius:9px;padding:6px 8px;font-size:13px;font-family:inherit;direction:ltr;text-align:center";
       const box = "border:1px solid #E2E8F0;border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#F8FAFC";
-      const reopenInputs = REGION_ORDER.map((r, i) => `
-            <div>
-              <label for="balagh-report-reopen-${i}" style="${lblCss}">${r}</label>
-              <input type="text" inputmode="numeric" id="balagh-report-reopen-${i}" data-region="${r}" style="${inputCss}" value="0" placeholder="العدد" autocomplete="off">
-              <div data-err="reopen-${i}" style="${errCss}"></div>
-            </div>`).join("");
+      const groupRow = (t) => `<tr><td colspan="${REGION_ORDER.length + 1}" style="padding:8px 6px 2px;font-size:11.5px;font-weight:900;color:#0F766E;border-bottom:1px solid #CCFBF1">${t}</td></tr>`;
+      const rowsHtml = FIELDS.map((f, fi) => (fi === 0 ? groupRow("① المعاد فتحها ورضا المستفيد — تأتي من ملف Excel (زر الاستيراد أعلاه)") : f.key === "tfmp.pp" ? groupRow("② زيارات الاستشاري TFMP — تُلصق (زر اللصق أعلاه)، والأسبوع السابق يأتي من الذاكرة") : "") + `
+        <tr>
+          <td style="padding:4px 6px 4px 10px;font-size:11.5px;font-weight:700;color:#475569;white-space:nowrap">${f.label}</td>
+          ${REGION_ORDER.map((r, ri) => `<td style="padding:3px 4px"><input type="text" inputmode="decimal" data-f="${fi}" data-r="${ri}" style="${inputCss}" placeholder="${f.ph}" autocomplete="off"></td>`).join("")}
+        </tr>`).join("");
       card.innerHTML = `
-        <div style="font-size:15px;font-weight:900;color:#1E293B;margin-bottom:4px">📄 تنزيل تقرير PowerPoint</div>
-        <div style="font-size:11.5px;color:#64748B;margin-bottom:12px">اختر الفترة، اكتب الأرقام اليدوية، ثم أدخل كلمة المرور للمتابعة</div>
+        <div style="font-size:15px;font-weight:900;color:#1E293B;margin-bottom:4px">📄 تنزيل التقرير الأسبوعي (PowerPoint)</div>
+        <div style="font-size:11.5px;color:#64748B;margin-bottom:12px">اختر الأسبوع، راجع القيم اليدوية لكل منطقة، ثم أدخل كلمة المرور</div>
         <div id="balagh-report-modal-errbanner" style="display:none;background:#FEF2F2;border:1.5px solid #DC2626;color:#B91C1C;border-radius:9px;padding:9px 11px;font-size:12px;font-weight:800;margin-bottom:12px"></div>
 
-        <div style="${secTitle}">فترة التقرير</div>
-        <div style="display:flex;gap:16px;margin-bottom:4px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#334155;cursor:pointer">
-            <input type="radio" name="balagh-report-period" value="7" checked style="accent-color:#7C3AED"> آخر أسبوع فقط
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#334155;cursor:pointer">
-            <input type="radio" name="balagh-report-period" value="14" style="accent-color:#7C3AED"> آخر أسبوعين
-          </label>
-        </div>
-        <div id="balagh-report-period-hint" style="font-size:11px;color:#7C3AED;font-weight:700;margin-bottom:12px;min-height:14px"></div>
-
         <div style="${box}">
-          <div style="${secTitle}">نسبة الالتزام بـSLA — لتشارت "المقاول (BMC) مقابل الاستشاري"</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div>
-              <label for="balagh-report-sla-contractor" style="${lblCss}">نسبة المقاول (BMC) %</label>
-              <input type="text" inputmode="decimal" id="balagh-report-sla-contractor" style="${inputCss}" placeholder="مثال: 82.5" autocomplete="off">
-              <div data-err="sla-contractor" style="${errCss}"></div>
-            </div>
-            <div>
-              <label for="balagh-report-sla-consultant" style="${lblCss}">نسبة الاستشاري %</label>
-              <input type="text" inputmode="decimal" id="balagh-report-sla-consultant" style="${inputCss}" placeholder="مثال: 74" autocomplete="off">
-              <div data-err="sla-consultant" style="${errCss}"></div>
-            </div>
+          <div style="${secTitle}">الأسبوع (من الأحد إلى السبت)</div>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:12px;font-weight:700;color:#475569">تاريخ نهاية الأسبوع (السبت):</label>
+            <input type="date" id="balagh-report-week" style="border:1.5px solid #CBD5E1;border-radius:9px;padding:6px 8px;font-size:13px;font-family:inherit">
+            <button type="button" id="balagh-report-week-latest" style="padding:6px 12px;border-radius:9px;border:1px solid #CBD5E1;background:#fff;color:#475569;font-weight:800;font-size:11.5px;cursor:pointer;font-family:inherit">آخر سبت</button>
           </div>
-          <div id="balagh-report-sla-hint" style="font-size:10.5px;color:#64748B;margin-top:2px;min-height:13px"></div>
-          <div id="balagh-report-gap-preview" style="font-size:12px;font-weight:800;color:#0F766E;margin-top:4px;min-height:16px"></div>
+          <div id="balagh-report-week-hint" style="font-size:11.5px;color:#7C3AED;font-weight:700;margin-top:6px;min-height:16px"></div>
         </div>
 
         <div style="${box}">
-          <div style="${secTitle}">عدد البلاغات المعاد فتحها — لكل منطقة</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px">${reopenInputs}
+          <div style="${secTitle}">القيم اليدوية لكل منطقة <span style="font-weight:600;color:#64748B">(تُحفظ في المتصفح — عدّل ما تغيّر فقط)</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <div style="flex:1;min-width:250px;border:1px solid #99F6E4;background:#F0FDFA;border-radius:10px;padding:8px 10px">
+              <button type="button" id="balagh-report-import-btn" style="padding:5px 11px;border-radius:9px;border:1px solid #0F766E;background:#fff;color:#0F766E;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit">📥 استيراد «المعاد فتحها + رضا المستفيد» من Excel</button>
+              <input type="file" id="balagh-report-import-file" accept=".xlsx,.xls,.csv" style="display:none">
+              <div style="font-size:11px;color:#475569;margin-top:5px;line-height:1.6">يملأ <b>متوسط تقييم الحالة (رضا المستفيد)</b> و<b>البلاغات المعاد فتحها</b> (تكرار 1 ، 2 إلى 3 ، 4 إلى 8). الأعمدة المطلوبة: المنطقة، المعاد فتحها، <bdi>Time 1</bdi>، <bdi>Time 2-3</bdi>، <bdi>Time 4-8</bdi>، الاستبيان - متوسط تقييم الحالة. صف «الإجمالي» يُتجاهل. نسبة الرضا % تُحسب تلقائيًا (التقييم ÷ 5).</div>
+            </div>
+            <div style="flex:1;min-width:250px;border:1px solid #DDD6FE;background:#F5F3FF;border-radius:10px;padding:8px 10px">
+              <button type="button" id="balagh-report-tfmp-btn" style="padding:5px 11px;border-radius:9px;border:1px solid #7C3AED;background:#fff;color:#7C3AED;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit">📋 لصق زيارات TFMP (الأسبوعان)</button>
+              <div style="font-size:11px;color:#475569;margin-top:5px;line-height:1.6">يملأ <b>المخطط والمكتمل</b> للأسبوع السابق والأسبوع الحالي. الصق الجدول كما يصلك (اسم الأسبوع، ثم المكتمل / المخطط / النسبة، ثم المناطق). الأسبوع السابق يُعبّأ تلقائيًا من الذاكرة إن كان مسجَّلًا.</div>
+            </div>
           </div>
-          <div id="balagh-report-reopen-total" style="font-size:12px;font-weight:800;color:#0F766E;margin-top:2px;min-height:16px"></div>
+          <div id="balagh-report-import-msg" style="font-size:11px;font-weight:700;margin-bottom:6px;display:none"></div>
+          <div id="balagh-report-tfmp-panel" style="display:none;border:1px dashed #7C3AED;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#FAF8FF">
+            <div style="font-size:11.5px;color:#475569;font-weight:700;margin-bottom:6px">الصق جدول كل أسبوع كما يصلك (اسم الأسبوع + العنوان + 4 مناطق). اترك المربع فارغًا لو لا تريد تغيير ذلك الأسبوع.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div style="flex:1;min-width:230px"><div style="font-size:11.5px;font-weight:800;color:#334155;margin-bottom:3px">الأسبوع السابق</div><textarea id="balagh-report-tfmp-prev" rows="6" style="width:100%;box-sizing:border-box;border:1.5px solid #CBD5E1;border-radius:9px;padding:6px;font-size:12px;font-family:inherit;direction:rtl" placeholder="الصق هنا"></textarea></div>
+              <div style="flex:1;min-width:230px"><div style="font-size:11.5px;font-weight:800;color:#334155;margin-bottom:3px">الأسبوع الحالي</div><textarea id="balagh-report-tfmp-cur" rows="6" style="width:100%;box-sizing:border-box;border:1.5px solid #CBD5E1;border-radius:9px;padding:6px;font-size:12px;font-family:inherit;direction:rtl" placeholder="الصق هنا"></textarea></div>
+            </div>
+            <div style="margin-top:6px"><button type="button" id="balagh-report-tfmp-apply" style="padding:5px 14px;border-radius:9px;border:1px solid #7C3AED;background:#7C3AED;color:#fff;font-weight:800;font-size:11.5px;cursor:pointer;font-family:inherit">تطبيق</button></div>
+          </div>
+          <div style="overflow:auto">
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr><th style="background:transparent !important;border:0"></th>${REGION_ORDER.map((r) => `<th style="font-size:12px;font-weight:800;color:#17355C !important;background:#EAF0F7 !important;padding:6px 4px;text-align:center;border-radius:6px">${r}</th>`).join("")}</tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+          <div id="balagh-report-manual-hint" style="font-size:11px;color:#0F766E;font-weight:700;margin-top:6px;min-height:15px"></div>
         </div>
 
         <div style="${secTitle}">كلمة المرور</div>
@@ -1139,175 +870,192 @@
         <div style="display:flex;gap:8px;margin-top:6px">
           <button type="button" id="balagh-report-modal-cancel" style="flex:1;padding:8px 0;border-radius:9px;border:1px solid #CBD5E1;background:#F8FAFC;color:#475569;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">إلغاء</button>
           <button type="button" id="balagh-report-modal-ok" style="flex:1;padding:8px 0;border-radius:9px;border:1px solid #7C3AED;background:#7C3AED;color:#fff;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">تنزيل</button>
-        </div>
-      `;
+        </div>`;
       overlay.appendChild(card);
       document.body.appendChild(overlay);
 
       const $ = (sel) => card.querySelector(sel);
+      const inputs = Array.from(card.querySelectorAll("input[data-f]"));
+      const inputAt = (fi, ri) => inputs.find((e) => +e.dataset.f === fi && +e.dataset.r === ri);
+      const weekInput = $("#balagh-report-week");
       const pwInput = $("#balagh-report-pw-input");
       const pwErrEl = $("#balagh-report-pw-err");
-      const slaC = $("#balagh-report-sla-contractor");
-      const slaK = $("#balagh-report-sla-consultant");
-      const reopenEls = REGION_ORDER.map((_, i) => $(`#balagh-report-reopen-${i}`));
-      const periodDaysNow = () => {
-        const el = card.querySelector('input[name="balagh-report-period"]:checked');
-        return el && el.value === "14" ? 14 : 7;
-      };
-      const setErr = (key, msg, inputEl) => {
-        const e = card.querySelector(`[data-err="${key}"]`);
-        if (e) e.textContent = msg || "";
-        if (inputEl) inputEl.style.borderColor = msg ? "#DC2626" : "#CBD5E1";
-      };
+      const setBorder = (el, bad) => { el.style.borderColor = bad ? "#DC2626" : "#CBD5E1"; };
 
-      // ── تلميحات (اختيارية، للمساعدة بس): الفترة الفعلية + نسبة الالتزام المحسوبة من
-      // البيانات للفترة المختارة. بتتحسب مرة لكل فترة وتتخزن؛ أي خطأ = من غير تلميح ──
-      const hintCache = {};
-      function refreshHints() {
-        const pd = periodDaysNow();
-        const apply = (d) => {
-          $("#balagh-report-period-hint").textContent = d ? `الفترة: ${d.periodLabel}` : "";
-          $("#balagh-report-sla-hint").textContent = d
-            ? `للاسترشاد: نسبة الالتزام المحسوبة من بيانات الفترة = ${d.compliancePct.toFixed(1)}%`
-            : "";
-        };
-        if (hintCache[pd] !== undefined) return apply(hintCache[pd]);
-        setTimeout(() => {
-          try { hintCache[pd] = computeReportData(pd); } catch (_) { hintCache[pd] = null; }
-          if (periodDaysNow() === pd) apply(hintCache[pd]);
-        }, 0);
+      function weekEndFromInput() {
+        const v = weekInput.value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+        const [y, m, d] = v.split("-").map(Number);
+        return saturdayOfWeek_(new Date(y, m - 1, d));
       }
-      function refreshGap() {
-        const a = parseUserNumber_(slaC.value);
-        const b = parseUserNumber_(slaK.value);
-        $("#balagh-report-gap-preview").textContent =
-          a !== null && b !== null && a <= 100 && b <= 100 ? `الفجوة = ${Math.abs(a - b).toFixed(1)}%` : "";
+      function fillFromSaved() {
+        const we = weekEndFromInput();
+        const saved = loadSaved_();
+        const vals = (we && saved.byWeek && saved.byWeek[iso_(we)]) || saved.last || {};
+        inputs.forEach((el) => {
+          const f = FIELDS[+el.dataset.f], region = REGION_ORDER[+el.dataset.r];
+          const v = getPath_(vals[region], f.key);
+          el.value = v == null ? "" : String(v);
+          setBorder(el, false);
+        });
+        const had = we && saved.byWeek && saved.byWeek[iso_(we)];
+        const tmsg = applyTfmpMemory(we, !!had);
+        $("#balagh-report-manual-hint").textContent = (had ? "تم تحميل القيم المحفوظة لهذا الأسبوع." : saved.last ? "القيم المعروضة من آخر تقرير — عدّل ما تغيّر." : "") + (tmsg ? "  " + tmsg : "");
       }
-      function refreshReopenTotal() {
-        const vals = reopenEls.map((el) => parseUserNumber_(el.value));
-        const ok = vals.every((v) => v !== null && Number.isInteger(v));
-        $("#balagh-report-reopen-total").textContent = ok
-          ? `الإجمالي = ${vals.reduce((s, v) => s + v, 0).toLocaleString("en-US")}`
-          : "";
+      // زيارات TFMP: «السابق» من سجل الأسبوع الذي قبله، و«الحالي» من سجل هذا الأسبوع إن وُجد (وإلا فارغ — الصقه)
+      function applyTfmpMemory(we, hadWeek) {
+        if (!we) return "";
+        const hist = loadTfmpHist_();
+        const idx = (k) => FIELDS.findIndex((f) => f.key === k);
+        const put = (rec, kp, kd) => REGION_ORDER.forEach((r, ri) => {
+          const v = rec && rec[r];
+          const ep = inputAt(idx(kp), ri), ed = inputAt(idx(kd), ri);
+          if (ep) { ep.value = v ? String(v.planned) : ""; setBorder(ep, false); }
+          if (ed) { ed.value = v ? String(v.done) : ""; setBorder(ed, false); }
+        });
+        const prevIso = iso_(addDays_(we, -7)), curIso = iso_(we);
+        const msgs = [];
+        if (hist[prevIso]) { put(hist[prevIso], "tfmp.pp", "tfmp.pd"); msgs.push("🧠 زيارات الأسبوع السابق من الذاكرة (" + rangeLabel_(addDays_(we, -13), addDays_(we, -7), true) + ")."); }
+        else if (!hadWeek) { put(null, "tfmp.pp", "tfmp.pd"); msgs.push("⚠️ لا يوجد سجل TFMP للأسبوع السابق — الصقه."); }
+        if (hist[curIso]) { put(hist[curIso], "tfmp.cp", "tfmp.cd"); msgs.push("🧠 زيارات الأسبوع الحالي محفوظة."); }
+        else if (!hadWeek) { put(null, "tfmp.cp", "tfmp.cd"); msgs.push("زيارات هذا الأسبوع: الصق جدول TFMP."); }
+        const keys = Object.keys(hist).sort();
+        if (keys.length) { const last = isoToDate_(keys[keys.length - 1]); msgs.push("آخر أسبوع مسجَّل لـ TFMP: " + rangeLabel_(addDays_(last, -6), last, true) + "."); }
+        return msgs.join(" ");
       }
-
+      $("#balagh-report-import-btn").addEventListener("click", () => $("#balagh-report-import-file").click());
+      $("#balagh-report-import-file").addEventListener("change", async (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        const msg = $("#balagh-report-import-msg");
+        ev.target.value = "";
+        if (!file) return;
+        const show = (t, ok) => { msg.textContent = t; msg.style.color = ok ? "#0F766E" : "#B45309"; msg.style.display = "block"; };
+        try {
+          const aoa = await readSheetFile_(file);
+          const res = parseReopenedAoa_(aoa);
+          const keys = ["rating", "rep1", "rep2", "rep3"];
+          let filled = 0;
+          res.regionsFound.forEach((r) => {
+            const ri = REGION_ORDER.indexOf(r);
+            keys.forEach((k) => {
+              const v = res.values[r][k];
+              if (v == null) return;
+              const fi = FIELDS.findIndex((f) => f.key === k);
+              const el = inputAt(fi, ri);
+              if (el) { el.value = String(v); setBorder(el, false); filled++; }
+            });
+          });
+          if (!res.regionsFound.length) { show("⚠️ " + (res.warnings[0] || "لم أتعرف على أي منطقة في الملف."), false); return; }
+          show(`✅ تم استيراد ${res.regionsFound.length} مناطق (${filled} خانة) من «${file.name}» — صف الإجمالي تم تجاهله. راجع القيم قبل التنزيل.` + (res.warnings.length ? "  ⚠️ " + res.warnings.join(" | ") : ""), !res.warnings.length);
+        } catch (e) {
+          show("⚠️ تعذّر قراءة الملف: " + (e && e.message ? e.message : e), false);
+        }
+      });
+      $("#balagh-report-tfmp-btn").addEventListener("click", () => {
+        const pn = $("#balagh-report-tfmp-panel");
+        pn.style.display = pn.style.display === "none" ? "block" : "none";
+      });
+      $("#balagh-report-tfmp-apply").addEventListener("click", () => {
+        const msg = $("#balagh-report-import-msg");
+        const show = (t, ok) => { msg.textContent = t; msg.style.color = ok ? "#0F766E" : "#B45309"; msg.style.display = "block"; };
+        const targets = [["prev", "الأسبوع السابق", "tfmp.pp", "tfmp.pd"], ["cur", "الأسبوع الحالي", "tfmp.cp", "tfmp.cd"]];
+        const parts = [], warns = [];
+        targets.forEach(([id, label, kp, kd]) => {
+          const txt = $("#balagh-report-tfmp-" + id).value;
+          if (!String(txt).trim()) return;
+          const res = parseTfmpPaste_(txt);
+          res.found.forEach((r) => {
+            const ri = REGION_ORDER.indexOf(r), v = res.values[r];
+            const ep = inputAt(FIELDS.findIndex((f) => f.key === kp), ri), ed = inputAt(FIELDS.findIndex((f) => f.key === kd), ri);
+            if (ep) { ep.value = String(v.planned); setBorder(ep, false); }
+            if (ed) { ed.value = String(v.done); setBorder(ed, false); }
+          });
+          parts.push(`${label}: ${res.found.length} مناطق`);
+          res.warnings.forEach((w) => warns.push(`${label} — ${w}`));
+        });
+        if (!parts.length) { show("⚠️ الصق جدول أسبوع واحد على الأقل ثم اضغط تطبيق.", false); return; }
+        show(`✅ تم تعبئة زيارات TFMP (${parts.join(" · ")}). راجع القيم قبل التنزيل.` + (warns.length ? "  ⚠️ " + warns.join(" | ") : ""), !warns.length);
+      });
+      function refreshWeekHint() {
+        const we = weekEndFromInput();
+        const hint = $("#balagh-report-week-hint");
+        if (!we) { hint.textContent = "اختر تاريخًا صحيحًا"; return; }
+        const s = addDays_(we, -6), s4 = addDays_(we, -27);
+        const snapped = weekInput.value !== iso_(we) ? ` (اعتُمد السبت ${iso_(we)})` : "";
+        hint.textContent = `الأسبوع: ${rangeLabel_(s, we, true)} — و4 أسابيع من ${rangeLabel_(s4, we, false)}${snapped}`;
+      }
       function cleanup(result) {
         document.removeEventListener("keydown", onKeydown);
         overlay.remove();
         resolve(result);
       }
       function submit() {
+        const errBanner = $("#balagh-report-modal-errbanner");
+        errBanner.style.display = "none";
         let firstBad = null;
         const mark = (el) => { if (!firstBad) firstBad = el; };
-        const errBanner = $("#balagh-report-modal-errbanner");
-        if (errBanner) errBanner.style.display = "none";
-        // نسب SLA: إجبارية، من 0 لـ 100
-        const slaVals = [
-          [slaC, "sla-contractor"],
-          [slaK, "sla-consultant"],
-        ].map(([el, key]) => {
+        const we = weekEndFromInput();
+        if (!we) { setBorder(weekInput, true); mark(weekInput); } else setBorder(weekInput, false);
+        const manual = {};
+        REGION_ORDER.forEach((r) => { manual[r] = { tfmp: {} }; });
+        inputs.forEach((el) => {
+          const f = FIELDS[+el.dataset.f], region = REGION_ORDER[+el.dataset.r];
           const v = parseUserNumber_(el.value);
-          if (!String(el.value).trim()) { setErr(key, "مطلوب", el); mark(el); return null; }
-          if (v === null || v > 100) { setErr(key, "اكتب رقم من 0 لـ 100", el); mark(el); return null; }
-          setErr(key, "", el);
-          return v;
+          const bad = v === null || (f.max != null && v > f.max) || (!f.dec && !Number.isInteger(v));
+          setBorder(el, bad);
+          if (bad) { mark(el); return; }
+          setPath_(manual[region], f.key, v);
         });
-        // البلاغات المعاد فتحها: إجبارية، عدد صحيح ≥ 0
-        const reopenedByRegion = {};
-        reopenEls.forEach((el, i) => {
-          const key = `reopen-${i}`;
-          const v = parseUserNumber_(el.value);
-          if (!String(el.value).trim()) { setErr(key, "مطلوب (اكتب 0 لو مفيش)", el); mark(el); return; }
-          if (v === null || !Number.isInteger(v)) { setErr(key, "اكتب عدد صحيح", el); mark(el); return; }
-          setErr(key, "", el);
-          reopenedByRegion[REGION_ORDER[i]] = v;
-        });
-        // كلمة المرور
-        const pw = pwInput.value;
-        if (pw !== REPORT_DOWNLOAD_PASSWORD) {
-          pwErrEl.textContent = "❌ كلمة المرور غير صحيحة";
-          pwInput.style.borderColor = "#DC2626";
-          mark(pwInput);
+        if (pwInput.value !== REPORT_DOWNLOAD_PASSWORD) {
+          pwErrEl.textContent = "❌ كلمة المرور غير صحيحة"; setBorder(pwInput, true); mark(pwInput);
         }
         if (firstBad) {
-          // ★ 2026-10-03 (طلب صريح بعد بلاغ المستخدم إن الزرار "مش بيحمل"):
-          // السبب الحقيقي كان إن الحقول دي (نسبتي SLA + البلاغات المعاد
-          // فتحها) إجبارية، ولو فاضية بيرفض يكمل التنزيل بصمت تقريبًا —
-          // رسالة "مطلوب" صغيرة تحت كل حقل بس، سهل جدًا إنها تفوت على
-          // حد مركّز على خانة كلمة المرور. البانر ده بيوضّح بشكل مش ممكن
-          // يتفوت إن فيه حقول محتاجة تتعبّى الأول.
-          if (errBanner) {
-            errBanner.textContent = firstBad === pwInput
-              ? "❌ كلمة المرور غير صحيحة."
-              : "⚠️ فيه حقول إجبارية لسه فاضية أو غلط (SLA% / البلاغات المعاد فتحها) — اتأكد منها تحت قبل التنزيل.";
-            errBanner.style.display = "block";
-          }
-          if (errBanner) errBanner.scrollIntoView({ block: "start" });
+          errBanner.textContent = firstBad === pwInput ? "❌ كلمة المرور غير صحيحة."
+            : "⚠️ توجد حقول فارغة أو غير صحيحة (الصفر مسموح؛ التقييم درجة من 5، والباقي أعداد صحيحة) — راجع الخانات الحمراء.";
+          errBanner.style.display = "block";
+          errBanner.scrollIntoView({ block: "start" });
           firstBad.focus();
-          if (firstBad.select) firstBad.select();
           return;
         }
-        cleanup({
-          password: pw,
-          periodDays: periodDaysNow(),
-          manual: { slaContractor: slaVals[0], slaConsultant: slaVals[1], reopenedByRegion },
-        });
+        saveManual_(iso_(we), manual);
+        cleanup({ password: pwInput.value, weekEnd: we, manual });
       }
       function onKeydown(e) {
         if (e.key === "Escape") { e.preventDefault(); cleanup(null); }
-        else if (e.key === "Enter") { e.preventDefault(); submit(); }
+        else if (e.key === "Enter" && e.target && e.target.tagName === "INPUT") { e.preventDefault(); submit(); }
       }
       $("#balagh-report-modal-ok").addEventListener("click", submit);
       $("#balagh-report-modal-cancel").addEventListener("click", () => cleanup(null));
       overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) cleanup(null); });
       document.addEventListener("keydown", onKeydown);
-      card.querySelectorAll('input[name="balagh-report-period"]').forEach((r) => r.addEventListener("change", refreshHints));
-      [slaC, slaK].forEach((el, i) => el.addEventListener("input", () => {
-        setErr(i === 0 ? "sla-contractor" : "sla-consultant", "", el);
-        refreshGap();
-      }));
-      reopenEls.forEach((el, i) => el.addEventListener("input", () => {
-        setErr(`reopen-${i}`, "", el);
-        refreshReopenTotal();
-      }));
-      pwInput.addEventListener("input", () => {
-        pwErrEl.textContent = "";
-        pwInput.style.borderColor = "#CBD5E1";
-      });
-      slaC.focus();
-      refreshHints();
-      refreshReopenTotal(); // الحقول الأربعة معبّأة 0 افتراضيًا — نعرض الإجمالي فورًا من غير ما ننتظر أول input
+      weekInput.addEventListener("change", () => { refreshWeekHint(); fillFromSaved(); });
+      $("#balagh-report-week-latest").addEventListener("click", () => { weekInput.value = iso_(defaultWeekEnd_()); refreshWeekHint(); fillFromSaved(); });
+      inputs.forEach((el) => el.addEventListener("input", () => setBorder(el, false)));
+      pwInput.addEventListener("input", () => { pwErrEl.textContent = ""; setBorder(pwInput, false); });
+      weekInput.value = iso_(defaultWeekEnd_());
+      refreshWeekHint();
+      fillFromSaved();
+      (inputs.find((e) => !e.value) || pwInput).focus();
     });
   }
-  window.__balaghReportOpenModal_ = openReportOptionsModal_; // للاختبار فقط
+  window.__balaghReportOpenModal_ = openReportOptionsModal_; // للاختبار
 
   window.__balaghReportButtonClick_ = async function (btn) {
     const statusEl = document.getElementById("balagh-report-status");
     const choice = await openReportOptionsModal_();
-    if (!choice) return; // المستخدم ألغى من نافذة كلمة المرور/الفترة
+    if (!choice) return;
     const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.style.cursor = "default";
-    btn.style.opacity = "0.7";
+    btn.disabled = true; btn.style.cursor = "default"; btn.style.opacity = "0.7";
     btn.innerHTML = "⏳ جارٍ تجهيز التقرير…";
     if (statusEl) { statusEl.textContent = ""; statusEl.style.color = ""; }
     try {
-      const data = await window.generateBalaghReportPptx(choice.periodDays, choice.manual);
-      if (statusEl) {
-        statusEl.style.color = "#059669";
-        statusEl.textContent = `✅ تم تنزيل التقرير — الفترة: ${data.periodLabel}`;
-      }
+      const data = await window.generateBalaghReportPptx(choice.weekEnd, choice.manual);
+      if (statusEl) { statusEl.style.color = "#059669"; statusEl.textContent = `✅ تم تنزيل التقرير — الأسبوع: ${data.periodLabel}`; }
     } catch (e) {
       console.error("[balagh report]", e);
-      if (statusEl) {
-        statusEl.style.color = "#DC2626";
-        statusEl.textContent = "❌ " + (e && e.message ? e.message : "تعذّر توليد التقرير");
-      }
+      if (statusEl) { statusEl.style.color = "#DC2626"; statusEl.textContent = "❌ " + (e && e.message ? e.message : "تعذّر توليد التقرير"); }
     } finally {
-      btn.disabled = false;
-      btn.style.cursor = "pointer";
-      btn.style.opacity = "1";
-      btn.innerHTML = originalHtml;
+      btn.disabled = false; btn.style.cursor = "pointer"; btn.style.opacity = "1"; btn.innerHTML = originalHtml;
     }
   };
 })();

@@ -1130,6 +1130,7 @@ function applyFilters() {
     if (activeId === "tab-security-safety") safeRun(renderSecuritySafetyTab, "security-safety");
     if (activeId === "tab-security-safety-summary") safeRun(renderSecuritySafetySummaryTab, "security-safety-summary");
     if (activeId === "tab-new-sla") safeRun(renderNewSlaTab, "new-sla");
+    if (activeId === "tab-balagh-subcat" && typeof window.renderBalaghSubcatTab === "function") safeRun(window.renderBalaghSubcatTab, "balagh-subcat");
     if (activeId === "tab-corrections-escalations") safeRun(renderCorrectionsEscalationsTab, "corrections-escalations");
     if (activeId === "tab-fuel")     safeRun(renderFuelTab,     "fuel");
     if (activeId === "tab-vehicles") safeRun(renderVehiclesTab, "vehicles");
@@ -1667,7 +1668,7 @@ function showTab(name, el) {
     // ⚡ 2026-09-03: عند فتح أي تبويب بلاغات (عام/أمن وسلامة) — تحقق فوري
     // (بدون انتظار Tick التايمر الدوري) هل البيانات المعروضة "قديمة" (أقدم
     // من BALAGH_AUTO_INTERVAL_MS)، ولو كذلك اسحب نسخة أحدث من كاش GAS بصمت.
-    (("balagh" === name || "security-safety" === name || "security-safety-summary" === name || "new-sla" === name) &&
+    (("balagh" === name || "security-safety" === name || "security-safety-summary" === name || "new-sla" === name || "balagh-subcat" === name) &&
       "function" === typeof window.__balaghMaybeRefreshOnView &&
       window.__balaghMaybeRefreshOnView()),
     "tajheez" === name && renderTajheezInventoryTab(),
@@ -1693,6 +1694,7 @@ function showTab(name, el) {
     "security-safety" === name && renderSecuritySafetyTab(),
     "security-safety-summary" === name && renderSecuritySafetySummaryTab(),
     "new-sla" === name && renderNewSlaTab(),
+    "balagh-subcat" === name && "function" === typeof window.renderBalaghSubcatTab && window.renderBalaghSubcatTab(),
     "corrections-escalations" === name && renderCorrectionsEscalationsTab(),
     "fuel"            === name && renderFuelTab(),
     "vehicles"        === name && renderVehiclesTab(),
@@ -9430,7 +9432,15 @@ function renderNewSlaTab() {
   // فاضي (من/إلى) بيتم عرض كل البيانات بدون استثناء. ──
   const dateFromObj = ST.dateFrom ? new Date(ST.dateFrom + "T00:00:00") : null;
   const dateToObj = ST.dateTo ? new Date(ST.dateTo + "T23:59:59") : null;
+  // __NEW_SLA_REGION_FILTER__ — فلتر المنطقة (المحافظات التابعة تحت منطقتها الأم عبر r.region)، يُطبَّق على كل الأقسام
+  const regionOptions = (() => {
+    const set = new Set();
+    rawAllRows.forEach((r) => { if (r.region) set.add(r.region); });
+    const pref = ["جدة", "مكة المكرمة", "المدينة المنورة", "الطائف"];
+    return [...pref.filter((x) => set.has(x)), ...[...set].filter((x) => !pref.includes(x)).sort()];
+  })();
   const allRows = rawAllRows.filter((r) => {
+    if (ST.region && r.region !== ST.region) return false;
     if (!dateFromObj && !dateToObj) return true;
     if (!r.creationDateObj) return false; // لو الفلتر مفعّل، البلاغات بتاريخ غير مقروء تُستبعد بدل ما تظهر بشكل مضلِّل
     if (dateFromObj && r.creationDateObj.getTime() < dateFromObj.getTime()) return false;
@@ -9556,6 +9566,13 @@ function renderNewSlaTab() {
           <div class="fg-lbl">إلى تاريخ</div>
           <input type="date" class="finp" value="${esc(ST.dateTo)}"
             onchange="window.__NEW_SLA_STATE__.dateTo=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+        </div>
+        <div class="fg">
+          <div class="fg-lbl">المنطقة</div>
+          <select class="fsel" onchange="window.__NEW_SLA_STATE__.region=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
+            <option value="">الكل</option>
+            ${regionOptions.map((r) => `<option value="${esc(r)}" ${ST.region === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
+          </select>
         </div>
         <button class="f-clear" onclick="window.__NEW_SLA_STATE__.dateFrom='';window.__NEW_SLA_STATE__.dateTo='';window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">✕ عرض كل التواريخ</button>
       </div>
@@ -16007,7 +16024,51 @@ window.classifyElevatorStatus = function (rawStatus) {
   return "غير محدد";
 };
 window.getElevatorStatusBucket = function (r) {
+  // قاعدة اكتمال التوريد/التركيب (نفس قاعدة أداة التنظيف): حالة المصعد "يعمل"
+  // والملاحظة تفيد "تم التوريد/التركيب" دون أي كلمة تعثّر ← يعمل.
+  if (r) {
+    const st = String(r["حالة المصعد"] ?? "").trim();
+    const nt = String(r["حالة إضافية / ملاحظات الحالة"] ?? r["ملاحظات الحالة"] ?? "").trim();
+    if (/يعمل/.test(st) && !/لا\s*يعمل|لايعمل/.test(st) &&
+        /تم\s+(ال)?(توريد|تركيب)|(توريد|تركيب).{0,12}تم/.test(nt) &&
+        !/انتظار|جاري|تعميد|عرض|اعتماد|عطل|صيانة|تالف|damaged|لا\s*يعمل|لايعمل/i.test(nt)) return "يعمل";
+  }
   return window.classifyElevatorStatus(window.getElevatorStatusRaw(r));
+};
+// 🛗 إحصاء المصاعد دون تكرار: كل صف = مصعد، والمبنى الواحد قد يتكرر في الشيت
+// بعدد صفوفه. عدد مصاعد المبنى = الأكبر بين (العدد المعلن بالمبنى) و(عدد صفوفه)،
+// فيُحسب المبنى المتكرر مرة واحدة، ويُحسب المبنى المعلن له 3 بصف واحد = 3.
+window.elevatorBuildingStats = function (rows) {
+  const val = (r, keys) => {
+    for (const k of keys) {
+      const v = r[k];
+      const t = v == null ? "" : String(v).trim();
+      if (t && t !== "—" && t !== "-") return t;
+    }
+    return "";
+  };
+  const map = new Map();
+  (rows || []).forEach((r) => {
+    const mid = val(r, ["رقم_وزاري", "الرقم الوزاري"]);
+    const city = val(r, ["المحافظة", "المدينة_الرئيسية", "المدينة"]);
+    const key = mid ? "MIN:" + mid
+      : "NAME:" + val(r, ["المنطقة"]) + "|" + city + "|" + val(r, ["اسم_المدرسة", "اسم المدرسة"]);
+    let b = map.get(key);
+    if (!b) { b = { rows: 0, declared: 0, city: city || "غير محدد", region: val(r, ["المنطقة"]), minId: mid, name: "" }; map.set(key, b); }
+    b.rows++;
+    if (!b.name) b.name = val(r, ["اسم_المدرسة", "اسم المدرسة"]);
+    const d = Number(val(r, ["عدد المصاعد بالمبنى"]));
+    if (Number.isFinite(d) && d > b.declared) b.declared = d;
+  });
+  let elevators = 0, recorded = 0;
+  const byCity = {};
+  map.forEach((b) => {
+    const e = Math.max(b.declared, b.rows);
+    elevators += e; recorded += b.rows;
+    const c = byCity[b.city] || (byCity[b.city] = { elevators: 0, rows: 0 });
+    c.elevators += e; c.rows += b.rows;
+  });
+  return { buildings: map.size, elevators, recorded, unrecorded: elevators - recorded, byCity, list: Array.from(map.values()) };
 };
 // "معطل" لأغراض التقارير/الذكاء الاصطناعي = فعليًا لا يعمل أو محتاج
 // صيانة فعلية — نستثني "قيد التوريد أو التركيب" لأنها حالة مستقبلية
@@ -16106,13 +16167,63 @@ window.renderElevatorsTab = function () {
     return true;
   });
 
-  const totalBuildings = new Set(filteredRows.map(getBuildingKey)).size;
-  const totalElevators = filteredRows.reduce((s, r) => s + (num(getCount(r)) || 0), 0);
+  const estats = window.elevatorBuildingStats(filteredRows);
+  const totalBuildings = estats.buildings;
+  const totalElevators = estats.elevators; // دون تكرار (راجع elevatorBuildingStats)
 
   // 🔑 توزيع الفئات الأربع (باتفاق المستخدم) — كل صف يُصنَّف مرة واحدة فقط
   const bucketCounts = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, "غير محدد": 0 };
   filteredRows.forEach((r) => { bucketCounts[window.getElevatorStatusBucket(r)]++; });
-  const classified = filteredRows.length - bucketCounts["غير محدد"];
+  // مصاعد بلا حالة موثّقة = مصاعد معلنة بلا صف خاص بها + صفوف حالتها غير مفهومة
+  const UNREC = "غير مسجّلة الحالة";
+  const unrecordedCount = bucketCounts["غير محدد"] + estats.unrecorded;
+  const classified = totalElevators || 1; // نسب الكروت من إجمالي المصاعد
+
+  // عرض تفاصيل كرت «غير مسجّلة الحالة»: (أ) مباني عدد مصاعدها المعلن أكبر من عدد صفوفها
+  // (ب) صفوف حالتها غير مفهومة. يعمل ضمن فلتر المنطقة/المحافظة الحالي.
+  window.__elevShowUnrecorded = function () {
+    const nameOf = (name, mid) => {
+      const sc = mid && typeof window.__IXFindSchoolByMinId === "function" ? window.__IXFindSchoolByMinId(mid) : null;
+      const shown = name || (sc && (sc.name || sc.buildingName)) || "";
+      const txt = shown ? esc(shown) : '<span style="color:var(--tx-muted)">اسم المدرسة غير موجود بالشيت</span>';
+      return sc && mid
+        ? '<span class="ix-school-link" data-min="' + esc(mid) + '" onclick="window.__elevCloseUnrecorded();window.__IXOpenSchoolByMinId(this.dataset.min)" title="انقر لعرض بيانات المدرسة">' + txt + "</span>"
+        : txt;
+    };
+    const missingB = estats.list.filter((b) => b.declared > b.rows).sort((a, b) => (b.declared - b.rows) - (a.declared - a.rows));
+    const unknownR = filteredRows.filter((r) => window.getElevatorStatusBucket(r) === "غير محدد");
+    const th = "<th>#</th><th>المدرسة / المبنى</th><th>الرقم الوزاري</th><th>المحافظة</th>";
+    const bodyA = missingB.map((b, i) =>
+      "<tr><td style=\"color:var(--tx-muted)\">" + (i + 1) + "</td><td style=\"text-align:right\">" + nameOf(b.name, b.minId) + "</td><td>" + esc(b.minId || "—") + "</td><td>" + esc(b.city) + "</td>" +
+      "<td>" + b.declared + "</td><td>" + b.rows + '</td><td style="font-weight:800;color:var(--c-warning)">' + (b.declared - b.rows) + "</td></tr>").join("");
+    const bodyB = unknownR.map((r, i) =>
+      "<tr><td style=\"color:var(--tx-muted)\">" + (i + 1) + "</td><td style=\"text-align:right\">" + nameOf(getName(r) === "—" ? "" : getName(r), getMinIdRaw(r)) + "</td><td>" + esc(getMinIdRaw(r) || "—") + "</td><td>" + esc(getCity(r)) + "</td>" +
+      "<td>" + esc(window.getElevatorStatusRaw(r) || "(فارغ)") + "</td></tr>").join("");
+    let ov = document.getElementById("elev-unrec-ov");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "elev-unrec-ov";
+      ov.style.cssText = "position:fixed;inset:0;z-index:9300;overflow:auto;display:none";
+      document.body.appendChild(ov);
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") window.__elevCloseUnrecorded(); });
+    }
+    ov.innerHTML = '<div style="position:absolute;inset:0;background:rgba(6,20,28,.55)" onclick="window.__elevCloseUnrecorded()"></div>' +
+      '<div style="position:relative;margin:4vh auto;width:min(980px,96vw);max-height:92vh;display:flex;flex-direction:column;background:var(--bg-3,#fff);border-radius:16px;box-shadow:0 20px 70px rgba(0,0,0,.4);overflow:hidden" dir="rtl">' +
+      '<div style="display:flex;align-items:flex-start;gap:12px;padding:16px 20px;border-bottom:1px solid var(--bd-light)">' +
+      '<div style="flex:1"><div style="font-size:17px;font-weight:800">مصاعد غير مسجّلة الحالة (' + unrecordedCount.toLocaleString("en-US") + ')</div>' +
+      '<div style="font-size:12px;color:var(--tx-muted);margin-top:3px">مصاعد معلنة في عمود «عدد المصاعد بالمبنى» دون صف خاص بها في الشيت، فلا حالة موثّقة لها. أضف لها صفوفًا في الشيت وسيختفي الفرق.</div></div>' +
+      '<button class="f-clear" type="button" onclick="window.__elevCloseUnrecorded()" style="font-size:15px">✕ إغلاق</button></div>' +
+      '<div style="overflow:auto;padding:12px 20px 18px;flex:1">' +
+      (missingB.length ? '<div class="card-title" style="margin-bottom:6px">مباني ينقصها صفوف (' + missingB.length + " مبنى)</div><table><thead><tr>" + th + "<th>العدد المعلن</th><th>الصفوف المسجّلة</th><th>الناقص</th></tr></thead><tbody>" + bodyA + "</tbody></table>" : "") +
+      (unknownR.length ? '<div class="card-title" style="margin:16px 0 6px">صفوف حالتها غير مفهومة (' + unknownR.length + ")</div><table><thead><tr>" + th + "<th>نص الحالة</th></tr></thead><tbody>" + bodyB + "</tbody></table>" : "") +
+      (!missingB.length && !unknownR.length ? '<div class="empty-msg">لا توجد مصاعد غير مسجّلة ضمن الفلتر الحالي</div>' : "") +
+      "</div></div>";
+    ov.style.display = "block";
+  };
+  window.__elevCloseUnrecorded = function () {
+    const ov = document.getElementById("elev-unrec-ov");
+    if (ov) { ov.style.display = "none"; ov.innerHTML = ""; }
+  };
 
   const cityOptions = ['<option value="">الكل</option>']
     .concat(
@@ -16156,7 +16267,9 @@ window.renderElevatorsTab = function () {
       <div class="kpi kc-navy">
         <div class="kpi-val">${totalElevators.toLocaleString("en-US")}</div>
         <div class="kpi-lbl">إجمالي المصاعد</div>
-        <div class="kpi-sub">مجموع عدد المصاعد بالمباني</div>
+        <div class="kpi-sub">${estats.unrecorded > 0
+          ? "دون تكرار — " + estats.recorded.toLocaleString("en-US") + " صف مسجَّل + " + estats.unrecorded.toLocaleString("en-US") + " مصعد معلن بلا صف"
+          : "دون تكرار — كل صف = مصعد"}</div>
       </div>
       <div class="kpi kc-green">
         <div class="kpi-val">${bucketCounts["يعمل"].toLocaleString("en-US")}</div>
@@ -16178,11 +16291,16 @@ window.renderElevatorsTab = function () {
         <div class="kpi-lbl">قيد التوريد أو التركيب</div>
         <div class="kpi-sub">${classified ? Math.round((bucketCounts["قيد التوريد أو التركيب"] / classified) * 100) + "%" : "—"}</div>
       </div>
+      ${unrecordedCount > 0 ? `<div class="kpi" style="cursor:pointer" role="button" tabindex="0" onclick="window.__elevShowUnrecorded()" onkeydown="if(event.key==='Enter')window.__elevShowUnrecorded()" title="اضغط لعرض المباني">
+        <div class="kpi-val">${unrecordedCount.toLocaleString("en-US")}</div>
+        <div class="kpi-lbl">${UNREC}</div>
+        <div class="kpi-sub">${Math.round((unrecordedCount / classified) * 100)}% — اضغط لعرض المباني</div>
+      </div>` : ""}
     </div>
 
     <div class="g2 mb14">
       <div class="card">
-        <div class="card-title">توزيع حالة المصاعد (4 فئات رئيسية)</div>
+        <div class="card-title">توزيع حالة المصاعد</div>
         <div class="chart-box" style="height:260px"><canvas id="ch-elev-status-donut"></canvas></div>
       </div>
       <div class="card">
@@ -16221,7 +16339,7 @@ window.renderElevatorsTab = function () {
               <tr>
                 <td>${esc(getRegion(r))}</td>
                 <td>${esc(getCity(r))}</td>
-                <td style="text-align:right">${esc(getName(r))}</td>
+                <td style="text-align:right">${(() => { const _nm = getName(r); const _has = _nm && _nm !== "—"; const _mid = getMinIdRaw(r); const _sc = _mid && typeof window.__IXFindSchoolByMinId === "function" ? window.__IXFindSchoolByMinId(_mid) : null; if (_sc) return '<span class="ix-school-link" data-min="' + esc(_mid) + '" onclick="window.__IXOpenSchoolByMinId(this.dataset.min)" title="انقر لعرض بيانات المدرسة">' + esc(_has ? _nm : (_sc.name || _sc.buildingName || _nm)) + '</span>' + (_has ? "" : ' <span style="font-size:10.5px;color:var(--tx-muted)">(الاسم من قائمة المدارس)</span>'); return _has ? esc(_nm) : '<span style="font-size:11px;color:var(--tx-muted)" title="الرقم الوزاري هو المعرّف لهذا الصف">اسم المدرسة غير موجود بالشيت</span>'; })()}</td>
                 <td>${esc(getMinId(r))}</td>
                 <td>${esc(getInstallYear(r))}</td>
                 <td>${esc(getCount(r))}</td>
@@ -16240,7 +16358,8 @@ window.renderElevatorsTab = function () {
 
   requestAnimationFrame(() => {
     killChart("ch-elev-status-donut");
-    const donutLabels = window.ELEVATOR_BUCKETS_ORDER.filter((b) => bucketCounts[b] > 0);
+    bucketCounts[UNREC] = unrecordedCount;
+    const donutLabels = window.ELEVATOR_BUCKETS_ORDER.concat([UNREC]).filter((b) => bucketCounts[b] > 0);
     CHARTS["ch-elev-status-donut"] = new Chart(document.getElementById("ch-elev-status-donut"), {
       type: "doughnut",
       data: {
@@ -16271,9 +16390,18 @@ window.renderElevatorsTab = function () {
     const cityBuckets = {};
     filteredRows.forEach((r) => {
       const c = norm(getCity(r)) || "غير محدد";
-      if (!cityBuckets[c]) cityBuckets[c] = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0 };
+      if (!cityBuckets[c]) cityBuckets[c] = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, [UNREC]: 0 };
       const b = window.getElevatorStatusBucket(r);
-      if (cityBuckets[c][b] != null) cityBuckets[c][b]++;
+      if (b === "غير محدد") cityBuckets[c][UNREC]++;
+      else if (cityBuckets[c][b] != null) cityBuckets[c][b]++;
+    });
+    // مصاعد معلنة بلا صف: تُنسب لمحافظة مبناها
+    Object.keys(estats.byCity).forEach((c) => {
+      const extra = estats.byCity[c].elevators - estats.byCity[c].rows;
+      if (extra > 0) {
+        if (!cityBuckets[c]) cityBuckets[c] = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, [UNREC]: 0 };
+        cityBuckets[c][UNREC] += extra;
+      }
     });
     const cityLabels = Object.keys(cityBuckets).sort(
       (a, b) => Object.values(cityBuckets[b]).reduce((s, v) => s + v, 0) - Object.values(cityBuckets[a]).reduce((s, v) => s + v, 0),
@@ -16283,7 +16411,7 @@ window.renderElevatorsTab = function () {
       type: "bar",
       data: {
         labels: cityLabels,
-        datasets: window.ELEVATOR_BUCKETS_ORDER.map((b) => ({
+        datasets: window.ELEVATOR_BUCKETS_ORDER.concat([UNREC]).filter((b) => b !== UNREC || unrecordedCount > 0).map((b) => ({
           label: b,
           data: cityLabels.map((c) => cityBuckets[c][b] || 0),
           backgroundColor: window.ELEVATOR_BUCKET_COLOR(b) + "AA",
@@ -23281,12 +23409,13 @@ function exportNashatExcel(rows) {
         };
         const getCity = (r) => gv(r, ["المحافظة", "المدينة_الرئيسية", "المدينة"]);
         const getCount = (r) => fcbNum(gv(r, ["عدد المصاعد بالمبنى"]));
-        const totalSchools = new Set(elvRaw.map((r) => gv(r, ["اسم_المدرسة", "اسم المدرسة"])).filter(Boolean)).size;
-        const totalElevators = elvRaw.reduce((s, r) => s + (getCount(r) || 0), 0);
+        const _es = window.elevatorBuildingStats(elvRaw);
+        const totalSchools = _es.buildings;
+        const totalElevators = _es.elevators; // دون تكرار
         const bucketCounts = { "يعمل": 0, "لا يعمل": 0, "بحاجة صيانة": 0, "قيد التوريد أو التركيب": 0, "غير محدد": 0 };
         elvRaw.forEach((r) => { bucketCounts[window.getElevatorStatusBucket(r)]++; });
         const cityCount = {};
-        elvRaw.forEach((r) => { const c = getCity(r); if (c) cityCount[c] = (cityCount[c] || 0) + (getCount(r) || 0); });
+        Object.keys(_es.byCity).forEach((c) => { cityCount[c] = _es.byCity[c].elevators; });
         summary.المصاعد = {
           مصدر: "تبويب المصاعد",
           عدد_المدارس_التي_لديها_مصاعد: totalSchools,
@@ -31066,6 +31195,7 @@ ${panelHTML}
 
   function _ixRenderSource(def, rows){
     if (!rows.length) return "";
+    if (def.key === "RAW_ELEVATORS") return _ixElevatorSourceHTML(rows);
     const shown = rows.length > 35 ? rows.slice(0,35) : rows;
     const more = rows.length - shown.length;
     const extra = more > 0
@@ -31074,7 +31204,7 @@ ${panelHTML}
 
     let summary = "";
     if (def.key === "RAW_BALAGH"){
-      const closed = rows.filter(r => (window.balaghIsClosed?.(r["الحالة"] ?? r.Status ?? r["Status"])) === true).length;
+      const closed = rows.filter(r => ((window.__balaghIsClosed || window.balaghIsClosed)?.(r["الحالة"] ?? r.Status ?? r["Status"])) === true).length;
       const open = Math.max(rows.length - closed, 0);
       summary = `<div class="ix-profile-mini-kpis">
         <div><b>${rows.length.toLocaleString()}</b><span>إجمالي</span></div>
@@ -31102,10 +31232,92 @@ ${panelHTML}
 
     return `
       ${summary}
+      ${def.key === "RAW_BALAGH" && typeof window.__bscPanelButtons === "function" ? window.__bscPanelButtons(rows) : ""}
       ${shown.slice(0,6).map((row, idx) => _ixRenderRecordCard(row, idx, def.singular)).join("")}
       ${rows.length > 6 ? `<div class="ix-profile-more">يوجد ${rows.length - 6} ${def.singular || "سجل"} إضافي — افتح التبويب الأصلي لعرض القائمة الكاملة.</div>` : ""}
       ${extra}`;
   }
+
+  /* ════════════════════════════════════════════════════════════════
+     🛗 المصاعد في بانل المدرسة (عرض خفيف) + ربط جدول المصاعد بالمدارس
+     - الربط بالرقم الوزاري بعد تنظيفه (أرقام فقط) عبر _ixId / normSchoolId.
+     - لا يغيّر أي بيانات؛ قراءة فقط من window.RAW_ELEVATORS و RAW.
+     ════════════════════════════════════════════════════════════════ */
+  function _ixElevStats(rows){
+    let working = 0, notWorking = 0, unknown = 0;
+    const items = rows.map(function(r){
+      const st = String((r && (r["حالة المصعد"] ?? r["الحالة الموحدة"])) ?? "").trim();
+      const note = String((r && (r["حالة إضافية / ملاحظات الحالة"] ?? r["ملاحظات الحالة"])) ?? "").trim();
+      let kind = "unknown";
+      if (st) kind = (/يعمل/.test(st) && !/لا\s*يعمل|لايعمل/.test(st)) ? "ok" : "bad";
+      if (kind === "ok") working++; else if (kind === "bad") notWorking++; else unknown++;
+      return { kind: kind, note: note };
+    });
+    return { total: rows.length, working: working, notWorking: notWorking, unknown: unknown, items: items };
+  }
+
+  function _ixElevItemsHTML(items){
+    return items.map(function(it, i){
+      const badge = it.kind === "ok"
+        ? '<span style="background:#05966918;color:#047857;border:1px solid #05966933;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">يعمل</span>'
+        : it.kind === "bad"
+          ? '<span style="background:#DC262618;color:#B91C1C;border:1px solid #DC262633;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">لا يعمل</span>'
+          : '<span style="background:#6B728018;color:#4B5563;border:1px solid #6B728033;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">غير محدد</span>';
+      return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;border-bottom:1px dashed var(--bd-light);font-size:12px">' +
+        '<span style="color:var(--tx-muted);min-width:56px">مصعد ' + (i + 1) + '</span>' + badge +
+        (it.note ? '<span style="flex:1;color:var(--tx-muted)">' + esc(it.note) + '</span>' : '') + '</div>';
+    }).join("");
+  }
+
+  function _ixElevMiniKpis(st){
+    return '<div class="ix-profile-mini-kpis">' +
+      '<div><b>' + st.total.toLocaleString() + '</b><span>مصعد</span></div>' +
+      '<div><b>' + st.working.toLocaleString() + '</b><span>يعمل</span></div>' +
+      '<div><b>' + st.notWorking.toLocaleString() + '</b><span>لا يعمل</span></div></div>';
+  }
+
+  // كارت المصاعد داخل بانل المدرسة (خفيف)
+  function _ixElevatorCardHTML(r){
+    try{
+      const all = window.RAW_ELEVATORS;
+      if (!Array.isArray(all) || !all.length) return "";
+      const rows = _ixRowsFor({rows:()=>all}, r);
+      const title = _ixSecTitle("🛗","المصاعد","Elevators");
+      if (!rows.length){
+        return title + '<div class="ix-profile-note"><span>ℹ️</span><span>لا يوجد سجل مصاعد لهذه المدرسة في حصر المصاعد.</span></div>';
+      }
+      const st = _ixElevStats(rows);
+      return title + _ixElevMiniKpis(st) + '<div style="margin:6px 0 14px">' + _ixElevItemsHTML(st.items) + '</div>';
+    }catch(_){ return ""; }
+  }
+
+  // عرض مصدر «المصاعد» عند فتحه من «الملف الشامل» (خفيف: الحالة والملاحظات فقط)
+  function _ixElevatorSourceHTML(rows){
+    const st = _ixElevStats(rows);
+    return _ixElevMiniKpis(st) + '<div style="margin-top:8px">' + _ixElevItemsHTML(st.items) + '</div>';
+  }
+
+  // البحث عن سجل مدرسة بالرقم الوزاري (بعد التنظيف) — فهرس مخزّن لحين تغيّر RAW
+  let __ixSchoolIdxCache = { src: null, map: null };
+  window.__IXFindSchoolByMinId = function(minId){
+    const id = _ixId(minId);
+    if (!id) return null;
+    const raw = getRaw();
+    if (!raw.length) return null;
+    if (__ixSchoolIdxCache.src !== raw || !__ixSchoolIdxCache.map){
+      const m = new Map();
+      raw.forEach(function(s){
+        const k = _ixId(s.minId || s.schoolSeq || s.buildingSeq);
+        if (k && !m.has(k)) m.set(k, s);
+      });
+      __ixSchoolIdxCache = { src: raw, map: m };
+    }
+    return __ixSchoolIdxCache.map.get(id) || null;
+  };
+  window.__IXOpenSchoolByMinId = function(minId){
+    const s = window.__IXFindSchoolByMinId(minId);
+    if (s) openSchoolPanel(s);
+  };
 
   function buildUnifiedSchoolProfile(base){
     const merged = { ...(base || {}) };
@@ -31448,6 +31660,9 @@ ${panelHTML}
 
       <!-- ── العقود ── -->
       ${contractsSectionHTML}
+
+      <!-- ── المصاعد (عرض خفيف) ── -->
+      ${_ixElevatorCardHTML(r)}
 
       <!-- ── الملف الشامل عبر جميع التبويبات ── -->
       ${typeof renderUnifiedCrossTabProfile === "function" ? renderUnifiedCrossTabProfile(r) : ""}
@@ -41169,6 +41384,7 @@ var PORTAL_CATEGORIES = {
     icon: "📢",
     tabs: [
       { name: "balagh",                  label: "البلاغات" },
+      { name: "balagh-subcat",          label: "تحليل الفئات الفرعية" },
       { name: "security-safety",         label: "بلاغات الأمن والسلامة" },
       { name: "security-safety-summary", label: "ملخص الأمن والسلامة" },
       { name: "new-sla",                 label: "NEW SLA" }

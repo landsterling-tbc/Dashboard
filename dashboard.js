@@ -76,6 +76,18 @@ window.__fetchWithRetry__ = async function (url, options, retries = 2, delayMs =
    ⚠️ نقطة مهمة: القراءة تحدث مرة واحدة عند تحميل الصفحة.
    لو احتجت قيمة بعد DOM جاهز، استخدم CSS_TOKENS مباشرة.
    ════════════════════════════════════════════════════════════════ */
+// __COLOR_STEP2_TEAL_TEXT__ (نص #0d849c الصغير → var(--c-info-2))
+// __COLOR_STEP3_AMBER_TEXT__
+// __COLOR_STEP4_NEUTRAL_KPI__
+// __COLOR_PHASE2_GREEN__
+// __COLOR_PHASE4_RED__
+// __COLOR_PHASE5_AMBER__
+// __COLOR_PHASE6_PURPLE__
+// __COLOR_PHASE7_BLUE_TEAL__
+// __COLOR_PHASE8_NEUTRALS__
+// __COLOR_PHASE9_TINTS__
+// __COLOR_PHASE10_TAIL__
+// __SVG_ICONS_NO_EMOJI__
 const CSS_TOKENS = (() => {
   const s = () => getComputedStyle(document.documentElement);
   const v = (name) => s().getPropertyValue(name).trim();
@@ -83,6 +95,7 @@ const CSS_TOKENS = (() => {
     // ── ألوان دلالية (Semantic) ─────────────────────────────────
     danger:   () => v("--c-danger")   || "#7d1f2c",  // خطر / حرج / وفيات
     warning:  () => v("--c-warning")  || "#c07a14",  // تحذير / متوسط
+    warningText: () => v("--c-warning-text") || "#92590a", // __COLOR_STEP3_AMBER_TEXT__ برتقالي للنص الصغير فقط
     positive: () => v("--c-positive") || "#066a52",  // إيجابي / جيد / مكتمل
     info:     () => v("--c-info")     || "#0d849c",  // معلومة / رئيسي / أزرق
     info2:    () => v("--c-info-2")   || "#0b6b7e",  // ثانوي / تيل داكن
@@ -689,7 +702,7 @@ function getTier(v) {
           : "vgood";
 }
 const tierColor = (v) => TIER[getTier(v)]?.color || CSS_TOKENS.txMuted(),
-  tierBg = (v) => TIER[getTier(v)]?.bg || "#f1f5f9";
+  tierBg = (v) => TIER[getTier(v)]?.bg || "#eef3f7";
 function killChart(id) {
   if (CHARTS[id]) {
     try {
@@ -785,14 +798,14 @@ function renderLoadingState(container, message = "جاري التحميل…") {
   const el = typeof container === "string" ? document.getElementById(container) : container;
   if (!el) return;
   el.innerHTML = `<div class="chart-loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:var(--tx-muted);gap:10px">
-    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.15)};border-top-color:#0891B2;border-radius:50%;animation:ixspin .8s linear infinite"></div>
+    <div class="ix-skeleton-spinner" style="width:26px;height:26px;border:3px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.15)};border-top-color:#0d849c;border-radius:50%;animation:ixspin .8s linear infinite"></div>
     <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
   </div>`;
 }
 function renderErrorState(container, message = "تعذّر عرض البيانات") {
   const el = typeof container === "string" ? document.getElementById(container) : container;
   if (!el) return;
-  el.innerHTML = `<div class="chart-error-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:#DC2626;gap:8px">
+  el.innerHTML = `<div class="chart-error-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:160px;color:#9c2a3a;gap:8px">
     <div style="font-size:28px;opacity:.6">⚠️</div>
     <div style="font-size:12px;font-weight:700">${sanitizeText(message)}</div>
   </div>`;
@@ -1915,6 +1928,12 @@ function _ovEsc(v) {
 function _ovFmt(n) {
   return typeof n === "number" && isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
 }
+const _OV_ICONS = {"banknote":"<rect width=\"20\" height=\"12\" x=\"2\" y=\"6\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M6 12h.01M18 12h.01\"/>","briefcase":"<path d=\"M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\"/><rect width=\"20\" height=\"14\" x=\"2\" y=\"6\" rx=\"2\"/>","building":"<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"/><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"/><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"/><path d=\"M10 6h4\"/><path d=\"M10 10h4\"/><path d=\"M10 14h4\"/><path d=\"M10 18h4\"/>","cap":"<path d=\"M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z\"/><path d=\"M22 10v6\"/><path d=\"M6 12.5V16a6 3 0 0 0 12 0v-3.5\"/>","car":"<path d=\"M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2\"/><circle cx=\"7\" cy=\"17\" r=\"2\"/><path d=\"M9 17h6\"/><circle cx=\"17\" cy=\"17\" r=\"2\"/>","card":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"5\" rx=\"2\"/><line x1=\"2\" x2=\"22\" y1=\"10\" y2=\"10\"/>","chart":"<path d=\"M5 21v-6\"/><path d=\"M12 21V3\"/><path d=\"M19 21V9\"/>","clipcheck":"<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/><path d=\"m9 14 2 2 4-4\"/>","door":"<path d=\"M13 4h3a2 2 0 0 1 2 2v14\"/><path d=\"M2 20h3\"/><path d=\"M13 20h9\"/><path d=\"M10 12v.01\"/><path d=\"M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z\"/>","elevator":"<path d=\"m21 16-4 4-4-4\"/><path d=\"M17 20V4\"/><path d=\"m3 8 4-4 4 4\"/><path d=\"M7 4v16\"/>","fuel":"<line x1=\"3\" x2=\"15\" y1=\"22\" y2=\"22\"/><line x1=\"4\" x2=\"14\" y1=\"9\" y2=\"9\"/><path d=\"M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18\"/><path d=\"M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5\"/>","hardhat":"<path d=\"M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5\"/><path d=\"M14 6a6 6 0 0 1 6 6v3\"/><path d=\"M4 15v-3a6 6 0 0 1 6-6\"/><rect x=\"2\" y=\"15\" width=\"20\" height=\"4\" rx=\"1\"/>","landmark":"<line x1=\"3\" x2=\"21\" y1=\"22\" y2=\"22\"/><line x1=\"6\" x2=\"6\" y1=\"18\" y2=\"11\"/><line x1=\"10\" x2=\"10\" y1=\"18\" y2=\"11\"/><line x1=\"14\" x2=\"14\" y1=\"18\" y2=\"11\"/><line x1=\"18\" x2=\"18\" y1=\"18\" y2=\"11\"/><polygon points=\"12 2 20 7 4 7\"/>","leaf":"<path d=\"M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z\"/><path d=\"M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12\"/>","mail":"<rect width=\"20\" height=\"16\" x=\"2\" y=\"4\" rx=\"2\"/><path d=\"m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7\"/>","megaphone":"<path d=\"m3 11 18-5v12L3 14v-3z\"/><path d=\"M11.6 16.8a3 3 0 1 1-5.8-1.6\"/>","network":"<rect x=\"16\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"2\" y=\"16\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3\"/><path d=\"M12 12V8\"/>","package":"<path d=\"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z\"/><path d=\"M12 22V12\"/><path d=\"m3.29 7 8.71 5 8.71-5\"/><path d=\"m7.5 4.27 9 5.15\"/>","receipt":"<path d=\"M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z\"/><path d=\"M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8\"/><path d=\"M12 17.5v-11\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\"/><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\"/><circle cx=\"12\" cy=\"14\" r=\"8\"/>","trend":"<polyline points=\"22 7 13.5 15.5 8.5 10.5 2 17\"/><polyline points=\"16 7 22 7 22 13\"/>","truck":"<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M15 18H9\"/><path d=\"M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>","wallet":"<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\"/><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z\"/>"};
+function _ovIcon(n, sz) {
+  const d = _OV_ICONS[n]; if (!d) return "";
+  sz = sz || 16;
+  return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;color:var(--c-info)" aria-hidden="true">${d}</svg>`;
+}
 function _ovCard(opts) {
   const { icon, title, lines, tab } = opts;
   if (!lines || !lines.length) return "";
@@ -1925,7 +1944,7 @@ function _ovCard(opts) {
     : "";
   return `<div class="card ov-card"${clickAttrs}>
     <div class="card-title" style="margin-bottom:6px">
-      <span>${icon} ${_ovEsc(title)}</span>
+      <span style="display:inline-flex;align-items:center;gap:7px">${_ovIcon(icon)}${_ovEsc(title)}</span>
       ${openable ? `<span class="sub">فتح ›</span>` : ""}
     </div>
     ${lines.map((l) => `<div style="font-size:12px;color:var(--tx-main);padding:2px 0;display:flex;justify-content:space-between;gap:8px">
@@ -2004,113 +2023,113 @@ function renderOverviewSummaryCards() {
 
   const groups = [
     {
-      title: "🏫 المدارس والتقييمات",
+      icon: "building", title: "المدارس والتقييمات",
       cards: [
-        stat.تحليل_FCA && _ovCard({ icon: "📈", title: "تحليل FCA", tab: "fca", lines: [
+        stat.تحليل_FCA && _ovCard({ icon: "trend", title: "تحليل FCA", tab: "fca", lines: [
           { k: "مدارس مقيَّمة", v: fmt(stat.تحليل_FCA.عدد_المدارس_المقيّمة) },
           { k: "متوسط الدرجة", v: fmt(stat.تحليل_FCA.المتوسط_الفعلي) },
         ]}),
-        stat.البيئة_المدرسية && _ovCard({ icon: "🌿", title: "البيئة المدرسية", tab: "env", lines: [
+        stat.البيئة_المدرسية && _ovCard({ icon: "leaf", title: "البيئة المدرسية", tab: "env", lines: [
           { k: "مدارس مقيَّمة", v: fmt(stat.البيئة_المدرسية.عدد_المقيّم) },
           { k: "متوسط الدرجة", v: fmt(stat.البيئة_المدرسية.المتوسط_الفعلي) },
         ]}),
-        stat.التكلفة && _ovCard({ icon: "💵", title: "التكلفة", tab: "cost", lines: [
+        stat.التكلفة && _ovCard({ icon: "wallet", title: "التكلفة", tab: "cost", lines: [
           { k: "الإجمالي (ر.س)", v: fmt(stat.التكلفة.الإجمالي) },
           { k: "مدارس لها تكلفة", v: fmt(stat.التكلفة.عدد_مدارس_لها_تكلفة) },
         ]}),
-        stat.الطلاب_والمبنى && stat.الطلاب_والمبنى.إجمالي_الطلاب != null && _ovCard({ icon: "🎒", title: "الطلاب وعمر المبنى", tab: "students", lines: [
+        stat.الطلاب_والمبنى && stat.الطلاب_والمبنى.إجمالي_الطلاب != null && _ovCard({ icon: "users", title: "الطلاب وعمر المبنى", tab: "students", lines: [
           { k: "إجمالي الطلاب", v: fmt(stat.الطلاب_والمبنى.إجمالي_الطلاب) },
         ]}),
       ],
     },
     {
-      title: "📢 البلاغات والسلامة",
+      icon: "megaphone", title: "البلاغات والسلامة",
       cards: [
-        sup.البلاغات && _ovCard({ icon: "📢", title: "البلاغات", tab: "balagh", lines: [
+        sup.البلاغات && _ovCard({ icon: "megaphone", title: "البلاغات", tab: "balagh", lines: [
           { k: "الإجمالي", v: fmt(sup.البلاغات.إجمالي_البلاغات) },
         ]}),
-        newSla && _ovCard({ icon: "⏱️", title: "NEW SLA", tab: "new-sla", lines: [
+        newSla && _ovCard({ icon: "timer", title: "NEW SLA", tab: "new-sla", lines: [
           { k: "نسبة الالتزام", v: newSla.pct != null ? newSla.pct + "%" : "—" },
           { k: "اختراق (شامل الحالي)", v: fmt(newSla.breach) },
         ]}),
-        (Array.isArray(window.RAW_SECURITY_SAFETY) && window.RAW_SECURITY_SAFETY.length) && _ovCard({ icon: "🛡️", title: "بلاغات الأمن والسلامة", tab: "security-safety", lines: [
+        (Array.isArray(window.RAW_SECURITY_SAFETY) && window.RAW_SECURITY_SAFETY.length) && _ovCard({ icon: "shield", title: "بلاغات الأمن والسلامة", tab: "security-safety", lines: [
           { k: "الإجمالي", v: fmt(window.RAW_SECURITY_SAFETY.length) },
         ]}),
       ],
     },
     {
-      title: "⚙️ الموارد البشرية والتشغيل",
+      icon: "briefcase", title: "الموارد البشرية والتشغيل",
       cards: [
-        sup.الهيكل_الوظيفي && _ovCard({ icon: "🗂️", title: "الهيكل الوظيفي", tab: "org-structure", lines: [
+        sup.الهيكل_الوظيفي && _ovCard({ icon: "network", title: "الهيكل الوظيفي", tab: "org-structure", lines: [
           { k: "إجمالي الوظائف", v: fmt(sup.الهيكل_الوظيفي.إجمالي_الوظائف_والسجلات) },
           { k: "شاغرة", v: fmt(sup.الهيكل_الوظيفي.الوظائف_الشاغرة) },
           { k: "نسبة الإشغال", v: sup.الهيكل_الوظيفي.نسبة_الإشغال || "—" },
         ]}),
-        train && _ovCard({ icon: "🎓", title: "برامج التدريب", tab: "training", lines: [
+        train && _ovCard({ icon: "cap", title: "برامج التدريب", tab: "training", lines: [
           { k: "عدد الموظفين", v: fmt(train.employees) },
           { k: "نسبة الإنجاز", v: train.pct != null ? train.pct + "%" : "—" },
         ]}),
-        sup.السيارات && _ovCard({ icon: "🚗", title: "السيارات", tab: "vehicles", lines: [
+        sup.السيارات && _ovCard({ icon: "car", title: "السيارات", tab: "vehicles", lines: [
           { k: "إجمالي السيارات", v: fmt(sup.السيارات.إجمالي_السيارات) },
         ]}),
-        sup.استهلاك_الوقود && _ovCard({ icon: "⛽", title: "استهلاك الوقود", tab: "fuel", lines: [
+        sup.استهلاك_الوقود && _ovCard({ icon: "fuel", title: "استهلاك الوقود", tab: "fuel", lines: [
           { k: "إجمالي اللترات", v: fmt(sup.استهلاك_الوقود.إجمالي_اللترات) },
           { k: "إجمالي التكلفة (ر.س)", v: fmt(sup.استهلاك_الوقود.إجمالي_التكلفة_SAR) },
         ]}),
-        sup.البوابون && _ovCard({ icon: "🚪", title: "البوابون", tab: "gatekeepers", lines: [
+        sup.البوابون && _ovCard({ icon: "door", title: "البوابون", tab: "gatekeepers", lines: [
           { k: "الإجمالي", v: fmt(sup.البوابون.إجمالي_البوابين) },
         ]}),
-        sup.المشرفون_والمهندسون && _ovCard({ icon: "👷", title: "المشرفون والمهندسون", tab: "supervisors", lines: [
+        sup.المشرفون_والمهندسون && _ovCard({ icon: "hardhat", title: "المشرفون والمهندسون", tab: "supervisors", lines: [
           { k: "الإجمالي", v: fmt(sup.المشرفون_والمهندسون.إجمالي_السجلات) },
         ]}),
-        sup.سجل_المراسلات && _ovCard({ icon: "✉️", title: "سجل المراسلات", tab: "correspondence", lines: [
+        sup.سجل_المراسلات && _ovCard({ icon: "mail", title: "سجل المراسلات", tab: "correspondence", lines: [
           { k: "الإجمالي", v: fmt(sup.سجل_المراسلات.إجمالي_المراسلات) },
         ]}),
-        sup.الزيارات && _ovCard({ icon: "🚚", title: "الزيارات", tab: "visits", lines: [
+        sup.الزيارات && _ovCard({ icon: "truck", title: "الزيارات", tab: "visits", lines: [
           { k: "نسبة الإنجاز", v: sup.الزيارات.نسبة_الإنجاز_الكلية || "—" },
           { k: "مكتملة", v: fmt(sup.الزيارات.إجمالي_الزيارات_المكتملة) },
         ]}),
       ],
     },
     {
-      title: "💰 العقود والتكاليف",
+      icon: "banknote", title: "العقود والتكاليف",
       cards: [
-        sup.مدفوعات_وعقود_LS && _ovCard({ icon: "💳", title: "مدفوعات وعقود LS", tab: "ls-payments", lines: [
+        sup.مدفوعات_وعقود_LS && _ovCard({ icon: "card", title: "مدفوعات وعقود LS", tab: "ls-payments", lines: [
           { k: "نسبة السداد", v: sup.مدفوعات_وعقود_LS.نسبة_السداد_الكلية || "—" },
           { k: "المتبقي (ر.س)", v: fmt(sup.مدفوعات_وعقود_LS.المتبقي_SAR) },
           { k: "Payment in Pipeline (ر.س)", v: fmt(sup.مدفوعات_وعقود_LS.Payment_in_Pipeline_SAR) },
         ]}),
-        ctp && _ovCard({ icon: "🏗️", title: "مدفوعات وعقود المقاولين", tab: "contractor-payments", lines: [
+        ctp && _ovCard({ icon: "landmark", title: "مدفوعات وعقود المقاولين", tab: "contractor-payments", lines: [
           { k: "نسبة السداد", v: ctp.pct != null ? ctp.pct + "%" : "—" },
           { k: "المتبقي (ر.س)", v: fmt(ctp.remaining) },
         ]}),
-        sup.العهدة && _ovCard({ icon: "🧾", title: "العهدة", tab: "petty-cash", lines: [
+        sup.العهدة && _ovCard({ icon: "receipt", title: "العهدة", tab: "petty-cash", lines: [
           { k: "الرصيد المتبقي (ر.س)", v: fmt(sup.العهدة.الرصيد_المتبقي) },
         ]}),
       ],
     },
     {
-      title: "🔧 الصيانة والأصول",
+      icon: "wrench", title: "الصيانة والأصول",
       cards: [
-        sup.المصاعد && _ovCard({ icon: "🛗", title: "المصاعد", tab: "elevators", lines: [
+        sup.المصاعد && _ovCard({ icon: "elevator", title: "المصاعد", tab: "elevators", lines: [
           { k: "العاملة", v: fmt(sup.المصاعد.العاملة) },
           { k: "المتعطلة", v: fmt(sup.المصاعد.المتعطلة) },
         ]}),
-        sup.حصر_الأصول && _ovCard({ icon: "📦", title: "حصر الأصول", tab: "hasr", lines: [
+        sup.حصر_الأصول && _ovCard({ icon: "package", title: "حصر الأصول", tab: "hasr", lines: [
           { k: "إجمالي الأصول", v: fmt(sup.حصر_الأصول.إجمالي_الأصول) },
         ]}),
-        sup.الصيانة_الوقائية_Maximo && _ovCard({ icon: "🛠️", title: "الصيانة الوقائية (Maximo)", tab: "ppm-maximo", lines: [
+        sup.الصيانة_الوقائية_Maximo && _ovCard({ icon: "wrench", title: "الصيانة الوقائية (Maximo)", tab: "ppm-maximo", lines: [
           { k: "نسبة الإنجاز الفعلي", v: sup.الصيانة_الوقائية_Maximo.Actual_الإجمالي || "—" },
         ]}),
       ],
     },
     {
-      title: "📊 مؤشرات الأداء",
+      icon: "chart", title: "مؤشرات الأداء",
       cards: [
-        sup.مؤشرات_الأداء && _ovCard({ icon: "📊", title: "مؤشرات أداء المقاول", tab: "mag-kpi", lines: [
+        sup.مؤشرات_الأداء && _ovCard({ icon: "chart", title: "مؤشرات أداء المقاول", tab: "mag-kpi", lines: [
           { k: "عدد المؤشرات", v: fmt(sup.مؤشرات_الأداء.عدد_مؤشرات_المقاول) },
         ]}),
-        sup.مؤشرات_الأداء && _ovCard({ icon: "📊", title: "مؤشرات أداء الاستشاري", tab: "consultant-kpi", lines: [
+        sup.مؤشرات_الأداء && _ovCard({ icon: "clipcheck", title: "مؤشرات أداء الاستشاري", tab: "consultant-kpi", lines: [
           { k: "عدد المؤشرات", v: fmt(sup.مؤشرات_الأداء.عدد_مؤشرات_الاستشاري) },
         ]}),
       ],
@@ -2122,7 +2141,7 @@ function renderOverviewSummaryCards() {
       const cardsHtml = g.cards.filter(Boolean).join("");
       if (!cardsHtml) return "";
       return `<div class="mb14">
-        <div style="font-size:13px;font-weight:800;color:var(--tx-muted);margin:4px 0 8px">${_ovEsc(g.title)}</div>
+        <div style="font-size:13px;font-weight:800;color:var(--tx-muted);margin:4px 0 8px;display:flex;align-items:center;gap:7px">${_ovIcon(g.icon, 15)}<span>${_ovEsc(g.title)}</span></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px">${cardsHtml}</div>
       </div>`;
     })
@@ -2186,7 +2205,7 @@ function renderOverviewCharts() {
           {
             label: "عدد المدارس",
             data: envBins,
-            // PHASE 1 (توحيد الألوان): كان أخضر مختلف (#059669) عن اللون
+            // PHASE 1 (توحيد الألوان): كان أخضر مختلف (#066a52) عن اللون
             // الموحّد في باقي الداشبورد (--c-positive #066a52)
             backgroundColor: CSS_TOKENS.positive() + "BB",
             borderWidth: 1,
@@ -2316,7 +2335,7 @@ function renderEnvCharts() {
 
       /* خلفية */
       ctx.fillStyle =
-        getComputedStyle(document.documentElement).getPropertyValue("--bg-2") || "#f8fafc";
+        getComputedStyle(document.documentElement).getPropertyValue("--bg-2") || "#f7fafc";
       ctx.fillRect(0, 0, W, H);
 
       /* ألوان الكثافة: من أبيض/رمادي فاتح → تيل غامق */
@@ -2325,7 +2344,7 @@ function renderEnvCharts() {
         const t = v / maxVal;
         if (t < 0.2) return `rgba(186,230,253,${alpha})`; /* أزرق فاتح جداً */
         if (t < 0.4) return `rgba(56,189,248,${alpha})`; /* سماوي */
-        if (t < 0.6) return `rgba(8,145,178,${alpha})`; /* تيل */
+        if (t < 0.6) return `rgba(13,132,156,${alpha})`; /* تيل */
         if (t < 0.8) return `rgba(6,95,115,${alpha})`; /* تيل داكن */
         return `rgba(4,55,68,${alpha})`; /* داكن جداً */
       }
@@ -2455,7 +2474,7 @@ function renderEnvCharts() {
         .join("");
 
       tooltip.innerHTML = `
-      <div style="font-weight:800;color:#06B6D4;margin-bottom:5px">FCA: ${xMin}–${xMax}% × بيئة: ${yMin}–${yMax}%</div>
+      <div style="font-weight:800;color:#16a4bf;margin-bottom:5px">FCA: ${xMin}–${xMax}% × بيئة: ${yMin}–${yMax}%</div>
       <div style="font-size:13px;font-weight:800">${v} مدرسة <span style="font-size:10px;opacity:.7">(${((v / pts.length) * 100).toFixed(1)}%)</span></div>
       ${sample}
       ${schoolList.length > 3 ? `<div style="font-size:10px;opacity:.6;margin-top:3px">+ ${schoolList.length - 3} مدارس أخرى</div>` : ""}`;
@@ -3227,7 +3246,7 @@ function renderStageCompareTab() {
       CHARTS[chartId]=new Chart(document.getElementById(chartId),{
         type:"doughnut",
         data:{ labels:["مقيّمة","بدون تقييم"],
-          datasets:[{data:[cnt,missing],backgroundColor:[col.bd,"#E5E7EB"],borderColor:"#fff",borderWidth:2}] },
+          datasets:[{data:[cnt,missing],backgroundColor:[col.bd,"#dbe7ee"],borderColor:"#fff",borderWidth:2}] },
         options:{ maintainAspectRatio:false,
           plugins:{ legend:{position:"bottom",labels:{font:{size:9},boxWidth:8}},
             tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${ctx.raw} مدرسة`}} } }
@@ -3612,9 +3631,9 @@ function renderTable() {
         ec = null != r.envScore ? tierColor(r.envScore) : "#ccc",
         genderStyle =
           "بنات" === r.gender
-            ? "background:#FEF2F2;color:#DC2626;border-color:#FECACA"
+            ? "background:#fdf0f2;color:#9c2a3a;border-color:#d8bcc0"
             : "بنين" === r.gender
-              ? "background:#ECFEFF;color:#0891B2;border-color:#A5F3FC"
+              ? "background:#eaf6fa;color:var(--c-info-2);border-color:#cfe6eb"
               : "",
         tr = document.createElement("tr");
       tr.dataset.rowIdx = String(start + pageIdx);
@@ -5074,7 +5093,7 @@ let __bgRevalidatedOnce = false;
           ? `<br><small style="opacity:.8">إعادة المحاولة تلقائياً (${retryCount}/${CFG.RETRY_MAX})</small>`
           : "";
       showToast(
-        `فشل تحميل الملفات<br><small style="opacity:.75">${err.message}</small>\n        <br><button onclick="loadData()" style="margin-top:6px;border:none;background:transparent;\n          color:#991B1B;text-decoration:underline;font-family:'IBM Plex Sans Arabic','Tajawal';font-size:12px;cursor:pointer">\n          إعادة المحاولة</button>${retryNote}`,
+        `فشل تحميل الملفات<br><small style="opacity:.75">${err.message}</small>\n        <br><button onclick="loadData()" style="margin-top:6px;border:none;background:transparent;\n          color:#7d1f2c;text-decoration:underline;font-family:'IBM Plex Sans Arabic','Tajawal';font-size:12px;cursor:pointer">\n          إعادة المحاولة</button>${retryNote}`,
         "err",
       );
     }
@@ -5502,7 +5521,7 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
 
   const modal = document.createElement("div");
   modal.style.cssText =
-    "background:#0B2733;border:1px solid rgba(255,255,255,.14);border-radius:14px;" +
+    "background:#081e2a;border:1px solid rgba(255,255,255,.14);border-radius:14px;" +
     "width:min(340px,100%);max-height:80vh;display:flex;flex-direction:column;" +
     "box-shadow:0 20px 50px rgba(0,0,0,.5);direction:rtl;color:#fff;" +
     "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;overflow:hidden";
@@ -5559,7 +5578,7 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
     p.id = "__backupProgressPill";
     p.title = "اضغط لعرض تفاصيل النسخ الاحتياطي";
     p.style.cssText =
-      "position:fixed;right:22px;bottom:22px;z-index:100000;background:#0B2733;" +
+      "position:fixed;right:22px;bottom:22px;z-index:100000;background:#081e2a;" +
       "border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 14px;" +
       "display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 12px 28px rgba(0,0,0,.45);" +
       "direction:rtl;color:#fff;font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;" +
@@ -5710,7 +5729,7 @@ function __backupCreateProgressUI_(sourceLabels, auto) {
       closeBtn.disabled = false;
       closeBtn.style.cssText =
         "width:100%;padding:8px;border:none;border-radius:8px;background:#2FB7C8;" +
-        "color:#04202b;font-weight:700;font-size:12px;cursor:pointer";
+        "color:#081e2a;font-weight:700;font-size:12px;cursor:pointer";
       overlay.onclick = (e) => {
         if (e.target === overlay) closeNow();
       };
@@ -6718,7 +6737,7 @@ window.__openBackupMenu = async function (ev) {
 
   const panel = document.createElement("div");
   panel.style.cssText =
-    "position:fixed;left:16px;bottom:52px;z-index:99999;background:#0B2733;" +
+    "position:fixed;left:16px;bottom:52px;z-index:99999;background:#081e2a;" +
     "border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:14px;" +
     "width:340px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,.45);direction:rtl;" +
     "font-family:'IBM Plex Sans Arabic','Tajawal',sans-serif;color:#fff;font-size:12px";
@@ -6727,7 +6746,7 @@ window.__openBackupMenu = async function (ev) {
   panel.innerHTML =
     '<div style="font-size:12px;font-weight:700;margin-bottom:10px;opacity:.9">النسخ الاحتياطي الكامل</div>' +
     '<button type="button" id="__backupNowBtn" style="width:100%;padding:8px;border:none;border-radius:8px;' +
-    'background:#2FB7C8;color:#04202b;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:12px">' +
+    'background:#2FB7C8;color:#081e2a;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:12px">' +
     "تنزيل الآن</button>" +
     '<div style="border-top:1px solid rgba(255,255,255,.1);margin-bottom:10px;padding-top:10px">' +
     '<div style="font-size:10px;opacity:.6;margin-bottom:8px">حفظ الملفات مباشرة في مجلد (أو مجلدين) بدل التنزيلات</div>' +
@@ -6911,7 +6930,7 @@ let _map = null,
 // ── ألوان/تسميات فئات البلاغات الأربع + فئة "لا بلاغات" (بنفس أسلوب
 // الألوان الثابتة المستخدم بالفعل في buildLegendHTML لباقي الأوضاع) —
 // الترتيب تصاعدي حسب الخطورة: index 0 = لا بلاغات … index 4 = الأعلى ──
-const BALAGH_TIER_COLORS = ["#94A3B8", "#059669", "#D97706", "#EA580C", "#DC2626"],
+const BALAGH_TIER_COLORS = ["#8aa1ad", "#066a52", "#c07a14", "#b3541e", "#9c2a3a"],
   BALAGH_TIER_LABELS = ["لا يوجد بلاغات", "منخفض", "متوسط", "مرتفع", "الأعلى"];
 
 // ── 🧭 حدود جغرافية تقريبية للسعودية (بهامش أمان) — تُستخدم لفحص إحداثيات
@@ -7005,15 +7024,15 @@ function getMarkerStyle(r, mode) {
 }
 function buildLegendHTML(mode) {
   if ("fca" === mode || "env" === mode) {
-    return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#059669"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>جيد جداً · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>لا توجد بيانات</div>`;
+    return `<div class="map-legend-title">🎨 ${"fca" === mode ? "درجة FCA" : "البيئة المدرسية"}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#9c2a3a"></div>حرج · 0–24%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#c07a14"></div>متوسط · 25–49%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#066a52"></div>جيد · 50–74%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0d849c"></div>جيد جداً · 75–100%</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#8aa1ad"></div>لا توجد بيانات</div>`;
   }
   if ("balagh" === mode) {
     return `<div class="map-legend-title">📢 عدد البلاغات <span style="font-weight:600">(نسبي)</span></div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[4]}"></div>الأعلى · أكثر من ${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[3]}"></div>مرتفع · ${_mapBalaghQuartiles.q2 + 1}–${_mapBalaghQuartiles.q3}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[2]}"></div>متوسط · ${_mapBalaghQuartiles.q1 + 1}–${_mapBalaghQuartiles.q2}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[1]}"></div>منخفض · 1–${_mapBalaghQuartiles.q1}</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:${BALAGH_TIER_COLORS[0]}"></div>${BALAGH_TIER_LABELS[0]}</div>`;
   }
   return "gender" === mode
-    ? '<div class="map-legend-title">👦👧 الجنس</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#DC2626"></div>بنات</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>بنين</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
+    ? '<div class="map-legend-title">👦👧 الجنس</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#9c2a3a"></div>بنات</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0d849c"></div>بنين</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#8aa1ad"></div>غير محدد</div>'
     : "owner" === mode
-      ? '<div class="map-legend-title">🏛️ الملكية</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0891B2"></div>حكومي</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#D97706"></div>مستأجر</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#94A3B8"></div>غير محدد</div>'
+      ? '<div class="map-legend-title">🏛️ الملكية</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#0d849c"></div>حكومي</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#c07a14"></div>مستأجر</div>\n      <div class="map-legend-item"><div class="map-legend-dot" style="background:#8aa1ad"></div>غير محدد</div>'
       : "";
 }
 // ── بناء/تحديث واجهة فلتر الخريطة المحلي حسب وضع العرض الحالي — بيتنفّذ
@@ -7775,7 +7794,7 @@ function renderStudentsTab() {
                 ? studBinData[5]++
                 : studBinData[6]++;
   }),
-    (el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-green">\n        <div class="kpi-val">${totalStudents.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الطلاب</div>\n        <div class="kpi-sub">${withStudents.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${Math.round(avgStudents).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط الطلاب/مدرسة</div>\n        <div class="kpi-sub">طالب لكل مدرسة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${Math.round(avgAge).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط عمر المبنى</div>\n        <div class="kpi-sub">${withAge.length.toLocaleString()} مبنى مقيّم · سنة</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${maxAge ? maxAge.buildingAge : "—"}</div>\n        <div class="kpi-lbl">أقدم مبنى</div>\n        <div class="kpi-sub">${maxAge ? esc(maxAge.name.slice(0, 28)) : "—"} · سنة</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — عدد الطلاب</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-stud-top"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">أعمر 20 مبنى <span class="sub">بالسنوات</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-age-top"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع عدد الطلاب </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-stud-hist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">توزيع عمر المبنى بالسنوات </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-age-hist"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">إجمالي الطلاب حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-stud-stage"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط عمر المبنى حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-age-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">إجمالي الطلاب حسب الحي <span class="sub">أعلى 20 حي</span></div>\n      <div class="chart-box" style="height:300px"><canvas id="ch-stud-dist"></canvas></div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">FCA مقابل عمر المبنى <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-fca-age-scatter"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">عدد الطلاب مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-stud-fca-scatter"></canvas></div>\n      </div>\n    </div>`),
+    (el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-green kc-neutral">\n        <div class="kpi-val">${totalStudents.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الطلاب</div>\n        <div class="kpi-sub">${withStudents.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${Math.round(avgStudents).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط الطلاب/مدرسة</div>\n        <div class="kpi-sub">طالب لكل مدرسة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${Math.round(avgAge).toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط عمر المبنى</div>\n        <div class="kpi-sub">${withAge.length.toLocaleString()} مبنى مقيّم · سنة</div>\n      </div>\n      <div class="kpi kc-red kc-neutral">\n        <div class="kpi-val">${maxAge ? maxAge.buildingAge : "—"}</div>\n        <div class="kpi-lbl">أقدم مبنى</div>\n        <div class="kpi-sub">${maxAge ? esc(maxAge.name.slice(0, 28)) : "—"} · سنة</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — عدد الطلاب</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-stud-top"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">أعمر 20 مبنى <span class="sub">بالسنوات</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-age-top"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع عدد الطلاب </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-stud-hist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">توزيع عمر المبنى بالسنوات </div>\n        <div class="chart-box" style="height:260px"><canvas id="ch-age-hist"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">إجمالي الطلاب حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-stud-stage"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط عمر المبنى حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-age-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">إجمالي الطلاب حسب الحي <span class="sub">أعلى 20 حي</span></div>\n      <div class="chart-box" style="height:300px"><canvas id="ch-stud-dist"></canvas></div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">FCA مقابل عمر المبنى <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-fca-age-scatter"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">عدد الطلاب مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n        <div class="chart-box" style="height:310px"><canvas id="ch-stud-fca-scatter"></canvas></div>\n      </div>\n    </div>`),
     requestAnimationFrame(() => {
       (killChart("ch-stud-top"),
         (CHARTS["ch-stud-top"] = new Chart(document.getElementById("ch-stud-top"), {
@@ -8138,7 +8157,7 @@ window.__kpiFocus = function (chartId, idx) {
   document.querySelectorAll('[data-kpi-chip="' + chartId + '"]').forEach((b) => {
     const i = parseInt(b.getAttribute("data-idx"), 10);
     const on = i < 0 ? f.length === 0 : f.includes(i);
-    const col = b.getAttribute("data-color") || "var(--teal, #0d9488)";
+    const col = b.getAttribute("data-color") || "var(--teal, #0d849c)";
     b.style.background = on ? col : "transparent";
     b.style.color = on ? "#fff" : "var(--tx-main)";
     b.style.borderColor = col;
@@ -8149,7 +8168,7 @@ window.__kpiSetGran = function (chartId, key) {
   window.KPI_GRAN[chartId] = key;
   document.querySelectorAll('[data-kpi-gran="' + chartId + '"]').forEach((b) => {
     const on = b.getAttribute("data-key") === key;
-    b.style.background = on ? "var(--teal, #0d9488)" : "transparent";
+    b.style.background = on ? "var(--teal, #0d849c)" : "transparent";
     b.style.color = on ? "#fff" : "var(--tx-main)";
   });
   if (typeof window.KPI_REDRAW[chartId] === "function") window.KPI_REDRAW[chartId](key);
@@ -8455,7 +8474,7 @@ function renderKpiTabGeneric_(opts) {
   const contractCol = hasContract ? `<th style="min-width:120px">رقم العقد</th>` : "";
   const contractCell = (r) =>
     hasContract
-      ? `<td style="font-family:monospace;font-size:11px;font-weight:700;color:#0891B2">${esc(r.contract || "—")}</td>`
+      ? `<td style="font-family:monospace;font-size:11px;font-weight:700;color:var(--c-info-2)">${esc(r.contract || "—")}</td>`
       : "";
   const contractSuffix = (c) => (hasContract && c ? ` · عقد ${esc(c)}` : "");
 
@@ -8490,7 +8509,7 @@ function renderKpiTabGeneric_(opts) {
         <div style="display:inline-flex;border:1px solid var(--brd);border-radius:999px;overflow:hidden">
           ${KPI_GRANULARITIES.map((g) => {
             const on = (window.KPI_GRAN[chartId] || "month") === g.key;
-            return `<button type="button" data-kpi-gran="${chartId}" data-key="${g.key}" onclick="__kpiSetGran('${chartId}','${g.key}')" style="border:0;cursor:pointer;padding:5px 14px;font-size:12px;font-weight:700;font-family:inherit;background:${on ? "var(--teal, #0d9488)" : "transparent"};color:${on ? "#fff" : "var(--tx-main)"}">${g.label}</button>`;
+            return `<button type="button" data-kpi-gran="${chartId}" data-key="${g.key}" onclick="__kpiSetGran('${chartId}','${g.key}')" style="border:0;cursor:pointer;padding:5px 14px;font-size:12px;font-weight:700;font-family:inherit;background:${on ? "var(--teal, #0d849c)" : "transparent"};color:${on ? "#fff" : "var(--tx-main)"}">${g.label}</button>`;
           }).join("")}
         </div>
       </div>
@@ -8502,13 +8521,13 @@ function renderKpiTabGeneric_(opts) {
             const on = idx < 0 ? foc.length === 0 : foc.includes(idx);
             return `<button type="button" data-kpi-chip="${chartId}" data-idx="${idx}" data-color="${color}" onclick="__kpiFocus('${chartId}',${idx})" style="cursor:pointer;padding:4px 12px;font-size:12px;font-weight:700;font-family:inherit;border-radius:999px;border:2px solid ${color};background:${on ? color : "transparent"};color:${on ? "#fff" : "var(--tx-main)"}">${label}</button>`;
           };
-          return chip(-1, "الكل", "#64748B") + data.map((r, i) => chip(i, esc(r.region) + (hasContract && r.contract ? ` · ${esc(r.contract)}` : ""), PALETTE[i % PALETTE.length])).join("");
+          return chip(-1, "الكل", "#52707e") + data.map((r, i) => chip(i, esc(r.region) + (hasContract && r.contract ? ` · ${esc(r.contract)}` : ""), PALETTE[i % PALETTE.length])).join("");
         })()}
       </div>
       <div class="chart-box" style="height:380px"><canvas id="${chartId}"></canvas></div>
       <div id="${chartId}-gran-note" style="display:none;font-size:11px;color:var(--tx-muted);margin-top:8px">قيمة كل فترة = متوسط أشهرها. الفترة التي تضم أشهرًا متوقعة تُحسب من الأشهر الفعلية والمتوقعة داخلها معًا (تظهر بخط متقطع).</div>
       <div style="font-size:11px;color:var(--tx-muted);margin-top:10px;display:flex;align-items:center;gap:6px">
-        <span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #64748B"></span>
+        <span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #52707e"></span>
         الخط المنقّط = توقع بمعادلة Holt's Linear Exponential Smoothing (α=0.4، β=0.2) — يعطي البيانات الحديثة وزناً أكبر، وليس تأكيدًا — للمتابعة فقط
       </div>
     </div>
@@ -8733,9 +8752,9 @@ function renderSecuritySafetyTab() {
       balaghState === "loading"
         ? "يتم تحميل البيانات."
         : balaghState === "error"
-        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
-        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
-    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#fdf6ec;border:1px solid #ecd7b8;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92590a">
       <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
     </div>`;
   }
@@ -8759,16 +8778,16 @@ function renderSecuritySafetyTab() {
   if (!notLoaded && allSecRows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
     const diag = typeof window.debugSecuritySafetyMismatch === "function" ? window.debugSecuritySafetyMismatch() : null;
     const topVals = diag ? diag.topUnmatched.slice(0, 12) : [];
-    diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:16px">
-      <div style="font-size:14px;font-weight:800;color:#991B1B;margin-bottom:6px">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن</div>
-      <div style="font-size:12px;color:#7F1D1D;line-height:1.9;margin-bottom:10px">
+    diagnosticHtml = `<div class="card mb14" style="background:#fdf0f2;border:1px solid #d8bcc0;padding:16px">
+      <div style="font-size:14px;font-weight:800;color:#7d1f2c;margin-bottom:6px">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن</div>
+      <div style="font-size:12px;color:#7d1f2c;line-height:1.9;margin-bottom:10px">
         البيانات محمَّلة بالفعل (${fmt2(window.RAW_BALAGH.length)} بلاغًا)، إلا أنه لا توجد قيمة في عمود "الفئة الفرعية" تطابق أيًا من التصنيفات الستة عشر المحدَّدة. فيما يلي أكثر القيم تكرارًا في عمود "الفئة الفرعية" حاليًا؛ يُرجى مراجعتها ومقارنتها بالتصنيفات، وإخبارنا بالتصنيف الصحيح في حال وجود اختلاف:
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${topVals.length ? topVals.map(([v, n]) => `
-          <div style="display:flex;justify-content:space-between;gap:10px;background:#fff;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;font-size:12px">
-            <span style="color:var(--tx-main)">${esc(v)}</span><span style="color:#991B1B;font-weight:700;white-space:nowrap">${fmt2(n)}×</span>
-          </div>`).join("") : `<div style="font-size:12px;color:#7F1D1D">عمود "الفئة الفرعية" فارغ في جميع البلاغات.</div>`}
+          <div style="display:flex;justify-content:space-between;gap:10px;background:#fff;border:1px solid #d8bcc0;border-radius:8px;padding:6px 10px;font-size:12px">
+            <span style="color:var(--tx-main)">${esc(v)}</span><span style="color:#7d1f2c;font-weight:700;white-space:nowrap">${fmt2(n)}×</span>
+          </div>`).join("") : `<div style="font-size:12px;color:#7d1f2c">عمود "الفئة الفرعية" فارغ في جميع البلاغات.</div>`}
       </div>
     </div>`;
   }
@@ -8893,23 +8912,23 @@ function renderSecuritySafetyTab() {
         <span class="sub">${fmt2(filteredTotal)} من ${fmt2(total)}</span>
       </div>
       <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
-        <div class="kpi kc-amber">
-          <div class="kpi-val" style="color:#D97706">${fmt2(filteredTotal)}</div>
+        <div class="kpi kc-amber kc-neutral">
+          <div class="kpi-val" style="color:#92590a">${fmt2(filteredTotal)}</div>
           <div class="kpi-lbl">إجمالي بلاغات الأمن والسلامة</div>
           <div class="kpi-sub">${total === filteredTotal ? "" : `من إجمالي ${fmt2(total)}`}</div>
         </div>
         <div class="kpi kc-red">
-          <div class="kpi-val" style="color:#991b1b">${fmt2(openCount)}</div>
+          <div class="kpi-val" style="color:#7d1f2c">${fmt2(openCount)}</div>
           <div class="kpi-lbl">مفتوحة</div>
           <div class="kpi-sub">${pct2(openCount, filteredTotal)} من المعروض</div>
         </div>
         <div class="kpi kc-green">
-          <div class="kpi-val" style="color:#059669">${fmt2(closedCount)}</div>
+          <div class="kpi-val" style="color:#066a52">${fmt2(closedCount)}</div>
           <div class="kpi-lbl">مغلقة</div>
           <div class="kpi-sub">${pct2(closedCount, filteredTotal)} من المعروض</div>
         </div>
         <div class="kpi kc-blue">
-          <div class="kpi-val" style="color:#0891B2">${slaBreachPct}%</div>
+          <div class="kpi-val" style="color:var(--c-info-2)">${slaBreachPct}%</div>
           <div class="kpi-lbl">نسبة اختراق SLA</div>
           <div class="kpi-sub">${fmt2(overdueCount)} بلاغ متأخر</div>
         </div>
@@ -8923,22 +8942,22 @@ function renderSecuritySafetyTab() {
           <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
               <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${esc(gs.group)}</span>
-              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(gs.total)} بلاغ</span>
+              <span style="font-size:14px;font-weight:800;color:var(--c-info-2)">${fmt2(gs.total)} بلاغ</span>
             </div>
             <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
-              <div style="height:100%;width:${(gs.total / maxGroupVal) * 100}%;background:#0891B2;border-radius:5px"></div>
+              <div style="height:100%;width:${(gs.total / maxGroupVal) * 100}%;background:#0d849c;border-radius:5px"></div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:${gs.topCat || gs.topRegion ? "10px" : "0"}">
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(gs.open)}</div>
+                <div style="font-size:13px;font-weight:800;color:#7d1f2c">${fmt2(gs.open)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">مفتوحة</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(gs.closed)}</div>
+                <div style="font-size:13px;font-weight:800;color:#066a52">${fmt2(gs.closed)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">مغلقة</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#0891B2">${gs.slaBreachPct}%</div>
+                <div style="font-size:13px;font-weight:800;color:var(--c-info-2)">${gs.slaBreachPct}%</div>
                 <div style="font-size:9px;color:var(--tx-muted)">اختراق SLA</div>
               </div>
             </div>
@@ -9049,7 +9068,7 @@ function renderSecuritySafetyTab() {
                 <td>${esc(r.location) || "—"}</td>
                 <td>${esc(window.balaghStatusLabel(r.status))}</td>
                 <td>${esc(window.balaghPriorityLabel(r.priority))}</td>
-                <td style="color:${r.isOverdue ? "#DC2626" : "var(--tx-muted)"};font-weight:${r.isOverdue ? "700" : "400"}">${r.isOverdue ? "متأخر" : (esc(r.slaStatus) || "—")}</td>
+                <td style="color:${r.isOverdue ? "#9c2a3a" : "var(--tx-muted)"};font-weight:${r.isOverdue ? "700" : "400"}">${r.isOverdue ? "متأخر" : (esc(r.slaStatus) || "—")}</td>
                 <td>${esc(r.contractor) || "—"}</td>
               </tr>`).join("")
               : `<tr><td colspan="9"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>`}
@@ -9144,9 +9163,9 @@ function renderSecuritySafetySummaryTab() {
       balaghState === "loading"
         ? "يتم تحميل البيانات."
         : balaghState === "error"
-        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
-        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
-    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#fdf6ec;border:1px solid #ecd7b8;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92590a">
       <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
     </div>`;
   }
@@ -9162,8 +9181,8 @@ function renderSecuritySafetySummaryTab() {
 
   let diagnosticHtml = "";
   if (!notLoaded && allRows.length === 0 && Array.isArray(window.RAW_BALAGH) && window.RAW_BALAGH.length > 0) {
-    diagnosticHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
-      <strong style="color:#991B1B">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن.</strong> يُرجى فتح تبويب "بلاغات الأمن والسلامة" لمعرفة السبب بالتفصيل، حيث تُعرض هناك أكثر القيم الفعلية تكرارًا في عمود "الفئة الفرعية" لمقارنتها بالتصنيفات.
+    diagnosticHtml = `<div class="card mb14" style="background:#fdf0f2;border:1px solid #d8bcc0;padding:14px 16px;font-size:12px;color:#7d1f2c">
+      <strong style="color:#7d1f2c">⚠️ لا توجد بلاغات مصنَّفة ضمن فئة الأمن والسلامة حتى الآن.</strong> يُرجى فتح تبويب "بلاغات الأمن والسلامة" لمعرفة السبب بالتفصيل، حيث تُعرض هناك أكثر القيم الفعلية تكرارًا في عمود "الفئة الفرعية" لمقارنتها بالتصنيفات.
     </div>`;
   }
 
@@ -9268,16 +9287,16 @@ function renderSecuritySafetySummaryTab() {
       <div style="display:flex;gap:24px;justify-content:space-around;padding:18px 0 12px;flex-wrap:wrap">
         <div style="text-align:center">
           <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">ملتزم باتفاقية مستوى الخدمة</div>
-          <div style="font-size:40px;font-weight:800;color:#059669">${slaCompliantPct}<span style="font-size:22px">%</span></div>
+          <div style="font-size:40px;font-weight:800;color:#066a52">${slaCompliantPct}<span style="font-size:22px">%</span></div>
         </div>
         <div style="text-align:center">
           <div style="font-size:13px;font-weight:700;color:var(--tx-sec);margin-bottom:6px">غير ملتزم باتفاقية مستوى الخدمة</div>
-          <div style="font-size:40px;font-weight:800;color:#DC2626">${slaNonCompliantPct}<span style="font-size:22px">%</span></div>
+          <div style="font-size:40px;font-weight:800;color:#9c2a3a">${slaNonCompliantPct}<span style="font-size:22px">%</span></div>
         </div>
       </div>
       <div style="height:10px;border-radius:6px;overflow:hidden;display:flex;border:1px solid var(--bd-light)">
-        <div style="width:${slaCompliantPct}%;background:#059669" title="ملتزم ${slaCompliantPct}%"></div>
-        <div style="width:${slaNonCompliantPct}%;background:#DC2626" title="غير ملتزم ${slaNonCompliantPct}%"></div>
+        <div style="width:${slaCompliantPct}%;background:#066a52" title="ملتزم ${slaCompliantPct}%"></div>
+        <div style="width:${slaNonCompliantPct}%;background:#9c2a3a" title="غير ملتزم ${slaNonCompliantPct}%"></div>
       </div>
     </div>
 
@@ -9303,7 +9322,7 @@ function renderSecuritySafetySummaryTab() {
     <div class="card mb14">
       <div class="card-title">تفاصيل عامة</div>
       <div class="kpi-grid" style="margin-top:12px">
-        <div class="kpi kc-green">
+        <div class="kpi kc-green kc-neutral">
           <div class="kpi-val">${fmt2(total)}</div>
           <div class="kpi-lbl">إجمالي بلاغات الأمن والسلامة</div>
         </div>
@@ -9321,18 +9340,18 @@ function renderSecuritySafetySummaryTab() {
           <div style="background:var(--bg-2);border-radius:12px;padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
               <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${g.group}</span>
-              <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(g.total)} بلاغ</span>
+              <span style="font-size:14px;font-weight:800;color:var(--c-info-2)">${fmt2(g.total)} بلاغ</span>
             </div>
             <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
-              <div style="height:100%;width:${(g.total / maxGroupTotal) * 100}%;background:#0891B2;border-radius:5px"></div>
+              <div style="height:100%;width:${(g.total / maxGroupTotal) * 100}%;background:#0d849c;border-radius:5px"></div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(g.open)}</div>
+                <div style="font-size:13px;font-weight:800;color:#7d1f2c">${fmt2(g.open)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">مفتوحة</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(g.resolvedOrClosed)}</div>
+                <div style="font-size:13px;font-weight:800;color:#066a52">${fmt2(g.resolvedOrClosed)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">تم حلها/مغلقة</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
@@ -9340,7 +9359,7 @@ function renderSecuritySafetySummaryTab() {
                 <div style="font-size:9px;color:var(--tx-muted)">ملغاة</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#0891B2">${g.slaCompliantPct}%</div>
+                <div style="font-size:13px;font-weight:800;color:var(--c-info-2)">${g.slaCompliantPct}%</div>
                 <div style="font-size:9px;color:var(--tx-muted)">التزام SLA</div>
               </div>
             </div>
@@ -9353,14 +9372,14 @@ function renderSecuritySafetySummaryTab() {
       <div style="padding:8px 0">
         ${groupsBreakdown.map((g) => `
           <div style="margin-bottom:18px">
-            <div style="font-size:12px;font-weight:800;color:#0891B2;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--bd-light)">${g.group}</div>
+            <div style="font-size:12px;font-weight:800;color:var(--c-info-2);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--bd-light)">${g.group}</div>
             ${g.categories.map(([c, n]) => `
               <div style="margin-bottom:10px;padding-right:8px">
                 <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--tx-main);margin-bottom:4px">
                   <span>${c}</span><span style="color:var(--tx-muted)">${fmt2(n)}</span>
                 </div>
                 <div style="height:8px;background:var(--bg-2);border-radius:5px;overflow:hidden">
-                  <div style="height:100%;width:${(n / maxCat) * 100}%;background:#0891B2;border-radius:5px"></div>
+                  <div style="height:100%;width:${(n / maxCat) * 100}%;background:#0d849c;border-radius:5px"></div>
                 </div>
               </div>`).join("")}
           </div>`).join("")}
@@ -9394,9 +9413,9 @@ function renderNewSlaTab() {
       balaghState === "loading"
         ? "يتم تحميل البيانات."
         : balaghState === "error"
-        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
-        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
-    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+        ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+        : `لم تُحمَّل بيانات البلاغات بعد. <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">انقر هنا للتحميل</button>`;
+    bannerHtml = `<div style="display:flex;align-items:center;gap:10px;background:#fdf6ec;border:1px solid #ecd7b8;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92590a">
       <span style="font-size:16px">${icon}</span><span style="flex:1">${msg}</span>
     </div>`;
   }
@@ -9415,8 +9434,8 @@ function renderNewSlaTab() {
   // تعليمات التسليم).
   let mapMissingHtml = "";
   if (!notLoaded && !mapCatalogLen) {
-    mapMissingHtml = `<div class="card mb14" style="background:#FEF2F2;border:1px solid #FECACA;padding:14px 16px;font-size:12px;color:#7F1D1D">
-      <strong style="color:#991B1B">⚠️ خريطة "NEW SLA" المرجعية غير محمَّلة بعد.</strong>
+    mapMissingHtml = `<div class="card mb14" style="background:#fdf0f2;border:1px solid #d8bcc0;padding:14px 16px;font-size:12px;color:#7d1f2c">
+      <strong style="color:#7d1f2c">⚠️ خريطة "NEW SLA" المرجعية غير محمَّلة بعد.</strong>
       البلاغات نفسها وصلت بنجاح، لكن الاستجابة الحالية من رابط GAS لا تحتوي على خريطة NEW SLA (86 صف). على الأرجح ما زال ملف Apps Script المنشور نسخة قديمة قبل هذا التحديث — يُرجى نشر نسخة جديدة من balagh_reports.gs (Deploy → Manage deployments → Edit → New version) ثم الضغط على "تحديث البلاغات الآن من الشيت" في تبويب البلاغات.
     </div>`;
   }
@@ -9535,9 +9554,9 @@ function renderNewSlaTab() {
   // __NEW_SLA_REGION_TABS_V2__ — مساعدات عرض القسم (قوائم أعمدة بدل الجداول). الشريط على أساس المُقيَّم فقط (ملتزم + اختراق)، و«قيد التنفيذ» خارجه ولونه برتقالي.
   const rdBar_ = (o) => {
     const ev = o.evaluated;
-    if (!ev) return '<div class="nsla-rd-bar"><i style="width:100%;background:#E2E8F0"></i></div>';
+    if (!ev) return '<div class="nsla-rd-bar"><i style="width:100%;background:#dbe7ee"></i></div>';
     const g = (o.compliant / ev) * 100, c = (o.breachClosed / ev) * 100, b = (o.breachOpen / ev) * 100;
-    return '<div class="nsla-rd-bar"><i style="width:' + g + '%;background:#059669"></i><i style="width:' + c + '%;background:#DC2626"></i><i style="width:' + b + '%;background:#7F1D1D"></i></div>';
+    return '<div class="nsla-rd-bar"><i style="width:' + g + '%;background:#066a52"></i><i style="width:' + c + '%;background:#b8425a"></i><i style="width:' + b + '%;background:#7d1f2c"></i></div>';
   };
   const rdPct_ = (o) => o.compPct != null ? '<bdi dir="ltr">' + o.compPct.toFixed(1) + "%</bdi>" : "—";
   const rdList_ = (title, hint, list, empty) => `
@@ -9551,7 +9570,7 @@ function renderNewSlaTab() {
               <span class="nsla-rd-val"><b>${rdPct_(o)}</b><em>نسبة الالتزام</em></span>
             </div>
             ${rdBar_(o)}
-            <div class="nsla-rd-sub"><span><i style="background:#059669"></i>ملتزم ${fmt2(o.compliant)}</span><span><i style="background:#DC2626"></i>اختراق مغلق ${fmt2(o.breachClosed)}</span><span><i style="background:#7F1D1D"></i>اختراق مفتوح ${fmt2(o.breachOpen)}</span><span><i style="background:#F59E0B"></i>قيد التنفيذ ${fmt2(o.pending)}</span><span style="margin-inline-start:auto;color:#475569">الإجمالي ${fmt2(o.total)}</span></div>
+            <div class="nsla-rd-sub"><span><i style="background:#066a52"></i>ملتزم ${fmt2(o.compliant)}</span><span><i style="background:#b8425a"></i>اختراق مغلق ${fmt2(o.breachClosed)}</span><span><i style="background:#7d1f2c"></i>اختراق مفتوح ${fmt2(o.breachOpen)}</span><span><i style="background:#c07a14"></i>قيد التنفيذ ${fmt2(o.pending)}</span><span style="margin-inline-start:auto;color:#52707e">الإجمالي ${fmt2(o.total)}</span></div>
           </div>`).join("") : `<div class="nsla-rd-empty">${empty}</div>`}
       </div>
     </div>`;
@@ -9649,7 +9668,7 @@ function renderNewSlaTab() {
   const list = rows.slice(ST.page * ST.size, ST.page * ST.size + ST.size);
 
   el.innerHTML = `
-    <div class="card mb14" style="border:1px solid #BAE6FD;background:#F0F9FF">
+    <div class="card mb14" style="border:1px solid #cfe6eb;background:#eaf6fa">
       <div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:10px 0">
         <div class="fg">
           <div class="fg-lbl">من تاريخ</div>
@@ -9661,7 +9680,7 @@ function renderNewSlaTab() {
           <input type="date" class="finp" value="${esc(ST.dateTo)}"
             onchange="window.__NEW_SLA_STATE__.dateTo=this.value;window.__NEW_SLA_STATE__.page=0;renderNewSlaTab()">
         </div>
-        <style>.nsla-chip{padding:5px 13px;border-radius:999px;border:1px solid #BAE6FD;background:#fff;color:#0B6B7E;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}.nsla-chip.on{background:#0891B2;border-color:#0891B2;color:#fff}.nsla-chips{display:flex;gap:6px;flex-wrap:wrap}</style>
+        <style>.nsla-chip{padding:5px 13px;border-radius:999px;border:1px solid #cfe6eb;background:#fff;color:#0B6B7E;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}.nsla-chip.on{background:#0d849c;border-color:#0d849c;color:#fff}.nsla-chips{display:flex;gap:6px;flex-wrap:wrap}</style>
         <div class="fg" style="flex:1 1 100%">
           <div class="fg-lbl">المنطقة <span style="font-weight:600;color:var(--tx-muted)">(يمكن اختيار أكثر من واحدة — بدون اختيار = الكل)</span></div>
           <div class="nsla-chips">
@@ -9685,23 +9704,23 @@ function renderNewSlaTab() {
         <span class="sub"></span>
       </div>
       <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
-        <div class="kpi kc-amber">
-          <div class="kpi-val" style="color:#D97706">${fmt2(totalP1to4)}</div>
+        <div class="kpi kc-amber kc-neutral">
+          <div class="kpi-val" style="color:#92590a">${fmt2(totalP1to4)}</div>
           <div class="kpi-lbl">إجمالي P1-P4 المطابقة</div>
           <div class="kpi-sub">${fmt2(evaluatedCount)} تم تقييمها (مغلقة أو تجاوزت الوقت المستهدف)</div>
         </div>
         <div class="kpi kc-green">
-          <div class="kpi-val" style="color:#059669">${compliancePct}%</div>
+          <div class="kpi-val" style="color:#066a52">${compliancePct}%</div>
           <div class="kpi-lbl">نسبة الالتزام (من المُقيَّم)</div>
           <div class="kpi-sub">${fmt2(compliantCount)} ملتزم</div>
         </div>
         <div class="kpi kc-red">
-          <div class="kpi-val" style="color:#991b1b">${fmt2(breachCount)}</div>
+          <div class="kpi-val" style="color:#7d1f2c">${fmt2(breachCount)}</div>
           <div class="kpi-lbl">اختراق SLA الجديد</div>
           <div class="kpi-sub">${pct2(breachCount, evaluatedCount)}% من المُقيَّم${breachOpenCount ? ` · منها ${fmt2(breachOpenCount)} لا يزال مفتوحًا` : ""}</div>
         </div>
         <div class="kpi kc-blue">
-          <div class="kpi-val" style="color:#0891B2">${fmt2(pendingCount)}</div>
+          <div class="kpi-val" style="color:var(--c-info-2)">${fmt2(pendingCount)}</div>
           <div class="kpi-lbl">قيد التنفيذ — لم يُحدَّد بعد</div>
           <div class="kpi-sub">مفتوحة ولم تتجاوز الوقت المستهدف بعد، أو بيانات مدة غير متاحة</div>
         </div>
@@ -9745,24 +9764,24 @@ function renderNewSlaTab() {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
               <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${p.priority}${p.hoursTarget != null ? ` <span style="font-size:11px;font-weight:600;color:var(--tx-muted)">(الهدف ${p.hoursTarget} ساعة)</span>` : ""}</span>
               <span style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:11px;font-weight:800;color:var(--tx-muted);background:#F3F4F6;border-radius:999px;padding:2px 8px" title="نسبة عدد بلاغات هذه الأولوية من إجمالي بلاغات P1-P4">${shareOfTotal}% من الإجمالي</span>
-                <span style="font-size:14px;font-weight:800;color:#0891B2">${fmt2(p.total)} بلاغ</span>
+                <span style="font-size:11px;font-weight:800;color:var(--tx-muted);background:#eef3f7;border-radius:999px;padding:2px 8px" title="نسبة عدد بلاغات هذه الأولوية من إجمالي بلاغات P1-P4">${shareOfTotal}% من الإجمالي</span>
+                <span style="font-size:14px;font-weight:800;color:var(--c-info-2)">${fmt2(p.total)} بلاغ</span>
               </span>
             </div>
             <div style="height:8px;background:var(--bd-light);border-radius:5px;overflow:hidden;margin-bottom:10px">
-              <div style="height:100%;width:${(p.total / maxPriorityTotal) * 100}%;background:#0891B2;border-radius:5px"></div>
+              <div style="height:100%;width:${(p.total / maxPriorityTotal) * 100}%;background:#0d849c;border-radius:5px"></div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#059669">${fmt2(p.compliant)}</div>
+                <div style="font-size:13px;font-weight:800;color:#066a52">${fmt2(p.compliant)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">ملتزم${hasPct ? ` (${p.compliancePct}%)` : ""}</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#991B1B">${fmt2(p.breach)}</div>
+                <div style="font-size:13px;font-weight:800;color:#7d1f2c">${fmt2(p.breach)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">اختراق${hasPct ? ` (${pct2(p.breach, pEvaluated2)}%)` : ""}</div>
               </div>
               <div style="text-align:center;background:#fff;border-radius:8px;padding:6px 2px">
-                <div style="font-size:13px;font-weight:800;color:#0891B2">${fmt2(p.pending)}</div>
+                <div style="font-size:13px;font-weight:800;color:var(--c-info-2)">${fmt2(p.pending)}</div>
                 <div style="font-size:9px;color:var(--tx-muted)">قيد التنفيذ</div>
               </div>
             </div>
@@ -9791,14 +9810,14 @@ function renderNewSlaTab() {
             <thead><tr><th>الترتيب</th><th>المنطقة</th><th>المُقيَّم</th><th>ملتزم</th><th>اختراق</th><th>نسبة الاختراق</th><th>نسبة الالتزام</th></tr></thead>
             <tbody>
               ${regionRanked.length ? regionRanked.map((o, i) => `
-                <tr${ST.regions.indexOf(o.region) >= 0 ? ' style="background:#F0F9FF"' : ""}>
+                <tr${ST.regions.indexOf(o.region) >= 0 ? ' style="background:#eaf6fa"' : ""}>
                   <td style="font-weight:800">${o.compPct != null ? (i === 0 ? "🏆 1" : i + 1) : "—"}</td>
                   <td style="font-weight:700">${esc(o.region)}</td>
                   <td>${fmt2(o.evaluated)}</td>
-                  <td style="color:#059669;font-weight:700">${fmt2(o.compliant)}</td>
-                  <td style="color:#DC2626;font-weight:700">${fmt2(o.breach)}</td>
+                  <td style="color:#066a52;font-weight:700">${fmt2(o.compliant)}</td>
+                  <td style="color:#b8425a;font-weight:700">${fmt2(o.breach)}</td>
                   <td>${o.breachPct != null ? o.breachPct.toFixed(1) + "%" : "—"}</td>
-                  <td style="font-weight:800;color:${i === 0 && o.compPct != null ? "#059669" : "inherit"}">${o.compPct != null ? o.compPct.toFixed(1) + "%" : "—"}</td>
+                  <td style="font-weight:800;color:${i === 0 && o.compPct != null ? "#066a52" : "inherit"}">${o.compPct != null ? o.compPct.toFixed(1) + "%" : "—"}</td>
                 </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--tx-muted)">لا توجد بيانات</td></tr>`}
             </tbody>
           </table>
@@ -9814,73 +9833,73 @@ function renderNewSlaTab() {
       </div>
       <style>
         #nsla-region-detail .nsla-rd-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
-        #nsla-region-detail .nsla-rd-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:12px;border:1.5px solid #D5E6EC;background:#fff;color:#0B6B7E;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+        #nsla-region-detail .nsla-rd-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:12px;border:1.5px solid #dbe7ee;background:#fff;color:#0B6B7E;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
         #nsla-region-detail .nsla-rd-tab small{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#EAF6FA;color:#0B6B7E}
         #nsla-region-detail .nsla-rd-tab:hover{border-color:#0B6B7E}
         #nsla-region-detail .nsla-rd-tab.on{background:#0B6B7E;border-color:#0B6B7E;color:#fff;box-shadow:0 4px 12px rgba(11,107,126,.25)}
         #nsla-region-detail .nsla-rd-tab.on small{background:rgba(255,255,255,.22);color:#fff}
-        #nsla-region-detail .nsla-rd-guide{padding:12px 16px 13px;border-radius:14px;background:#F4FAFC;border:1px solid #DCEBF0;margin:0 0 18px}
+        #nsla-region-detail .nsla-rd-guide{padding:12px 16px 13px;border-radius:14px;background:#f7fafc;border:1px solid #dbe7ee;margin:0 0 18px}
         #nsla-region-detail .nsla-rd-guide .gt{font-size:13.5px;font-weight:800;color:#0D2F40;margin-bottom:8px}
         #nsla-region-detail .nsla-rd-guide .gk{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px 18px}
         #nsla-region-detail .nsla-rd-guide .gk>div{display:flex;align-items:flex-start;gap:8px}
         #nsla-region-detail .nsla-rd-guide .gk i{width:14px;height:14px;border-radius:4px;flex:none;margin-top:3px}
-        #nsla-region-detail .nsla-rd-guide .gk span{font-size:12px;color:#475569;line-height:1.6}
+        #nsla-region-detail .nsla-rd-guide .gk span{font-size:12px;color:#52707e;line-height:1.6}
         #nsla-region-detail .nsla-rd-guide .gk b{display:block;font-size:12.5px;color:#0D2F40}
         #nsla-region-detail .nsla-rd-guide .gf{margin-top:10px;padding-top:9px;border-top:1px dashed #CFE2E9;font-size:12px;color:#334E5C;line-height:1.8}
         #nsla-region-detail .nsla-rd-guide .gf b{color:#0D2F40}
         #nsla-region-detail .nsla-rd-keys i,#nsla-region-detail .nsla-rd-stat i,#nsla-region-detail .nsla-rd-sub i,#nsla-region-detail .nsla-rd-pm i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
-        #nsla-region-detail .nsla-rd-hero{display:flex;flex-wrap:wrap;gap:22px;align-items:center;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,#F4FAFC,#fff);border:1px solid #E2EEF1;margin:0 0 18px}
+        #nsla-region-detail .nsla-rd-hero{display:flex;flex-wrap:wrap;gap:22px;align-items:center;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,#f7fafc,#fff);border:1px solid #dbe7ee;margin:0 0 18px}
         #nsla-region-detail .nsla-rd-dwrap{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
         #nsla-region-detail .nsla-rd-donut{width:148px;height:148px;border-radius:50%;display:grid;place-items:center}
-        #nsla-region-detail .nsla-rd-donut>div{width:104px;height:104px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px #EEF3F5;text-align:center}
+        #nsla-region-detail .nsla-rd-donut>div{width:104px;height:104px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px #dbe7ee;text-align:center}
         #nsla-region-detail .nsla-rd-donut b{font-size:24px;line-height:1.2;color:#0D2F40}
-        #nsla-region-detail .nsla-rd-donut span{font-size:11px;color:#475569;line-height:1.4}
+        #nsla-region-detail .nsla-rd-donut span{font-size:11px;color:#52707e;line-height:1.4}
         #nsla-region-detail .nsla-rd-rank{font-size:12px;font-weight:700;color:#0B6B7E;background:#EAF6FA;border-radius:999px;padding:3px 12px}
         #nsla-region-detail .nsla-rd-stats{flex:1 1 360px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
         @media (max-width:640px){#nsla-region-detail .nsla-rd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        #nsla-region-detail .nsla-rd-stat{background:#fff;border:1px solid #E2EEF1;border-radius:12px;padding:10px 14px}
+        #nsla-region-detail .nsla-rd-stat{background:#fff;border:1px solid #dbe7ee;border-radius:12px;padding:10px 14px}
         #nsla-region-detail .nsla-rd-stat b{display:block;font-size:22px;line-height:1.25}
-        #nsla-region-detail .nsla-rd-stat span{font-size:12px;color:#475569;display:flex;align-items:center;gap:6px;line-height:1.5}
+        #nsla-region-detail .nsla-rd-stat span{font-size:12px;color:#52707e;display:flex;align-items:center;gap:6px;line-height:1.5}
         #nsla-region-detail .nsla-rd-sec{font-size:15px;font-weight:800;color:#0D2F40;margin:4px 2px 4px;display:flex;align-items:center;gap:8px}
         #nsla-region-detail .nsla-rd-sec:before{content:"";width:4px;height:16px;border-radius:3px;background:#0B6B7E}
-        #nsla-region-detail .nsla-rd-secsub{font-size:12px;color:#64748B;margin:0 14px 10px}
+        #nsla-region-detail .nsla-rd-secsub{font-size:12px;color:#52707e;margin:0 14px 10px}
         #nsla-region-detail .nsla-rd-pri{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:0 0 20px}
-        #nsla-region-detail .nsla-rd-pcard{border:1px solid #E2EEF1;border-radius:14px;padding:12px 14px 12px;background:#fff}
+        #nsla-region-detail .nsla-rd-pcard{border:1px solid #dbe7ee;border-radius:14px;padding:12px 14px 12px;background:#fff}
         #nsla-region-detail .nsla-rd-pcard .ph{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
         #nsla-region-detail .nsla-rd-pcard .pp{font-size:12px;font-weight:800;color:#fff;padding:2px 11px;border-radius:999px}
-        #nsla-region-detail .nsla-rd-pcard .pn{font-size:11.5px;color:#475569}
+        #nsla-region-detail .nsla-rd-pcard .pn{font-size:11.5px;color:#52707e}
         #nsla-region-detail .nsla-rd-pcard .pv{display:flex;align-items:baseline;gap:8px;font-size:26px;font-weight:800;line-height:1.35;color:#0D2F40}
-        #nsla-region-detail .nsla-rd-pcard .pv small,#nsla-region-detail .nsla-rd-val em{font-size:11.5px;font-weight:700;color:#047857;font-style:normal}
+        #nsla-region-detail .nsla-rd-pcard .pv small,#nsla-region-detail .nsla-rd-val em{font-size:11.5px;font-weight:700;color:#066a52;font-style:normal}
         #nsla-region-detail .nsla-rd-pm{display:flex;flex-direction:column;margin-top:2px}
-        #nsla-region-detail .nsla-rd-pm div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 2px;border-top:1px dashed #E8EFF2}
+        #nsla-region-detail .nsla-rd-pm div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 2px;border-top:1px dashed #dbe7ee}
         #nsla-region-detail .nsla-rd-pm div:first-child{border-top:0}
-        #nsla-region-detail .nsla-rd-pm span{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569}
+        #nsla-region-detail .nsla-rd-pm span{display:flex;align-items:center;gap:6px;font-size:12px;color:#52707e}
         #nsla-region-detail .nsla-rd-pm b{font-size:14px;color:#0D2F40}
-        #nsla-region-detail .nsla-rd-ptot{font-size:11.5px;color:#475569;margin-top:8px;text-align:center}
-        #nsla-region-detail .nsla-rd-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#EDF2F4;margin:6px 0 8px}
+        #nsla-region-detail .nsla-rd-ptot{font-size:11.5px;color:#52707e;margin-top:8px;text-align:center}
+        #nsla-region-detail .nsla-rd-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#eef3f7;margin:6px 0 8px}
         #nsla-region-detail .nsla-rd-bar i{display:block;height:100%}
         #nsla-region-detail .nsla-rd-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;align-items:start}
-        #nsla-region-detail .nsla-rd-box{border:1px solid #E2EEF1;border-radius:14px;padding:12px 14px;background:#fff;min-width:0}
+        #nsla-region-detail .nsla-rd-box{border:1px solid #dbe7ee;border-radius:14px;padding:12px 14px;background:#fff;min-width:0}
         #nsla-region-detail .nsla-rd-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
         #nsla-region-detail .nsla-rd-h b{font-size:14px;color:#0D2F40}
-        #nsla-region-detail .nsla-rd-h span{font-size:11px;color:#64748B}
+        #nsla-region-detail .nsla-rd-h span{font-size:11px;color:#52707e}
         #nsla-region-detail .nsla-rd-list{max-height:440px;overflow:auto;display:flex;flex-direction:column;padding-inline-end:2px}
-        #nsla-region-detail .nsla-rd-row{padding:9px 0;border-bottom:1px dashed #E8EFF2}
+        #nsla-region-detail .nsla-rd-row{padding:9px 0;border-bottom:1px dashed #dbe7ee}
         #nsla-region-detail .nsla-rd-row:last-child{border-bottom:0}
         #nsla-region-detail .nsla-rd-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-        #nsla-region-detail .nsla-rd-name{font-size:13px;font-weight:600;color:#17394A;line-height:1.5}
+        #nsla-region-detail .nsla-rd-name{font-size:13px;font-weight:600;color:#163d52;line-height:1.5}
         #nsla-region-detail .nsla-rd-val{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
         #nsla-region-detail .nsla-rd-val b{font-size:14px;color:#0D2F40}
-        #nsla-region-detail .nsla-rd-sub{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:#475569}
+        #nsla-region-detail .nsla-rd-sub{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:#52707e}
         #nsla-region-detail .nsla-rd-sub span{display:inline-flex;align-items:center;gap:5px}
-        #nsla-region-detail .nsla-rd-empty{padding:18px 6px;text-align:center;color:#64748B;font-size:12px}
+        #nsla-region-detail .nsla-rd-empty{padding:18px 6px;text-align:center;color:#52707e;font-size:12px}
       </style>
       ${regionDetail ? (() => {
         const a = regionDetail.all;
         const ev = a.evaluated;
         const gp = ev ? (a.compliant / ev) * 100 : 0, cp = ev ? gp + (a.breachClosed / ev) * 100 : 0;
-        const donut = ev ? `conic-gradient(#059669 0 ${gp}%, #DC2626 ${gp}% ${cp}%, #7F1D1D ${cp}% 100%)` : "conic-gradient(#E2E8F0 0 100%)";
-        const PRI_BG = { P1: "#0B3C5D", P2: "#1D6F94", P3: "#4FA3C7", P4: "#7FB9D3" };
+        const donut = ev ? `conic-gradient(#066a52 0 ${gp}%, #b8425a ${gp}% ${cp}%, #7d1f2c ${cp}% 100%)` : "conic-gradient(#dbe7ee 0 100%)";
+        const PRI_BG = { P1: "#163d52", P2: "#1D6F94", P3: "#4FA3C7", P4: "#7FB9D3" };
         const ORD = ["", "الأولى", "الثانية", "الثالثة", "الرابعة"];
         return `
       <div class="nsla-rd-tabs">
@@ -9892,10 +9911,10 @@ function renderNewSlaTab() {
       <div class="nsla-rd-guide">
         <div class="gt">دليل قراءة الألوان والنسب</div>
         <div class="gk">
-          <div><i style="background:#059669"></i><span><b>ملتزم</b>بلاغ أُنجز ضمن المدة المستهدفة.</span></div>
-          <div><i style="background:#DC2626"></i><span><b>اختراق في بلاغ مغلق</b>بلاغ أُغلق بعد تجاوز المدة المستهدفة.</span></div>
-          <div><i style="background:#7F1D1D"></i><span><b>اختراق في بلاغ مفتوح</b>بلاغ ما زال مفتوحًا وقد تجاوز المدة المستهدفة.</span></div>
-          <div><i style="background:#F59E0B"></i><span><b>قيد التنفيذ</b>بلاغ مفتوح لم يتجاوز المدة المستهدفة بعد، ولا يدخل في النسبة.</span></div>
+          <div><i style="background:#066a52"></i><span><b>ملتزم</b>بلاغ أُنجز ضمن المدة المستهدفة.</span></div>
+          <div><i style="background:#b8425a"></i><span><b>اختراق في بلاغ مغلق</b>بلاغ أُغلق بعد تجاوز المدة المستهدفة.</span></div>
+          <div><i style="background:#7d1f2c"></i><span><b>اختراق في بلاغ مفتوح</b>بلاغ ما زال مفتوحًا وقد تجاوز المدة المستهدفة.</span></div>
+          <div><i style="background:#c07a14"></i><span><b>قيد التنفيذ</b>بلاغ مفتوح لم يتجاوز المدة المستهدفة بعد، ولا يدخل في النسبة.</span></div>
         </div>
       </div>
       <div class="nsla-rd-hero">
@@ -9905,10 +9924,10 @@ function renderNewSlaTab() {
         <div class="nsla-rd-stats">
           <div class="nsla-rd-stat"><b>${fmt2(a.total)}</b><span>إجمالي البلاغات</span></div>
           <div class="nsla-rd-stat"><b>${fmt2(a.evaluated)}</b><span>البلاغات المُقيَّمة (ملتزمة + مخترِقة)</span></div>
-          <div class="nsla-rd-stat"><b style="color:#059669">${fmt2(a.compliant)}</b><span><i style="background:#059669"></i>بلاغات ملتزمة</span></div>
-          <div class="nsla-rd-stat"><b style="color:#DC2626">${fmt2(a.breachClosed)}</b><span><i style="background:#DC2626"></i>اختراق في بلاغات مغلقة</span></div>
-          <div class="nsla-rd-stat"><b style="color:#7F1D1D">${fmt2(a.breachOpen)}</b><span><i style="background:#7F1D1D"></i>اختراق في بلاغات مفتوحة</span></div>
-          <div class="nsla-rd-stat"><b style="color:#B45309">${fmt2(a.pending)}</b><span><i style="background:#F59E0B"></i>قيد التنفيذ</span></div>
+          <div class="nsla-rd-stat"><b style="color:#066a52">${fmt2(a.compliant)}</b><span><i style="background:#066a52"></i>بلاغات ملتزمة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#b8425a">${fmt2(a.breachClosed)}</b><span><i style="background:#b8425a"></i>اختراق في بلاغات مغلقة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#7d1f2c">${fmt2(a.breachOpen)}</b><span><i style="background:#7d1f2c"></i>اختراق في بلاغات مفتوحة</span></div>
+          <div class="nsla-rd-stat"><b style="color:#92590a">${fmt2(a.pending)}</b><span><i style="background:#c07a14"></i>قيد التنفيذ</span></div>
         </div>
       </div>
 
@@ -9917,14 +9936,14 @@ function renderNewSlaTab() {
         ${regionDetail.pri.length ? regionDetail.pri.map((o) => {
           const ps = priorityStats.find((x) => x.priority === o.key);
           return `<div class="nsla-rd-pcard">
-            <div class="ph"><span class="pp" style="background:${PRI_BG[o.key] || "#64748B"}">${esc(o.key)}</span><span class="pn">${ps && ps.hoursTarget ? "المدة المستهدفة: " + ps.hoursTarget + " ساعة" : ""}</span></div>
+            <div class="ph"><span class="pp" style="background:${PRI_BG[o.key] || "#52707e"}">${esc(o.key)}</span><span class="pn">${ps && ps.hoursTarget ? "المدة المستهدفة: " + ps.hoursTarget + " ساعة" : ""}</span></div>
             <div class="pv">${rdPct_(o)}<small>نسبة الالتزام</small></div>
             ${rdBar_(o)}
             <div class="nsla-rd-pm">
-              <div><span><i style="background:#059669"></i>ملتزم</span><b>${fmt2(o.compliant)}</b></div>
-              <div><span><i style="background:#DC2626"></i>اختراق في بلاغ مغلق</span><b>${fmt2(o.breachClosed)}</b></div>
-              <div><span><i style="background:#7F1D1D"></i>اختراق في بلاغ مفتوح</span><b>${fmt2(o.breachOpen)}</b></div>
-              <div><span><i style="background:#F59E0B"></i>قيد التنفيذ</span><b>${fmt2(o.pending)}</b></div>
+              <div><span><i style="background:#066a52"></i>ملتزم</span><b>${fmt2(o.compliant)}</b></div>
+              <div><span><i style="background:#b8425a"></i>اختراق في بلاغ مغلق</span><b>${fmt2(o.breachClosed)}</b></div>
+              <div><span><i style="background:#7d1f2c"></i>اختراق في بلاغ مفتوح</span><b>${fmt2(o.breachOpen)}</b></div>
+              <div><span><i style="background:#c07a14"></i>قيد التنفيذ</span><b>${fmt2(o.pending)}</b></div>
             </div>
             <div class="nsla-rd-ptot">إجمالي البلاغات: ${fmt2(o.total)}</div>
           </div>`;
@@ -9967,8 +9986,8 @@ function renderNewSlaTab() {
                 <td style="font-weight:700">${esc(c.priority)}</td>
                 <td>${c.hoursTarget != null ? c.hoursTarget : "—"}</td>
                 <td>${fmt2(c.total)}</td>
-                <td style="color:#059669;font-weight:700">${fmt2(c.compliant)}</td>
-                <td style="color:#991B1B;font-weight:700">${fmt2(c.breach)}</td>
+                <td style="color:#066a52;font-weight:700">${fmt2(c.compliant)}</td>
+                <td style="color:#7d1f2c;font-weight:700">${fmt2(c.breach)}</td>
                 <td>${c.compliant + c.breach ? c.compliancePct + "%" : "—"}</td>
               </tr>`).join("") : `<tr><td colspan="7"><div class="empty-msg">لا توجد بيانات</div></td></tr>`}
           </tbody>
@@ -9976,7 +9995,7 @@ function renderNewSlaTab() {
       </div>
     </div>
 
-    <div class="card mb14" style="border:1px solid #E5E7EB">
+    <div class="card mb14" style="border:1px solid #dbe7ee">
       <div class="card-title">
         <span>🚫 فئات P5 — بدون SLA جديد</span>
         <span class="sub">${fmt2(p5Total)} بلاغ</span>
@@ -9994,7 +10013,7 @@ function renderNewSlaTab() {
       </div>
     </div>
 
-    <div class="card mb14" style="border:1px solid #E5E7EB">
+    <div class="card mb14" style="border:1px solid #dbe7ee">
       <div class="card-title">
         <span>◻️ فئات غير مصنّفة — بدون أولوية</span>
         <span class="sub">${fmt2(unclassifiedTotal)} بلاغ</span>
@@ -10070,7 +10089,7 @@ function renderNewSlaTab() {
                   ? `${r.newSlaOpenElapsedHours.toFixed(1)} <span style="color:var(--tx-muted);font-size:10px">(لا يزال مفتوحًا)</span>`
                   : "—"}</td>
                 <td>${r.newSlaHoursTarget != null ? r.newSlaHoursTarget : "—"}</td>
-                <td style="color:${r.newSlaEvalStatus === "compliant" ? "#059669" : isBreachStatus(r.newSlaEvalStatus) ? "#DC2626" : "var(--tx-muted)"};font-weight:700">${evalStatusLabel(r.newSlaEvalStatus)}</td>
+                <td style="color:${r.newSlaEvalStatus === "compliant" ? "#066a52" : isBreachStatus(r.newSlaEvalStatus) ? "#b8425a" : "var(--tx-muted)"};font-weight:700">${evalStatusLabel(r.newSlaEvalStatus)}</td>
               </tr>`).join("")
               : `<tr><td colspan="9"><div class="empty-msg">لا توجد نتائج مطابقة للفلاتر الحالية</div></td></tr>`}
           </tbody>
@@ -10153,8 +10172,8 @@ function renderNewSlaTab() {
     if (document.getElementById("ch-newsla-category")) { // __NEW_SLA_CAT_CHART__ (2026-10-11): ألوان حسب الأولوية + نسبة/عدد على الأعمدة + تسميات متعددة الأسطر
       const nonZero = categoryStats.filter((c) => c.total > 0);
       const dataEntries = (nonZero.length ? nonZero : categoryStats).slice(0, 20);
-      const PRI_COLORS = { P1: "#0B3C5D", P2: "#1D6F94", P3: "#4FA3C7", P4: "#9BCBE0" }; // تدرّج واحد: الأغمق = الأعلى أولوية
-      const priColor = (pr) => PRI_COLORS[pr] || "#7C93A1";
+      const PRI_COLORS = { P1: "#163d52", P2: "#1D6F94", P3: "#4FA3C7", P4: "#9BCBE0" }; // تدرّج واحد: الأغمق = الأعلى أولوية
+      const priColor = (pr) => PRI_COLORS[pr] || "#8aa1ad";
       const catCanvas = document.getElementById("ch-newsla-category");
       const catBox = catCanvas.closest(".chart-box");
       if (catBox) catBox.style.height = Math.max(340, dataEntries.length * 38 + 70) + "px";
@@ -10251,9 +10270,9 @@ function renderNewSlaTab() {
         data: {
           labels: regionStats.map((o) => o.region),
           datasets: [
-            { label: "ملتزم", data: regionStats.map((o) => o.compliant), backgroundColor: "#059669CC", borderColor: "#059669", borderWidth: 1 },
-            { label: "اختراق (مغلق)", data: regionStats.map((o) => o.breachClosed), backgroundColor: "#DC2626CC", borderColor: "#DC2626", borderWidth: 1 },
-            { label: "اختراق حالي (مفتوح)", data: regionStats.map((o) => o.breachOpen), backgroundColor: "#7F1D1DCC", borderColor: "#7F1D1D", borderWidth: 1 },
+            { label: "ملتزم", data: regionStats.map((o) => o.compliant), backgroundColor: "#066a52CC", borderColor: "#066a52", borderWidth: 1 },
+            { label: "اختراق (مغلق)", data: regionStats.map((o) => o.breachClosed), backgroundColor: "#b8425aCC", borderColor: "#b8425a", borderWidth: 1 },
+            { label: "اختراق حالي (مفتوح)", data: regionStats.map((o) => o.breachOpen), backgroundColor: "#7d1f2cCC", borderColor: "#7d1f2c", borderWidth: 1 },
           ],
         },
         options: {
@@ -10384,7 +10403,7 @@ function renderCorrectionsEscalationsTab() {
         <span class="sub">${total.toLocaleString()} ملاحظة</span>
       </div>
       <div class="g4" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:0">
-        <div class="kpi kc-amber">
+        <div class="kpi kc-amber kc-neutral">
           <div class="kpi-val">${total.toLocaleString()}</div>
           <div class="kpi-lbl">إجمالي الملاحظات</div>
           <div class="kpi-sub">بعد الفلترة الحالية</div>
@@ -10535,7 +10554,7 @@ function renderSpareTab() {
       .filter((r) => null != r.quantity)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 20);
-  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-info">\n        <div class="kpi-val">${rows.length.toLocaleString()}</div>\n        <div class="kpi-lbl">عدد المدارس</div>\n        <div class="kpi-sub">من إجمالي ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${totalQty.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الكميات</div>\n        <div class="kpi-sub">${withQty.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-purple">\n        <div class="kpi-val">${fmt(totalVal, 0)}</div>\n        <div class="kpi-lbl">إجمالي القيمة</div>\n        <div class="kpi-sub">الكمية × قيمة الوحدة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${null != avgUnit ? fmt(avgUnit, 2) : "—"}</div>\n        <div class="kpi-lbl">متوسط قيمة الوحدة</div>\n        <div class="kpi-sub">أعلى: ${null != maxUnit ? fmt(maxUnit, 2) : "—"}</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — الكمية</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-top-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي الكميات حسب الحي <span class="sub">أعلى 20</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-dist"></canvas></div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع الكميات حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي القيمة حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-val"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card">\n      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">\n        <div class="card-title" style="margin:0">\n          تفصيل قطع الغيار\n          <span class="sub" id="spare-tbl-cnt">${rows.length.toLocaleString()} مدرسة</span>\n        </div>\n        <select class="fsel" id="spare-tbl-sort" onchange="renderSpareTable()" style="font-size:11px">\n          <option value="qty_desc">الكمية ↓ تنازلي</option>\n          <option value="qty_asc">الكمية ↑ تصاعدي</option>\n          <option value="unit_desc">قيمة الوحدة ↓ تنازلي</option>\n          <option value="unit_asc">قيمة الوحدة ↑ تصاعدي</option>\n          <option value="total_desc">إجمالي القيمة ↓ تنازلي</option>\n          <option value="name">الاسم أ-ي</option>\n        </select>\n      </div>\n      <div class="tbl-wrap">\n        <table>\n          <thead><tr>\n            <th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>\n            <th style="min-width:80px">الرقم الوزاري</th>\n            <th style="min-width:100px">الحي</th>\n            <th style="min-width:110px">المرحلة</th>\n            <th style="min-width:180px">الوصف</th>\n            <th style="min-width:80px">الكمية</th>\n            <th style="min-width:100px">قيمة الوحدة</th>\n            <th style="min-width:110px">إجمالي القيمة</th>\n          </tr></thead>\n          <tbody id="spare-tbl-body"></tbody>\n        </table>\n      </div>\n      <div class="pag-bar" id="spare-tbl-pag">\n        <span class="pag-info" id="spare-pag-info"></span>\n        <div class="pag-btns" id="spare-pag-btns"></div>\n      </div>\n    </div>`),
+  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">\n      <div class="kpi kc-info">\n        <div class="kpi-val">${rows.length.toLocaleString()}</div>\n        <div class="kpi-lbl">عدد المدارس</div>\n        <div class="kpi-sub">من إجمالي ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-green kc-neutral">\n        <div class="kpi-val">${totalQty.toLocaleString()}</div>\n        <div class="kpi-lbl">إجمالي الكميات</div>\n        <div class="kpi-sub">${withQty.length.toLocaleString()} مدرسة</div>\n      </div>\n      <div class="kpi kc-purple kc-neutral">\n        <div class="kpi-val">${fmt(totalVal, 0)}</div>\n        <div class="kpi-lbl">إجمالي القيمة</div>\n        <div class="kpi-sub">الكمية × قيمة الوحدة</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${null != avgUnit ? fmt(avgUnit, 2) : "—"}</div>\n        <div class="kpi-lbl">متوسط قيمة الوحدة</div>\n        <div class="kpi-sub">أعلى: ${null != maxUnit ? fmt(maxUnit, 2) : "—"}</div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أعلى 20 مدرسة — الكمية</div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-top-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي الكميات حسب الحي <span class="sub">أعلى 20</span></div>\n        <div class="chart-box" style="height:480px"><canvas id="ch-spare-dist"></canvas></div>\n      </div>\n    </div>\n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">توزيع الكميات حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-qty"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">إجمالي القيمة حسب المرحلة</div>\n        <div class="chart-box" style="height:250px"><canvas id="ch-spare-stage-val"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card">\n      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">\n        <div class="card-title" style="margin:0">\n          تفصيل قطع الغيار\n          <span class="sub" id="spare-tbl-cnt">${rows.length.toLocaleString()} مدرسة</span>\n        </div>\n        <select class="fsel" id="spare-tbl-sort" onchange="renderSpareTable()" style="font-size:11px">\n          <option value="qty_desc">الكمية ↓ تنازلي</option>\n          <option value="qty_asc">الكمية ↑ تصاعدي</option>\n          <option value="unit_desc">قيمة الوحدة ↓ تنازلي</option>\n          <option value="unit_asc">قيمة الوحدة ↑ تصاعدي</option>\n          <option value="total_desc">إجمالي القيمة ↓ تنازلي</option>\n          <option value="name">الاسم أ-ي</option>\n        </select>\n      </div>\n      <div class="tbl-wrap">\n        <table>\n          <thead><tr>\n            <th style="text-align:right;padding-right:14px;min-width:200px">اسم المدرسة</th>\n            <th style="min-width:80px">الرقم الوزاري</th>\n            <th style="min-width:100px">الحي</th>\n            <th style="min-width:110px">المرحلة</th>\n            <th style="min-width:180px">الوصف</th>\n            <th style="min-width:80px">الكمية</th>\n            <th style="min-width:100px">قيمة الوحدة</th>\n            <th style="min-width:110px">إجمالي القيمة</th>\n          </tr></thead>\n          <tbody id="spare-tbl-body"></tbody>\n        </table>\n      </div>\n      <div class="pag-bar" id="spare-tbl-pag">\n        <span class="pag-info" id="spare-pag-info"></span>\n        <div class="pag-btns" id="spare-pag-btns"></div>\n      </div>\n    </div>`),
     requestAnimationFrame(() => {
       (killChart("ch-spare-top-qty"),
         (CHARTS["ch-spare-top-qty"] = new Chart(document.getElementById("ch-spare-top-qty"), {
@@ -10688,7 +10707,7 @@ function renderSpareTable() {
   (page.forEach((r) => {
     const totalVal = null != r.quantity && null != r.unitValue ? r.quantity * r.unitValue : null,
       tr = document.createElement("tr");
- ((tr.innerHTML = ` <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div> </td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td style="font-size:11px;color:var(--tx-muted)">${esc(r.district) || "—"}</td> <td style="font-size:11px;white-space:normal">${esc(r.stage) || "—"}</td> <td style="font-size:11px;max-width:180px;white-space:normal;line-height:1.4">${esc(r.description) || "—"}</td> <td style="font-weight:700;color:#059669;text-align:center">${r.quantity ?? "—"}</td> <td style="font-weight:700;color:#7C3AED;text-align:center">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td> <td style="font-weight:800;color:#0E7490;text-align:center">${null != totalVal ? fmt(totalVal, 2) : "—"}</td>`),
+ ((tr.innerHTML = ` <td style="text-align:right;padding-right:14px"> <div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.name)}</div> </td> <td style="font-size:10px;color:var(--tx-muted)">${esc(r.minId) || "—"}</td> <td style="font-size:11px;color:var(--tx-muted)">${esc(r.district) || "—"}</td> <td style="font-size:11px;white-space:normal">${esc(r.stage) || "—"}</td> <td style="font-size:11px;max-width:180px;white-space:normal;line-height:1.4">${esc(r.description) || "—"}</td> <td style="font-weight:700;color:#066a52;text-align:center">${r.quantity ?? "—"}</td> <td style="font-weight:700;color:#6c2bd9;text-align:center">${null != r.unitValue ? fmt(r.unitValue, 2) : "—"}</td> <td style="font-weight:800;color:#0b6b7e;text-align:center">${null != totalVal ? fmt(totalVal, 2) : "—"}</td>`),
       frag.appendChild(tr));
   }),
     tbody.appendChild(frag));
@@ -10800,7 +10819,7 @@ function renderAyenTab() {
   });
   const worst10 = scored.slice(0, 10),
     best10 = [...scored].reverse().slice(0, 10);
-  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="margin-bottom:16px">\n      <div class="kpi kc-teal">\n        <div class="kpi-val">${avgAyen.toFixed(1)}%</div>\n        <div class="kpi-lbl">متوسط تقييم عاين</div>\n        <div class="kpi-sub">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${critical.toLocaleString()}</div>\n        <div class="kpi-lbl">حرج · أقل من 25%</div>\n        <div class="kpi-sub">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${needWork.toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط · 25–49%</div>\n        <div class="kpi-sub">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${good.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد · 50–74%</div>\n        <div class="kpi-sub">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${excellent.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد جداً · 75–100%</div>\n        <div class="kpi-sub">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#DC2626"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#D97706"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#F0FDF4;color:#059669;border:1px solid #A7F3D0;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#059669"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#ECFEFF;color:#0891B2;border:1px solid #A5F3FC;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0891B2"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card" style="display:flex;flex-direction:column">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="flex:1;min-height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#DC2626;margin-bottom:10px;padding:6px 12px;background:#FFF5F5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:10px;padding:6px 12px;background:#F0FDF4;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
+  ((el.innerHTML = `\n    \n    <div class="kpi-grid" style="margin-bottom:16px">\n      <div class="kpi kc-teal">\n        <div class="kpi-val">${avgAyen.toFixed(1)}%</div>\n        <div class="kpi-lbl">متوسط تقييم عاين</div>\n        <div class="kpi-sub">${total.toLocaleString()} مدرسة مقيّمة من ${D.length.toLocaleString()}</div>\n      </div>\n      <div class="kpi kc-red">\n        <div class="kpi-val">${critical.toLocaleString()}</div>\n        <div class="kpi-lbl">حرج · أقل من 25%</div>\n        <div class="kpi-sub">${total ? ((critical / total) * 100).toFixed(0) : 0}% من المقيّمات · تدخل عاجل</div>\n      </div>\n      <div class="kpi kc-amber">\n        <div class="kpi-val">${needWork.toLocaleString()}</div>\n        <div class="kpi-lbl">متوسط · 25–49%</div>\n        <div class="kpi-sub">${total ? ((needWork / total) * 100).toFixed(0) : 0}% · تحتاج متابعة</div>\n      </div>\n      <div class="kpi kc-green">\n        <div class="kpi-val">${good.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد · 50–74%</div>\n        <div class="kpi-sub">${total ? ((good / total) * 100).toFixed(0) : 0}% · مستوى مقبول</div>\n      </div>\n      <div class="kpi kc-blue">\n        <div class="kpi-val">${excellent.toLocaleString()}</div>\n        <div class="kpi-lbl">جيد جداً · 75–100%</div>\n        <div class="kpi-sub">${total ? ((excellent / total) * 100).toFixed(0) : 0}% · مستوى جيد جداً</div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14" style="padding-bottom:20px">\n      <div class="card-title">\n        <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>\n        توزيع درجة تقييم عاين\n        <span class="sub">${total.toLocaleString()} مدرسة · متوسط ${avgAyen.toFixed(1)}%</span>\n      </div>\n      <div class="tier-strip">\n        <div class="tier-seg" style="background:#fdf0f2;color:#9c2a3a;border:1px solid #d8bcc0;--pct:${total ? ((critical / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#9c2a3a"></div>\n          <div class="tier-num">${critical}</div>\n          <div class="tier-pct">${total ? ((critical / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">حرج · 0–24%</div>\n        </div>\n        <div class="tier-seg" style="background:#fdf6ec;color:var(--c-warning-text);border:1px solid #ecd7b8;--pct:${total ? ((needWork / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#c07a14"></div>\n          <div class="tier-num">${needWork}</div>\n          <div class="tier-pct">${total ? ((needWork / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">متوسط · 25–49%</div>\n        </div>\n        <div class="tier-seg" style="background:#edfaf5;color:#066a52;border:1px solid #b4d2cb;--pct:${total ? ((good / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#066a52"></div>\n          <div class="tier-num">${good}</div>\n          <div class="tier-pct">${total ? ((good / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد · 50–74%</div>\n        </div>\n        <div class="tier-seg" style="background:#eaf6fa;color:var(--c-info-2);border:1px solid #cfe6eb;--pct:${total ? ((excellent / total) * 100).toFixed(0) : 0}%">\n          <div class="tier-indicator" style="background:#0d849c"></div>\n          <div class="tier-num">${excellent}</div>\n          <div class="tier-pct">${total ? ((excellent / total) * 100).toFixed(0) : 0}%</div>\n          <div class="tier-sub">جيد جداً · 75–100%</div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card" style="display:flex;flex-direction:column">\n        <div class="card-title">توزيع درجات عاين </div>\n        <div class="chart-box" style="flex:1;min-height:260px"><canvas id="ch-ayen-hist"></canvas></div>\n      </div>\n      <div class="g2" style="margin-bottom:0">\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الجنس</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-gender"></canvas></div>\n        </div>\n        <div class="card">\n          <div class="card-title">متوسط عاين حسب الملكية</div>\n          <div class="chart-box" style="height:260px"><canvas id="ch-ayen-owner"></canvas></div>\n        </div>\n      </div>\n    </div>\n\n    \n    <div class="g2 mb14">\n      <div class="card">\n        <div class="card-title">أسوأ 20 حي — متوسط درجة عاين</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-dist"></canvas></div>\n      </div>\n      <div class="card">\n        <div class="card-title">متوسط درجة عاين حسب المرحلة</div>\n        <div class="chart-box" style="height:520px"><canvas id="ch-ayen-stage"></canvas></div>\n      </div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">تقييم عاين مقابل FCA <span class="sub">كل نقطة = مدرسة</span></div>\n      <div class="chart-box" style="height:320px"><canvas id="ch-ayen-scatter"></canvas></div>\n    </div>\n\n    \n    <div class="card mb14">\n      <div class="card-title">أفضل وأسوأ المدارس — تقييم عاين</div>\n      <div class="g2">\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#9c2a3a;margin-bottom:10px;padding:6px 12px;background:#fdf0f2;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ⚠️ أسوأ 10 مدارس — تحتاج تدخل عاجل\n          </div>\n          <div id="ayen-worst-list"></div>\n        </div>\n        <div>\n          <div style="font-size:11px;font-weight:700;color:#066a52;margin-bottom:10px;padding:6px 12px;background:#edfaf5;border-radius:8px;display:inline-flex;align-items:center;gap:6px">\n            ✅ أفضل 10 مدارس — نموذج يُحتذى\n          </div>\n          <div id="ayen-best-list"></div>\n        </div>\n      </div>\n    </div>\n\n`),
     (window._AYEN_ROWS = scored),
     (window._AYEN_PAGE = { cur: 0, SIZE: 50 }),
     requestAnimationFrame(() => {
@@ -11158,7 +11177,7 @@ function renderAsolTab() {
 
     <div class="card mb14" style="padding-bottom:20px">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
         توزيع حالة تقييم منصة أصول
         <span class="sub">${totalClassified.toLocaleString()} مبنى مصنّف</span>
       </div>
@@ -11179,7 +11198,7 @@ function renderAsolTab() {
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div class="card-title" style="margin:0">
-          <span class="card-title-icon" style="background:#FFF5F5;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+          <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           قائمة المباني الحرجة
           <span class="sub" id="asol-tbl-cnt">${critical.length.toLocaleString()} مبنى</span>
         </div>
@@ -11405,12 +11424,12 @@ function acPaymentPct(r) {
 }
 function acPaymentBadge(pct) {
   return null == pct
-    ? '<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #64748b33">—</span>'
+    ? '<span style="background:#eef3f7;color:#52707e;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #52707e33">—</span>'
     : pct <= 0
-      ? '<span style="background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #DC262633">لم يبدأ السداد</span>'
+      ? '<span style="background:#fdf0f2;color:#9c2a3a;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #9c2a3a33">لم يبدأ السداد</span>'
       : pct >= 100
-        ? '<span style="background:#ECFDF5;color:#059669;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #05966933">مكتمل السداد</span>'
-        : '<span style="background:#FFFBEB;color:#D97706;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #D9770633">جاري السداد</span>';
+        ? '<span style="background:#edfaf5;color:#066a52;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #066a5233">مكتمل السداد</span>'
+        : '<span style="background:#fdf6ec;color:var(--c-warning-text);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid #c07a1433">جاري السداد</span>';
 }
 window._acState = { contractor: "", search: "" };
 function renderAllContracts() {
@@ -11542,7 +11561,7 @@ function renderAllContractsBody() {
         <div class="kpi-lbl">إجمالي العقود</div>
         <div class="kpi-sub">عقد</div>
       </div>
-      <div class="kpi kc-purple">
+      <div class="kpi kc-purple kc-neutral">
         <div class="kpi-val" style="font-size:18px">${fmt(totalValue, 0)}</div>
         <div class="kpi-lbl">إجمالي قيمة العقود (محدثة)</div>
         <div class="kpi-sub">ر.س · أساسي ${fmt(totalBase, 0)}</div>
@@ -11554,11 +11573,11 @@ function renderAllContractsBody() {
       </div>
       <div class="kpi ${notStarted ? "kc-red" : "kc-green"}">
         <div class="kpi-val" style="font-size:20px;color:var(--tx-main)">
-          <span style="color:#059669">${fullyPaid}</span>
+          <span style="color:#066a52">${fullyPaid}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
-          <span style="color:#D97706">${inProgress}</span>
+          <span style="color:var(--c-warning-text)">${inProgress}</span>
           <span style="color:var(--tx-muted);font-size:13px"> / </span>
-          <span style="color:#DC2626">${notStarted}</span>
+          <span style="color:#9c2a3a">${notStarted}</span>
         </div>
         <div class="kpi-lbl">مكتمل / جاري / لم يبدأ (السداد)</div>
         <div class="kpi-sub">من إجمالي ${total} عقد</div>
@@ -11612,10 +11631,10 @@ function renderAllContractsBody() {
               .map(
                 (c, i) => `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">
                   <td style="padding:9px 10px;font-weight:700">${esc(c.name)}</td>
-                  <td style="padding:9px 10px;font-weight:700;color:#0891B2">${c.count}</td>
+                  <td style="padding:9px 10px;font-weight:700;color:var(--c-info-2)">${c.count}</td>
                   <td style="padding:9px 10px">${fmt(c.base, 0)} ر.س</td>
-                  <td style="padding:9px 10px;font-weight:700;color:#7C3AED">${fmt(c.updated, 0)} ر.س</td>
-                  <td style="padding:9px 10px;color:#0E7490">${fmt(c.spent, 0)} ر.س</td>
+                  <td style="padding:9px 10px;font-weight:700;color:#6c2bd9">${fmt(c.updated, 0)} ر.س</td>
+                  <td style="padding:9px 10px;color:#0b6b7e">${fmt(c.spent, 0)} ر.س</td>
                   <td style="padding:9px 10px;font-weight:700;color:${c.due > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${fmt(c.due, 0)} ر.س</td>
                   <td style="padding:9px 10px">${c.updated ? Math.round((c.spent / c.updated) * 100) : 0}%</td>
                 </tr>`,
@@ -11623,13 +11642,13 @@ function renderAllContractsBody() {
               .join("")}
           </tbody>
           <tfoot>
-            <tr style="border-top:2px solid var(--bd-mid);font-weight:800;background:#fbfdfe;position:sticky;bottom:0">
+            <tr style="border-top:2px solid var(--bd-mid);font-weight:800;background:#f7fafc;position:sticky;bottom:0">
               <td style="padding:9px 10px">الإجمالي</td>
-              <td style="padding:9px 10px;color:#0891B2">${contractorFinRows.reduce((s, c) => s + c.count, 0)}</td>
+              <td style="padding:9px 10px;color:var(--c-info-2)">${contractorFinRows.reduce((s, c) => s + c.count, 0)}</td>
               <td style="padding:9px 10px">${fmt(contractorFinRows.reduce((s, c) => s + c.base, 0), 0)} ر.س</td>
-              <td style="padding:9px 10px;color:#7C3AED">${fmt(contractorFinRows.reduce((s, c) => s + c.updated, 0), 0)} ر.س</td>
-              <td style="padding:9px 10px;color:#0E7490">${fmt(contractorFinRows.reduce((s, c) => s + c.spent, 0), 0)} ر.س</td>
-              <td style="padding:9px 10px;color:#DC2626">${fmt(contractorFinRows.reduce((s, c) => s + c.due, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#6c2bd9">${fmt(contractorFinRows.reduce((s, c) => s + c.updated, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#0b6b7e">${fmt(contractorFinRows.reduce((s, c) => s + c.spent, 0), 0)} ر.س</td>
+              <td style="padding:9px 10px;color:#9c2a3a">${fmt(contractorFinRows.reduce((s, c) => s + c.due, 0), 0)} ر.س</td>
               <td></td>
             </tr>
           </tfoot>
@@ -11642,7 +11661,7 @@ function renderAllContractsBody() {
         <span class="sub">${total} عقد</span>
       </div>
       <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
-      <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead>
             <tr style="text-align:right">
@@ -11670,13 +11689,13 @@ function renderAllContractsBody() {
                   remVal = num(r["المتبقي"]);
                 return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:160px">${esc(r["المقاول"] || "")}</td>
-                  <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:#0891B2">${esc(r["رقم العقد"] || "—")}</td>
+                  <td style="padding:10px 12px;font-family:monospace;font-size:10px;font-weight:700;color:var(--c-info-2)">${esc(r["رقم العقد"] || "—")}</td>
                   <td style="padding:10px 8px;font-weight:600">${esc(r["المنطقة"] || "")}</td>
                   <td style="padding:10px 12px;font-weight:600;line-height:1.4;max-width:260px">${esc(r["المجال / الوصف"] || "—")}</td>
                   <td style="padding:10px 8px;font-size:10px">${esc(r["التصنيف"] || "—")}</td>
                   <td style="padding:10px 8px;white-space:nowrap">${null == baseVal ? "—" : fmt(baseVal, 0) + " ر.س"}</td>
-                  <td style="padding:10px 8px;white-space:nowrap;font-weight:700;color:#7C3AED">${null == updatedVal ? "—" : fmt(updatedVal, 0) + " ر.س"}</td>
-                  <td style="padding:10px 8px;white-space:nowrap;color:#0E7490">${null == paidVal ? "—" : fmt(paidVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;font-weight:700;color:#6c2bd9">${null == updatedVal ? "—" : fmt(updatedVal, 0) + " ر.س"}</td>
+                  <td style="padding:10px 8px;white-space:nowrap;color:#0b6b7e">${null == paidVal ? "—" : fmt(paidVal, 0) + " ر.س"}</td>
                   <td style="padding:10px 8px;font-weight:700">${pctDisplay}</td>
                   <td style="padding:10px 8px;white-space:nowrap;font-weight:600;color:${remVal > 0 ? CSS_TOKENS.danger() : "var(--tx-muted)"}">${null == remVal ? "—" : fmt(remVal, 0) + " ر.س"}</td>
                   <td style="padding:10px 8px">${acPaymentBadge(pct)}</td>
@@ -11862,7 +11881,7 @@ const SYS_TIER = {
   "جيد جداً": { color: CSS_TOKENS.info(), bg: CSS_TOKENS.bgInfo(), border: CSS_TOKENS.info() + "44" },
 };
 function sysBadge(cat) {
-  const t = SYS_TIER[cat] || { color: CSS_TOKENS.txMuted(), bg: "#f1f5f9", border: CSS_TOKENS.txMuted() + "44" };
+  const t = SYS_TIER[cat] || { color: CSS_TOKENS.txMuted(), bg: "#edf4f8", border: CSS_TOKENS.txMuted() + "44" };
   return `<span style="padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;\n    background:${t.bg};color:${t.color};border:1px solid ${t.border}">${cat || "—"}</span>`;
 }
 function sysScoreDot(score) {
@@ -11985,7 +12004,7 @@ function renderSysMain() {
   const mainSystems = [...new Set(data.map((r) => r["القسم الرئيسي"]).filter(Boolean))]
     .filter((s) => !HIDDEN_SYSTEMS.includes(s))
     .sort();
-  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية FCA والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0891B2">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0891B2">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #DC2626">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#DC2626">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1=الأفضل ← 5=الأضعف)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
+  ((el.innerHTML = `\n  \n  <!-- ── بطاقة تصفح الأنظمة الرئيسية ── -->\n  <div class="card mb14" style="border-top:3px solid var(--teal);cursor:pointer;transition:box-shadow .18s"\n    onclick="sysBrowseOpen()"\n    onmouseover="this.style.boxShadow='0 6px 24px rgba(13,132,156,.18)'"\n    onmouseout="this.style.boxShadow=''">\n    <div style="display:flex;align-items:center;gap:18px;padding:6px 4px">\n      <div style="font-size:38px">⚙️</div>\n      <div style="flex:1">\n        <div style="font-size:15px;font-weight:800;color:var(--tx-main)">تصفح الأنظمة الرئيسية FCA والفرعية</div>\n        <div style="font-size:12px;color:var(--tx-muted);margin-top:3px">${mainSystems.length} نظام رئيسي — اضغط لتصفح الأنظمة واختيار نظام فرعي</div>\n      </div>\n      <div style="display:flex;gap:8px;flex-wrap:wrap">\n        ${mainSystems.slice(0,5).map(s=>`<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;background:rgba(13,132,156,.1);color:var(--teal);border:1px solid rgba(13,132,156,.2)">${esc(s)}</span>`).join("")}\n        ${mainSystems.length>5?`<span style="font-size:11px;color:var(--tx-muted);padding:4px 8px">+${mainSystems.length-5}</span>`:""}\n      </div>\n      <div style="font-size:22px;color:var(--teal);font-weight:700">‹</div>\n    </div>\n  </div>\n\n  <div class="g4 mb14">\n    <div class="card" style="border-top:3px solid var(--teal)">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">المدارس المقيّمة</div>\n      <div style="font-size:28px;font-weight:800;color:var(--teal)">${totalSchools.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n        <div class="card" style="border-top:3px solid #0d849c">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس جيد جداً (≥70%)</div>\n      <div style="font-size:28px;font-weight:800;color:#0b6b7e">${cntExcellent.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n    <div class="card" style="border-top:3px solid #9c2a3a">\n      <div style="font-size:10px;color:var(--tx-muted);font-weight:700;margin-bottom:6px">مدارس تحتاج تدخل (<50%)</div>\n      <div style="font-size:28px;font-weight:800;color:#9c2a3a">${cntLow.toLocaleString()}</div>\n      <div style="font-size:10px;color:var(--tx-muted);margin-top:4px">مدرسة</div>\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم لكل نظام رئيسي (1=الأفضل ← 5=الأضعف)</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">توزيع فئات الدرجة الكلية للمباني</div>\n      <div class="chart-box" style="height:280px"><canvas id="ch-sys-tier"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📊 توزيع فئات التقييم لكل نظام رئيسي</div>\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:12px">\n        <thead>\n          <tr style="text-align:right">\n            <th>النظام الرئيسي</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#b4d2cb!important;text-align:center">جيد</th>\n            <th style="color:#cfe6eb!important;text-align:center">جيد جداً</th>\n            <th style="text-align:center">المجموع</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${Object.entries(
     tierRows,
   )
     .filter(([k]) => "6" !== k)
@@ -11993,7 +12012,7 @@ function renderSysMain() {
       const total = Object.values(cats).reduce((a, b) => a + b, 0),
         pctCrit = total ? (((cats["حرج"] || 0) / total) * 100).toFixed(1) : "0.0",
         barW = parseFloat(pctCrit);
-      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">\n              <td style="padding:10px 14px;font-weight:600">${esc(sys)}</td>\n              <td style="padding:10px;text-align:center;color:#DC2626;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#D97706;font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#059669;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#0891B2;font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;font-weight:600">${total.toLocaleString()}</td>\n                          </tr>`;
+      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : CSS_TOKENS.bgNeutral()}">\n              <td style="padding:10px 14px;font-weight:600">${esc(sys)}</td>\n              <td style="padding:10px;text-align:center;color:#9c2a3a;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:var(--c-warning-text);font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:#066a52;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;color:var(--c-info-2);font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              <td style="padding:10px;text-align:center;font-weight:600">${total.toLocaleString()}</td>\n                          </tr>`;
     })
     .join(
       "",
@@ -12020,7 +12039,7 @@ function renderSysMain() {
           <option value="score_desc" ${(window._sysMainState?.sortBy || "score_desc") === "score_desc" ? "selected" : ""}>الأعلى درجة أولاً</option>
           <option value="score_asc"  ${window._sysMainState?.sortBy === "score_asc" ? "selected" : ""}>الأقل درجة أولاً</option>
         </select>
-      </div>\n    </div>\n\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:11px" id="sysm-table">\n        <thead>\n          <tr style="text-align:right">\n            <th style="white-space:nowrap;padding:9px 12px">اسم المدرسة</th>\n            <th style="white-space:nowrap;min-width:90px;color:#0891B2;padding:9px 8px">الرقم الوزاري</th>\n            <th style="white-space:nowrap">المدينة</th>\n            <th style="white-space:nowrap">الدرجة الكلية</th>\n            <th style="white-space:nowrap">الفئة</th>\n            ${mainSystems
+      </div>\n    </div>\n\n    <div style="overflow-x:auto">\n      <table style="width:100%;border-collapse:collapse;font-size:11px" id="sysm-table">\n        <thead>\n          <tr style="text-align:right">\n            <th style="white-space:nowrap;padding:9px 12px">اسم المدرسة</th>\n            <th style="white-space:nowrap;min-width:90px;color:var(--c-info-2);padding:9px 8px">الرقم الوزاري</th>\n            <th style="white-space:nowrap">المدينة</th>\n            <th style="white-space:nowrap">الدرجة الكلية</th>\n            <th style="white-space:nowrap">الفئة</th>\n            ${mainSystems
         .filter((s) => "6" !== s)
         .map(
           (s) =>
@@ -12590,7 +12609,7 @@ function renderSysDetail() {
           `<option value="${n}" ${n === showN ? "selected" : ""}>${n === hmSchools.length ? "الكل (" + n + ")" : n + " مدرسة"}</option>`,
       )
       .join("");
-  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#6EE7B7!important;text-align:center">جيد</th>\n            <th style="color:#7DD3FC!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
+  ((el.innerHTML = `\n  \n  <div class="card mb14" style="padding:14px 18px">\n    <div style="font-size:12px;font-weight:800;color:var(--tx-sec);margin-bottom:10px">تصفية حسب القسم الرئيسي</div>\n    ${sectionChips}\n    <div style="font-size:11px;color:var(--tx-muted);margin-top:4px">\n      ${subAvg.length} نظام فرعي\n      &nbsp;·&nbsp; ${hmSchools.length} مدرسة\n      &nbsp;·&nbsp; ${data.filter((r) => "6" !== r["النظام الفرعي"]).length.toLocaleString()} تقييم\n      ${selMain ? `&nbsp;<span style="background:${CSS_TOKENS.α(CSS_TOKENS.info(),.1)};color:var(--teal);padding:2px 10px;border-radius:20px;font-weight:700">📌 ${esc(selMain)}</span>` : ""}\n    </div>\n  </div>\n\n  \n  <div class="g2 mb14">\n    <div class="card">\n      <div class="card-title">متوسط التقييم للأنظمة الفرعية (من الأسوأ للأفضل)</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-avg"></canvas></div>\n    </div>\n    <div class="card">\n      <div class="card-title">نسبة التقييمات الحرجة لكل نظام فرعي</div>\n      <div class="chart-box" style="height:${Math.min(600, Math.max(280, 26 * subAvg.length))}px"><canvas id="ch-syd-crit"></canvas></div>\n    </div>\n  </div>\n\n  \n  <div class="card mb14">\n    <div class="card-title">📋 تفاصيل التقييم لكل نظام فرعي</div>\n    <div style="overflow-x:auto;max-height:480px">\n      <table style="width:100%;border-collapse:collapse;font-size:11px">\n        <thead style="position:sticky;top:0;z-index:2">\n          <tr style="text-align:right">\n            <th>القسم الرئيسي</th>\n            <th>النظام الفرعي</th>\n            <th style="text-align:center">متوسط</th>\n            <th style="color:#FCA5A5!important;text-align:center">حرج</th>\n            <th style="color:#FCD34D!important;text-align:center">متوسط</th>\n            <th style="color:#b4d2cb!important;text-align:center">جيد</th>\n            <th style="color:#cfe6eb!important;text-align:center">جيد جداً</th>\n          </tr>\n        </thead>\n        <tbody>\n          ${subAvg
     .map((row, i) => {
       const cats = subTiers[row.name] || {},
         total = row.cnt,
@@ -12605,7 +12624,7 @@ function renderSysDetail() {
                 ? CSS_TOKENS.warning()
                 : CSS_TOKENS.danger(),
         riskW = parseFloat(pctCrit);
-      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-2)"}">\n              <td style="padding:9px 14px;font-size:10px;color:var(--tx-muted)">${esc(row.main || "")}</td>\n              <td style="padding:9px 14px;font-weight:600">${esc(row.name)}</td>\n              <td style="padding:9px 8px;text-align:center">\n                <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;color:${avgClr};background:${avgClr}18">${row.avg.toFixed(2)}</span>\n              </td>\n              <td style="padding:9px 8px;text-align:center;color:#DC2626;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#D97706;font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#059669;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#0891B2;font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              \n            </tr>`;
+      return `<tr style="border-bottom:1px solid var(--bd-light);background:${i % 2 == 0 ? "#fff" : "var(--bg-2)"}">\n              <td style="padding:9px 14px;font-size:10px;color:var(--tx-muted)">${esc(row.main || "")}</td>\n              <td style="padding:9px 14px;font-weight:600">${esc(row.name)}</td>\n              <td style="padding:9px 8px;text-align:center">\n                <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;color:${avgClr};background:${avgClr}18">${row.avg.toFixed(2)}</span>\n              </td>\n              <td style="padding:9px 8px;text-align:center;color:#9c2a3a;font-weight:700">${(cats["حرج"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:var(--c-warning-text);font-weight:700">${(cats["متوسط"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:#066a52;font-weight:700">${(cats["جيد"] || 0).toLocaleString()}</td>\n              <td style="padding:9px 8px;text-align:center;color:var(--c-info-2);font-weight:700">${(cats["جيد جداً"] || 0).toLocaleString()}</td>\n              \n            </tr>`;
     })
     .join(
       "",
@@ -13815,7 +13834,7 @@ function _sysDownloadFile(filename, content, mime) {
           <div style="flex:1">
             <div class="mini-track"><div class="mini-fill" style="width:${w}%;background:${color}"></div></div>
           </div>
-          <div style="min-width:78px;text-align:left;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${fmt(it.v)} <span style="font-weight:700;opacity:.7;font-size:11px">(${pct}%)</span></div>
+          <div style="min-width:78px;text-align:left;font-weight:800;color:${color === CSS_TOKENS.warning() ? CSS_TOKENS.warningText() : color};font-variant-numeric:tabular-nums">${fmt(it.v)} <span style="font-weight:700;opacity:.7;font-size:11px">(${pct}%)</span></div>
         </div>`;
       })
       .join("");
@@ -14086,14 +14105,14 @@ function _sysDownloadFile(filename, content, mime) {
         balaghState === "loading"
           ? "جارٍ تحميل بيانات البلاغات في الخلفية، وستُحدَّث الأرقام والرسوم البيانية تلقائياً فور اكتمال التحميل"
           : balaghState === "error"
-          ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
-          : `البلاغات لم تُحمَّل بعد — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:#0891B2;text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">اضغط هنا للتحميل</button>`;
+          ? `${window.__BALAGH_LOAD_ERR__ || "تعذّر تحميل البلاغات"} — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">إعادة المحاولة</button>`
+          : `البلاغات لم تُحمَّل بعد — <button onclick="window.loadBalaghSeparate()" style="background:none;border:none;color:var(--c-info-2);text-decoration:underline;cursor:pointer;font-family:inherit;font-weight:800">اضغط هنا للتحميل</button>`;
       const spin =
         balaghState === "loading"
-          ? `<span style="display:inline-block;width:14px;height:14px;border:2px solid #FDE68A;border-top-color:#92400E;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span><style>@keyframes balaghspin{to{transform:rotate(360deg)}}</style>`
+          ? `<span style="display:inline-block;width:14px;height:14px;border:2px solid #ecd7b8;border-top-color:#92590a;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span><style>@keyframes balaghspin{to{transform:rotate(360deg)}}</style>`
           : "";
       balaghBannerHtml = `
-        <div style="display:flex;align-items:center;gap:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400E">
+        <div style="display:flex;align-items:center;gap:10px;background:#fdf6ec;border:1px solid #ecd7b8;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92590a">
           ${spin}
           <span style="font-size:16px">${balaghState === "loading" ? "" : icon}</span>
           <span style="flex:1">${msg}</span>
@@ -14253,7 +14272,7 @@ function _sysDownloadFile(filename, content, mime) {
       const viewBtn = sc
         ? `<button type="button" class="bal-school-view" data-min="${escText(mid)}" onclick="event.stopPropagation();window.__IXOpenSchoolByMinId(this.dataset.min)" title="فتح بيانات المدرسة" style="${btn}border:1px solid var(--bd-light);background:var(--bg-2);color:var(--tx-main)">عرض البيانات</button>`
         : "";
-      const filterBtn = `<button type="button" data-balagh-filter="${safeAttr}" data-balagh-label="${safeName}" title="عرض بلاغات هذه المدرسة فقط" style="${btn}border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8">🔎 فلترة</button>`;
+      const filterBtn = `<button type="button" data-balagh-filter="${safeAttr}" data-balagh-label="${safeName}" title="عرض بلاغات هذه المدرسة فقط" style="${btn}border:1px solid #cfe6eb;background:#eaf6fa;color:#0b6b7e"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-inline-end:4px" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> فلترة</button>`;
       return `<div style="line-height:1.5;cursor:default;user-select:text">${safeName}</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">${viewBtn}${filterBtn}</div>`;
     };
     const categoryCounts = topCounts(rows, "category", 6);
@@ -14525,14 +14544,14 @@ function _sysDownloadFile(filename, content, mime) {
     const frMsg = window.__BALAGH_FORCE_REFRESH_MSG__ || "";
     const frBtnLabel =
       frState === "loading"
-        ? '<span style="display:inline-block;width:11px;height:11px;border:2px solid #FDE68A;border-top-color:#fff;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span> جاري السحب من الشيت...'
+        ? '<span style="display:inline-block;width:11px;height:11px;border:2px solid #ecd7b8;border-top-color:#fff;border-radius:50%;animation:balaghspin 0.8s linear infinite;flex:none"></span> جاري السحب من الشيت...'
         : "🔄 تحديث فوري من الشيت";
     const frBtnHtml = `<button type="button" id="balagh-force-refresh-btn" onclick="window.balaghForceRefreshFromSheet()" ${frState === "loading" ? "disabled" : ""}
         title="يسحب أحدث بيانات البلاغات مباشرة من Google Sheets الآن (بدون انتظار التحديث التلقائي) ويحدّث الكاش فورًا"
-        style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:${frState === "loading" ? "default" : "pointer"};white-space:nowrap;border:1px solid #0891B2;background:${frState === "loading" ? "#0891B2" : "#ECFEFF"};color:${frState === "loading" ? "#fff" : "#0891B2"};margin-right:8px"
+        style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:${frState === "loading" ? "default" : "pointer"};white-space:nowrap;border:1px solid #0d849c;background:${frState === "loading" ? "#0d849c" : "#eaf6fa"};color:${frState === "loading" ? "#fff" : "var(--c-info-2)"};margin-right:8px"
       >${frBtnLabel}</button><style>@keyframes balaghspin{to{transform:rotate(360deg)}}</style>`;
     const frStatusHtml = frMsg
-      ? `<span id="balagh-force-refresh-status" style="font-size:11px;font-weight:700;color:${frState === "err" ? "#DC2626" : "#059669"}">${frMsg}</span>`
+      ? `<span id="balagh-force-refresh-status" style="font-size:11px;font-weight:700;color:${frState === "err" ? "#9c2a3a" : "#066a52"}">${frMsg}</span>`
       : `<span id="balagh-force-refresh-status"></span>`;
 
     el.innerHTML = `
@@ -14540,7 +14559,7 @@ function _sysDownloadFile(filename, content, mime) {
       ${balaghSecHead(1, "📊", "نظرة عامة", "أهم الأرقام ضمن الفلاتر الحالية")}
       <div class="card mb14">
         <div class="card-title" style="flex-wrap:wrap">
-          <span class="card-title-icon" style="background:#FFF7ED;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></span>
+          <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/></svg></span>
           <span>لوحة البلاغات — ملف CSV</span>
           <span class="sub">${fmt(filteredTotal)} من ${fmt(total)}</span>
           ${frBtnHtml}
@@ -14548,30 +14567,30 @@ function _sysDownloadFile(filename, content, mime) {
           ${__currentBrand() === "landsterling" ? `
           <button type="button" id="balagh-report-btn" onclick="window.__balaghReportButtonClick_ && window.__balaghReportButtonClick_(this)"
             title="يولّد ملف PowerPoint بنفس تمبلت تقرير متابعة البلاغات، مبني على بيانات الفترة المختارة (بعد إدخال كلمة المرور) من تبويب البلاغات"
-            style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;border:1px solid #7C3AED;background:#F5F3FF;color:#7C3AED;margin-right:8px"
+            style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:11px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;border:1px solid #6c2bd9;background:#f3eefe;color:#6c2bd9;margin-right:8px"
           >📄 تحميل تقرير PowerPoint</button>
           <span id="balagh-report-status" style="font-size:11px;font-weight:700"></span>
           ` : ""}
         </div>
 
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
-          <div class="kpi kc-amber">
-            <div class="kpi-val" style="color:#D97706">${fmt(filteredTotal)}</div>
+          <div class="kpi kc-amber kc-neutral">
+            <div class="kpi-val" style="color:#92590a">${fmt(filteredTotal)}</div>
             <div class="kpi-lbl">إجمالي البلاغات</div>
             <div class="kpi-sub">${total === filteredTotal ? "" : `من إجمالي ${fmt(total)} سجل`}</div>
           </div>
           <div class="kpi kc-red">
-            <div class="kpi-val" style="color:#991b1b">${fmt(openCount)}</div>
+            <div class="kpi-val" style="color:#7d1f2c">${fmt(openCount)}</div>
             <div class="kpi-lbl">بلاغات مفتوحة</div>
             <div class="kpi-sub">${pct(openCount, filteredTotal)} من المعروض</div>
           </div>
           <div class="kpi kc-green">
-            <div class="kpi-val" style="color:#059669">${fmt(closedCount)}</div>
+            <div class="kpi-val" style="color:#066a52">${fmt(closedCount)}</div>
             <div class="kpi-lbl">بلاغات مغلقة</div>
             <div class="kpi-sub">${pct(closedCount, filteredTotal)} من المعروض</div>
           </div>
           <div class="kpi kc-blue">
-            <div class="kpi-val" style="color:#0891B2">${fmt(overdueCount)}</div>
+            <div class="kpi-val" style="color:var(--c-info-2)">${fmt(overdueCount)}</div>
             <div class="kpi-lbl">متأخرة SLA</div>
             <div class="kpi-sub">${pct(overdueCount, filteredTotal)} من المعروض</div>
           </div>
@@ -14584,17 +14603,17 @@ function _sysDownloadFile(filename, content, mime) {
             <div class="kpi-sub">من إجمالي البلاغات المعروضة</div>
           </div>
           <div class="kpi kc-navy">
-            <div class="kpi-val" style="color:#083D4F;font-size:22px">${latestDateStr}</div>
+            <div class="kpi-val" style="color:#163d52;font-size:22px">${latestDateStr}</div>
             <div class="kpi-lbl">أحدث بلاغ</div>
             <div class="kpi-sub">تاريخ الإنشاء</div>
           </div>
           <div class="kpi kc-teal">
-            <div class="kpi-val" style="color:#0E7490;font-size:22px">${oldestDateStr}</div>
+            <div class="kpi-val" style="color:#0b6b7e;font-size:22px">${oldestDateStr}</div>
             <div class="kpi-lbl">أقدم بلاغ</div>
             <div class="kpi-sub">تاريخ الإنشاء</div>
           </div>
-          <div class="kpi kc-purple">
-            <div class="kpi-val" style="color:#6D28D9">${fmt(new Set(rows.map((r) => r.category).filter(Boolean)).size)}</div>
+          <div class="kpi kc-purple kc-neutral">
+            <div class="kpi-val" style="color:#6c2bd9">${fmt(new Set(rows.map((r) => r.category).filter(Boolean)).size)}</div>
             <div class="kpi-lbl">فئات البلاغات</div>
             <div class="kpi-sub">${[...new Set(rows.map(r=>r.category).filter(Boolean))].join(" · ") || "—"}</div>
           </div>
@@ -14641,7 +14660,7 @@ function _sysDownloadFile(filename, content, mime) {
       <div class="g21" style="align-items:stretch">
         <div class="card">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#FEF3C7;color:#B45309"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
+            <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
             <span>أكثر المدارس تكرارًا في البلاغات</span>
             <span style="margin-right:auto;display:flex;align-items:center;gap:6px">
               <label style="font-size:11px;color:var(--tx-muted);font-weight:600">عدد المدارس:</label>
@@ -14662,14 +14681,14 @@ function _sysDownloadFile(filename, content, mime) {
         <div style="display:flex;flex-direction:column;gap:16px;min-width:260px">
         <div class="card" style="margin:0">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#FEE2E2;color:#B91C1C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+            <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
             <span>الأولوية</span>
           </div>
           ${renderBarList(priorityCounts, totalForBars, CSS_TOKENS.danger(), balaghPriorityLabel)}
         </div>
         <div class="card" style="margin:0;flex:1 1 auto">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#FFEDD5;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
             <span>أكثر المدارس اختراقًا لـ SLA</span>
           </div>
           <div style="font-size:11px;color:var(--tx-muted);margin:-4px 2px 6px">عدد البلاغات المخترقة من إجمالي بلاغات كل مدرسة</div>
@@ -14748,14 +14767,14 @@ function _sysDownloadFile(filename, content, mime) {
       <div class="g21" style="align-items:start">
         <div class="card">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#E0F2FE;color:#0369A1"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
+            <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
             <span>الفئات</span>
           </div>
           ${renderBarList(categoryCounts, totalForBars, CSS_TOKENS.info())}
         </div>
         <div class="card">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
             <span>المدن / المواقع</span>
           </div>
           ${renderBarList(locationCounts, totalForBars, CSS_TOKENS.positive())}
@@ -14765,7 +14784,7 @@ function _sysDownloadFile(filename, content, mime) {
       ${balaghSecHead(4, "📅", "الاتجاهات الزمنية", "كيف تتغيّر البلاغات شهرياً وأسبوعياً")}
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#EDE9FE;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span>
+          <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></span>
           <span>المقارنات الزمنية — البلاغات بمرور الوقت</span>
           <span class="sub">${fmt(filteredTotal)} سجل</span>
         </div>
@@ -14783,7 +14802,7 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#FEF3C7;color:#B45309"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M8 17h.01"/><path d="M12 17h.01"/><path d="M16 17h.01"/></svg></span>
+          <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M8 17h.01"/><path d="M12 17h.01"/><path d="M16 17h.01"/></svg></span>
           <span>البلاغات أسبوعياً (آخر 12 أسبوع)</span>
         </div>
         <div class="chart-box" style="height:220px"><canvas id="balagh-weekly-chart"></canvas></div>
@@ -14791,7 +14810,7 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
+            <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
             <span>تطور الفئات الأعلى خلال 6 أشهر</span>
           </div>
           <div class="chart-box" style="height:220px"><canvas id="balagh-cat-trend-chart"></canvas></div>
@@ -14800,7 +14819,7 @@ function _sysDownloadFile(filename, content, mime) {
       ${balaghSecHead(5, "🎯", "تحليل متقدم ومخاطر", "الحالة، الأولوية، التزام SLA، وأكثر المدارس عرضة للمخاطر")}
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#F0FDFA;color:#0F766E"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/></svg></span>
+          <span class="card-title-icon" style="background:#edfaf5;color:#0F766E"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/></svg></span>
           <span>الحالة، الأولوية، والتزام SLA</span>
           <span class="sub">${fmt(filteredTotal)} سجل ضمن الفلاتر الحالية</span>
         </div>
@@ -14822,7 +14841,7 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#FFF1F2;color:#9F1239"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg></span>
+          <span class="card-title-icon" style="background:#fdf0f2;color:#7d1f2c"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg></span>
           <span>أعلى الفئات حسب الأولوية</span>
           <span class="sub">أعلى 8 فئات — توزيع درجات الأولوية داخل كل فئة</span>
         </div>
@@ -14831,7 +14850,7 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#F0FDF4;color:#15803D"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
+          <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
           <span>متوسط زمن الحل شهرياً</span>
           <span class="sub">للبلاغات المغلقة فقط (أيام)</span>
         </div>
@@ -14841,24 +14860,24 @@ function _sysDownloadFile(filename, content, mime) {
       ${balaghSecHead(6, "⏱️", "SLA والمقاولون", "سرعة الحل وأداء المقاولين")}
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#ECFEFF;color:#0E7490"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
+          <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
           <span>ملخص سريع</span>
         </div>
         <div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
           <div class="kpi kc-blue">
-            <div class="kpi-val" style="color:#0891B2">${avgSlaDays != null ? avgSlaDays.toFixed(1) : "—"}</div>
+            <div class="kpi-val" style="color:var(--c-info-2)">${avgSlaDays != null ? avgSlaDays.toFixed(1) : "—"}</div>
             <div class="kpi-lbl">متوسط زمن الحل (أيام)</div>
           </div>
           <div class="kpi kc-blue">
-            <div class="kpi-val" style="color:#0891B2">${medianSlaDays != null ? medianSlaDays.toFixed(1) : "—"}</div>
+            <div class="kpi-val" style="color:var(--c-info-2)">${medianSlaDays != null ? medianSlaDays.toFixed(1) : "—"}</div>
             <div class="kpi-lbl">وسيط زمن الحل (أيام)</div>
           </div>
           <div class="kpi kc-green">
-            <div class="kpi-val" style="color:#059669;font-size:${contractorList[0] && contractorList[0].avgSla != null ? "18px" : "28px"}">${contractorList[0] && contractorList[0].avgSla != null ? escText(contractorList[0].name) : "—"}</div>
+            <div class="kpi-val" style="color:#066a52;font-size:${contractorList[0] && contractorList[0].avgSla != null ? "18px" : "28px"}">${contractorList[0] && contractorList[0].avgSla != null ? escText(contractorList[0].name) : "—"}</div>
             <div class="kpi-lbl">أسرع مقاول</div>
           </div>
           <div class="kpi kc-navy">
-            <div class="kpi-val" style="color:#083D4F">${fmt(contractorList.length)}</div>
+            <div class="kpi-val" style="color:#163d52">${fmt(contractorList.length)}</div>
             <div class="kpi-lbl">عدد المقاولين</div>
           </div>
         </div>
@@ -14884,8 +14903,8 @@ function _sysDownloadFile(filename, content, mime) {
                       <tr style="border-top:1px solid var(--bd-soft)">
                         <td style="padding:6px">${escText(r.isLinked ? r.linkedSchoolName : r.schoolName || "—")}</td>
                         <td style="padding:6px">${escText(r.contractor || "—")}</td>
-                        <td style="padding:6px;font-weight:700;color:#DC2626">${r.slaDurationDays}</td>
-                        <td style="padding:6px${r.resolutionDaysActual != null && Math.abs(r.resolutionDaysActual - r.slaDurationDays) > 5 ? ';font-weight:700;color:#DC2626' : ''}">${r.resolutionDaysActual != null ? r.resolutionDaysActual + " يوم" : "—"}</td>
+                        <td style="padding:6px;font-weight:700;color:#9c2a3a">${r.slaDurationDays}</td>
+                        <td style="padding:6px${r.resolutionDaysActual != null && Math.abs(r.resolutionDaysActual - r.slaDurationDays) > 5 ? ';font-weight:700;color:#9c2a3a' : ''}">${r.resolutionDaysActual != null ? r.resolutionDaysActual + " يوم" : "—"}</td>
                         <td style="padding:6px">${escText(r.creationDate || "—")}</td>
                         <td style="padding:6px">${escText(r.finishDate || "—")}</td>
                       </tr>`
@@ -14901,7 +14920,7 @@ function _sysDownloadFile(filename, content, mime) {
       <div class="g2 mb14" style="align-items:start">
         <div class="card">
           <div class="card-title">
-            <span class="card-title-icon" style="background:#F0FDF4;color:#15803D"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
+            <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
             <span>حسب المرحلة</span>
           </div>
           ${renderBarList(stageCounts, totalForBars, CSS_TOKENS.positive())}
@@ -14917,7 +14936,7 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#FFF7ED;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></svg></span>
+          <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></svg></span>
           <span>ترتيب المقاولين — الأسرع أولاً</span>
         </div>
         ${
@@ -14970,42 +14989,42 @@ function _sysDownloadFile(filename, content, mime) {
 
       <div class="card mb14">
         <div class="card-title" style="flex-wrap:wrap">
-          <span class="card-title-icon" style="background:#F0FDF4;color:#15803D"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3v4a1 1 0 0 0 1 1h4"/><path d="M18 21a2 2 0 0 0 2-2V7l-4-4H8a2 2 0 0 0-2 2v2"/><path d="M4.5 12.5 9 8l4.5 4.5"/><path d="m3 21 4-4"/><path d="M3.5 15.5 8 20"/></svg></span>
+          <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3v4a1 1 0 0 0 1 1h4"/><path d="M18 21a2 2 0 0 0 2-2V7l-4-4H8a2 2 0 0 0-2 2v2"/><path d="M4.5 12.5 9 8l4.5 4.5"/><path d="m3 21 4-4"/><path d="M3.5 15.5 8 20"/></svg></span>
           <span>ترتيب المقاولين — بند النظافة</span>
           <span class="sub">${fmt(cleaningTotal_)} بلاغ نظافة إجمالاً</span>
         </div>
         <div style="padding:0 14px 8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--tx-muted)">
           <span>الفئة الرئيسية = نظافة فقط، بصرف النظر عن الفلاتر.</span>
-          ${cleaningBackfilledCount_ ? `<span title="بحسب المدرسة: ${fmt(cleaningBackfilledBySchool_)} — بحسب الحي: ${fmt(cleaningBackfilledByDistrict_)} — بحسب المحافظة: ${fmt(cleaningBackfilledByLocation_)}" style="background:#ECFEFF;color:#0E7490;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningBackfilledCount_)} أُسند تلقائيًا</span>` : ""}
-          ${cleaningUndeterminedCount_ ? `<span title="لا توجد بيانات كافية في نفس المدرسة أو الحي، والمحافظة فيها أكثر من مقاول" style="background:#FEF2F2;color:#B91C1C;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningUndeterminedCount_)} بلا مقاول محدد</span>` : ""}
+          ${cleaningBackfilledCount_ ? `<span title="بحسب المدرسة: ${fmt(cleaningBackfilledBySchool_)} — بحسب الحي: ${fmt(cleaningBackfilledByDistrict_)} — بحسب المحافظة: ${fmt(cleaningBackfilledByLocation_)}" style="background:#eaf6fa;color:#0b6b7e;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningBackfilledCount_)} أُسند تلقائيًا</span>` : ""}
+          ${cleaningUndeterminedCount_ ? `<span title="لا توجد بيانات كافية في نفس المدرسة أو الحي، والمحافظة فيها أكثر من مقاول" style="background:#fdf0f2;color:#9c2a3a;border-radius:99px;padding:2px 10px;font-weight:700;cursor:help">${fmt(cleaningUndeterminedCount_)} بلا مقاول محدد</span>` : ""}
         </div>
         ${
           cleaningHandovers_.length
-            ? `<details style="margin:0 14px 8px;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:8px 12px">
-                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#0369A1">🔄 مدارس تغيّر مقاولها (${fmt(cleaningHandovers_.length)}) — وضع طبيعي عند انتهاء العقد</summary>
+            ? `<details style="margin:0 14px 8px;background:#eaf6fa;border:1px solid #cfe6eb;border-radius:10px;padding:8px 12px">
+                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#0b6b7e">🔄 مدارس تغيّر مقاولها (${fmt(cleaningHandovers_.length)}) — وضع طبيعي عند انتهاء العقد</summary>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:220px;overflow:auto">
                   ${cleaningHandovers_.slice(0, 15).map((h) => `
-                    <div style="font-size:11px;color:#0C4A6E;line-height:1.7"><strong>${escText(h.label)}</strong><div style="padding-inline-start:10px">${h.steps.map((s) => `<bdi>${escText(s.name)}</bdi> <span style="color:#64748B">(منذ ${cleaningDateText_(s.from)})</span>`).join(" ← ")}</div></div>`).join("")}
-                  ${cleaningHandovers_.length > 15 ? `<div style="font-size:11px;color:#64748B">… و${fmt(cleaningHandovers_.length - 15)} مدرسة أخرى.</div>` : ""}
+                    <div style="font-size:11px;color:#163d52;line-height:1.7"><strong>${escText(h.label)}</strong><div style="padding-inline-start:10px">${h.steps.map((s) => `<bdi>${escText(s.name)}</bdi> <span style="color:#52707e">(منذ ${cleaningDateText_(s.from)})</span>`).join(" ← ")}</div></div>`).join("")}
+                  ${cleaningHandovers_.length > 15 ? `<div style="font-size:11px;color:#52707e">… و${fmt(cleaningHandovers_.length - 15)} مدرسة أخرى.</div>` : ""}
                 </div>
               </details>`
             : ""
         }
         ${
           cleaningConflicts_.length
-            ? `<details style="margin:0 14px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px 12px">
-                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#92400E">⚠️ مدارس للمراجعة (${fmt(cleaningConflicts_.length)}) — تبادل مقاولين على نفس المدرسة</summary>
+            ? `<details style="margin:0 14px 8px;background:#fdf6ec;border:1px solid #ecd7b8;border-radius:10px;padding:8px 12px">
+                <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#92590a">⚠️ مدارس للمراجعة (${fmt(cleaningConflicts_.length)}) — تبادل مقاولين على نفس المدرسة</summary>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:220px;overflow:auto">
                   ${cleaningConflicts_.slice(0, 15).map((cf) => `
-                    <div style="font-size:11px;color:#78350F;line-height:1.7"><strong>${escText(cf.label)}</strong><div style="padding-inline-start:10px">${cf.contractors.map((x) => `<bdi>${escText(x.name)}</bdi> (${fmt(x.count)})`).join("، ")}</div></div>`).join("")}
-                  ${cleaningConflicts_.length > 15 ? `<div style="font-size:11px;color:#92400E">… و${fmt(cleaningConflicts_.length - 15)} مدرسة أخرى.</div>` : ""}
+                    <div style="font-size:11px;color:#92590a;line-height:1.7"><strong>${escText(cf.label)}</strong><div style="padding-inline-start:10px">${cf.contractors.map((x) => `<bdi>${escText(x.name)}</bdi> (${fmt(x.count)})`).join("، ")}</div></div>`).join("")}
+                  ${cleaningConflicts_.length > 15 ? `<div style="font-size:11px;color:#92590a">… و${fmt(cleaningConflicts_.length - 15)} مدرسة أخرى.</div>` : ""}
                 </div>
               </details>`
             : ""
         }
         ${
           cleaningMultiLocations_.length
-            ? `<details style="margin:0 14px 8px;background:var(--bg-soft,#F8FAFC);border:1px solid var(--bd-light);border-radius:10px;padding:8px 12px">
+            ? `<details style="margin:0 14px 8px;background:var(--bg-soft,#f7fafc);border:1px solid var(--bd-light);border-radius:10px;padding:8px 12px">
                 <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--tx-sec)">ℹ️ محافظات يعمل فيها أكثر من مقاول نظافة (${fmt(cleaningMultiLocations_.length)})</summary>
                 <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
                   ${cleaningMultiLocations_.map((m) => `
@@ -15031,7 +15050,7 @@ function _sysDownloadFile(filename, content, mime) {
                       .map(
                         (c) => `
                       <tr style="border-top:1px solid var(--bd-light);font-size:12px">
-                        <td style="padding:8px;font-weight:700${c.name.indexOf("غير محدد") === 0 ? ";color:#DC2626" : ""}">${escText(c.name)}</td>
+                        <td style="padding:8px;font-weight:700${c.name.indexOf("غير محدد") === 0 ? ";color:#9c2a3a" : ""}">${escText(c.name)}</td>
                         <td style="padding:8px;color:var(--tx-muted)">${c.locations.length ? escText(c.locations.join("، ")) : "—"}</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums">${fmt(c.count)}</td>
                         <td style="padding:8px;font-variant-numeric:tabular-nums;color:var(--tx-muted)">${cleaningTotal_ ? Math.round((c.count / cleaningTotal_) * 100) : 0}%</td>
@@ -15048,7 +15067,7 @@ function _sysDownloadFile(filename, content, mime) {
       ${balaghSecHead(7, "🧾", "السجل التفصيلي", "كل البلاغات مع إمكانية البحث والترتيب والتصدير")}
       <div class="card">
         <div class="card-title">
-          <span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span>
+          <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span>
           <span>تفاصيل البلاغات</span>
           <span class="sub">${fmt(filteredTotal)} سجل</span>
           <span style="margin-right:auto">
@@ -15106,14 +15125,14 @@ function _sysDownloadFile(filename, content, mime) {
                 <tr>
                   <td style="font-weight:800">${escText(r.recordNo)}</td>
                   <td>${escText(r.creationDate)}</td>
-                  <td><span class="badge" style="background:${r.isClosed ? CSS_TOKENS.bgPositive() : r.isOverdue ? CSS_TOKENS.bgDanger() : CSS_TOKENS.bgWarning()};color:${r.isClosed ? CSS_TOKENS.positive() : r.isOverdue ? CSS_TOKENS.danger() : CSS_TOKENS.warning()}">${escText(balaghStatusLabel(r.status))}</span></td>
+                  <td><span class="badge" style="background:${r.isClosed ? CSS_TOKENS.bgPositive() : r.isOverdue ? CSS_TOKENS.bgDanger() : CSS_TOKENS.bgWarning()};color:${r.isClosed ? CSS_TOKENS.positive() : r.isOverdue ? CSS_TOKENS.danger() : CSS_TOKENS.warningText()}">${escText(balaghStatusLabel(r.status))}</span></td>
                   <td style="text-align:right;font-weight:700">${escText(r.schoolName)}</td>
-                  <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? '#0891B2' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
+                  <td style="font-size:11px;font-weight:700;color:${r.schoolNumber ? 'var(--c-info-2)' : '#ccc'}">${escText(r.schoolNumber || '—')}</td>
                   <td>${escText(r.location)}</td>
-                  <td style="font-weight:700;color:#0891B2">${escText(r.region || "—")}</td>
+                  <td style="font-weight:700;color:var(--c-info-2)">${escText(r.region || "—")}</td>
                   <td>${escText(r.category)}</td>
                   <td>${escText(r.subCategory || "—")}</td>
-                  <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
+                  <td><span class="badge" style="background:${r.priority === "Critical" ? CSS_TOKENS.bgDanger() : r.priority === "High" ? CSS_TOKENS.bgWarning() : CSS_TOKENS.bgPositive()};color:${r.priority === "Critical" ? CSS_TOKENS.danger() : r.priority === "High" ? CSS_TOKENS.warningText() : CSS_TOKENS.positive()}">${escText(balaghPriorityLabel(r.priority))}</span></td>
                   <td style="font-variant-numeric:tabular-nums">${r.slaDurationDays != null ? fmt(r.slaDurationDays, 1) : "—"}</td>
                   <td>${escText(r.stage || "—")}</td>
                   <td>${escText(r.gender || "—")}</td>
@@ -15392,7 +15411,7 @@ function _sysDownloadFile(filename, content, mime) {
               {
                 label: "بلاغات أسبوعية",
                 data: weekVals,
-                backgroundColor: "rgba(109,40,217,0.12)",
+                backgroundColor: "rgba(108,43,217,0.12)",
                 borderColor: CSS_TOKENS.special(),
                 borderWidth: 2.5,
                 pointBackgroundColor: CSS_TOKENS.special(),
@@ -16652,7 +16671,7 @@ window.renderElevatorsTab = function () {
     const th = "<th>#</th><th>المدرسة / المبنى</th><th>الرقم الوزاري</th><th>المحافظة</th>";
     const bodyA = missingB.map((b, i) =>
       "<tr><td style=\"color:var(--tx-muted)\">" + (i + 1) + "</td><td style=\"text-align:right\">" + nameOf(b.name, b.minId) + "</td><td>" + esc(b.minId || "—") + "</td><td>" + esc(b.city) + "</td>" +
-      "<td>" + b.declared + "</td><td>" + b.rows + '</td><td style="font-weight:800;color:var(--c-warning)">' + (b.declared - b.rows) + "</td></tr>").join("");
+      "<td>" + b.declared + "</td><td>" + b.rows + '</td><td style="font-weight:800;color:var(--c-warning-text)">' + (b.declared - b.rows) + "</td></tr>").join("");
     const bodyB = unknownR.map((r, i) =>
       "<tr><td style=\"color:var(--tx-muted)\">" + (i + 1) + "</td><td style=\"text-align:right\">" + nameOf(getName(r) === "—" ? "" : getName(r), getMinIdRaw(r)) + "</td><td>" + esc(getMinIdRaw(r) || "—") + "</td><td>" + esc(getCity(r)) + "</td>" +
       "<td>" + esc(window.getElevatorStatusRaw(r) || "(فارغ)") + "</td></tr>").join("");
@@ -17374,7 +17393,7 @@ window.renderElevatorsTab = function () {
           <td style="padding:10px 12px;text-align:center">${fmt(s.subCategoryCount)}</td>
           <td style="padding:10px 12px;text-align:center;font-weight:800">${fmt(s.qty, 0)}</td>
           <td style="padding:10px 12px;text-align:center;font-weight:800;color:#B8860B">${fmtSAR(s.price)}</td>
-          <td style="padding:10px 12px;text-align:center;font-weight:800;color:#0891B2">${s.avgUnit == null ? "—" : s.avgUnit.toFixed(2)}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:800;color:var(--c-info-2)">${s.avgUnit == null ? "—" : s.avgUnit.toFixed(2)}</td>
         </tr>
       `,
         )
@@ -17542,7 +17561,7 @@ window.renderElevatorsTab = function () {
 
         <div class="card mb14" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 18px">
           <div class="card-title" style="margin:0;padding:0;border:0">
-            <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+            <span class="card-title-icon" style="background:#eaf6fa;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
             <span>تحليل التكلفة</span>
             <span id="cost-status-dot" class="dot loading"></span>
             <span id="cost-subtitle" class="sub">All Cities · Complete Data</span>
@@ -17558,7 +17577,7 @@ window.renderElevatorsTab = function () {
             ${Array.from({ length: 8 })
               .map(
                 () =>
-                  '<div style="height:112px;border-radius:20px;background:linear-gradient(90deg,#edf4f8 25%,#f7fbfd 50%,#edf4f8 75%);background-size:200% 100%;animation:costPulse 1.2s infinite"></div>',
+                  '<div style="height:112px;border-radius:20px;background:linear-gradient(90deg,#eef3f7 25%,#f7fafc 50%,#eef3f7 75%);background-size:200% 100%;animation:costPulse 1.2s infinite"></div>',
               )
               .join("")}
           </div>
@@ -17567,7 +17586,7 @@ window.renderElevatorsTab = function () {
 
         <div id="cost-empty" class="card" style="display:none;padding:56px 20px;text-align:center;color:var(--tx-muted);font-size:13px;font-weight:700">
           لا توجد بيانات تكلفة متاحة.
-          <div id="cost-error" style="margin-top:8px;font-weight:600;color:#991b1b"></div>
+          <div id="cost-error" style="margin-top:8px;font-weight:600;color:#7d1f2c"></div>
         </div>
 
         <div id="cost-body" style="display:none">
@@ -17597,7 +17616,7 @@ window.renderElevatorsTab = function () {
           <div class="g12" style="align-items:start">
             <div class="card" style="position:sticky;top:72px">
               <div class="card-title">
-                <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span>
+                <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span>
                 <span>الفلاتر</span>
               </div>
               <div style="display:grid;gap:12px">
@@ -17635,14 +17654,14 @@ window.renderElevatorsTab = function () {
               <div class="g2" style="margin-bottom:0">
                 <div class="card" style="padding-bottom:14px">
                   <div class="card-title">
-                    <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+                    <span class="card-title-icon" style="background:#eaf6fa;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
                     <span>أكبر الفئات حسب الكمية</span>
                   </div>
                   <div class="chart-box" style="height:320px"><canvas id="cost-chart-categories"></canvas></div>
                 </div>
                 <div class="card" style="padding-bottom:14px">
                   <div class="card-title">
-                    <span class="card-title-icon" style="background:#F0FDF4;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+                    <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
                     <span>أكبر المدن حسب التكلفة</span>
                   </div>
                   <div class="chart-box" style="height:320px"><canvas id="cost-chart-cities"></canvas></div>
@@ -17652,14 +17671,14 @@ window.renderElevatorsTab = function () {
               <div class="g2" style="margin-bottom:0">
                 <div class="card" style="padding-bottom:14px">
                   <div class="card-title">
-                    <span class="card-title-icon" style="background:#FAF5FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+                    <span class="card-title-icon" style="background:#FAF5FF;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
                     <span>أهم الفئات الفرعية حسب التكلفة</span>
                   </div>
                   <div class="chart-box" style="height:320px"><canvas id="cost-chart-subcats"></canvas></div>
                 </div>
                 <div class="card" style="padding-bottom:14px">
                   <div class="card-title">
-                    <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+                    <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
                     <span>أعلى المدارس تكلفة</span>
                   </div>
                   <div class="chart-box" style="height:320px"><canvas id="cost-chart-schools"></canvas></div>
@@ -17670,7 +17689,7 @@ window.renderElevatorsTab = function () {
 
           <div class="card mb14" style="padding:0;overflow:hidden">
             <div class="card-title" style="margin:0;padding:16px 18px;border-bottom:1px solid var(--bd-light)">
-              <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+              <span class="card-title-icon" style="background:#eaf6fa;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
               <span>تحليل الفئات</span>
               <span class="sub" id="cost-cat-count"></span>
             </div>
@@ -17693,7 +17712,7 @@ window.renderElevatorsTab = function () {
 
           <div class="card" style="padding:0;overflow:hidden">
             <div class="card-title" style="margin:0;padding:16px 18px;border-bottom:1px solid var(--bd-light)">
-              <span class="card-title-icon" style="background:#F0FDF4;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
+              <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
               <span>ملخص المدارس</span>
               <span class="sub" id="cost-school-count"></span>
             </div>
@@ -17987,7 +18006,7 @@ window.renderElevatorsTab = function () {
     el.innerHTML = `
     <!-- شريط الحالة -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-      <span class="dot" style="background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18)"></span>
+      <span class="dot" style="background:#0e9488;box-shadow:0 0 0 3px rgba(14,148,136,.18)"></span>
       <span style="font-size:11px;font-weight:700;color:var(--tx-muted)">البيانات محمّلة — ${dataRows.length} عقد</span>
       <button onclick="loadData()" class="f-clear" style="margin-right:auto;padding:6px 14px;font-size:11px">🔄 تحديث</button>
     </div>
@@ -18027,7 +18046,7 @@ window.renderElevatorsTab = function () {
           <span style="font-size:22px">⚠️</span>
           <div>
             <div style="font-size:11px;color:var(--tx-muted);font-weight:700">خصومات KPI</div>
-            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#D97706" data-tip="${payFmtFull(kpi.kpiDeduction)} ريال">${payFmt(kpi.kpiDeduction)}</div>
+            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#92590a" data-tip="${payFmtFull(kpi.kpiDeduction)} ريال">${payFmt(kpi.kpiDeduction)}</div>
           </div>
         </div>
         <div style="font-size:10px;color:var(--tx-muted)">خصومات مؤشرات الأداء</div>
@@ -18037,7 +18056,7 @@ window.renderElevatorsTab = function () {
           <span style="font-size:22px">🔻</span>
           <div>
             <div style="font-size:11px;color:var(--tx-muted);font-weight:700">إجمالي الخصومات</div>
-            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#DC2626" data-tip="${payFmtFull(kpi.totalDeduction)} ريال">${payFmt(kpi.totalDeduction)}</div>
+            <div class="pay-tip" style="font-size:22px;font-weight:900;color:#9c2a3a" data-tip="${payFmtFull(kpi.totalDeduction)} ريال">${payFmt(kpi.totalDeduction)}</div>
           </div>
         </div>
         <div style="font-size:10px;color:var(--tx-muted)">KPI + خصومات أخرى</div>
@@ -18054,8 +18073,8 @@ window.renderElevatorsTab = function () {
         <div style="height:100%;width:${Math.min(pctNum, 100).toFixed(1)}%;background:${pctColor};border-radius:999px;transition:width 1s cubic-bezier(.22,.61,.36,1)"></div>
       </div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:11px">
-        <div><span style="color:var(--tx-muted)">مصروف: </span><strong style="color:#059669">${payFmt(kpi.paid)}</strong></div>
-        <div><span style="color:var(--tx-muted)">متبقي: </span><strong style="color:#D97706">${payFmt(kpi.remaining)}</strong></div>
+        <div><span style="color:var(--tx-muted)">مصروف: </span><strong style="color:#066a52">${payFmt(kpi.paid)}</strong></div>
+        <div><span style="color:var(--tx-muted)">متبقي: </span><strong style="color:var(--c-warning-text)">${payFmt(kpi.remaining)}</strong></div>
         <div><span style="color:var(--tx-muted)">الإجمالي: </span><strong style="color:var(--tx-main)">${payFmt(kpi.updatedContract)}</strong></div>
       </div>
     </div>
@@ -18063,7 +18082,7 @@ window.renderElevatorsTab = function () {
     <!-- تقدم لكل عقد -->
     <div class="card mb14">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+        <span class="card-title-icon" style="background:#eaf6fa;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
         تقدم الصرف لكل عقد
         <span class="sub">${dataRows.length} عقد</span>
       </div>
@@ -18073,7 +18092,7 @@ window.renderElevatorsTab = function () {
     <!-- شارت مقارنة العقود -->
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#F0FDF4;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
+        <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
         مقارنة قيم العقود والمصروف لكل منطقة
       </div>
       <div class="chart-box" style="height:280px"><canvas id="pay-ch-contracts"></canvas></div>
@@ -18130,9 +18149,9 @@ window.renderElevatorsTab = function () {
         </div>
         <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
           <div><span style="color:var(--tx-muted)">القيمة المحدثة: </span><strong class="pay-tip" style="color:var(--tx-main)" data-tip="${payFmtFull(updated)} ريال">${payFmt(updated)}</strong></div>
-          <div><span style="color:var(--tx-muted)">المدفوع: </span><strong class="pay-tip" style="color:#059669" data-tip="${payFmtFull(paid)} ريال">${payFmt(paid)}</strong></div>
-          <div><span style="color:var(--tx-muted)">المتبقي: </span><strong class="pay-tip" style="color:#D97706" data-tip="${payFmtFull(remaining)} ريال">${payFmt(remaining)}</strong></div>
-          ${kpiDed > 0 ? `<div><span style="color:var(--tx-muted)">خصم KPI: </span><strong class="pay-tip" style="color:#DC2626" data-tip="${payFmtFull(kpiDed)} ريال">${payFmt(kpiDed)}</strong></div>` : ""}
+          <div><span style="color:var(--tx-muted)">المدفوع: </span><strong class="pay-tip" style="color:#066a52" data-tip="${payFmtFull(paid)} ريال">${payFmt(paid)}</strong></div>
+          <div><span style="color:var(--tx-muted)">المتبقي: </span><strong class="pay-tip" style="color:var(--c-warning-text)" data-tip="${payFmtFull(remaining)} ريال">${payFmt(remaining)}</strong></div>
+          ${kpiDed > 0 ? `<div><span style="color:var(--tx-muted)">خصم KPI: </span><strong class="pay-tip" style="color:#9c2a3a" data-tip="${payFmtFull(kpiDed)} ريال">${payFmt(kpiDed)}</strong></div>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -18270,7 +18289,7 @@ function renderKhanadeqTab() {
   el.innerHTML = `
   <!-- ── KPIs ── -->
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${totalSchools.toLocaleString()}</div>
       <div class="kpi-lbl">إجمالي المدارس</div>
       <div class="kpi-sub">في ${cityData.length} مدن</div>
@@ -18285,7 +18304,7 @@ function renderKhanadeqTab() {
       <div class="kpi-lbl">متوسط خندق / مدرسة</div>
       <div class="kpi-sub">خندق لكل مدرسة</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber kc-neutral">
       <div class="kpi-val">${maxCity && maxCity.khanadeq > 0 ? maxCity.khanadeq.toLocaleString() : "—"}</div>
       <div class="kpi-lbl">أعلى مدينة</div>
       <div class="kpi-sub">${maxCity && maxCity.khanadeq > 0 ? maxCity.city : "لا توجد بيانات بعد"}</div>
@@ -18296,14 +18315,14 @@ function renderKhanadeqTab() {
   ${
     totalKhanadeq === 0
       ? `
-  <div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:1.5px dashed #7C3AED55;
+  <div style="background:linear-gradient(135deg,#f3eefe,#f3eefe);border:1.5px dashed #6c2bd955;
     border-radius:16px;padding:18px 22px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
     <div style="font-size:28px">⚙️</div>
     <div>
-      <div style="font-size:13px;font-weight:800;color:#5B21B6;margin-bottom:4px">أضف بيانات خنادق الصرف</div>
-      <div style="font-size:11px;color:#7C3AED;line-height:1.6">
-        عدّل قيم <code style="background:#DDD6FE;padding:1px 6px;border-radius:4px">khanadeq</code> في الجزء المخصص داخل الكود<br>
-        ابحث عن التعليق: <code style="background:#DDD6FE;padding:1px 6px;border-radius:4px">🔧 بيانات خنادق الصرف — عدّل الأرقام هنا فقط</code>
+      <div style="font-size:13px;font-weight:800;color:#6c2bd9;margin-bottom:4px">أضف بيانات خنادق الصرف</div>
+      <div style="font-size:11px;color:#6c2bd9;line-height:1.6">
+        عدّل قيم <code style="background:#d3bff4;padding:1px 6px;border-radius:4px">khanadeq</code> في الجزء المخصص داخل الكود<br>
+        ابحث عن التعليق: <code style="background:#d3bff4;padding:1px 6px;border-radius:4px">🔧 بيانات خنادق الصرف — عدّل الأرقام هنا فقط</code>
       </div>
     </div>
   </div>`
@@ -18314,7 +18333,7 @@ function renderKhanadeqTab() {
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
       <div class="card-title" style="margin:0;padding:0;border:0">
-        <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 19q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 5q2.5 2 5 0t5 0 5 0 5 0"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 19q2.5 2 5 0t5 0 5 0 5 0"/><path d="M2 5q2.5 2 5 0t5 0 5 0 5 0"/></svg></span>
         ملخص خنادق الصرف حسب المدينة
         <span class="sub">${cityData.length} مدينة · ${totalSchools.toLocaleString()} مدرسة</span>
       </div>
@@ -18347,12 +18366,12 @@ function renderKhanadeqTab() {
               const color = CITY_COLORS[i % CITY_COLORS.length];
               return `<tr>
               <td style="text-align:right;padding-right:18px;font-weight:700">${r.city}</td>
-              <td style="font-weight:700;color:#083D4F">${r.schools.toLocaleString()}</td>
+              <td style="font-weight:700;color:#163d52">${r.schools.toLocaleString()}</td>
               <td style="font-weight:800;color:${color};font-size:15px">${r.khanadeq > 0 ? r.khanadeq.toLocaleString() : "—"}</td>
-              <td style="font-weight:700;color:#059669">${r.khanadeq > 0 ? ratio : "—"}</td>
+              <td style="font-weight:700;color:#066a52">${r.khanadeq > 0 ? ratio : "—"}</td>
               <td style="font-size:11px;color:var(--tx-muted)">${r.khanadeq > 0 ? pctOfTotal + "%" : "—"}</td>
               <td style="min-width:120px">
-                <div style="background:#F3F4F6;border-radius:999px;height:8px;overflow:hidden;width:100%">
+                <div style="background:#eef3f7;border-radius:999px;height:8px;overflow:hidden;width:100%">
                   <div style="width:${barW}%;height:100%;background:${color};border-radius:999px;transition:width .6s ease"></div>
                 </div>
               </td>
@@ -18361,11 +18380,11 @@ function renderKhanadeqTab() {
             .join("")}
         </tbody>
         <tfoot>
-          <tr style="background:#F8FAFC;border-top:2px solid #E0EAF0">
-            <td style="text-align:right;padding-right:18px;font-weight:800;color:#083D4F">الإجمالي</td>
-            <td style="font-weight:800;color:#083D4F">${totalSchools.toLocaleString()}</td>
-            <td style="font-weight:800;color:#7C3AED;font-size:15px">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : "—"}</td>
-            <td style="font-weight:800;color:#059669">${avgPerSchool}</td>
+          <tr style="background:#f7fafc;border-top:2px solid #dbe7ee">
+            <td style="text-align:right;padding-right:18px;font-weight:800;color:#163d52">الإجمالي</td>
+            <td style="font-weight:800;color:#163d52">${totalSchools.toLocaleString()}</td>
+            <td style="font-weight:800;color:#6c2bd9;font-size:15px">${totalKhanadeq > 0 ? totalKhanadeq.toLocaleString() : "—"}</td>
+            <td style="font-weight:800;color:#066a52">${avgPerSchool}</td>
             <td style="font-weight:700">100%</td>
             <td></td>
           </tr>
@@ -18567,13 +18586,13 @@ function renderKhanadeqTab() {
       if (sort==='ratio_desc') return (b.khanadeq/Math.max(b.schools,1)) - (a.khanadeq/Math.max(a.schools,1));
       return 0;
     });
-    var COLORS=['#7C3AED','#0891B2','#059669','#D97706','#6366F1','#0891B2','#DC2626','#D97706','#0891B2'];
+    var COLORS=['#6c2bd9','#0d849c','#066a52','#c07a14','#6c2bd9','#0d849c','#9c2a3a','#c07a14','#0d849c'];
     tbody.innerHTML = sorted.map(function(r,i){
       var ratio = r.schools>0?(r.khanadeq/r.schools).toFixed(2):'—';
       var pct = totalKhanadeq>0?((r.khanadeq/totalKhanadeq)*100).toFixed(1):0;
       var barW = totalKhanadeq>0?Math.round((r.khanadeq/totalKhanadeq)*100):0;
       var color = COLORS[i%COLORS.length];
-      return '<tr><td style="text-align:right;padding-right:18px;font-weight:700">'+r.city+'</td><td style="font-weight:700;color:#083D4F">'+r.schools.toLocaleString()+'</td><td style="font-weight:800;color:'+color+';font-size:15px">'+(r.khanadeq>0?r.khanadeq.toLocaleString():'—')+'</td><td style="font-weight:700;color:#059669">'+(r.khanadeq>0?ratio:'—')+'</td><td style="font-size:11px;color:var(--tx-muted)">'+(r.khanadeq>0?pct+'%':'—')+'</td><td style="min-width:120px"><div style="background:#F3F4F6;border-radius:999px;height:8px;overflow:hidden;width:100%"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:999px"></div></div></td></tr>';
+      return '<tr><td style="text-align:right;padding-right:18px;font-weight:700">'+r.city+'</td><td style="font-weight:700;color:#163d52">'+r.schools.toLocaleString()+'</td><td style="font-weight:800;color:'+color+';font-size:15px">'+(r.khanadeq>0?r.khanadeq.toLocaleString():'—')+'</td><td style="font-weight:700;color:#066a52">'+(r.khanadeq>0?ratio:'—')+'</td><td style="font-size:11px;color:var(--tx-muted)">'+(r.khanadeq>0?pct+'%':'—')+'</td><td style="min-width:120px"><div style="background:#eef3f7;border-radius:999px;height:8px;overflow:hidden;width:100%"><div style="width:'+barW+'%;height:100%;background:'+color+';border-radius:999px"></div></div></td></tr>';
     }).join('');
   };
 }
@@ -18758,7 +18777,7 @@ function pctFmt(v) {
 function coverageBadge(need, alloc, ppp) {
   ppp = ppp || 0;
   if (need === null || alloc === null)
-    return { color: CSS_TOKENS.txMuted(), bg: "#F1F5F9", label: "غير محدد" };
+    return { color: CSS_TOKENS.txMuted(), bg: "#edf4f8", label: "غير محدد" };
   const demand = need + ppp;
   if (alloc === 0 && demand > 0) return { color: CSS_TOKENS.danger(), bg: CSS_TOKENS.bgDanger(), label: "عجز كامل" };
   const pct = demand > 0 ? (alloc / demand) * 100 : 100;
@@ -19026,7 +19045,7 @@ window._tajSortAll = "qism";
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .28s cubic-bezier(.22,.6,.34,1);
-      border-right:2px solid var(--teal,#0891B2);
+      border-right:2px solid var(--teal,#0d849c);
       overflow:hidden;
     }
     #taj-dp.hasr-open { transform:translateX(0); }
@@ -19118,60 +19137,60 @@ function tajOpenDetail(topic, qismName) {
   let tiles;
   if (topic === "alloc") {
     tiles = [
-      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
-      { l: "كمية المخصصات", v: numFmt(totalAllocQty), c: "#1D4ED8" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
-      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#0d849c" },
+      { l: "كمية المخصصات", v: numFmt(totalAllocQty), c: "#0d849c" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#066a52" : coverPct >= 75 ? "#c07a14" : "#9c2a3a" },
     ];
   } else if (topic === "need") {
     tiles = [
-      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
-      { l: "كمية الاحتياج", v: numFmt(totalNeedQty), c: "#D97706" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
-      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#c07a14" },
+      { l: "كمية الاحتياج", v: numFmt(totalNeedQty), c: "#c07a14" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#066a52" : coverPct >= 75 ? "#c07a14" : "#9c2a3a" },
     ];
   } else if (topic === "ppp") {
     tiles = [
-      { l: "قيمة PPP", v: sarFmt(totalPppVal), c: "#7C3AED" },
-      { l: "كمية PPP", v: numFmt(totalPppQty), c: "#7C3AED" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
-      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+      { l: "قيمة PPP", v: sarFmt(totalPppVal), c: "#6c2bd9" },
+      { l: "كمية PPP", v: numFmt(totalPppQty), c: "#6c2bd9" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#066a52" : coverPct >= 75 ? "#c07a14" : "#9c2a3a" },
     ];
   } else if (topic === "need_ppp") {
     tiles = [
-      { l: "احتياج + PPP (قيمة)", v: sarFmt(totalNeedVal + totalPppVal), c: "#B45309" },
-      { l: "قيمة الاحتياج وحده", v: sarFmt(totalNeedVal), c: "#D97706" },
-      { l: "قيمة PPP وحده", v: sarFmt(totalPppVal), c: "#7C3AED" },
-      { l: "احتياج + PPP (كمية)", v: numFmt(totalNeedQty + totalPppQty), c: "#B45309" },
+      { l: "احتياج + PPP (قيمة)", v: sarFmt(totalNeedVal + totalPppVal), c: "#92590a" },
+      { l: "قيمة الاحتياج وحده", v: sarFmt(totalNeedVal), c: "#c07a14" },
+      { l: "قيمة PPP وحده", v: sarFmt(totalPppVal), c: "#6c2bd9" },
+      { l: "احتياج + PPP (كمية)", v: numFmt(totalNeedQty + totalPppQty), c: "#92590a" },
     ];
   } else if (topic === "diff") {
     tiles = [
-      { l: "إجمالي الفائض", v: sarFmt(surplusVal), c: "#059669" },
-      { l: "إجمالي العجز", v: sarFmt(Math.abs(deficitVal)), c: "#DC2626" },
-      { l: "صافي الفرق", v: sarFmt(surplusVal + deficitVal), c: (surplusVal + deficitVal) >= 0 ? "#059669" : "#DC2626" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
+      { l: "إجمالي الفائض", v: sarFmt(surplusVal), c: "#066a52" },
+      { l: "إجمالي العجز", v: sarFmt(Math.abs(deficitVal)), c: "#9c2a3a" },
+      { l: "صافي الفرق", v: sarFmt(surplusVal + deficitVal), c: (surplusVal + deficitVal) >= 0 ? "#066a52" : "#9c2a3a" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
     ];
   } else if (topic === "coverage") {
     tiles = [
-      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
-      { l: "أصناف مغطاة", v: numFmt(covered.length), c: "#059669" },
-      { l: "أصناف غير مغطاة", v: numFmt(notCoveredCount), c: "#DC2626" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#1D4ED8" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#066a52" : coverPct >= 75 ? "#c07a14" : "#9c2a3a" },
+      { l: "أصناف مغطاة", v: numFmt(covered.length), c: "#066a52" },
+      { l: "أصناف غير مغطاة", v: numFmt(notCoveredCount), c: "#9c2a3a" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#0d849c" },
     ];
   } else if (topic === "suppliers") {
     tiles = [
-      { l: "عدد الموردين", v: numFmt(suppliersCount), c: "#4F46E5" },
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
-      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
-      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
+      { l: "عدد الموردين", v: numFmt(suppliersCount), c: "#6c2bd9" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#c07a14" },
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#0d849c" },
     ];
   } else {
     // total / qism
     tiles = [
-      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#059669" },
-      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#1D4ED8" },
-      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#D97706" },
-      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#059669" : coverPct >= 75 ? "#D97706" : "#DC2626" },
+      { l: "إجمالي الأصناف", v: numFmt(totalItems), c: "#066a52" },
+      { l: "قيمة المخصصات", v: sarFmt(totalAllocVal), c: "#0d849c" },
+      { l: "قيمة الاحتياج", v: sarFmt(totalNeedVal), c: "#c07a14" },
+      { l: "نسبة التغطية", v: coverPct + "%", c: coverPct >= 100 ? "#066a52" : coverPct >= 75 ? "#c07a14" : "#9c2a3a" },
     ];
   }
 
@@ -19204,7 +19223,7 @@ function tajOpenDetail(topic, qismName) {
             // ★ 2026-09-20 (مُصحَّح): PPP جزء من المطلوب، والمتاح هو المخصص لوحده.
             const demand = m.احتياج_كلي + m.ppp_كلي;
             const pct = demand > 0 ? Math.round((m.مخصص_كلي / demand) * 100) : m.مخصص_كلي > 0 ? 100 : 0;
-            const pc = pct >= 100 ? "#059669" : pct >= 75 ? "#D97706" : "#DC2626";
+            const pc = pct >= 100 ? "#066a52" : pct >= 75 ? "#c07a14" : "#9c2a3a";
             return `<div class="hasr-srow" style="cursor:default">
               <div style="flex:1;min-width:0">
                 <div class="hasr-sname">${esc(m.مورد)}</div>
@@ -19462,13 +19481,13 @@ function renderTajheezInventoryTab() {
       <div class="kpi-lbl">إجمالي الاحتياج${fC ? " — " + fC : ""}</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + _needQty(r), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-teal hasr-clickable" style="background:#F5F3FF" onclick="tajOpenDetail('ppp')" title="اضغط لعرض التفاصيل">
+    <div class="kpi kc-teal hasr-clickable" style="background:#f3eefe" onclick="tajOpenDetail('ppp')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg></div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalPppVal)}</div>
       <div class="kpi-lbl">إجمالي PPP${fC ? " — " + fC : ""}</div>
       <div class="kpi-sub">${numFmt(filtered.reduce((s, r) => s + _pppQty(r), 0))} وحدة</div>
     </div>
-    <div class="kpi kc-amber hasr-clickable" style="background:#FFF7ED" onclick="tajOpenDetail('need_ppp')" title="اضغط لعرض التفاصيل — الاحتياج مجموع مع PPP">
+    <div class="kpi kc-amber hasr-clickable" style="background:#fdf6ec" onclick="tajOpenDetail('need_ppp')" title="اضغط لعرض التفاصيل — الاحتياج مجموع مع PPP">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/><path d="M9 20h6"/></svg></div>
       <div class="kpi-val" style="font-size:18px">${sarFmt(totalNeedVal + totalPppVal)}</div>
       <div class="kpi-lbl">إجمالي الاحتياج + PPP${fC ? " — " + fC : ""}</div>
@@ -19486,7 +19505,7 @@ function renderTajheezInventoryTab() {
       <div class="kpi-lbl">نسبة تغطية التجهيزات</div>
       <div class="kpi-sub">${numFmt(covered.length)} من ${numFmt(totalItems)} صنف مغطى</div>
     </div>
-    <div class="kpi kc-navy hasr-clickable" style="background:#EEF2FF" onclick="tajOpenDetail('suppliers')" title="اضغط لعرض التفاصيل">
+    <div class="kpi kc-navy hasr-clickable" style="background:#f3eefe" onclick="tajOpenDetail('suppliers')" title="اضغط لعرض التفاصيل">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></div>
       <div class="kpi-val">${numFmt(موردونَ_فيَ_النتيجة.size)}</div>
       <div class="kpi-lbl">عدد الموردين</div>
@@ -19497,7 +19516,7 @@ function renderTajheezInventoryTab() {
   <!-- ══ كارت: الأصناف الرئيسية (توزيع حسب القسم) — كل قسم قابل للضغط ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
       الأصناف الرئيسية
       <span class="sub">حسب القسم — اضغط أي قسم لعرض تفاصيله</span>
     </div>
@@ -19514,11 +19533,11 @@ function renderTajheezInventoryTab() {
                     <span style="font-size:12px;font-weight:700;color:var(--tx-main)">${esc(qism)}</span>
                     <span style="display:flex;gap:10px;align-items:center;flex-shrink:0">
                       <span style="font-size:10px;color:var(--tx-muted);white-space:nowrap">${numFmt(cnt)} صنف</span>
-                      <span style="font-size:11px;font-weight:800;color:#1D4ED8;white-space:nowrap">${sarFmt(needVal)}</span>
+                      <span style="font-size:11px;font-weight:800;color:#0b6b7e;white-space:nowrap">${sarFmt(needVal)}</span>
                     </span>
                   </div>
                   <div style="height:7px;border-radius:5px;background:var(--bd-light);overflow:hidden">
-                    <div style="height:100%;width:${pct}%;background:#1D4ED8;border-radius:5px"></div>
+                    <div style="height:100%;width:${pct}%;background:#0d849c;border-radius:5px"></div>
                   </div>
                 </div>`;
               })
@@ -19532,14 +19551,14 @@ function renderTajheezInventoryTab() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
         أكبر الأقسام من حيث قيمة الاحتياج
       </div>
       <div class="chart-box" style="height:300px"><canvas id="ch-taj-qism-need"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg></span>
+        <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg></span>
         مقارنة المخصصات والاحتياج لكل قسم
       </div>
       <div class="chart-box" style="height:300px"><canvas id="ch-taj-compare"></canvas></div>
@@ -19548,14 +19567,14 @@ function renderTajheezInventoryTab() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFEFF;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>
+        <span class="card-title-icon" style="background:#eaf6fa;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>
         توزيع قيمة الاحتياج حسب الأقسام
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-taj-pie"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></span>
         توزيع حالة التغطية
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-taj-coverage"></canvas></div>
@@ -19566,14 +19585,14 @@ function renderTajheezInventoryTab() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EFF6FF;color:#2563EB"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>
+        <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>
         مخصص × احتياج × PPP لكل مدينة
       </div>
       <div class="chart-box" style="height:300px"><canvas id="ch-taj-city"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
         أكبر الموردين من حيث قيمة الاحتياج
         <span class="sub">${moredRows.length} مورد</span>
       </div>
@@ -19584,7 +19603,7 @@ function renderTajheezInventoryTab() {
   <!-- ══ جدول تحليل الموردين ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
+      <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
       تحليل الموردين
       <span class="sub">${moredRows.length} مورد</span>
     </div>
@@ -19613,8 +19632,8 @@ function renderTajheezInventoryTab() {
                 <td style="text-align:center;color:var(--tx-muted)">${numFmt(m.مخصص_كلي)}</td>
                 <td style="font-weight:700">${sarFmt(m.مخصص_قيمة)}</td>
                 <td style="text-align:center;color:var(--tx-muted)">${numFmt(m.احتياج_كلي)}</td>
-                <td style="font-weight:700;color:#D97706">${sarFmt(m.احتياج_قيمة)}</td>
-                <td style="color:#7C3AED">${sarFmt(m.ppp_قيمة)}</td>
+                <td style="font-weight:700;color:var(--c-warning-text)">${sarFmt(m.احتياج_قيمة)}</td>
+                <td style="color:#6c2bd9">${sarFmt(m.ppp_قيمة)}</td>
                 <td><span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;color:${pctColor};background:${pctColor}18;border:1px solid ${pctColor}33">${pct}%</span></td>
               </tr>`;
             })
@@ -19627,7 +19646,7 @@ function renderTajheezInventoryTab() {
   <!-- ══ جدول أكثر الأصناف احتياجاً ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+      <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
       أكثر الأصناف احتياجاً
       <span class="sub" id="taj-need-cnt">${needSorted.length}</span>
       <select id="taj-sort-need" class="fsel" style="margin-right:auto;font-size:11px;min-width:auto" onchange="window._tajSortNeed.key=null;renderTajheezInventoryTab()">
@@ -19662,9 +19681,9 @@ function renderTajheezInventoryTab() {
   <!-- ══ جدول أكبر الفوائض ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
+      <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
       أكبر الفوائض
-      <span class="sub" style="background:#ECFDF5;color:#059669">${faedSorted.length} صنف</span>
+      <span class="sub" style="background:#edfaf5;color:#066a52">${faedSorted.length} صنف</span>
       <select id="taj-sort-faed" class="fsel" style="margin-right:auto;font-size:11px;min-width:auto" onchange="window._tajSortFaed.key=null;renderTajheezInventoryTab()">
         <option value="val_desc">قيمة الفائض ↓</option>
         <option value="qty_desc">كمية الفائض ↓</option>
@@ -19693,9 +19712,9 @@ function renderTajheezInventoryTab() {
   <!-- ══ جدول أكبر العجز ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg></span>
+      <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg></span>
       أكبر حالات العجز
-      <span class="sub" style="background:#FEF2F2;color:#DC2626">${ajzSorted.length} صنف</span>
+      <span class="sub" style="background:#fdf0f2;color:#9c2a3a">${ajzSorted.length} صنف</span>
       <select id="taj-sort-ajz" class="fsel" style="margin-right:auto;font-size:11px;min-width:auto" onchange="window._tajSortAjz.key=null;renderTajheezInventoryTab()">
         <option value="val_desc">قيمة العجز ↓</option>
         <option value="qty_desc">كمية العجز ↓</option>
@@ -19724,7 +19743,7 @@ function renderTajheezInventoryTab() {
   <!-- ══ جدول كامل ══ -->
   <div class="card">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#EEF3F7;color:#0891B2"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+      <span class="card-title-icon" style="background:#EEF3F7;color:var(--c-info-2)"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
       جدول التجهيزات الكامل
       <span class="sub" id="taj-all-cnt">${filtered.length}</span>
       <select id="taj-sort-all" class="fsel" style="margin-right:auto;font-size:11px;min-width:auto" onchange="window._tajSortAll.key=null;renderTajheezInventoryTab()">
@@ -19938,8 +19957,8 @@ function renderTajheezInventoryTab() {
           {
             label: "PPP",
             data: TAJHEEZ_CITIES.map((c) => +cityAgg[c].ppp.toFixed(0)),
-            backgroundColor: "#7C3AED88",
-            borderColor: "#7C3AED",
+            backgroundColor: "#6c2bd988",
+            borderColor: "#6c2bd9",
             borderWidth: 1.5,
             borderRadius: 4,
           },
@@ -19970,8 +19989,8 @@ function renderTajheezInventoryTab() {
             {
               label: "قيمة الاحتياج",
               data: topMored.map((m) => +m.احتياج_قيمة.toFixed(0)),
-              backgroundColor: "#4F46E588",
-              borderColor: "#4F46E5",
+              backgroundColor: "#6c2bd988",
+              borderColor: "#6c2bd9",
               borderWidth: 1.5,
               borderRadius: 5,
             },
@@ -20067,9 +20086,9 @@ function renderTajheezNeedTable() {
         `<td style="text-align:right;padding-right:14px"><div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.صنف)}</div></td>`,
       (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>`,
       (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.مورد) || "—"}</td>`,
-      (r) => `<td style="font-weight:700;color:#0891B2">${sarFmt2(r.سعر)}</td>`,
-      (r) => `<td style="font-weight:700;color:#D97706">${numFmt(r.احتياج.كلي)}</td>`,
-      (r) => `<td style="font-weight:800;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
+      (r) => `<td style="font-weight:700;color:var(--c-info-2)">${sarFmt2(r.سعر)}</td>`,
+      (r) => `<td style="font-weight:700;color:var(--c-warning-text)">${numFmt(r.احتياج.كلي)}</td>`,
+      (r) => `<td style="font-weight:800;color:var(--c-warning-text)">${sarFmt(r.احتياج.قيمة)}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${numFmt(r.مخصص.كلي)}</td>`,
       (r) =>
         `<td style="font-weight:700;color:${r.نسبة !== null && r.نسبة > 100 ? CSS_TOKENS.danger() : r.نسبة !== null && r.نسبة > 75 ? CSS_TOKENS.warning() : CSS_TOKENS.positive()}">${pctFmt(r.نسبة)}</td>`,
@@ -20098,8 +20117,8 @@ function renderTajheezFaedTable() {
       (r) =>
         `<td style="text-align:right;padding-right:14px"><div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.صنف)}</div></td>`,
       (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>`,
-      (r) => `<td style="font-weight:700;color:#059669">${numFmt(r.فرق_كمية)}</td>`,
-      (r) => `<td style="font-weight:800;color:#059669">${sarFmt(r.فرق_قيمة)}</td>`,
+      (r) => `<td style="font-weight:700;color:#066a52">${numFmt(r.فرق_كمية)}</td>`,
+      (r) => `<td style="font-weight:800;color:#066a52">${sarFmt(r.فرق_قيمة)}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${sarFmt(r.مخصص.قيمة)}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${sarFmt(r.احتياج.قيمة)}</td>`,
     ],
@@ -20123,8 +20142,8 @@ function renderTajheezAjzTable() {
       (r) =>
         `<td style="text-align:right;padding-right:14px"><div style="font-weight:700;font-size:12px;max-width:200px;white-space:normal;line-height:1.4">${esc(r.صنف)}</div></td>`,
       (r) => `<td style="font-size:11px;color:var(--tx-sec)">${esc(r.قسم) || "—"}</td>`,
-      (r) => `<td style="font-weight:700;color:#DC2626">${numFmt(r.فرق_كمية)}</td>`,
-      (r) => `<td style="font-weight:800;color:#DC2626">${sarFmt(Math.abs(r.فرق_قيمة))}</td>`,
+      (r) => `<td style="font-weight:700;color:#9c2a3a">${numFmt(r.فرق_كمية)}</td>`,
+      (r) => `<td style="font-weight:800;color:#9c2a3a">${sarFmt(Math.abs(r.فرق_قيمة))}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${sarFmt(r.مخصص.قيمة)}</td>`,
       (r) => `<td style="color:var(--tx-muted)">${sarFmt(r.احتياج.قيمة)}</td>`,
     ],
@@ -20157,9 +20176,9 @@ function renderTajheezAllTable() {
       (r) => `<td style="font-weight:700;text-align:center">${numFmt(r.مخصص.كلي)}</td>`,
       (r) => `<td style="font-weight:700">${sarFmt(r.مخصص.قيمة)}</td>`,
       (r) => `<td style="font-weight:700;text-align:center">${numFmt(r.احتياج.كلي)}</td>`,
-      (r) => `<td style="font-weight:700;color:#D97706">${sarFmt(r.احتياج.قيمة)}</td>`,
-      (r) => `<td style="text-align:center;color:#7C3AED">${numFmt(r.ppp?.كلي)}</td>`,
-      (r) => `<td style="font-weight:700;color:#7C3AED">${sarFmt(r.ppp?.قيمة)}</td>`,
+      (r) => `<td style="font-weight:700;color:var(--c-warning-text)">${sarFmt(r.احتياج.قيمة)}</td>`,
+      (r) => `<td style="text-align:center;color:#6c2bd9">${numFmt(r.ppp?.كلي)}</td>`,
+      (r) => `<td style="font-weight:700;color:#6c2bd9">${sarFmt(r.ppp?.قيمة)}</td>`,
       (r) =>
         `<td style="text-align:center;font-weight:700;color:${r.فرق_كمية !== null ? (r.فرق_كمية >= 0 ? CSS_TOKENS.positive() : CSS_TOKENS.danger()) : "#ccc"}">${numFmt(r.فرق_كمية)}</td>`,
       (r) =>
@@ -20459,7 +20478,7 @@ function _tajsupRenderAll() {
       <div class="kpi-val">${numFmt(supplierAgg.length)}</div>
       <div class="kpi-lbl">عدد الموردين</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber kc-neutral">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg></div>
       <div class="kpi-val">${numFmt(totReq)}</div>
       <div class="kpi-lbl">إجمالي الكمية المطلوبة</div>
@@ -20479,7 +20498,7 @@ function _tajsupRenderAll() {
   ${
     TAJSUP.supplierKpi.length
       ? `<div class="card-title" style="margin-bottom:10px">
-    <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+    <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
     المؤشرات المالية
   </div>
   <div class="kpi-grid" style="margin-bottom:18px">
@@ -20506,7 +20525,7 @@ function _tajsupRenderAll() {
   </div>
   ${
     qtyOnlyCount
-      ? `<div style="font-size:11.5px;color:${CSS_TOKENS.txMuted()};margin:-10px 0 18px;padding:8px 12px;background:#FFFBEB;border:1px solid #F0DFB0;border-radius:8px">
+      ? `<div style="font-size:11.5px;color:${CSS_TOKENS.txMuted()};margin:-10px 0 18px;padding:8px 12px;background:#fdf6ec;border:1px solid #F0DFB0;border-radius:8px">
     ⚠️ ${qtyOnlyCount} سجل (مورد × أمر عمل) مالوش سعر وحدة موثوق فيتوفرلهم قيمة تعاقد "بالكمية" بس (مش بالريال) — موجودة في عمود منفصل بالجدول تحت، ومش داخلة في الإجماليات المالية فوق عشان منخلطش وحدتين مختلفتين.
   </div>`
       : ""
@@ -20517,14 +20536,14 @@ function _tajsupRenderAll() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
         نسبة الإنجاز حسب المنطقة
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-tajsup-region"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
         المطلوب مقابل المورَّد حسب المورد
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-tajsup-supplier"></canvas></div>
@@ -20534,14 +20553,14 @@ function _tajsupRenderAll() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
         الكمية: بأمر عمل معتمد مقابل قيد الاعتماد
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-tajsup-status"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/><path d="m6 11-3.52 2.147a1 1 0 0 0-.48.854V19a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a1 1 0 0 0-.48-.853L18 11"/><path d="M6 4.933V21"/><circle cx="12" cy="9" r="2"/></svg></span>
         أكثر 10 أصناف احتياجًا (الكمية المتبقية)
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-tajsup-topitems"></canvas></div>
@@ -20550,7 +20569,7 @@ function _tajsupRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F0F9FF;color:#0284C7"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+      <span class="card-title-icon" style="background:#eaf6fa;color:#0284C7"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
       ملخص حسب المورد
       <span class="sub">${supplierAgg.length} مورد</span>
     </div>
@@ -20581,7 +20600,7 @@ function _tajsupRenderAll() {
     TAJSUP.supplierKpi.length
       ? `<div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+      <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
       المؤشرات المالية حسب المورد وأمر العمل
       <span class="sub" id="tajsup-fin-count"></span>
       <div style="margin-right:auto;display:flex;gap:8px;align-items:center">
@@ -20610,7 +20629,7 @@ function _tajsupRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+      <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
       جدول التوزيع التفصيلي (منطقة × مورد × صنف)
       <span class="sub" id="tajsup-tbl-count"></span>
     </div>
@@ -20637,7 +20656,7 @@ function _tajsupRenderAll() {
     TAJSUP.pendingItems.length
       ? `<div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#FEF3C7;color:#92400E"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg></span>
+      <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg></span>
       بنود قيد اعتماد أمر العمل (لا يوجد مورد معتمد بعد)
       <span class="sub">${TAJSUP.pendingItems.length} بند</span>
     </div>
@@ -20785,7 +20804,7 @@ function _tajsupRenderTable() {
     [
       (r) => `<td>${esc(r.منطقة)}</td>`,
       (r) => `<td>${esc(r.مورد)}</td>`,
-      (r) => `<td style="font-family:monospace;font-weight:700;color:#0891B2">${esc(r.امر_العمل)}</td>`,
+      (r) => `<td style="font-family:monospace;font-weight:700;color:var(--c-info-2)">${esc(r.امر_العمل)}</td>`,
       (r) => `<td>${esc(r.صنف)}</td>`,
       (r) => `<td>${numFmt(r.مطلوب)}</td>`,
       (r) => `<td>${r.مورّد === null ? "—" : numFmt(r.مورّد)}</td>`,
@@ -20824,7 +20843,7 @@ function _tajsupRenderFinTable() {
     rows,
     [
       (r) => `<td>${esc(r["المورد"])}</td>`,
-      (r) => `<td style="font-family:monospace;font-weight:700;color:#0891B2">${esc(r["رقم_أمر_العمل"] || "—")}</td>`,
+      (r) => `<td style="font-family:monospace;font-weight:700;color:var(--c-info-2)">${esc(r["رقم_أمر_العمل"] || "—")}</td>`,
       (r) => `<td style="font-weight:700">${sarFmt(_tajsupN(r["إجمالي التعاقد"]))}</td>`,
       (r) => {
         const qty = _tajsupN(r["إجمالي التعاقد (بالكمية، لا يتوفر سعر)"]);
@@ -20929,7 +20948,7 @@ function _mokIsCompanyCompleted(company) {
   return !!MOK_COMPANY_COMPLETED[company];
 }
 function _mokCompletedBadgeHtml() {
-  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;background:#DCFCE7;color:#15803D;border:1px solid #86EFAC;padding:2px 9px;border-radius:99px;margin-inline-start:6px">✅ مكتمل التسليم</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;background:#edfaf5;color:#066a52;border:1px solid #b4d2cb;padding:2px 9px;border-radius:99px;margin-inline-start:6px">✅ مكتمل التسليم</span>`;
 }
 
 const MOKAYEFAT = {
@@ -21230,13 +21249,13 @@ function _mokRenderModal() {
   const sortedRows = _tajSortRowsGeneric(filteredRows, MOKAYEFAT.sort, _mokVal);
 
   body.innerHTML = `
-  <div style="background:#FFFBEB;border:1px solid #F0DFB0;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#92400E;display:flex;align-items:center;gap:8px">
+  <div style="background:#fdf6ec;border:1px solid #F0DFB0;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#92590a;display:flex;align-items:center;gap:8px">
     <span style="font-size:15px">⏳</span>
     <span>قسم <b>مؤقت</b> — البيانات هنا خاصة بمشروع توريد وتركيب المكيفات، ومتوقع إزالة هذا القسم من الداشبورد خلال شهر إلى ثلاثة أشهر على الأكثر.</span>
   </div>
   ${
     Object.keys(MOK_COMPANY_COMPLETED).some(_mokIsCompanyCompleted)
-      ? `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#15803D;display:flex;align-items:center;gap:8px">
+      ? `<div style="background:#edfaf5;border:1px solid #b4d2cb;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#066a52;display:flex;align-items:center;gap:8px">
           <span style="font-size:15px">✅</span>
           <span>${Object.keys(MOK_COMPANY_COMPLETED)
             .filter(_mokIsCompanyCompleted)
@@ -21278,7 +21297,7 @@ function _mokRenderModal() {
       <div class="kpi-val">${numFmt(schoolCount)}</div>
       <div class="kpi-lbl">عدد المدارس</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber kc-neutral">
       <div class="kpi-val">${numFmt(totalPlanned)}</div>
       <div class="kpi-lbl">إجمالي الوحدات المخططة</div>
     </div>
@@ -21389,7 +21408,7 @@ function mokInit() {
       }
       #mok-banner::before {
         content:""; position:absolute; inset:0 0 auto 0; height:3px;
-        background:linear-gradient(90deg,#D97706,#F59E0B 55%,#FBBF24);
+        background:linear-gradient(90deg,#c07a14,#d4af6a 55%,#e8cf9a);
         opacity:.85;
       }
       #mok-banner:hover {
@@ -21405,23 +21424,23 @@ function mokInit() {
       #mok-banner-icon-wrap {
         flex-shrink:0; width:50px; height:50px; border-radius:14px;
         display:flex; align-items:center; justify-content:center;
-        background:linear-gradient(155deg,#FEF3C7,#FDE7B8);
+        background:linear-gradient(155deg,#fdf6ec,#FDE7B8);
         border:1px solid rgba(180,131,45,.35);
         box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
       }
       #mok-banner-icon { font-size:24px; line-height:1; }
       #mok-banner-text { flex:1; min-width:0; }
       #mok-banner-title-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-      #mok-banner-title { font-weight:800; font-size:14.5px; color:#78350F; letter-spacing:-.005em; }
+      #mok-banner-title { font-weight:800; font-size:14.5px; color:#92590a; letter-spacing:-.005em; }
       #mok-banner-badge-pill {
         display:inline-flex; align-items:center; gap:5px;
         font-size:10px; font-weight:800; letter-spacing:.02em;
-        background:linear-gradient(135deg,#B45309,#92400E); color:#fff;
+        background:linear-gradient(135deg,#92590a,#92590a); color:#fff;
         padding:3px 10px 3px 8px; border-radius:99px;
         box-shadow:0 1px 3px rgba(146,64,14,.25);
       }
       #mok-banner-live-dot {
-        width:6px; height:6px; border-radius:50%; background:#FDE68A;
+        width:6px; height:6px; border-radius:50%; background:#ecd7b8;
         box-shadow:0 0 0 0 rgba(253,230,138,.7);
         animation: mokPulse 1.8s ease-out infinite;
       }
@@ -21430,12 +21449,12 @@ function mokInit() {
         70%  { box-shadow:0 0 0 6px rgba(253,230,138,0); }
         100% { box-shadow:0 0 0 0 rgba(253,230,138,0); }
       }
-      #mok-banner-badge { font-size:12px; font-weight:600; color:#92400E; margin-top:4px; }
-      #mok-banner-sub { font-size:10.5px; color:#A16207; opacity:.8; margin-top:3px; line-height:1.5; }
+      #mok-banner-badge { font-size:12px; font-weight:600; color:#92590a; margin-top:4px; }
+      #mok-banner-sub { font-size:10.5px; color:#92590a; opacity:.8; margin-top:3px; line-height:1.5; }
       #mok-banner-arrow-wrap {
         flex-shrink:0; width:30px; height:30px; border-radius:50%;
         display:flex; align-items:center; justify-content:center;
-        background:rgba(180,131,45,.10); color:#92400E;
+        background:rgba(180,131,45,.10); color:#92590a;
         transition: transform .2s ease, background .2s ease;
       }
       #mok-banner:hover #mok-banner-arrow-wrap { background:rgba(180,131,45,.18); transform:translateX(-3px); }
@@ -21465,14 +21484,14 @@ function mokInit() {
       #mok-modal-title { font-family:Tajawal,sans-serif; font-weight:800; font-size:16.5px; color:#0d2f40; display:flex; align-items:center; gap:10px; }
       #mok-modal-title-icon {
         width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
-        background:linear-gradient(155deg,#FEF3C7,#FDE7B8); border:1px solid rgba(180,131,45,.35); font-size:17px;
+        background:linear-gradient(155deg,#fdf6ec,#FDE7B8); border:1px solid rgba(180,131,45,.35); font-size:17px;
       }
       #mok-modal-close {
-        background:rgba(13,47,64,.06); border:none; font-size:16px; cursor:pointer; color:#5b7684;
+        background:rgba(13,47,64,.06); border:none; font-size:16px; cursor:pointer; color:#52707e;
         width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
         transition:background .15s ease, color .15s ease;
       }
-      #mok-modal-close:hover { background:rgba(220,38,38,.10); color:#dc2626; }
+      #mok-modal-close:hover { background:rgba(156,42,58,.10); color:#9c2a3a; }
       #mok-modal-body { padding:18px 22px; overflow-y:auto; }
       @media (max-width:640px) {
         #mok-banner { margin:10px 12px 0; padding:14px 16px; }
@@ -21502,7 +21521,7 @@ function mokInit() {
     overlay.innerHTML = `
       <div id="mok-modal">
         <div id="mok-modal-head">
-          <div id="mok-modal-title"><span id="mok-modal-title-icon">❄️</span> توريد وتركيب المكيفات <span style="font-size:10px;font-weight:800;background:linear-gradient(135deg,#B45309,#92400E);color:#fff;padding:3px 10px;border-radius:99px">⏳ مؤقت</span></div>
+          <div id="mok-modal-title"><span id="mok-modal-title-icon">❄️</span> توريد وتركيب المكيفات <span style="font-size:10px;font-weight:800;background:linear-gradient(135deg,#92590a,#92590a);color:#fff;padding:3px 10px;border-radius:99px">⏳ مؤقت</span></div>
           <button id="mok-modal-close" onclick="closeMokModal()">✕</button>
         </div>
         <div id="mok-modal-body"></div>
@@ -21593,9 +21612,9 @@ function _srFmtDateTimeFull(d) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 function _srPriorityColor(p) {
-  if (p === "عاجل") return { bg: "#FEE2E2", fg: "#991B1B", bd: "#FCA5A5" };
-  if (p === "متوسط") return { bg: "#FEF3C7", fg: "#92400E", bd: "#FDE68A" };
-  return { bg: "#DCFCE7", fg: "#15803D", bd: "#86EFAC" };
+  if (p === "عاجل") return { bg: "#fdf0f2", fg: "#7d1f2c", bd: "#d8bcc0" };
+  if (p === "متوسط") return { bg: "#fdf6ec", fg: "#92590a", bd: "#ecd7b8" };
+  return { bg: "#edfaf5", fg: "#066a52", bd: "#b4d2cb" };
 }
 function _srPriorityBadge(p) {
   const label = p || "غير محدَّد";
@@ -21769,8 +21788,8 @@ function _srBreakdownCard(title, field, items, total) {
             <span>${field === "priority" ? _srPriorityBadge(i.key) : esc(i.key)}</span>
             <span style="color:${CSS_TOKENS.txMuted()};white-space:nowrap">${numFmt(i.count)} (${pctFmt((i.count / total) * 100)})</span>
           </div>
-          <div style="height:6px;border-radius:99px;background:#EEF2F6;overflow:hidden">
-            <div style="height:100%;width:${(i.count / max) * 100}%;border-radius:99px;background:${field === "priority" && i.key === "عاجل" ? "#DC2626" : "#0891B2"}"></div>
+          <div style="height:6px;border-radius:99px;background:#eef3f7;overflow:hidden">
+            <div style="height:100%;width:${(i.count / max) * 100}%;border-radius:99px;background:${field === "priority" && i.key === "عاجل" ? "#9c2a3a" : "#0d849c"}"></div>
           </div>
         </div>`,
               )
@@ -22148,7 +22167,7 @@ function srInit() {
          (لما تكون مصغَّرة) بفاصل كافٍ يمنع أي تداخل بينهم. */
       #sr-banner {
         display:flex; align-items:center; gap:10px; padding:10px 14px;
-        background:linear-gradient(135deg,#ECFEFF,#F0F9FF); border:1px solid #A5F3FC; border-radius:999px;
+        background:linear-gradient(135deg,#eaf6fa,#eaf6fa); border:1px solid #cfe6eb; border-radius:999px;
         cursor:pointer; position:fixed; bottom:96px; right:16px; z-index:9500;
         max-width:min(280px,calc(100vw - 32px)); overflow:hidden;
         box-shadow:0 10px 26px rgba(8,60,80,.22); transition:transform .15s,box-shadow .15s;
@@ -22159,28 +22178,28 @@ function srInit() {
         #sr-banner { bottom:82px; right:12px; }
       }
       #sr-banner.sr-has-urgent {
-        background:linear-gradient(135deg,#FEF2F2,#FEE2E2); border-color:#FCA5A5; animation:sr-pulse 1.8s infinite;
+        background:linear-gradient(135deg,#fdf0f2,#fdf0f2); border-color:#d8bcc0; animation:sr-pulse 1.8s infinite;
       }
-      #sr-banner.sr-has-urgent #sr-banner-icon-wrap { background:#FECACA; }
-      #sr-banner.sr-has-urgent #sr-banner-title { color:#991B1B; }
-      #sr-banner.sr-has-urgent #sr-banner-badge { color:#991B1B; font-weight:800; }
-      #sr-banner.sr-has-urgent #sr-banner-sub { color:#B91C1C; }
-      #sr-banner.sr-has-urgent #sr-banner-badge-pill { background:linear-gradient(135deg,#DC2626,#B91C1C); }
+      #sr-banner.sr-has-urgent #sr-banner-icon-wrap { background:#d8bcc0; }
+      #sr-banner.sr-has-urgent #sr-banner-title { color:#7d1f2c; }
+      #sr-banner.sr-has-urgent #sr-banner-badge { color:#7d1f2c; font-weight:800; }
+      #sr-banner.sr-has-urgent #sr-banner-sub { color:#9c2a3a; }
+      #sr-banner.sr-has-urgent #sr-banner-badge-pill { background:linear-gradient(135deg,#9c2a3a,#9c2a3a); }
       @keyframes sr-pulse {
-        0% { box-shadow:0 0 0 0 rgba(220,38,38,.35); }
-        70% { box-shadow:0 0 0 10px rgba(220,38,38,0); }
-        100% { box-shadow:0 0 0 0 rgba(220,38,38,0); }
+        0% { box-shadow:0 0 0 0 rgba(156,42,58,.35); }
+        70% { box-shadow:0 0 0 10px rgba(156,42,58,0); }
+        100% { box-shadow:0 0 0 0 rgba(156,42,58,0); }
       }
       #sr-banner-icon-wrap { width:34px; height:34px; border-radius:10px; background:#CFFAFE; display:flex; align-items:center; justify-content:center; flex:none; transition:background .2s; }
       #sr-banner-icon { font-size:17px; line-height:1; }
       #sr-banner-text { flex:1; min-width:0; }
       #sr-banner-title-row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-      #sr-banner-title { font-weight:800; font-size:12px; color:#0E7490; letter-spacing:-.005em; transition:color .2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+      #sr-banner-title { font-weight:800; font-size:12px; color:#0b6b7e; letter-spacing:-.005em; transition:color .2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
       #sr-banner-badge-pill {
         display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800;
-        background:linear-gradient(135deg,#0891B2,#0E7490); color:#fff; padding:2px 8px; border-radius:99px; transition:background .2s; flex:none;
+        background:linear-gradient(135deg,#0d849c,#0b6b7e); color:#fff; padding:2px 8px; border-radius:99px; transition:background .2s; flex:none;
       }
-      #sr-banner-live-dot { width:6px; height:6px; border-radius:50%; background:#A7F3D0; animation:sr-live 1.6s infinite; }
+      #sr-banner-live-dot { width:6px; height:6px; border-radius:50%; background:#b4d2cb; animation:sr-live 1.6s infinite; }
       @keyframes sr-live { 0%{box-shadow:0 0 0 0 rgba(167,243,208,.6);} 70%{box-shadow:0 0 0 5px rgba(167,243,208,0);} 100%{box-shadow:0 0 0 0 rgba(167,243,208,0);} }
       #sr-banner-badge { font-size:11px; font-weight:600; color:#155E75; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .2s; }
       /* الجملة التعريفية الطويلة مالهاش لازمة في الشكل المدمج (الحبّة) —
@@ -22194,7 +22213,7 @@ function srInit() {
       #sr-banner {
         width:60px; height:60px; padding:0; gap:0; justify-content:center; border-radius:50%;
         max-width:none; overflow:visible; bottom:96px; right:16px; z-index:9600;
-        background:linear-gradient(135deg,#06B6D4,#0E7490); border:3px solid #fff;
+        background:linear-gradient(135deg,#16a4bf,#0b6b7e); border:3px solid #fff;
         box-shadow:0 10px 26px rgba(8,60,80,.35);
       }
       #sr-banner:hover { transform:scale(1.08); box-shadow:0 14px 32px rgba(8,60,80,.42); }
@@ -22204,18 +22223,18 @@ function srInit() {
       #sr-banner-icon { font-size:26px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
       #sr-banner-count {
         position:absolute; top:-6px; inset-inline-start:-6px; min-width:22px; height:22px; padding:0 6px; box-sizing:border-box;
-        border-radius:99px; background:#fff; color:#0E7490; border:2px solid #0E7490;
+        border-radius:99px; background:#fff; color:#0b6b7e; border:2px solid #0b6b7e;
         font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; line-height:1;
       }
       #sr-banner-count:empty { display:none; }
       #sr-banner.sr-has-urgent {
-        background:linear-gradient(135deg,#EF4444,#B91C1C); border-color:#fff; animation:sr-pulse-bubble 1.6s infinite;
+        background:linear-gradient(135deg,#9c2a3a,#9c2a3a); border-color:#fff; animation:sr-pulse-bubble 1.6s infinite;
       }
-      #sr-banner.sr-has-urgent #sr-banner-count { color:#B91C1C; border-color:#B91C1C; }
+      #sr-banner.sr-has-urgent #sr-banner-count { color:#9c2a3a; border-color:#9c2a3a; }
       @keyframes sr-pulse-bubble {
-        0% { box-shadow:0 0 0 0 rgba(220,38,38,.55), 0 10px 26px rgba(8,60,80,.35); }
-        70% { box-shadow:0 0 0 18px rgba(220,38,38,0), 0 10px 26px rgba(8,60,80,.35); }
-        100% { box-shadow:0 0 0 0 rgba(220,38,38,0), 0 10px 26px rgba(8,60,80,.35); }
+        0% { box-shadow:0 0 0 0 rgba(156,42,58,.55), 0 10px 26px rgba(8,60,80,.35); }
+        70% { box-shadow:0 0 0 18px rgba(156,42,58,0), 0 10px 26px rgba(8,60,80,.35); }
+        100% { box-shadow:0 0 0 0 rgba(156,42,58,0), 0 10px 26px rgba(8,60,80,.35); }
       }
       /* اهتزاز + توهّج لحظة وصول بلاغ جديد (يُضاف الكلاس sr-ring لثواني ثم يُزال) */
       #sr-banner.sr-ring { animation:sr-ring-shake .6s ease-in-out 4, sr-pulse-bubble 1.6s infinite; }
@@ -22228,25 +22247,25 @@ function srInit() {
         #sr-banner-icon { font-size:23px; }
       }
 
-      #sr-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:9999; align-items:center; justify-content:center; padding:20px; }
+      #sr-overlay { display:none; position:fixed; inset:0; background:rgba(12,35,48,.5); z-index:9999; align-items:center; justify-content:center; padding:20px; }
       #sr-overlay.sr-open { display:flex; }
       #sr-modal { background:#fff; border-radius:16px; max-width:1100px; width:100%; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
-      #sr-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #E5E7EB; }
+      #sr-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #dbe7ee; }
       #sr-modal-title { font-weight:800; font-size:16px; display:flex; align-items:center; gap:10px; }
-      #sr-modal-close { border:none; background:#F1F5F9; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; }
+      #sr-modal-close { border:none; background:#eef3f7; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; }
       #sr-modal-body { padding:18px 20px; overflow:auto; }
 
       #sr-alert-stack { position:fixed; top:16px; inset-inline-end:16px; z-index:10000; display:flex; flex-direction:column; gap:10px; max-width:340px; }
       .sr-alert-card {
-        display:flex; align-items:flex-start; gap:10px; background:#fff; border:1px solid #FCA5A5; border-inline-start:4px solid #DC2626;
+        display:flex; align-items:flex-start; gap:10px; background:#fff; border:1px solid #d8bcc0; border-inline-start:4px solid #9c2a3a;
         border-radius:12px; padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,.15); cursor:pointer; animation:sr-alert-in .25s ease-out;
       }
       @keyframes sr-alert-in { from{opacity:0;transform:translateY(-8px);} to{opacity:1;transform:translateY(0);} }
       .sr-alert-icon { font-size:20px; line-height:1; }
       .sr-alert-body { flex:1; min-width:0; }
-      .sr-alert-title { font-weight:800; font-size:12.5px; color:#991B1B; }
-      .sr-alert-sub { font-size:11px; color:#7F1D1D; margin-top:2px; opacity:.85; }
-      .sr-alert-close { border:none; background:transparent; color:#9CA3AF; cursor:pointer; font-size:12px; }
+      .sr-alert-title { font-weight:800; font-size:12.5px; color:#7d1f2c; }
+      .sr-alert-sub { font-size:11px; color:#7d1f2c; margin-top:2px; opacity:.85; }
+      .sr-alert-close { border:none; background:transparent; color:#8aa1ad; cursor:pointer; font-size:12px; }
     `;
     document.head.appendChild(style);
 
@@ -22505,7 +22524,7 @@ function _tajconRenderAll() {
       <div class="kpi-val">${numFmt(_cSuppliers)}</div>
       <div class="kpi-lbl">عدد الموردين</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber kc-neutral">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></div>
       <div class="kpi-val">${sarFmt(_cTotalValue)}</div>
       <div class="kpi-lbl">إجمالي قيمة العقود</div>
@@ -22530,14 +22549,14 @@ function _tajconRenderAll() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg></span>
         قيمة العقود حسب النوع
       </div>
       <div class="chart-box" style="height:300px"><canvas id="ch-tajcon-type"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16h.01"/><path d="M16 16h.01"/><path d="M3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a.5.5 0 0 0-.769-.422l-4.462 2.844A.5.5 0 0 1 15 10.5v-2a.5.5 0 0 0-.769-.422L9.77 10.922A.5.5 0 0 1 9 10.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M8 16h.01"/></svg></span>
         قيمة العقود حسب المورد
       </div>
       <div class="chart-box" style="height:300px"><canvas id="ch-tajcon-supplier"></canvas></div>
@@ -22546,7 +22565,7 @@ function _tajconRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+      <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
       حالة الإنجاز عبر العقود
     </div>
     <div class="chart-box" style="height:220px"><canvas id="ch-tajcon-status"></canvas></div>
@@ -22554,7 +22573,7 @@ function _tajconRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+      <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
       جدول العقود التفصيلي
       <span class="sub" id="tajcon-tbl-count"></span>
     </div>
@@ -22656,7 +22675,7 @@ function _tajconRenderTable() {
     "tajcon-tbl-body",
     rows,
     [
-      (r) => `<td style="font-family:monospace;font-weight:700;color:#0891B2">${esc(r["رقم_أمر_العمل"] || "—")}</td>`,
+      (r) => `<td style="font-family:monospace;font-weight:700;color:var(--c-info-2)">${esc(r["رقم_أمر_العمل"] || "—")}</td>`,
       (r) => `<td>${esc(r["رقم_العقد"])}</td>`,
       (r) => `<td>${esc(r["اسم_المورد"])}</td>`,
       (r) => `<td>${esc(r["نوع_العقد"])}</td>`,
@@ -22973,10 +22992,10 @@ function _nashatRenderAll() {
     return v === null ? "—" : pctFmt(v * 100);
   };
   const _dsCardHTML = (r, isTotal, label) => `
-    <div style="border:1px solid ${isTotal ? "var(--bd-danger)" : "var(--bd-light)"};border-radius:12px;padding:${isTotal ? "16px" : "12px"};${isTotal ? "background:#FEF2F2" : ""}">
+    <div style="border:1px solid ${isTotal ? "var(--bd-danger)" : "var(--bd-light)"};border-radius:12px;padding:${isTotal ? "16px" : "12px"};${isTotal ? "background:#fdf0f2" : ""}">
       <div style="font-weight:800;margin-bottom:8px;${isTotal ? "color:var(--red);font-size:16px" : ""}">${esc(label !== undefined ? label : _nashatS(r["الشركة"]))}</div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-        <div class="kpi kc-red">
+        <div class="kpi kc-red kc-neutral">
           <div class="kpi-val" style="font-size:${isTotal ? "17px" : "15px"}">${_dsMoney(r, "إجمالي_التعاقد_بالتوصيل")}</div>
           <div class="kpi-lbl">إجمالي التعاقد بالتوصيل</div>
         </div>
@@ -23035,7 +23054,7 @@ function _nashatRenderAll() {
       <div class="kpi-val">${numFmt(activeCompanies)}</div>
       <div class="kpi-lbl">عدد الشركات${fCompany ? "" : " (من أصل " + numFmt(companyNames.length) + ")"}</div>
     </div>
-    <div class="kpi kc-amber">
+    <div class="kpi kc-amber kc-neutral">
       <div class="kpi-icon"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/></svg></div>
       <div class="kpi-val">${hasQtyAlloc ? numFmt(qtyAllocTot) : "—"}${fRegion ? " — " + fRegion : ""}</div>
       <div class="kpi-lbl">إجمالي الكمية المخصصة</div>
@@ -23053,7 +23072,7 @@ function _nashatRenderAll() {
   </div>
 
   <div class="card-title" style="margin-bottom:10px">
-    <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+    <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
     المؤشرات المالية
   </div>
   <div class="kpi-grid" style="margin-bottom:18px">
@@ -23080,7 +23099,7 @@ function _nashatRenderAll() {
   </div>
 
   <div class="card-title" style="margin-bottom:10px">
-    <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/></svg></span>
+    <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/></svg></span>
     الأربعة مؤشرات الأهم — ملخص الإنجاز والتوصيل (حسب الشركة)
   </div>
   <div class="mb14" style="display:flex;flex-direction:column;gap:12px">
@@ -23090,14 +23109,14 @@ function _nashatRenderAll() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#ECFDF5;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
         نسبة الإنجاز حسب المنطقة (بالكمية)
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-nashat-region"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EEF2FF;color:#4F46E5"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
+        <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
         القيمة المخصصة مقابل الموردة حسب الشركة
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-nashat-company"></canvas></div>
@@ -23107,14 +23126,14 @@ function _nashatRenderAll() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FFFBEB;color:#D97706"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
         إجمالي الكمية: مخصص مقابل موّرد
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-nashat-status"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M18 4.933V21"/><path d="m4 6 7.106-3.79a2 2 0 0 1 1.788 0L20 6"/></svg></span>
         أكثر 10 أصناف احتياجًا (الكمية المتبقية)
       </div>
       <div class="chart-box" style="height:280px"><canvas id="ch-nashat-topitems"></canvas></div>
@@ -23123,7 +23142,7 @@ function _nashatRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F0F9FF;color:#0284C7"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
+      <span class="card-title-icon" style="background:#eaf6fa;color:#0284C7"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg></span>
       ملخص حسب الشركة
       <span class="sub">${companyAgg.length} شركة</span>
     </div>
@@ -23151,7 +23170,7 @@ function _nashatRenderAll() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F5F3FF;color:#7C3AED"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
+      <span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg></span>
       جدول التوزيع التفصيلي (شركة × منطقة × صنف)
       <span class="sub" id="nashat-tbl-count"></span>
     </div>
@@ -28365,7 +28384,7 @@ ${(() => {
                 "<td>" + escText(r.city || "—") + "</td>" +
                 '<td style="text-align:right;font-weight:700">' + escText(r.gateName || "—") + "</td>" +
                 '<td style="font-variant-numeric:tabular-nums">' +
-                (r.phone ? '<a href="tel:' + escText(r.phone) + '" style="color:#0891B2;text-decoration:none">' + escText(r.phone) + "</a>" : "—") +
+                (r.phone ? '<a href="tel:' + escText(r.phone) + '" style="color:var(--c-info-2);text-decoration:none">' + escText(r.phone) + "</a>" : "—") +
                 "</td>" +
                 '<td style="font-variant-numeric:tabular-nums;color:var(--tx-muted)">' + escText(r.nationalId || "—") + "</td>" +
                 "</tr>"
@@ -28377,17 +28396,17 @@ ${(() => {
       el.innerHTML =
         '<div class="card mb14">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
         "<span>قائمة البوابين </span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
         "</div>" +
         '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
-        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(filteredTotal) + '</div><div class="kpi-lbl">إجمالي البوابين</div><div class="kpi-sub">' +
+        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#163d52">' + fmt_(filteredTotal) + '</div><div class="kpi-lbl">إجمالي البوابين</div><div class="kpi-sub">' +
         (total === filteredTotal ? "" : "من إجمالي " + fmt_(total) + " سجل") + "</div></div>" +
-        '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
-        '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(citiesList.length) + '</div><div class="kpi-lbl">عدد المدن</div><div class="kpi-sub">' +
+        '<div class="kpi kc-blue"><div class="kpi-val" style="color:var(--c-info-2)">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
+        '<div class="kpi kc-green kc-neutral"><div class="kpi-val" style="color:#066a52">' + fmt_(citiesList.length) + '</div><div class="kpi-lbl">عدد المدن</div><div class="kpi-sub">' +
         escText(citiesList.slice(0, 3).join("، ") + (citiesList.length > 3 ? "…" : "")) + "</div></div>" +
-        '<div class="kpi kc-amber"><div class="kpi-val" style="color:#92400e">' + fmt_(missingPhone) + '</div><div class="kpi-lbl">بدون رقم جوال</div><div class="kpi-sub">' +
+        '<div class="kpi kc-amber"><div class="kpi-val" style="color:#92590a">' + fmt_(missingPhone) + '</div><div class="kpi-lbl">بدون رقم جوال</div><div class="kpi-sub">' +
         pctOf(missingPhone, filteredTotal) + " من المعروض</div></div>" +
         "</div></div>" +
         '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
@@ -28408,12 +28427,12 @@ ${(() => {
         '<button class="export-btn export-btn-csv" onclick="window.exportGateCSV_dispatch && window.exportGateCSV_dispatch()">⬇ تصدير CSV</button>' +
         "</div>" +
         '<div class="card"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>' +
         "<span>عدد البوابين حسب المدينة</span></div>" +
         renderBarList(cityCounts, totalForBars, CSS_TOKENS.info()) +
         "</div>" +
         '<div class="card"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span>' +
         "<span>تفاصيل البوابين</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
         '<div class="tbl-wrap"><table><thead><tr>' +
@@ -28675,8 +28694,8 @@ ${(() => {
                 "<tr>" +
                 '<td style="text-align:right;font-weight:700">' + escText(r.person) + "</td>" +
                 '<td style="font-variant-numeric:tabular-nums">' + escText(fmtDate(r.date)) + "</td>" +
-                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#059669;font-weight:700">' + (r.received ? fmt_(r.received, 2) : "—") + "</td>" +
-                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#B91C1C;font-weight:700">' + (r.spent ? fmt_(r.spent, 2) : "—") + "</td>" +
+                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#066a52;font-weight:700">' + (r.received ? fmt_(r.received, 2) : "—") + "</td>" +
+                '<td style="text-align:center;font-variant-numeric:tabular-nums;color:#9c2a3a;font-weight:700">' + (r.spent ? fmt_(r.spent, 2) : "—") + "</td>" +
                 '<td style="text-align:center;font-variant-numeric:tabular-nums;font-weight:700">' + fmt_(r.balance, 2) + "</td>" +
                 "</tr>"
               );
@@ -28690,8 +28709,8 @@ ${(() => {
             '<div class="school-row" style="align-items:flex-start;flex-wrap:wrap;gap:8px">' +
             '<div style="min-width:140px;flex:0 0 auto;font-size:13px;font-weight:800;color:var(--tx-main)">' + escText(p.name) + "</div>" +
             '<div style="flex:1;min-width:200px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px">' +
-            '<span>المستلم: <b style="color:#059669">' + fmt_(p.received, 2) + "</b></span>" +
-            '<span>المصروف: <b style="color:#B91C1C">' + fmt_(p.spent, 2) + "</b></span>" +
+            '<span>المستلم: <b style="color:#066a52">' + fmt_(p.received, 2) + "</b></span>" +
+            '<span>المصروف: <b style="color:#9c2a3a">' + fmt_(p.spent, 2) + "</b></span>" +
             '<span>المتبقي: <b>' + fmt_(p.remaining, 2) + "</b></span>" +
             '<span style="color:var(--tx-muted)">آخر تاريخ: ' + escText(fmtDate(p.lastDate)) + "</span>" +
             "</div></div>"
@@ -28702,18 +28721,18 @@ ${(() => {
       el.innerHTML =
         '<div class="card mb14">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>' +
         "<span>العهدة</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
         "</div>" +
         '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
-        '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(totalReceived, 2) + '</div><div class="kpi-lbl">إجمالي المستلم</div><div class="kpi-sub">لكل المسؤولين عن العهدة</div></div>' +
-        '<div class="kpi kc-red"><div class="kpi-val" style="color:#B91C1C">' + fmt_(totalSpent, 2) + '</div><div class="kpi-lbl">إجمالي المصروف</div><div class="kpi-sub">' + pctOf(totalSpent, totalReceived) + " من المستلم</div></div>" +
-        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(totalRemaining, 2) + '</div><div class="kpi-lbl">الرصيد المتبقي</div><div class="kpi-sub">المستلم - المصروف</div></div>' +
-        '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(people.length) + '</div><div class="kpi-lbl">عدد المسؤولين</div><div class="kpi-sub">' + escText(byPerson.map(function (p) { return p.name; }).join("، ")) + "</div></div>" +
+        '<div class="kpi kc-green kc-neutral"><div class="kpi-val" style="color:#066a52">' + fmt_(totalReceived, 2) + '</div><div class="kpi-lbl">إجمالي المستلم</div><div class="kpi-sub">لكل المسؤولين عن العهدة</div></div>' +
+        '<div class="kpi kc-red kc-neutral"><div class="kpi-val" style="color:#9c2a3a">' + fmt_(totalSpent, 2) + '</div><div class="kpi-lbl">إجمالي المصروف</div><div class="kpi-sub">' + pctOf(totalSpent, totalReceived) + " من المستلم</div></div>" +
+        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#163d52">' + fmt_(totalRemaining, 2) + '</div><div class="kpi-lbl">الرصيد المتبقي</div><div class="kpi-sub">المستلم - المصروف</div></div>' +
+        '<div class="kpi kc-blue"><div class="kpi-val" style="color:var(--c-info-2)">' + fmt_(people.length) + '</div><div class="kpi-lbl">عدد المسؤولين</div><div class="kpi-sub">' + escText(byPerson.map(function (p) { return p.name; }).join("، ")) + "</div></div>" +
         "</div></div>" +
         '<div class="card mb14"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#FFF7ED;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>' +
         "<span>مقارنة شهرية: المستلم مقابل المصروف</span>" +
         '<span class="sub">تقريبي — لمتابعة اتجاه الاستلام والصرف شهرًا بشهر</span>' +
         "</div>" +
@@ -28722,7 +28741,7 @@ ${(() => {
           : '<div class="empty-msg">لا توجد تواريخ كافية لبناء مقارنة شهرية</div>') +
         "</div>" +
         '<div class="card mb14"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
         "<span>حسب المسؤول</span></div>" +
         breakdownHtml +
         "</div>" +
@@ -28743,7 +28762,7 @@ ${(() => {
         '<button class="export-btn export-btn-csv" onclick="window.exportPettyCashCSV_dispatch && window.exportPettyCashCSV_dispatch()">⬇ تصدير CSV</button>' +
         "</div>" +
         '<div class="card"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#FEF3C7;color:#92400E"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
         "<span>سجل العهدة</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
         '<div class="tbl-wrap"><table><thead><tr>' +
@@ -28773,26 +28792,26 @@ ${(() => {
                 {
                   label: "المستلم",
                   data: monthly.received,
-                  borderColor: "#059669",
-                  backgroundColor: "#05966922",
+                  borderColor: "#066a52",
+                  backgroundColor: "#066a5222",
                   borderWidth: 2.5,
                   tension: 0.3,
                   fill: true,
                   pointRadius: 4,
                   pointHoverRadius: 6,
-                  pointBackgroundColor: "#059669",
+                  pointBackgroundColor: "#066a52",
                 },
                 {
                   label: "المصروف",
                   data: monthly.spent,
-                  borderColor: "#B91C1C",
-                  backgroundColor: "#B91C1C22",
+                  borderColor: "#9c2a3a",
+                  backgroundColor: "#9c2a3a22",
                   borderWidth: 2.5,
                   tension: 0.3,
                   fill: true,
                   pointRadius: 4,
                   pointHoverRadius: 6,
-                  pointBackgroundColor: "#B91C1C",
+                  pointBackgroundColor: "#9c2a3a",
                 },
               ],
             },
@@ -28973,7 +28992,7 @@ ${(() => {
   }
 
   function phoneCell(phone) {
-    return phone ? '<a href="tel:' + esc_(phone) + '" style="color:#0891B2;text-decoration:none">' + esc_(phone) + "</a>" : "—";
+    return phone ? '<a href="tel:' + esc_(phone) + '" style="color:var(--c-info-2);text-decoration:none">' + esc_(phone) + "</a>" : "—";
   }
 
   function personCell(name, phone) {
@@ -29060,15 +29079,15 @@ ${(() => {
       el.innerHTML =
         '<div class="card mb14">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>' +
         "<span>المشرفون والمهندسون</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
         "</div>" +
         '<div class="g4" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">' +
-        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#083D4F">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
-        '<div class="kpi kc-blue"><div class="kpi-val" style="color:#0891B2">' + fmt_(Object.keys(fieldSet).length) + '</div><div class="kpi-lbl">مشرفون ميدانيون</div><div class="kpi-sub">عدد فريد</div></div>' +
-        '<div class="kpi kc-green"><div class="kpi-val" style="color:#059669">' + fmt_(Object.keys(engSet).length) + '</div><div class="kpi-lbl">المهندسون</div><div class="kpi-sub">عدد فريد</div></div>' +
-        '<div class="kpi kc-amber"><div class="kpi-val" style="color:#92400e">' + fmt_(Object.keys(devSet).length) + '</div><div class="kpi-lbl">مسؤولو التطوير</div><div class="kpi-sub">عدد فريد</div></div>' +
+        '<div class="kpi kc-navy"><div class="kpi-val" style="color:#163d52">' + fmt_(schoolsCount) + '</div><div class="kpi-lbl">عدد المدارس المغطاة</div><div class="kpi-sub">حسب الرقم الوزاري</div></div>' +
+        '<div class="kpi kc-blue"><div class="kpi-val" style="color:var(--c-info-2)">' + fmt_(Object.keys(fieldSet).length) + '</div><div class="kpi-lbl">مشرفون ميدانيون</div><div class="kpi-sub">عدد فريد</div></div>' +
+        '<div class="kpi kc-green kc-neutral"><div class="kpi-val" style="color:#066a52">' + fmt_(Object.keys(engSet).length) + '</div><div class="kpi-lbl">المهندسون</div><div class="kpi-sub">عدد فريد</div></div>' +
+        '<div class="kpi kc-amber kc-neutral"><div class="kpi-val" style="color:#92590a">' + fmt_(Object.keys(devSet).length) + '</div><div class="kpi-lbl">مسؤولو التطوير</div><div class="kpi-sub">عدد فريد</div></div>' +
         "</div></div>" +
         '<div class="filters-row" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">' +
         '<div class="fg" style="flex:1;min-width:240px"><div class="fg-lbl">بحث</div>' +
@@ -29088,12 +29107,12 @@ ${(() => {
         '<button class="export-btn export-btn-csv" onclick="window.exportSupCSV_dispatch && window.exportSupCSV_dispatch()">⬇ تصدير CSV</button>' +
         "</div>" +
         '<div class="card"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>' +
         "<span>عدد المدارس حسب المنطقة</span></div>" +
         renderBarList(regionCounts, totalForBars, CSS_TOKENS.info()) +
         "</div>" +
         '<div class="card"><div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/></svg></span>' +
         "<span>تفاصيل الإشراف</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
         '<div class="tbl-wrap"><table><thead><tr>' +
@@ -29340,21 +29359,21 @@ ${(() => {
             ';transition:.15s" onclick="window.__recruitSelectRegion(\'' + c.rg.replace(/'/g, "\\'") + '\')">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
             '<div style="font-size:13px;font-weight:800;color:var(--tx-main)">' + esc_(c.rg) + "</div>" +
-            (c.isActive ? '<span style="font-size:10px;font-weight:800;color:#0891B2"> مُفعّل</span>' : "") +
+            (c.isActive ? '<span style="font-size:10px;font-weight:800;color:var(--c-info-2)"> مُفعّل</span>' : "") +
             "</div>" +
-            '<div style="font-size:28px;font-weight:900;color:#083D4F;font-variant-numeric:tabular-nums">' + fmt_(c.tt) + "</div>" +
+            '<div style="font-size:28px;font-weight:900;color:#163d52;font-variant-numeric:tabular-nums">' + fmt_(c.tt) + "</div>" +
             '<div style="font-size:11px;color:var(--tx-muted);margin-bottom:8px">إجمالي الوظائف</div>' +
             '<div class="mini-track" style="height:8px;border-radius:6px;overflow:hidden;display:flex">' +
-            '<div style="width:' + (c.tt ? (c.j / c.tt) * 100 : 0) + '%;background:#059669"></div>' +
-            '<div style="width:' + (c.tt ? (c.w / c.tt) * 100 : 0) + '%;background:#d97706"></div>' +
-            '<div style="width:' + (c.tt ? (c.v / c.tt) * 100 : 0) + '%;background:#dc2626"></div>' +
+            '<div style="width:' + (c.tt ? (c.j / c.tt) * 100 : 0) + '%;background:#066a52"></div>' +
+            '<div style="width:' + (c.tt ? (c.w / c.tt) * 100 : 0) + '%;background:#c07a14"></div>' +
+            '<div style="width:' + (c.tt ? (c.v / c.tt) * 100 : 0) + '%;background:#9c2a3a"></div>' +
             "</div>" +
             '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10.5px;font-weight:700">' +
-            '<span style="color:#059669"> ' + fmt_(c.j) + "</span>" +
-            '<span style="color:#d97706">⏳ ' + fmt_(c.w) + "</span>" +
-            '<span style="color:#dc2626"> ' + fmt_(c.v) + "</span>" +
+            '<span style="color:#066a52"> ' + fmt_(c.j) + "</span>" +
+            '<span style="color:var(--c-warning-text)">⏳ ' + fmt_(c.w) + "</span>" +
+            '<span style="color:#9c2a3a"> ' + fmt_(c.v) + "</span>" +
             "</div>" +
-            '<div style="margin-top:10px;text-align:center;font-size:11px;font-weight:800;color:#0891B2;padding:6px;border-radius:8px;background:#ECFEFF"> اعرف الموظفين</div>' +
+            '<div style="margin-top:10px;text-align:center;font-size:11px;font-weight:800;color:var(--c-info-2);padding:6px;border-radius:8px;background:#eaf6fa"> اعرف الموظفين</div>' +
             "</div>"
           );
         })
@@ -29388,7 +29407,7 @@ ${(() => {
       el.innerHTML =
         '<div class="card mb14">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"></span>' +
         "<span>نظرة عامة على التوظيف</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " من " + fmt_(total) + "</span>" +
         "</div>" +
@@ -29402,7 +29421,7 @@ ${(() => {
 
         '<div class="card mb14">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#ECFDF5;color:#047857"></span>' +
+        '<span class="card-title-icon" style="background:#edfaf5;color:#066a52"></span>' +
         "<span>الموظفون حسب المنطقة</span>" +
         '<span class="sub">اضغط على أي منطقة لعرض موظفيها</span>' +
         "</div>" +
@@ -29411,17 +29430,17 @@ ${(() => {
 
         '<div class="g2">' +
         '<div class="card">' +
-        '<div class="card-title"><span class="card-title-icon" style="background:#FEF3C7;color:#92400E"></span><span>توزيع الحالات الوظيفية</span></div>' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#fdf6ec;color:#92590a"></span><span>توزيع الحالات الوظيفية</span></div>' +
         '<div class="chart-box" style="height:270px"><canvas id="ch-recruit-status"></canvas></div>' +
         "</div>" +
         '<div class="card">' +
-        '<div class="card-title"><span class="card-title-icon" style="background:#DBEAFE;color:#1D4ED8"></span><span>عدد الموظفين حسب المنطقة</span></div>' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"></span><span>عدد الموظفين حسب المنطقة</span></div>' +
         '<div class="chart-box" style="height:270px"><canvas id="ch-recruit-region"></canvas></div>' +
         "</div>" +
         "</div>" +
 
         '<div class="card mb14">' +
-        '<div class="card-title"><span class="card-title-icon" style="background:#EDE9FE;color:#6D28D9"></span><span>أكثر المسميات الوظيفية</span>' +
+        '<div class="card-title"><span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"></span><span>أكثر المسميات الوظيفية</span>' +
         '<span class="sub">' + (STATE.region ? esc_(STATE.region) : "كل المناطق") + "</span></div>" +
         '<div class="chart-box" style="height:' + Math.max(220, topTitles.length * 32) + 'px"><canvas id="ch-recruit-title"></canvas></div>' +
         "</div>" +
@@ -29454,7 +29473,7 @@ ${(() => {
 
         '<div class="card">' +
         '<div class="card-title">' +
-        '<span class="card-title-icon" style="background:#EEF2FF;color:#4338CA"></span>' +
+        '<span class="card-title-icon" style="background:#f3eefe;color:#6c2bd9"></span>' +
         "<span>قائمة الموظفين" + (STATE.region ? " — " + esc_(STATE.region) : "") + "</span>" +
         '<span class="sub">' + fmt_(filteredTotal) + " سجل</span></div>" +
         '<div class="tbl-wrap"><table><thead><tr>' +
@@ -29766,7 +29785,7 @@ ${(() => {
   // شفافية آمنة لأي لون (hex أو غيره) — بدل لصق "B3" على النص
   function mxA(c, a) { try { return /^#[0-9a-f]{6}$/i.test(c) ? CSS_TOKENS.α(c, a) : c; } catch (_) { return c; } }
   // لوحة ألوان متنوعة للرسوم الفئوية (ملكية/جنس/محافظة…)
-  function mxPal() { return [CSS_TOKENS.info(), CSS_TOKENS.special(), CSS_TOKENS.positive(), CSS_TOKENS.accent(), CSS_TOKENS.danger(), "#2563eb", "#db2777", CSS_TOKENS.warning()]; }
+  function mxPal() { return [CSS_TOKENS.info(), CSS_TOKENS.special(), CSS_TOKENS.positive(), CSS_TOKENS.accent(), CSS_TOKENS.danger(), "#0d849c", "#b8425a", CSS_TOKENS.warning()]; }
   function kill(id) { try { window.killChart && window.killChart(id); } catch (_) {} try { if (window.CHARTS && window.CHARTS[id]) { window.CHARTS[id].destroy(); delete window.CHARTS[id]; } } catch (_) {} }
 
   // ★ 2026-10-05 (بند 15): توحيد الفئات المكررة (مثل "مشترك أساسي" / "اساسي مشترك" / "مشترك اساسي"،
@@ -30573,7 +30592,7 @@ ${panelHTML}
 
       .ix-panel-head {
         padding: 20px 24px 16px;
-        background: linear-gradient(135deg, #071C28 0%, #0A3043 100%);
+        background: linear-gradient(135deg, #071C28 0%, #0d2f40 100%);
         color: #fff; flex-shrink: 0;
         border-bottom: 1px solid rgba(255,255,255,.08);
         display: flex; flex-direction: column; gap: 8px;
@@ -30660,7 +30679,7 @@ ${panelHTML}
       }
       .ix-kpi-modal-head {
         padding: 20px 24px 16px;
-        background: linear-gradient(135deg, #071C28 0%, #0A3043 100%);
+        background: linear-gradient(135deg, #071C28 0%, #0d2f40 100%);
         color: #fff; flex-shrink: 0;
         display: flex; align-items: center; justify-content: space-between;
         gap: 12px;
@@ -30784,11 +30803,11 @@ ${panelHTML}
       }
       .ix-action-btn:hover { background: var(--bg-3); border-color: var(--teal); color: var(--teal); transform: translateY(-1px); }
       .ix-action-btn.ix-btn-primary {
-        background: linear-gradient(135deg,#0c7a8a,#0891B2);
-        border-color: #0891B2; color: #fff;
+        background: linear-gradient(135deg,#0c7a8a,#0d849c);
+        border-color: #0d849c; color: #fff;
       }
-      .ix-action-btn.ix-btn-primary:hover { background: linear-gradient(135deg,#0891B2,#06b6d4); color: #fff; }
-      .ix-action-btn.ix-btn-copied { background:#059669!important; border-color:#059669!important; color:#fff!important; }
+      .ix-action-btn.ix-btn-primary:hover { background: linear-gradient(135deg,#0d849c,#16a4bf); color: #fff; }
+      .ix-action-btn.ix-btn-copied { background:#066a52!important; border-color:#066a52!important; color:#fff!important; }
 
       /* ── Score cards enhancement ── */
       .ix-score-card {
@@ -30798,13 +30817,13 @@ ${panelHTML}
       .ix-score-card::before {
         content: ''; position: absolute; top: 0; right: 0;
         width: 4px; height: 100%; border-radius: 0 12px 12px 0;
-        background: var(--ix-sc-color, #94a3b8);
+        background: var(--ix-sc-color, #8aa1ad);
       }
       .ix-score-lbl { font-size: 10px; color: var(--tx-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
       .ix-score-val { font-size: 22px; font-weight: 900; letter-spacing: -.02em; color: var(--ix-sc-color, var(--tx-main)); }
       .ix-score-tier { font-size: 10px; font-weight: 700; margin-top: 2px; color: var(--ix-sc-color, var(--tx-muted)); }
       .ix-score-bar2 { height: 6px; border-radius: 3px; background: var(--bd-light); overflow: hidden; margin-top: 8px; }
-      .ix-score-fill2 { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.22,.6,.34,1); background: var(--ix-sc-color, #94a3b8); }
+      .ix-score-fill2 { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.22,.6,.34,1); background: var(--ix-sc-color, #8aa1ad); }
 
       /* ── Info grid enhanced ── */
       .ix-info-grid2 {
@@ -30838,7 +30857,7 @@ ${panelHTML}
         padding: 24px 24px 18px;
         background:
           radial-gradient(120% 160% at 100% 0%, rgba(255,255,255,.09), transparent 55%),
-          linear-gradient(135deg, #051C25 0%, #0A3644 55%, #0D5468 100%);
+          linear-gradient(135deg, #051C25 0%, #0d2f40 55%, #0D5468 100%);
         gap: 10px;
       }
       .ix-panel-head::after {
@@ -31039,7 +31058,7 @@ ${panelHTML}
       .ix-source-head {
         display: flex; align-items: center; gap: 10px;
         padding: 18px 20px 16px; flex-shrink: 0;
-        background: linear-gradient(135deg, #051C25 0%, #0A3644 55%, #0D5468 100%);
+        background: linear-gradient(135deg, #051C25 0%, #0d2f40 55%, #0D5468 100%);
         color: #fff; position: relative;
       }
       .ix-source-head::after {
@@ -31659,7 +31678,7 @@ ${panelHTML}
       ".ix-person-line{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;font-variant-numeric:tabular-nums}" +
       ".ix-person-line a{color:#0b6b7e;font-weight:800;text-decoration:none}" +
       ".ix-person-line a:hover{text-decoration:underline}" +
-      ".ix-person-line .ix-person-wa{margin-inline-start:auto;font-size:10px;font-weight:800;background:#e7f8ef;color:#047857;border:1px solid #05966933;border-radius:999px;padding:1px 9px;text-decoration:none}";
+      ".ix-person-line .ix-person-wa{margin-inline-start:auto;font-size:10px;font-weight:800;background:#e7f8ef;color:#066a52;border:1px solid #066a5233;border-radius:999px;padding:1px 9px;text-decoration:none}";
     document.head.appendChild(st);
   }
   function _ixPersonCardHTML_(base, p){
@@ -31779,10 +31798,10 @@ ${panelHTML}
   function _ixElevItemsHTML(items){
     return items.map(function(it, i){
       const badge = it.kind === "ok"
-        ? '<span style="background:#05966918;color:#047857;border:1px solid #05966933;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">يعمل</span>'
+        ? '<span style="background:#066a5218;color:#066a52;border:1px solid #066a5233;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">يعمل</span>'
         : it.kind === "bad"
-          ? '<span style="background:#DC262618;color:#B91C1C;border:1px solid #DC262633;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">لا يعمل</span>'
-          : '<span style="background:#6B728018;color:#4B5563;border:1px solid #6B728033;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">غير محدد</span>';
+          ? '<span style="background:#9c2a3a18;color:#9c2a3a;border:1px solid #9c2a3a33;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">لا يعمل</span>'
+          : '<span style="background:#52707e18;color:#52707e;border:1px solid #52707e33;border-radius:10px;padding:1px 9px;font-weight:800;font-size:11.5px">غير محدد</span>';
       return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;border-bottom:1px dashed var(--bd-light);font-size:12px">' +
         '<span style="color:var(--tx-muted);min-width:56px">مصعد ' + (i + 1) + '</span>' + badge +
         (it.note ? '<span style="flex:1;color:var(--tx-muted)">' + esc(it.note) + '</span>' : '') + '</div>';
@@ -31971,9 +31990,9 @@ ${panelHTML}
 
     // ── عمر المبنى لون (لازم قبل استخدامه في statsItemsHTML) ──
     const ageColor = r.buildingAge != null
-      ? (r.buildingAge >= 40 ? "color:#DC2626;font-weight:800"
-        : r.buildingAge >= 25 ? "color:#D97706;font-weight:800"
-        : "color:#059669;font-weight:800")
+      ? (r.buildingAge >= 40 ? "color:#9c2a3a;font-weight:800"
+        : r.buildingAge >= 25 ? "color:var(--c-warning-text);font-weight:800"
+        : "color:#066a52;font-weight:800")
       : "";
 
     // scoreCard: يرجع "" (بدون كارت) لو القيمة غير متوفرة، بدل عرض كارت فاضٍ بـ "—"
@@ -32029,7 +32048,7 @@ ${panelHTML}
 
     const statsItemsHTML = [
       infoItem("عدد الطلاب",
-        r.students != null ? `<span style="color:#059669;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : ""),
+        r.students != null ? `<span style="color:#066a52;font-weight:800;font-size:15px">${Number(r.students).toLocaleString()}</span>` : ""),
       infoItem("عدد الفصول",
         r.classrooms != null ? `<span style="font-weight:800">${r.classrooms}</span>` : ""),
       infoItem("حجم المدرسة",  r.schoolSize ? esc(r.schoolSize) : ""),
@@ -32223,7 +32242,7 @@ ${panelHTML}
             marker.bindPopup(
               `<div style="font-family:Tajawal,sans-serif;font-weight:700;font-size:12px;direction:rtl;text-align:right">
                 📍 ${safeStr(r.name||r.buildingName)}<br>
-                <span style="font-weight:400;color:#64748b">${safeStr(r.district||"")}${r.district&&r.city?" · ":""}${safeStr(r.city||"")}</span>
+                <span style="font-weight:400;color:#52707e">${safeStr(r.district||"")}${r.district&&r.city?" · ":""}${safeStr(r.city||"")}</span>
               </div>`,
               { direction: "right" }
             ).openPopup();
@@ -32260,7 +32279,7 @@ ${panelHTML}
         if (c.key === "fca") return `<td style="color:${fcaColor(r.fca)};font-weight:700">${r.fca != null ? r.fca.toFixed(1) + "%" : "—"}</td>`;
         if (c.key === "envScore") return `<td style="color:${fcaColor(r.envScore)};font-weight:700">${r.envScore != null ? r.envScore.toFixed(1) + "%" : "—"}</td>`;
         if (c.key === "ayenScore") return `<td style="color:${fcaColor(r.ayenScore)};font-weight:700">${r.ayenScore != null ? r.ayenScore.toFixed(1) + "%" : "—"}</td>`;
-        if (c.key === "alerts") return `<td style="color:${(r.alerts||0)>0?'#DC2626':'#059669'};font-weight:700">${r.alerts ?? "—"}</td>`;
+        if (c.key === "alerts") return `<td style="color:${(r.alerts||0)>0?'#9c2a3a':'#066a52'};font-weight:700">${r.alerts ?? "—"}</td>`;
         return `<td>${esc(r[c.key]) || "—"}</td>`;
       }).join("");
       return `<tr>${cells}</tr>`;
@@ -34008,7 +34027,7 @@ function renderFuelTab(_fromMonth, _toMonth) {
       <div class="kpi-lbl">إجمالي الاستهلاك</div>
       <div class="kpi-sub">لتر · ${rows.length.toLocaleString()} سجل</div>
     </div>
-    <div class="kpi kc-green">
+    <div class="kpi kc-green kc-neutral">
       <div class="kpi-val">${totalCost.toLocaleString('ar',{maximumFractionDigits:0})}</div>
       <div class="kpi-lbl">إجمالي التكلفة</div>
       <div class="kpi-sub">ريال سعودي</div>
@@ -34018,7 +34037,7 @@ function renderFuelTab(_fromMonth, _toMonth) {
       <div class="kpi-lbl">متوسط سعر اللتر</div>
       <div class="kpi-sub">ريال / لتر</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${uniqueCars.toLocaleString()}</div>
       <div class="kpi-lbl">عدد السيارات</div>
       <div class="kpi-sub">حسب رقم اللوحة</div>
@@ -34367,7 +34386,7 @@ function renderVehiclesTab() {
       <div class="kpi-lbl">لها مستخدم فعلي</div>
       <div class="kpi-sub">${total ? ((assignedUsers/total)*100).toFixed(1) : 0}% من الأسطول</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${withRegion.toLocaleString()}</div>
       <div class="kpi-lbl">لها منطقة محددة</div>
       <div class="kpi-sub">${total ? ((withRegion/total)*100).toFixed(1) : 0}% من الأسطول</div>
@@ -34430,7 +34449,7 @@ function renderVehiclesTab() {
       </div>
     </div>
     <!-- ⚠️ الجداول لازم تكون صغيرة/محدودة الارتفاع زي باقي التبويبات (max-height + overflow:auto بدل overflow-x:auto فقط) -->
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="veh-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم اللوحة</th>
@@ -34692,7 +34711,7 @@ function _corrDrawRegionChart(byRegionType, regionsSet, status) {
     .sort((a, b) => b.out + b.inn - (a.out + a.inn));
   document.querySelectorAll('[data-corr-chart-status]').forEach((btn) => {
     const on = btn.getAttribute("data-corr-chart-status") === st;
-    btn.style.background = on ? "var(--teal, #0d9488)" : "transparent";
+    btn.style.background = on ? "var(--teal, #0d849c)" : "transparent";
     btn.style.color = on ? "#fff" : "var(--tx-main)";
   });
   killChart("ch-corr-region-type");
@@ -34884,7 +34903,7 @@ function _corrGroupSectionHtml(groupKey, groupRows, opts) {
     </div>
 
     ${regionsSet.length ? `
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0);margin-bottom:14px">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee);margin-bottom:14px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         ${_corrRegionTableHeadHtml()}
         <tbody>${_corrRegionTableRowsHtml(regionsSet, byRegionType)}</tbody>
@@ -34906,7 +34925,7 @@ function _corrGroupSectionHtml(groupKey, groupRows, opts) {
         <button class="export-btn export-btn-csv" onclick="_corrExportGroupCSV('${groupKey}')" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:360px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:360px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم أعمالي</th>
@@ -34980,7 +34999,7 @@ function renderCorrespondenceTab() {
       <div class="kpi-lbl">وارد</div>
       <div class="kpi-sub">${total ? ((inCount / total) * 100).toFixed(1) : 0}% من الإجمالي</div>
     </div>
-    <div class="kpi kc-red">
+    <div class="kpi kc-red kc-neutral">
       <div class="kpi-val">${regionsSet.length.toLocaleString("ar")}</div>
       <div class="kpi-lbl">عدد المناطق</div>
       <div class="kpi-sub">مناطق التشغيل</div>
@@ -34989,12 +35008,12 @@ function renderCorrespondenceTab() {
 
   <div class="card mb14" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:14px 18px">
     <div style="font-size:12px;font-weight:700;color:var(--tx-muted)">تصنيف المراسلات حسب المصدر:</div>
-    <div style="display:flex;align-items:center;gap:8px;background:#EFF6FF;border-radius:999px;padding:6px 14px">
+    <div style="display:flex;align-items:center;gap:8px;background:#eaf6fa;border-radius:999px;padding:6px 14px">
       <span style="font-size:14px">📋</span>
-      <span style="font-size:13px;font-weight:800;color:#1D4ED8">${aamaliRows.length.toLocaleString("ar")}</span>
+      <span style="font-size:13px;font-weight:800;color:#0b6b7e">${aamaliRows.length.toLocaleString("ar")}</span>
       <span style="font-size:12px;color:var(--tx-muted)">منصة أعمالي (${total ? ((aamaliRows.length / total) * 100).toFixed(1) : 0}%)</span>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;background:#F3F4F6;border-radius:999px;padding:6px 14px">
+    <div style="display:flex;align-items:center;gap:8px;background:#eef3f7;border-radius:999px;padding:6px 14px">
       <span style="font-size:14px">✉️</span>
       <span style="font-size:13px;font-weight:800;color:var(--tx-main)">${otherRows.length.toLocaleString("ar")}</span>
       <span style="font-size:12px;color:var(--tx-muted)">خطابات أخرى (${total ? ((otherRows.length / total) * 100).toFixed(1) : 0}%)</span>
@@ -35005,7 +35024,7 @@ function renderCorrespondenceTab() {
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
       <div class="card-title" style="margin:0;padding:0;border:0">الصادر والوارد حسب المنطقة</div>
       <div style="display:inline-flex;border:1px solid var(--brd);border-radius:999px;overflow:hidden">
-        ${[["all", "الكل"], ["open", "مفتوح"], ["closed", "مغلق"]].map(([k, l]) => `<button type="button" data-corr-chart-status="${k}" onclick="_corrSetRegionChartStatus('${k}')" style="border:0;cursor:pointer;padding:5px 16px;font-size:12px;font-weight:700;font-family:inherit;background:${k === "all" ? "var(--teal, #0d9488)" : "transparent"};color:${k === "all" ? "#fff" : "var(--tx-main)"}">${l}</button>`).join("")}
+        ${[["all", "الكل"], ["open", "مفتوح"], ["closed", "مغلق"]].map(([k, l]) => `<button type="button" data-corr-chart-status="${k}" onclick="_corrSetRegionChartStatus('${k}')" style="border:0;cursor:pointer;padding:5px 16px;font-size:12px;font-weight:700;font-family:inherit;background:${k === "all" ? "var(--teal, #0d849c)" : "transparent"};color:${k === "all" ? "#fff" : "var(--tx-main)"}">${l}</button>`).join("")}
       </div>
     </div>
     <div class="chart-box" style="height:${Math.max(240, regionsSet.length * 62 + 90)}px"><canvas id="ch-corr-region-type"></canvas></div>
@@ -35029,7 +35048,7 @@ function renderCorrespondenceTab() {
 
   <div class="card mb14">
     <div class="card-title">الصادر والوارد لكل منطقة — المفتوح والمغلق</div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         ${_corrRegionTableHeadHtml()}
         <tbody>${_corrRegionTableRowsHtml(regionsSet, byRegionType)}</tbody>
@@ -35058,7 +35077,7 @@ function renderCorrespondenceTab() {
         <button class="export-btn export-btn-csv" onclick="_corrExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="corr-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم أعمالي</th>
@@ -35077,8 +35096,8 @@ function renderCorrespondenceTab() {
     </div>
   </div>
 
-  ${_corrGroupSectionHtml("aamali", aamaliRows, { icon: "📋", title: "خطابات منصة أعمالي", accentColor: "#2563EB", kpiClass: "kc-blue" })}
-  ${_corrGroupSectionHtml("other", otherRows, { icon: "✉️", title: "الخطابات الأخرى", accentColor: "#6B7280", kpiClass: "kc-navy" })}
+  ${_corrGroupSectionHtml("aamali", aamaliRows, { icon: "📋", title: "خطابات منصة أعمالي", accentColor: "#0d849c", kpiClass: "kc-blue" })}
+  ${_corrGroupSectionHtml("other", otherRows, { icon: "✉️", title: "الخطابات الأخرى", accentColor: "#52707e", kpiClass: "kc-navy" })}
   `;
 
   CORR._region = "";
@@ -35101,7 +35120,7 @@ function renderCorrespondenceTab() {
     if (typeof Chart === "undefined") return;
     _corrDrawRegionChart(byRegionType, regionsSet, "all");
     makeDoughnut("ch-corr-type", { صادر: outCount, وارد: inCount }, { صادر: CSS_TOKENS.info(), وارد: CSS_TOKENS.warning() });
-    makeDoughnut("ch-corr-source", { "منصة أعمالي": aamaliRows.length, "خطابات أخرى": otherRows.length }, { "منصة أعمالي": "#2563EB", "خطابات أخرى": "#9CA3AF" });
+    makeDoughnut("ch-corr-source", { "منصة أعمالي": aamaliRows.length, "خطابات أخرى": otherRows.length }, { "منصة أعمالي": "#0d849c", "خطابات أخرى": "#8aa1ad" });
     makeDoughnut("ch-corr-status", byStatus, { مفتوح: CSS_TOKENS.warning(), مغلق: CSS_TOKENS.positive() });
   });
 }
@@ -36490,15 +36509,15 @@ function _orgBuildChartPanel(rows) {
           <button type="button" class="org-view-btn" id="orgc-editmode-btn" onclick="_orgToggleEditMode()">✏️ تعديل</button>
           <input type="text" class="orgc-search-input" placeholder="ابحث بالاسم أو المسمى الوظيفي…" oninput="_orgChartSearch(this.value)">
           <div class="orgc-legend">
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#16a34a"></span>موظف حالي</span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot orgc-legend-dot-dashed" style="border-color:#94a3b8"></span>شاغر</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#066a52"></span>موظف حالي</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot orgc-legend-dot-dashed" style="border-color:#8aa1ad"></span>شاغر</span>
             <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d4af6a"></span>مدير خارج نطاق الملف</span>
             <span class="orgc-legend-item">★ له مرؤوسون</span>
             <span class="orgc-legend-sep"></span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#2563eb"></span>مهندس</span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#d97706"></span>مشرف</span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#db2777"></span>خدمات مساندة</span>
-            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#7c3aed"></span>مدير</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#0d849c"></span>مهندس</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#c07a14"></span>مشرف</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#b8425a"></span>خدمات مساندة</span>
+            <span class="orgc-legend-item"><span class="orgc-legend-dot" style="background:#6c2bd9"></span>مدير</span>
           </div>
         </div>` +
         `<div class="orgc-local-edits-row">
@@ -36625,7 +36644,7 @@ function renderOrgStructureTab() {
       <div class="kpi-lbl">شواغر</div>
       <div class="kpi-sub">${total ? ((vacantCount / total) * 100).toFixed(1) : 0}% تحتاج متابعة</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${regionsSet.length.toLocaleString("ar")}</div>
       <div class="kpi-lbl">عدد المناطق</div>
       <div class="kpi-sub">مناطق التشغيل</div>
@@ -36650,7 +36669,7 @@ function renderOrgStructureTab() {
 
   <div class="card mb14">
     <div class="card-title">تفصيل نوع الفريق — متوظف وشاغر لكل نوع</div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">نوع الفريق</th>
@@ -36679,7 +36698,7 @@ function renderOrgStructureTab() {
 
   <div class="card mb14">
     <div class="card-title">جميع المسميات الوظيفية — مشغولة وشاغرة</div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المسمى الوظيفي</th>
@@ -36713,7 +36732,7 @@ function renderOrgStructureTab() {
     </div>
     <div class="card">
       <div class="card-title">سعودي مقابل غير سعودي</div>
-      <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+      <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead><tr style="background:var(--bg2)">
             <th style="padding:6px 10px;text-align:right">التصنيف</th>
@@ -36757,7 +36776,7 @@ function renderOrgStructureTab() {
         <button class="export-btn export-btn-csv" onclick="_orgExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="org-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
@@ -36912,8 +36931,8 @@ function _lspRowHtml(r) {
     <td style="padding:6px 10px;text-align:center;font-size:11px">${remaining !== null ? remaining.toLocaleString("en-US") : "—"}</td>
     <td style="padding:6px 10px;text-align:center;font-size:11px;white-space:nowrap" title="${_lspEsc(pl.note)}">${
       !pl.isPipeline ? "—"
-      : pl.amount !== null ? `<span style="color:${CSS_TOKENS.warning()};font-weight:700">${pl.amount.toLocaleString("en-US")}</span>`
-      : `<span style="color:${CSS_TOKENS.warning()};font-weight:700">قيد الإجراء</span> <span style="color:var(--tx-muted)">(${_lspEsc(pl.note)})</span>`
+      : pl.amount !== null ? `<span style="color:${CSS_TOKENS.warningText()};font-weight:700">${pl.amount.toLocaleString("en-US")}</span>`
+      : `<span style="color:${CSS_TOKENS.warningText()};font-weight:700">قيد الإجراء</span> <span style="color:var(--tx-muted)">(${_lspEsc(pl.note)})</span>`
     }</td>
   </tr>`;
 }
@@ -36985,12 +37004,12 @@ function renderLsPaymentsTab() {
       <div class="kpi-lbl">إجمالي العقود</div>
       <div class="kpi-sub">عقود الاستشاري (LS)</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي قيمة العقود</div>
       <div class="kpi-sub">ريال سعودي</div>
     </div>
-    <div class="kpi kc-green">
+    <div class="kpi kc-green kc-neutral">
       <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي المدفوع</div>
       <div class="kpi-sub">${overallPct.toFixed(1)}% من الإجمالي</div>
@@ -37023,7 +37042,7 @@ function renderLsPaymentsTab() {
         <button class="export-btn export-btn-csv" onclick="_lspExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="lsp-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم العقد</th>
@@ -37234,7 +37253,7 @@ function _ctpSectionKpisHtml(rows) {
       <div class="kpi-val">${rows.length.toLocaleString("ar")}</div>
       <div class="kpi-lbl">عدد المشاريع/النطاقات</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${Math.round(totalValue).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي القيمة المحدّثة</div>
       <div class="kpi-sub">ريال سعودي</div>
@@ -37246,7 +37265,7 @@ function _ctpSectionKpisHtml(rows) {
     </div>
   </div>
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
-    <div class="kpi kc-green">
+    <div class="kpi kc-green kc-neutral">
       <div class="kpi-val">${Math.round(totalPaid).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي المدفوع</div>
       <div class="kpi-sub">ريال سعودي</div>
@@ -37306,7 +37325,7 @@ function renderContractorPaymentsTab() {
         <button class="export-btn export-btn-csv" onclick="_ctpMajalExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="ctp-majal-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم العقد</th>
@@ -37347,7 +37366,7 @@ function renderContractorPaymentsTab() {
         <button class="export-btn export-btn-csv" onclick="_ctpExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="ctp-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">رقم العقد</th>
@@ -37517,7 +37536,7 @@ function renderPpmMaximoTab() {
       <div class="kpi-lbl">إجمالي المهام</div>
       <div class="kpi-sub">عبر ${regionsPresent.length} مناطق</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${Math.round(western.totalTarget).toLocaleString("en-US")}</div>
       <div class="kpi-lbl">إجمالي المستهدف الكلي</div>
       <div class="kpi-sub">المنطقة الغربية بالكامل</div>
@@ -37538,7 +37557,7 @@ function renderPpmMaximoTab() {
   </div>
 
   <div class="card mb14">
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
@@ -37553,7 +37572,7 @@ function renderPpmMaximoTab() {
                 <td style="padding:6px 10px">${_ppmEsc(label)}</td>
                 <td style="padding:6px 10px;text-align:center">${agg.tasks.toLocaleString("ar")}</td>
                 <td style="padding:6px 10px;text-align:center">${Math.round(agg.totalTarget).toLocaleString("en-US")}</td>
-                <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.warning()}">${agg.plannedPct.toFixed(1)}%</td>
+                <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.warningText()}">${agg.plannedPct.toFixed(1)}%</td>
                 <td style="padding:6px 10px;text-align:center;color:${CSS_TOKENS.positive()}">${agg.actualPct.toFixed(1)}%</td>
               </tr>`)
             .join("")}
@@ -37565,7 +37584,7 @@ function renderPpmMaximoTab() {
   <div class="card mb14">
     <div class="card-title">نسبة المحقق التراكمي إلى المستهدف التراكمي حسب المنطقة (وإجمالي المنطقة الغربية)</div>
     <div class="chart-box" style="height:280px"><canvas id="ch-ppm-progress"></canvas></div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0);margin-top:12px">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee);margin-top:12px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
@@ -37598,7 +37617,7 @@ function renderPpmMaximoTab() {
         <button class="export-btn export-btn-csv" onclick="_ppmExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="ppm-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
@@ -37885,7 +37904,7 @@ function _visRenderKpiSection() {
       <div class="kpi-lbl">نسبة الإنجاز</div>
       <div class="kpi-sub">مكتملة ÷ مسندة</div>
     </div>
-    <div class="kpi kc-purple">
+    <div class="kpi kc-purple kc-neutral">
       <div class="kpi-val">${regionsSorted.length.toLocaleString("ar")}</div>
       <div class="kpi-lbl">عدد المناطق المسجّلة</div>
       <div class="kpi-sub">${totalCompletedByRegion.toLocaleString("ar")} زيارة مكتملة (كل الفترة)</div>
@@ -37965,7 +37984,7 @@ function renderVisitsTab() {
     </div>
     <div id="vis-region-note" style="font-size:11px;color:var(--tx-muted);margin-bottom:8px"></div>
     <div class="chart-box" style="height:260px;margin-bottom:14px"><canvas id="ch-vis-region"></canvas></div>
-    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">المنطقة</th>
@@ -38187,7 +38206,7 @@ function renderTrainingTab(_fromDate, _toDate) {
 
   <div class="card mb14">
     <div class="card-title">تفصيل الدورات</div>
-    <div style="overflow:auto;max-height:260px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:260px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">الدورة</th>
@@ -38222,7 +38241,7 @@ function renderTrainingTab(_fromDate, _toDate) {
         <button class="export-btn export-btn-csv" onclick="_trainExportCSV()" style="font-size:11px">⬇ تصدير CSV</button>
       </div>
     </div>
-    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#e2e8f0)">
+    <div style="overflow:auto;max-height:420px;border-radius:10px;border:1px solid var(--bd-light,#dbe7ee)">
       <table style="width:100%;border-collapse:collapse;font-size:11px" id="train-table">
         <thead><tr style="background:var(--bg2)">
           <th style="padding:8px 10px;text-align:right">الاسم</th>
@@ -38294,13 +38313,13 @@ function renderTrainingTab(_fromDate, _toDate) {
         const neverStartedRow = r.completedCount === 0;
         const pct = totalCourses ? (r.completedCount / totalCourses) * 100 : 0;
         const pctColor = pct >= 100 ? CSS_TOKENS.positive() : pct > 0 ? CSS_TOKENS.info() : CSS_TOKENS.txMuted();
-        return `<tr style="border-bottom:1px solid var(--brd)${neverStartedRow ? ";background:#FFFBEB" : ""}">
+        return `<tr style="border-bottom:1px solid var(--brd)${neverStartedRow ? ";background:#fdf6ec" : ""}">
           <td style="padding:6px 10px;font-weight:600">${esc(r.name)}</td>
           <td style="padding:6px 10px;font-size:11px;color:var(--tx-muted)">${esc(r.email) || "—"}</td>
           <td style="padding:6px 10px;font-size:11px">${esc(r.department) || "—"}</td>
           <td style="padding:6px 10px;text-align:center;font-weight:700;color:${pctColor}">${r.completedCount} / ${totalCourses}</td>
           <td style="padding:6px 10px;text-align:center">${r.avgGrade !== null ? r.avgGrade.toFixed(1) + "%" : "—"}</td>
-          <td style="padding:6px 10px;font-size:11px;color:${neverStartedRow ? "#DC2626" : "var(--tx-muted)"}">${esc(r.lastAccessRaw) || "لم يدخل أبداً"}</td>
+          <td style="padding:6px 10px;font-size:11px;color:${neverStartedRow ? "#9c2a3a" : "var(--tx-muted)"}">${esc(r.lastAccessRaw) || "لم يدخل أبداً"}</td>
         </tr>`;
       }).join("") ||
       `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--tx-muted)">لا توجد سجلات مطابقة</td></tr>`;
@@ -39027,7 +39046,7 @@ function _hasrRenderFilterBanner() {
         </div>
         <button onclick="hasrClearSubFilter()"
           style="font-size:11px;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;
-                 background:#EFF6FF;color:#1D4ED8;border:1.5px solid #BFDBFE;font-family:Tajawal;white-space:nowrap">
+                 background:#eaf6fa;color:#0b6b7e;border:1.5px solid #cfe6eb;font-family:Tajawal;white-space:nowrap">
           ✕ مسح الفلتر
         </button>
       </div>`;
@@ -39064,7 +39083,7 @@ function _hasrRenderFilterBanner() {
       display:flex; flex-direction:column;
       transform:translateX(-105%);
       transition:transform .28s cubic-bezier(.22,.6,.34,1);
-      border-right:2px solid var(--teal,#0891B2);
+      border-right:2px solid var(--teal,#0d849c);
       overflow:hidden;
     }
     #hasr-dp.hasr-open { transform:translateX(0); }
@@ -39088,7 +39107,7 @@ function _hasrRenderFilterBanner() {
     #hasr-ov.hasr-open { display:block; opacity:1; }
     .hasr-head {
       padding:20px 24px 16px;
-      background:linear-gradient(135deg,#071C28 0%,#0A3043 60%,#0d3d55 100%);
+      background:linear-gradient(135deg,#071C28 0%,#0d2f40 60%,#163d52 100%);
       color:#fff; flex-shrink:0;
       border-bottom:1px solid rgba(255,255,255,.1);
       position:relative;
@@ -39117,7 +39136,7 @@ function _hasrRenderFilterBanner() {
       font-family:Tajawal,sans-serif;
     }
     .hasr-tab:hover  { color:rgba(255,255,255,.8); }
-    .hasr-tab.active { color:#fff; border-bottom-color:#0891B2; }
+    .hasr-tab.active { color:#fff; border-bottom-color:#0d849c; }
     .hasr-body { flex:1; overflow-y:auto; padding:18px 20px; scrollbar-width:thin; }
     .hasr-body::-webkit-scrollbar { width:7px; }
     .hasr-body::-webkit-scrollbar-track { background:transparent; }
@@ -39133,7 +39152,7 @@ function _hasrRenderFilterBanner() {
     .hasr-ic:hover { box-shadow:0 6px 18px rgba(6,20,28,.1); transform:translateY(-2px); }
     .hasr-ic::before {
       content:''; position:absolute; top:0; right:0;
-      width:3.5px; height:100%; background:var(--hc,#94a3b8);
+      width:3.5px; height:100%; background:var(--hc,#8aa1ad);
     }
     .hasr-ic.full { grid-column:1/-1; }
     .hasr-ic-lbl  { font-size:13px; color:var(--tx-muted); font-weight:700; margin-bottom:5px; letter-spacing:.01em; }
@@ -39149,7 +39168,7 @@ function _hasrRenderFilterBanner() {
     }
     .hasr-sec::before {
       content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0;
-      background:var(--teal,#0891B2);
+      background:var(--teal,#0d849c);
       box-shadow:0 0 0 3px ${CSS_TOKENS.α(CSS_TOKENS.info(), 0.15)};
     }
     .hasr-sec:first-child { margin-top:0; }
@@ -39172,8 +39191,8 @@ function _hasrRenderFilterBanner() {
     .hasr-smeta { font-size:13px; color:var(--tx-muted); margin-top:4px; line-height:1.5; }
     .hasr-sbadge {
       font-size:13px; font-weight:800; padding:4px 12px;
-      border-radius:999px; background:#EFF6FF; color:#1D4ED8;
-      border:1px solid rgba(29,78,216,.15);
+      border-radius:999px; background:#eaf6fa; color:#0b6b7e;
+      border:1px solid rgba(13,132,156,.15);
       flex-shrink:0; margin-right:6px; white-space:nowrap;
     }
     .hasr-cbar {
@@ -39197,17 +39216,17 @@ function _hasrRenderFilterBanner() {
       box-shadow:0 6px 20px rgba(0,0,0,.1) !important;
     }
     .hasr-clickable.hasr-active {
-      box-shadow:0 0 0 2px var(--hac,#1D4ED8),0 4px 16px rgba(0,0,0,.1) !important;
+      box-shadow:0 0 0 2px var(--hac,#0d849c),0 4px 16px rgba(0,0,0,.1) !important;
     }
     .hasr-finp {
       width:100%; box-sizing:border-box; padding:10px 14px; margin-bottom:10px;
       background:var(--bg-2); border:1px solid var(--bd-light); border-radius:10px;
       font-size:14px; font-family:Tajawal,sans-serif; color:var(--tx-main); outline:none;
     }
-    .hasr-finp:focus { border-color:#0891B2; box-shadow:0 0 0 3px ${CSS_TOKENS.α(CSS_TOKENS.info(),.12)}; }
+    .hasr-finp:focus { border-color:#0d849c; box-shadow:0 0 0 3px ${CSS_TOKENS.α(CSS_TOKENS.info(),.12)}; }
     .hasr-back-btn {
       display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;
-      padding:8px 16px;border-radius:10px;background:var(--bg-2);color:var(--teal,#0891B2);
+      padding:8px 16px;border-radius:10px;background:var(--bg-2);color:var(--teal,#0d849c);
       border:1.5px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.3)};cursor:pointer;font-family:Tajawal;
       margin-bottom:16px;transition:background .15s;
     }
@@ -39570,10 +39589,10 @@ function _hasrRenderKPIs() {
   _hS('hasr-k-assets', s.totalAssets.toLocaleString('ar'));
   const bk = document.getElementById('hasr-assets-breakdown');
   if (bk) bk.innerHTML = `
-    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#D1FAE5;color:#065F46">ممتاز ${s.excellent.toLocaleString('ar')}</span>
-    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#DBEAFE;color:#1E40AF">جيد ${s.good.toLocaleString('ar')}</span>
-    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#FEF3C7;color:#92400E">سئ ${s.bad.toLocaleString('ar')}</span>
-    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#FEE2E2;color:#991B1B">متهالك ${s.deteriorated.toLocaleString('ar')}</span>`;
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#D1FAE5;color:#066a52">ممتاز ${s.excellent.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#eaf6fa;color:#163d52">جيد ${s.good.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#fdf6ec;color:#92590a">سئ ${s.bad.toLocaleString('ar')}</span>
+    <span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#fdf0f2;color:#7d1f2c">متهالك ${s.deteriorated.toLocaleString('ar')}</span>`;
 
   _hS('hasr-k-reassessed',     s.totalReassessed.toLocaleString('ar'));
   _hS('hasr-k-reassessed-pct', s.reassessedPct + '%');
@@ -39593,14 +39612,14 @@ function _hasrRenderKPIs() {
 /* ربط الكروت بالبانيل — مرة واحدة فقط */
 function _hasrBindKPIs() {
   const MAP = [
-    {id:'hasr-k-surveyed',       k:'schools',    c:'#1D4ED8'},
-    {id:'hasr-k-assets',         k:'assets',     c:'#059669'},
-    {id:'hasr-k-reassessed',     k:'reassessed', c:'#7C3AED'},
-    {id:'hasr-k-avg-assets',     k:'avg',        c:'#0891B2'},
-    {id:'hasr-k-total-buildings',k:'buildings',  c:'#D97706'},
-    {id:'hasr-k-total-rooms',    k:'rooms',      c:'#DC2626'},
-    {id:'hasr-k-main-systems',   k:'systems',    c:'#1E3A8A'},
-    {id:'hasr-k-sub-systems',    k:'subsystems', c:'#0E7490'},
+    {id:'hasr-k-surveyed',       k:'schools',    c:'#0d849c'},
+    {id:'hasr-k-assets',         k:'assets',     c:'#066a52'},
+    {id:'hasr-k-reassessed',     k:'reassessed', c:'#6c2bd9'},
+    {id:'hasr-k-avg-assets',     k:'avg',        c:'#0d849c'},
+    {id:'hasr-k-total-buildings',k:'buildings',  c:'#c07a14'},
+    {id:'hasr-k-total-rooms',    k:'rooms',      c:'#9c2a3a'},
+    {id:'hasr-k-main-systems',   k:'systems',    c:'#163d52'},
+    {id:'hasr-k-sub-systems',    k:'subsystems', c:'#0b6b7e'},
   ];
   MAP.forEach(({id, k, c}) => {
     const card = document.getElementById(id)?.closest('.kpi');
@@ -39691,18 +39710,18 @@ function _hPanelSchools(body) {
   const cities = [...new Set(sc.map(x=>x.city).filter(Boolean))].sort();
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#1D4ED8">
+      <div class="hasr-ic" style="--hc:#0d849c">
         <div class="hasr-ic-lbl">محصورة</div>
         <div class="hasr-ic-val">${s.totalSchoolsSurveyed.toLocaleString('ar')}</div>
         <div class="hasr-ic-sub">من ${HASR_TOTAL_TARGET.toLocaleString('ar')}</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.coveragePct}%;background:#1D4ED8"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.coveragePct}%;background:#0d849c"></div></div>
       </div>
-      <div class="hasr-ic" style="--hc:#059669">
+      <div class="hasr-ic" style="--hc:#066a52">
         <div class="hasr-ic-lbl">نسبة التغطية</div>
         <div class="hasr-ic-val">${s.coveragePct}%</div>
         <div class="hasr-ic-sub">من الهدف</div>
       </div>
-      <div class="hasr-ic full" style="--hc:#7C3AED">
+      <div class="hasr-ic full" style="--hc:#6c2bd9">
         <div class="hasr-ic-lbl">المدن المشمولة</div>
         <div class="hasr-ic-val">${ctx.cities.length}</div>
         <div class="hasr-ic-sub">${ctx.cities.map(c=>_hE(c.city)).join(' · ')}</div>
@@ -39766,49 +39785,49 @@ function _hPanelAssets(body) {
   const topSys = ctx.systems.slice(0,8);
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#059669">
+      <div class="hasr-ic full" style="--hc:#066a52">
         <div class="hasr-ic-lbl">إجمالي الأصول</div>
         <div class="hasr-ic-val">${s.totalAssets.toLocaleString('ar')}</div>
       </div>
-      <div class="hasr-ic" style="--hc:#10B981">
+      <div class="hasr-ic" style="--hc:#0e9488">
         <div class="hasr-ic-lbl">ممتاز</div>
         <div class="hasr-ic-val">${s.excellent.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.excellent)}%</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.excellent)}%;background:#10B981"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.excellent)}%;background:#0e9488"></div></div>
       </div>
-      <div class="hasr-ic" style="--hc:#3B82F6">
+      <div class="hasr-ic" style="--hc:#0d849c">
         <div class="hasr-ic-lbl">جيد</div>
         <div class="hasr-ic-val">${s.good.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.good)}%</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.good)}%;background:#3B82F6"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.good)}%;background:#0d849c"></div></div>
       </div>
-      <div class="hasr-ic" style="--hc:#F59E0B">
+      <div class="hasr-ic" style="--hc:#c07a14">
         <div class="hasr-ic-lbl">سئ</div>
         <div class="hasr-ic-val">${s.bad.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.bad)}%</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.bad)}%;background:#F59E0B"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.bad)}%;background:#c07a14"></div></div>
       </div>
-      <div class="hasr-ic" style="--hc:#EF4444">
+      <div class="hasr-ic" style="--hc:#9c2a3a">
         <div class="hasr-ic-lbl">متهالك</div>
         <div class="hasr-ic-val">${s.deteriorated.toLocaleString('ar')}</div><div class="hasr-ic-sub">${p(s.deteriorated)}%</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.deteriorated)}%;background:#EF4444"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${p(s.deteriorated)}%;background:#9c2a3a"></div></div>
       </div>
     </div>
     <div class="hasr-cbar">
-      ${s.excellent>0?`<div class="hasr-cseg" style="flex:${s.excellent};background:#10B981">${p(s.excellent)}%</div>`:''}
-      ${s.good>0?`<div class="hasr-cseg" style="flex:${s.good};background:#3B82F6">${p(s.good)}%</div>`:''}
-      ${s.bad>0?`<div class="hasr-cseg" style="flex:${s.bad};background:#F59E0B">${p(s.bad)}%</div>`:''}
-      ${s.deteriorated>0?`<div class="hasr-cseg" style="flex:${s.deteriorated};background:#EF4444">${p(s.deteriorated)}%</div>`:''}
+      ${s.excellent>0?`<div class="hasr-cseg" style="flex:${s.excellent};background:#0e9488">${p(s.excellent)}%</div>`:''}
+      ${s.good>0?`<div class="hasr-cseg" style="flex:${s.good};background:#0d849c">${p(s.good)}%</div>`:''}
+      ${s.bad>0?`<div class="hasr-cseg" style="flex:${s.bad};background:#c07a14">${p(s.bad)}%</div>`:''}
+      ${s.deteriorated>0?`<div class="hasr-cseg" style="flex:${s.deteriorated};background:#9c2a3a">${p(s.deteriorated)}%</div>`:''}
     </div>
     <div class="hasr-sec">أعلى الأنظمة أصولاً</div>
     ${topSys.map(sys=>`
       <div style="padding:7px 0;border-bottom:1px solid var(--bd-light)">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px">
           <span style="font-size:14px;font-weight:600;color:var(--tx-main)">${_hE(sys.name)}</span>
-          <span style="font-size:14px;font-weight:700;color:#1D4ED8">${sys.total}</span>
+          <span style="font-size:14px;font-weight:700;color:#0b6b7e">${sys.total}</span>
         </div>
         <div style="display:flex;border-radius:4px;overflow:hidden;height:6px;background:var(--bd-light)">
-          ${sys.excellent>0?`<div style="flex:${sys.excellent};background:#10B981"></div>`:''}
-          ${sys.good>0?`<div style="flex:${sys.good};background:#3B82F6"></div>`:''}
-          ${sys.bad>0?`<div style="flex:${sys.bad};background:#F59E0B"></div>`:''}
-          ${sys.deteriorated>0?`<div style="flex:${sys.deteriorated};background:#EF4444"></div>`:''}
+          ${sys.excellent>0?`<div style="flex:${sys.excellent};background:#0e9488"></div>`:''}
+          ${sys.good>0?`<div style="flex:${sys.good};background:#0d849c"></div>`:''}
+          ${sys.bad>0?`<div style="flex:${sys.bad};background:#c07a14"></div>`:''}
+          ${sys.deteriorated>0?`<div style="flex:${sys.deteriorated};background:#9c2a3a"></div>`:''}
         </div>
       </div>`).join('')}
   `;
@@ -39821,13 +39840,13 @@ function _hPanelReassessed(body) {
   const list = ctx.schools.filter(sc=>sc.reassessed==='نعم');
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#7C3AED">
+      <div class="hasr-ic" style="--hc:#6c2bd9">
         <div class="hasr-ic-lbl">معادة</div>
         <div class="hasr-ic-val">${s.totalReassessed.toLocaleString('ar')}</div>
         <div class="hasr-ic-sub">${s.reassessedPct}% من المحصورة</div>
-        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.reassessedPct}%;background:#7C3AED"></div></div>
+        <div class="hasr-prog"><div class="hasr-pfill" style="width:${s.reassessedPct}%;background:#6c2bd9"></div></div>
       </div>
-      <div class="hasr-ic" style="--hc:#94A3B8">
+      <div class="hasr-ic" style="--hc:#8aa1ad">
         <div class="hasr-ic-lbl">غير معادة</div>
         <div class="hasr-ic-val">${(s.totalSchoolsSurveyed-s.totalReassessed).toLocaleString('ar')}</div>
         <div class="hasr-ic-sub">${(100-s.reassessedPct).toFixed(1)}%</div>
@@ -39842,7 +39861,7 @@ function _hPanelReassessed(body) {
             <div class="hasr-sname">${_hE(sc.name)}</div>
             <div class="hasr-smeta">${_hE(sc.city)} · ${sc.buildings||0} مبنى · ${sc.rooms||0} غرفة</div>
           </div>
-          <span style="font-size:12.5px;padding:2px 8px;border-radius:999px;background:#EDE9FE;color:#6D28D9;font-weight:700">✓ معادة</span>
+          <span style="font-size:12.5px;padding:2px 8px;border-radius:999px;background:#f3eefe;color:#6c2bd9;font-weight:700">✓ معادة</span>
         </div>`).join('')}
   `;
 }
@@ -39857,17 +39876,17 @@ function _hPanelAvg(body) {
   const bot5 = [...sc].sort((a,b)=>a.totalAssets-b.totalAssets).filter(x=>x.totalAssets>0).slice(0,5);
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#0891B2"><div class="hasr-ic-lbl">متوسط الأصول</div><div class="hasr-ic-val">${Math.round(s.totalAssets/n).toLocaleString('ar')}</div><div class="hasr-ic-sub">أصل / مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#D97706"><div class="hasr-ic-lbl">متوسط المباني</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#DC2626"><div class="hasr-ic-lbl">متوسط الغرف</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#10B981"><div class="hasr-ic-lbl">متوسط ممتاز</div><div class="hasr-ic-val">${Math.round(s.excellent/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#F59E0B"><div class="hasr-ic-lbl">متوسط سئ</div><div class="hasr-ic-val">${Math.round(s.bad/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#EF4444"><div class="hasr-ic-lbl">متوسط متهالك</div><div class="hasr-ic-val">${Math.round(s.deteriorated/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#0d849c"><div class="hasr-ic-lbl">متوسط الأصول</div><div class="hasr-ic-val">${Math.round(s.totalAssets/n).toLocaleString('ar')}</div><div class="hasr-ic-sub">أصل / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#c07a14"><div class="hasr-ic-lbl">متوسط المباني</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#9c2a3a"><div class="hasr-ic-lbl">متوسط الغرف</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#0e9488"><div class="hasr-ic-lbl">متوسط ممتاز</div><div class="hasr-ic-val">${Math.round(s.excellent/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#c07a14"><div class="hasr-ic-lbl">متوسط سئ</div><div class="hasr-ic-val">${Math.round(s.bad/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#9c2a3a"><div class="hasr-ic-lbl">متوسط متهالك</div><div class="hasr-ic-val">${Math.round(s.deteriorated/n)}</div><div class="hasr-ic-sub">/ مدرسة</div></div>
     </div>
     <div class="hasr-sec">أعلى 5 أصولاً</div>
-    ${top5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#1D4ED8;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+    ${top5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#0b6b7e;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
     <div class="hasr-sec">أقل 5 أصولاً</div>
-    ${bot5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#EF4444;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
+    ${bot5.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#9c2a3a;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#fdf0f2;color:#7d1f2c">${x.totalAssets.toLocaleString('ar')}</div></div>`).join('')}
   `;
 }
 
@@ -39880,12 +39899,12 @@ function _hPanelBuildings(body) {
   const top10= [...sc].sort((a,b)=>(b.buildings||0)-(a.buildings||0)).slice(0,10);
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#D97706"><div class="hasr-ic-lbl">إجمالي المباني</div><div class="hasr-ic-val">${s.totalBuildings.toLocaleString('ar')}</div></div>
-      <div class="hasr-ic" style="--hc:#D97706"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.buildings||0),0)}</div><div class="hasr-ic-sub">مبنى</div></div>
+      <div class="hasr-ic full" style="--hc:#c07a14"><div class="hasr-ic-lbl">إجمالي المباني</div><div class="hasr-ic-val">${s.totalBuildings.toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#c07a14"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalBuildings/n).toFixed(1)}</div><div class="hasr-ic-sub">مبنى / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#066a52"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.buildings||0),0)}</div><div class="hasr-ic-sub">مبنى</div></div>
     </div>
     <div class="hasr-sec">أعلى 10 مدارس مبانياً</div>
-    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#D97706;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEF3C7;color:#92400E">${x.buildings||0} مبنى</div></div>`).join('')}
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:var(--c-warning-text);min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#fdf6ec;color:#92590a">${x.buildings||0} مبنى</div></div>`).join('')}
   `;
 }
 
@@ -39898,12 +39917,12 @@ function _hPanelRooms(body) {
   const top10= [...sc].sort((a,b)=>(b.rooms||0)-(a.rooms||0)).slice(0,10);
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#DC2626"><div class="hasr-ic-lbl">إجمالي الغرف</div><div class="hasr-ic-val">${s.totalRooms.toLocaleString('ar')}</div></div>
-      <div class="hasr-ic" style="--hc:#DC2626"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
-      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.rooms||0),0)}</div><div class="hasr-ic-sub">غرفة</div></div>
+      <div class="hasr-ic full" style="--hc:#9c2a3a"><div class="hasr-ic-lbl">إجمالي الغرف</div><div class="hasr-ic-val">${s.totalRooms.toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#9c2a3a"><div class="hasr-ic-lbl">المتوسط</div><div class="hasr-ic-val">${(s.totalRooms/n).toFixed(1)}</div><div class="hasr-ic-sub">غرفة / مدرسة</div></div>
+      <div class="hasr-ic" style="--hc:#066a52"><div class="hasr-ic-lbl">الأعلى</div><div class="hasr-ic-val">${sc.reduce((m,x)=>Math.max(m,x.rooms||0),0)}</div><div class="hasr-ic-sub">غرفة</div></div>
     </div>
     <div class="hasr-sec">أعلى 10 مدارس غرفاً</div>
-    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#DC2626;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#FEE2E2;color:#991B1B">${x.rooms||0} غرفة</div></div>`).join('')}
+    ${top10.map((x,i)=>`<div class="hasr-srow" onclick="hasrOpenDetail('${_hE(x.code)}')"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:15px;font-weight:900;color:#9c2a3a;min-width:18px">${i+1}</span><div><div class="hasr-sname">${_hE(x.name)}</div><div class="hasr-smeta">${_hE(x.city)}</div></div></div><div class="hasr-sbadge" style="background:#fdf0f2;color:#7d1f2c">${x.rooms||0} غرفة</div></div>`).join('')}
   `;
 }
 
@@ -39922,16 +39941,16 @@ function _hPanelMainSystems(body) {
 
   const ctxBanner = sc
     ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
-        <span style="font-size:14px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:14px;color:#163d52;font-weight:700">🏫 ${_hE(sc.name)}</span>
         <span style="font-size:13px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
-        <button onclick="HASR._schoolCtx=null;hasrTab('systems')" style="margin-right:auto;font-size:12.5px;padding:2px 8px;border-radius:999px;background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ عرض جميع المدارس</button>
+        <button onclick="HASR._schoolCtx=null;hasrTab('systems')" style="margin-right:auto;font-size:12.5px;padding:2px 8px;border-radius:999px;background:#E0E7FF;color:#6c2bd9;border:none;cursor:pointer;font-family:Tajawal">✕ عرض جميع المدارس</button>
       </div>`
     : '';
 
   body.innerHTML = `
     ${ctxBanner}
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#1E3A8A">
+      <div class="hasr-ic full" style="--hc:#163d52">
         <div class="hasr-ic-lbl">عدد الأنظمة الرئيسية</div>
         <div class="hasr-ic-val">${sys.length.toLocaleString('ar')}</div>
       </div>
@@ -39948,10 +39967,10 @@ function _hPanelMainSystems(body) {
             <div style="flex:1">
               <div class="hasr-sname">${_hE(s.name)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:7px;background:var(--bd-light);margin-top:5px">
-                ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
-                ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
-                ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
-                ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
+                ${s.excellent>0?`<div style="flex:${s.excellent};background:#0e9488"></div>`:''}
+                ${s.good>0?`<div style="flex:${s.good};background:#0d849c"></div>`:''}
+                ${s.bad>0?`<div style="flex:${s.bad};background:#c07a14"></div>`:''}
+                ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#9c2a3a"></div>`:''}
               </div>
               <div class="hasr-smeta" style="margin-top:4px">${((tot/totAll)*100).toFixed(1)}% من الإجمالي</div>
             </div>
@@ -39968,7 +39987,7 @@ function _hPanelSubSystems(body) {
   const totAll = subs.reduce((t,x)=>t+(x.total||0),0) || 1;
   body.innerHTML = `
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#0E7490">
+      <div class="hasr-ic full" style="--hc:#0b6b7e">
         <div class="hasr-ic-lbl">إجمالي الأنظمة الفرعية</div>
         <div class="hasr-ic-val">${subs.length.toLocaleString('ar')}</div>
       </div>
@@ -39980,15 +39999,15 @@ function _hPanelSubSystems(body) {
           const isActive = ctx.filter.subSys===sub.name && ctx.filter.mainSys===sub.mainSys;
           return `
           <div class="hasr-srow" onclick="hasrSelectSubSystem('${_hE(sub.mainSys)}','${_hE(sub.name)}')"
-               style="border:1.5px solid ${isActive?'rgba(14,116,144,.4)':'transparent'};background:${isActive?'rgba(14,116,144,.06)':''}">
+               style="border:1.5px solid ${isActive?'rgba(11,107,126,.4)':'transparent'};background:${isActive?'rgba(11,107,126,.06)':''}">
             <div style="flex:1">
               <div class="hasr-sname">${_hE(sub.name)}</div>
               <div class="hasr-smeta">${_hE(sub.mainSys)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:4px">
-                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
-                ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
-                ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
-                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
+                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#0e9488"></div>`:''}
+                ${sub.good>0?`<div style="flex:${sub.good};background:#0d849c"></div>`:''}
+                ${sub.bad>0?`<div style="flex:${sub.bad};background:#c07a14"></div>`:''}
+                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#9c2a3a"></div>`:''}
               </div>
             </div>
             <div class="hasr-sbadge">${(sub.total||0).toLocaleString('ar')} أصل</div>
@@ -40032,28 +40051,28 @@ function hasrSelectMainSystem(mainSys) {
   const schoolBanner = sc
     ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;
                    background:rgba(30,58,138,.08);border-radius:8px;border:1px solid rgba(30,58,138,.18);flex-wrap:wrap">
-        <span style="font-size:14px;color:#1E3A8A;font-weight:700">🏫 ${_hE(sc.name)}</span>
+        <span style="font-size:14px;color:#163d52;font-weight:700">🏫 ${_hE(sc.name)}</span>
         <span style="font-size:13px;color:var(--tx-muted)">${_hE(sc.city)} · ${_hE(sc.code)}</span>
         <button onclick="HASR._schoolCtx=null;hasrTab('systems')"
           style="margin-right:auto;font-size:12.5px;padding:2px 8px;border-radius:999px;
-                 background:#E0E7FF;color:#3730A3;border:none;cursor:pointer;font-family:Tajawal">✕ كل المدارس</button>
+                 background:#E0E7FF;color:#6c2bd9;border:none;cursor:pointer;font-family:Tajawal">✕ كل المدارس</button>
       </div>`
     : '';
 
   /* بنر معلومات النظام الرئيسي */
   const totSys = sysEntry?.total || 0;
   const tE=sysEntry?.excellent||0, tG=sysEntry?.good||0, tB=sysEntry?.bad||0, tD=sysEntry?.deteriorated||0;
-  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
+  const bars=[{v:tE,c:'#066a52',l:'ممتاز'},{v:tG,c:'#0d849c',l:'جيد'},{v:tB,c:'#c07a14',l:'سئ'},{v:tD,c:'#9c2a3a',l:'متهالك'}];
   const barTot = totSys||1;
 
   body.innerHTML = `
     ${schoolBanner}
     <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#1E3A8A">
+      <div class="hasr-ic" style="--hc:#163d52">
         <div class="hasr-ic-lbl">إجمالي الأصول</div>
         <div class="hasr-ic-val">${totSys.toLocaleString('ar')}</div>
       </div>
-      <div class="hasr-ic" style="--hc:#0E7490">
+      <div class="hasr-ic" style="--hc:#0b6b7e">
         <div class="hasr-ic-lbl">الأنظمة الفرعية</div>
         <div class="hasr-ic-val">${subs.length}</div>
       </div>
@@ -40079,10 +40098,10 @@ function hasrSelectMainSystem(mainSys) {
             <div style="flex:1">
               <div class="hasr-sname">${_hE(sub.name)}</div>
               <div style="display:flex;border-radius:5px;overflow:hidden;height:6px;background:var(--bd-light);margin-top:5px">
-                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#10B981"></div>`:''}
-                ${sub.good>0?`<div style="flex:${sub.good};background:#3B82F6"></div>`:''}
-                ${sub.bad>0?`<div style="flex:${sub.bad};background:#F59E0B"></div>`:''}
-                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#EF4444"></div>`:''}
+                ${sub.excellent>0?`<div style="flex:${sub.excellent};background:#0e9488"></div>`:''}
+                ${sub.good>0?`<div style="flex:${sub.good};background:#0d849c"></div>`:''}
+                ${sub.bad>0?`<div style="flex:${sub.bad};background:#c07a14"></div>`:''}
+                ${sub.deteriorated>0?`<div style="flex:${sub.deteriorated};background:#9c2a3a"></div>`:''}
               </div>
               <div class="hasr-smeta" style="margin-top:3px">${sub.total.toLocaleString('ar')} أصل · ${pct}%</div>
             </div>
@@ -40113,7 +40132,7 @@ function hasrShowSubDetail(mainSys, subSys) {
 
   const tot  = subObj?.total || 0;
   const tE=subObj?.excellent||0, tG=subObj?.good||0, tB=subObj?.bad||0, tD=subObj?.deteriorated||0;
-  const bars=[{v:tE,c:'#10B981',l:'ممتاز'},{v:tG,c:'#3B82F6',l:'جيد'},{v:tB,c:'#F59E0B',l:'سئ'},{v:tD,c:'#EF4444',l:'متهالك'}];
+  const bars=[{v:tE,c:'#066a52',l:'ممتاز'},{v:tG,c:'#0d849c',l:'جيد'},{v:tB,c:'#c07a14',l:'سئ'},{v:tD,c:'#9c2a3a',l:'متهالك'}];
   const barTot = tot||1;
   const body = document.getElementById('hasr-spr-body');
   if (!body) return;
@@ -40126,7 +40145,7 @@ function hasrShowSubDetail(mainSys, subSys) {
     <button class="hasr-back-btn" onclick="hasrSelectMainSystem('${_hE(mainSys)}')">← رجوع لـ ${_hE(mainSys)}</button>
 
     <div class="hasr-igrid">
-      <div class="hasr-ic full" style="--hc:#0E7490">
+      <div class="hasr-ic full" style="--hc:#0b6b7e">
         <div class="hasr-ic-lbl">${_hE(subSys)}</div>
         <div class="hasr-ic-val">${tot.toLocaleString('ar')}</div>
         <div class="hasr-ic-sub">إجمالي الأصول</div>
@@ -40146,12 +40165,12 @@ function hasrShowSubDetail(mainSys, subSys) {
 
     <div class="hasr-sec">النظام الرئيسي</div>
     <div style="padding:10px 12px;background:rgba(30,58,138,.06);border-radius:8px;border:1px solid rgba(30,58,138,.15)">
-      <span style="font-size:14.5px;font-weight:700;color:#1E3A8A">⚙️ ${_hE(mainSys)}</span>
+      <span style="font-size:14.5px;font-weight:700;color:#163d52">⚙️ ${_hE(mainSys)}</span>
     </div>
     ${sc ? `
     <div class="hasr-sec" style="margin-top:12px">المدرسة</div>
     <div style="padding:10px 12px;background:${CSS_TOKENS.α(CSS_TOKENS.info(),.06)};border-radius:8px;border:1px solid ${CSS_TOKENS.α(CSS_TOKENS.info(),.18)}">
-      <div style="font-size:14.5px;font-weight:700;color:#0E7490">🏫 ${_hE(sc.name)}</div>
+      <div style="font-size:14.5px;font-weight:700;color:#0b6b7e">🏫 ${_hE(sc.name)}</div>
       <div style="font-size:13px;color:var(--tx-muted);margin-top:2px">${_hE(sc.city)} · ${_hE(sc.code)}</div>
     </div>` : ''}
   `;
@@ -40183,14 +40202,14 @@ function hasrOpenDetail(code) {
   _hS('hasr-dp-title', sc.name);
   _hS('hasr-dp-sub',   'كود: ' + sc.code + ' · ' + sc.city);
   const tot=sc.totalAssets||1;
-  const bars=[{v:sc.excellent,c:'#10B981',l:'ممتاز'},{v:sc.good,c:'#3B82F6',l:'جيد'},{v:sc.bad,c:'#F59E0B',l:'سئ'},{v:sc.deteriorated,c:'#EF4444',l:'متهالك'}];
+  const bars=[{v:sc.excellent,c:'#066a52',l:'ممتاز'},{v:sc.good,c:'#0d849c',l:'جيد'},{v:sc.bad,c:'#c07a14',l:'سئ'},{v:sc.deteriorated,c:'#9c2a3a',l:'متهالك'}];
   const active=(sc.systems||[]).filter(s=>s.total>0);
   document.getElementById('hasr-dp-body').innerHTML=`
     <div class="hasr-igrid">
-      <div class="hasr-ic" style="--hc:#059669"><div class="hasr-ic-lbl">الأصول</div><div class="hasr-ic-val">${(sc.totalAssets||0).toLocaleString('ar')}</div></div>
-      <div class="hasr-ic" style="--hc:#1D4ED8"><div class="hasr-ic-lbl">المباني</div><div class="hasr-ic-val">${sc.buildings||0}</div></div>
-      <div class="hasr-ic" style="--hc:#7C3AED"><div class="hasr-ic-lbl">الغرف</div><div class="hasr-ic-val">${sc.rooms||0}</div></div>
-      <div class="hasr-ic" style="--hc:${sc.reassessed==='نعم'?'#7C3AED':'#94A3B8'}"><div class="hasr-ic-lbl">معادة</div><div class="hasr-ic-val" style="font-size:15.5px">${sc.reassessed==='نعم'?'✓ نعم':'لا'}</div></div>
+      <div class="hasr-ic" style="--hc:#066a52"><div class="hasr-ic-lbl">الأصول</div><div class="hasr-ic-val">${(sc.totalAssets||0).toLocaleString('ar')}</div></div>
+      <div class="hasr-ic" style="--hc:#0d849c"><div class="hasr-ic-lbl">المباني</div><div class="hasr-ic-val">${sc.buildings||0}</div></div>
+      <div class="hasr-ic" style="--hc:#6c2bd9"><div class="hasr-ic-lbl">الغرف</div><div class="hasr-ic-val">${sc.rooms||0}</div></div>
+      <div class="hasr-ic" style="--hc:${sc.reassessed==='نعم'?'#6c2bd9':'#8aa1ad'}"><div class="hasr-ic-lbl">معادة</div><div class="hasr-ic-val" style="font-size:15.5px">${sc.reassessed==='نعم'?'✓ نعم':'لا'}</div></div>
     </div>
     <div class="hasr-sec">توزيع الحالة</div>
     <div class="hasr-cbar">
@@ -40201,7 +40220,7 @@ function hasrOpenDetail(code) {
     </div>
     <div class="hasr-sec" style="display:flex;align-items:center;justify-content:space-between">
       <span>الأنظمة الرئيسية</span>
-      ${active.length?`<button onclick="hasrOpenSchoolSystems('${_hE(sc.code)}')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;background:#1E3A8A;color:#fff;border:none;cursor:pointer;font-family:Tajawal">⚙️ عرض الكل</button>`:''}
+      ${active.length?`<button onclick="hasrOpenSchoolSystems('${_hE(sc.code)}')" style="font-size:12.5px;padding:3px 9px;border-radius:6px;background:#163d52;color:#fff;border:none;cursor:pointer;font-family:Tajawal">⚙️ عرض الكل</button>`:''}
     </div>
     ${!active.length
       ?'<div style="color:var(--tx-muted);font-size:14.5px;text-align:center;padding:16px">لا توجد أصول</div>'
@@ -40210,13 +40229,13 @@ function hasrOpenDetail(code) {
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;margin-bottom:5px">
               <span style="font-size:14.5px;font-weight:700;color:var(--tx-main)">${_hE(s.name)}</span>
-              <span style="font-size:14px;font-weight:700;background:#EFF6FF;color:#1D4ED8;padding:2px 8px;border-radius:6px">${s.total}</span>
+              <span style="font-size:14px;font-weight:700;background:#eaf6fa;color:#0b6b7e;padding:2px 8px;border-radius:6px">${s.total}</span>
             </div>
             <div style="display:flex;border-radius:5px;overflow:hidden;height:9px;background:var(--bd-light)">
-              ${s.excellent>0?`<div style="flex:${s.excellent};background:#10B981"></div>`:''}
-              ${s.good>0?`<div style="flex:${s.good};background:#3B82F6"></div>`:''}
-              ${s.bad>0?`<div style="flex:${s.bad};background:#F59E0B"></div>`:''}
-              ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#EF4444"></div>`:''}
+              ${s.excellent>0?`<div style="flex:${s.excellent};background:#0e9488"></div>`:''}
+              ${s.good>0?`<div style="flex:${s.good};background:#0d849c"></div>`:''}
+              ${s.bad>0?`<div style="flex:${s.bad};background:#c07a14"></div>`:''}
+              ${s.deteriorated>0?`<div style="flex:${s.deteriorated};background:#9c2a3a"></div>`:''}
             </div>
           </div>
           <div style="font-size:13px;color:var(--tx-muted);padding-right:6px">← تفاصيل</div>
@@ -40265,7 +40284,7 @@ function _hasrChartCondition() {
   if(HASR.charts?.cond){HASR.charts.cond.destroy();}
   HASR.charts.cond=new Chart(ctx,{
     type:'doughnut',
-    data:{labels:['ممتاز','جيد','سئ','متهالك'],datasets:[{data:[E,G,B,D],backgroundColor:['#10B981','#3B82F6','#F59E0B','#EF4444'],borderWidth:2,borderColor:'#fff'}]},
+    data:{labels:['ممتاز','جيد','سئ','متهالك'],datasets:[{data:[E,G,B,D],backgroundColor:['#0e9488','#0d849c','#c07a14','#9c2a3a'],borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
       plugins:{legend:{position:'bottom',labels:{font:{family:'Tajawal',size:11},padding:14}},
         tooltip:{callbacks:{label:c=>{const t=E+G+B+D;return ` ${c.raw.toLocaleString('ar')} أصل (${t>0?((c.raw/t)*100).toFixed(1):0}%)`;}}}}}}
@@ -40278,7 +40297,7 @@ function _hasrChartSystems() {
   if(HASR.charts?.sys){HASR.charts.sys.destroy();}
   HASR.charts.sys=new Chart(ctx,{
     type:'bar',
-    data:{labels:top.map(s=>s.name),datasets:[{label:'إجمالي الأصول',data:top.map(s=>s.total),backgroundColor:'#3B82F6CC',borderColor:'#1D4ED8',borderWidth:1,borderRadius:4}]},
+    data:{labels:top.map(s=>s.name),datasets:[{label:'إجمالي الأصول',data:top.map(s=>s.total),backgroundColor:'#0d849cCC',borderColor:'#0d849c',borderWidth:1,borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
       layout:{padding:{right:8}},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('ar')} أصل`}}},
@@ -40296,7 +40315,7 @@ function _hasrChartCities() {
   if(HASR.charts?.cit){HASR.charts.cit.destroy();}
   HASR.charts.cit=new Chart(ctx,{
     type:'bar',
-    data:{labels:cities.map(c=>c.city),datasets:[{label:'عدد المدارس',data:cities.map(c=>c.schools),backgroundColor:'#6366F1CC',borderColor:'#4F46E5',borderWidth:1,borderRadius:4}]},
+    data:{labels:cities.map(c=>c.city),datasets:[{label:'عدد المدارس',data:cities.map(c=>c.schools),backgroundColor:'#6c2bd9CC',borderColor:'#6c2bd9',borderWidth:1,borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString('ar')} مدرسة`}}},
       scales:{x:{ticks:{font:{family:'Tajawal',size:10}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{family:'Tajawal',size:10}}}}}
@@ -40325,10 +40344,10 @@ function _hasrDrawTbl(){
   /* الحالة المفلترة حالياً — عشان نبرز العمود المناسب */
   const activeCond = document.getElementById('hasr-global-condition')?.value || '';
   const condStyles = {
-    excellent:  { color:'#059669', bg:'#DCFCE7', border:'#86EFAC' },
-    good:       { color:'#1D4ED8', bg:'#DBEAFE', border:'#93C5FD' },
-    bad:        { color:'#D97706', bg:'#FEF3C7', border:'#FCD34D' },
-    deteriorated:{ color:'#DC2626', bg:'#FEE2E2', border:'#FCA5A5' }
+    excellent:  { color:'#066a52', bg:'#edfaf5', border:'#b4d2cb' },
+    good:       { color:'#0b6b7e', bg:'#eaf6fa', border:'#cfe6eb' },
+    bad:        { color:'#92590a', bg:'#fdf6ec', border:'#ecd7b8' },
+    deteriorated:{ color:'#9c2a3a', bg:'#fdf0f2', border:'#d8bcc0' }
   };
   const makeCell = (val, key) => {
     const isActive = activeCond === key;
@@ -40355,12 +40374,12 @@ function _hasrDrawTbl(){
       ${makeCell(sc.bad,         'bad')}
       ${makeCell(sc.deteriorated,'deteriorated')}
       <td>${sc.buildings||0}</td><td>${sc.rooms||0}</td>
-      <td><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${r?'#EDE9FE':'#F1F5F9'};color:${r?'#6D28D9':'#64748B'}">${r?'✓ معادة':'لا'}</span></td>
+      <td><span style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;background:${r?'#f3eefe':'#eef3f7'};color:${r?'#6c2bd9':'#52707e'}">${r?'✓ معادة':'لا'}</span></td>
       <td style="white-space:nowrap">
         <button onclick="event.stopPropagation();hasrOpenDetail('${_hE(sc.code)}')"
-          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;font-family:Tajawal">عرض ←</button>
+          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#eaf6fa;color:#0b6b7e;border:1px solid #cfe6eb;font-family:Tajawal">عرض ←</button>
         <button onclick="event.stopPropagation();hasrOpenSchoolSystems('${_hE(sc.code)}')"
-          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;font-family:Tajawal;margin-right:4px">⚙️ أنظمتها</button>
+          style="font-size:10px;padding:3px 8px;border-radius:6px;cursor:pointer;background:#f3eefe;color:#6c2bd9;border:1px solid #d3bff4;font-family:Tajawal;margin-right:4px">⚙️ أنظمتها</button>
       </td>
     </tr>`;
   }).join('');
@@ -40468,11 +40487,11 @@ window.EMP_KPI = EMP_KPI;
 
 /* ── ألوان التقديرات ── */
 const EMP_GRADE_COLORS = {
-  'ممتاز':        { bg: '#F0FDF4', color: '#15803D', border: '#86EFAC' },
-  'جيد جداً':     { bg: '#ECFDF5', color: '#059669', border: '#6EE7B7' },
-  'جيد':          { bg: '#EFF6FF', color: '#1D4ED8', border: '#93C5FD' },
-  'يحتاج تحسين':  { bg: '#FFFBEB', color: '#D97706', border: '#FCD34D' },
-  'ضعيف':         { bg: '#FEF2F2', color: '#DC2626', border: '#FCA5A5' },
+  'ممتاز':        { bg: '#edfaf5', color: '#066a52', border: '#b4d2cb' },
+  'جيد جداً':     { bg: '#edfaf5', color: '#066a52', border: '#b4d2cb' },
+  'جيد':          { bg: '#eaf6fa', color: '#0b6b7e', border: '#cfe6eb' },
+  'يحتاج تحسين':  { bg: '#fdf6ec', color: '#92590a', border: '#ecd7b8' },
+  'ضعيف':         { bg: '#fdf0f2', color: '#9c2a3a', border: '#d8bcc0' },
 };
 const EMP_GRADE_ORDER = ['ممتاز', 'جيد جداً', 'جيد', 'يحتاج تحسين', 'ضعيف'];
 
@@ -40554,13 +40573,13 @@ function renderEmpKpiTab() {
 
   <!-- ══ توضيح نظام التقييم ══ -->
   <div style="padding:12px 16px;margin-bottom:14px;border-radius:12px;
-       background:linear-gradient(135deg,#EFF6FF 0%,#F0FDF4 100%);
-       border:1.5px solid #BFDBFE">
-    <div style="font-size:11px;font-weight:800;color:#1D4ED8;margin-bottom:8px">📋 كيف يُحسب التقييم؟</div>
+       background:linear-gradient(135deg,#eaf6fa 0%,#edfaf5 100%);
+       border:1.5px solid #cfe6eb">
+    <div style="font-size:11px;font-weight:800;color:#0b6b7e;margin-bottom:8px">📋 كيف يُحسب التقييم؟</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       ${METRIC_KEYS.map((k,i) => `
         <div style="font-size:10px;color:var(--tx-sec);background:#fff;padding:4px 10px;
-             border-radius:8px;border:1px solid #E2E8F0;white-space:nowrap">
+             border-radius:8px;border:1px solid #dbe7ee;white-space:nowrap">
           <strong>${METRIC_LABELS[i]}</strong> — ${METRIC_DESC[i]}
         </div>`).join('')}
     </div>
@@ -40571,7 +40590,7 @@ function renderEmpKpiTab() {
 
   <!-- ══ فلاتر موحدة ══ -->
   <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:14px 16px;
-       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f8fafc);border:1.5px solid var(--bd-light,#e2e8f0)">
+       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f7fafc);border:1.5px solid var(--bd-light,#dbe7ee)">
     <div class="fg" style="margin:0;min-width:130px">
       <div class="fg-lbl">المنطقة</div>
       <select class="fsel" id="emp-filter-region"
@@ -40642,7 +40661,7 @@ function renderEmpKpiTab() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#F0FDF4;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg></span>
         توزيع التقديرات
         <span class="sub">من إجمالي ${total} موظف</span>
       </div>
@@ -40650,7 +40669,7 @@ function renderEmpKpiTab() {
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+        <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
         متوسط الدرجة الكلية حسب المنطقة
         <span class="sub">الدرجة من 100</span>
       </div>
@@ -40660,7 +40679,7 @@ function renderEmpKpiTab() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#FFF7ED;color:#C2410C"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg></span>
+      <span class="card-title-icon" style="background:#fdf6ec;color:#92590a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg></span>
       متوسط المؤشرات الخمسة — مقارنة شاملة
       <span class="sub">كل مؤشر من 100%</span>
     </div>
@@ -40670,14 +40689,14 @@ function renderEmpKpiTab() {
   <!-- ══ جدول الموظفين ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></span>
+      <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></span>
       تفاصيل الموظفين
       <span class="sub" id="emp-tbl-count"></span>
     </div>
 
     <!-- أعمدة الجدول + شرحها -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;
-         background:var(--bg-2,#f8fafc);border-radius:8px;border:1px solid var(--bd-light)">
+         background:var(--bg-2,#f7fafc);border-radius:8px;border:1px solid var(--bd-light)">
       <span style="font-size:10px;color:var(--tx-muted);font-weight:700">شرح الأعمدة:</span>
       <span style="font-size:10px;color:var(--tx-sec)">المسند = إجمالي المهام</span>
       <span style="font-size:10px;color:var(--tx-muted)">·</span>
@@ -40693,7 +40712,7 @@ function renderEmpKpiTab() {
             <th style="min-width:180px;text-align:right;padding-right:14px">الموظف</th>
             <th>المنطقة</th>
             <th title="إجمالي المهام المسندة">المسند</th>
-            <th title="المهام المنجَزة" style="color:#059669">المنجَز</th>
+            <th title="المهام المنجَزة" style="color:#066a52">المنجَز</th>
             <th title="نسبة الإنجاز = المنجَز ÷ المسند">الإنجاز %</th>
             <th title="نسبة توثيق المهام بالصور">توثيق بالصور</th>
             <th title="نسبة إضافة تعليقات">التعليقات</th>
@@ -40768,12 +40787,12 @@ function _empKpiDrawTable() {
   const fmt = v => n_(v).toFixed(1) + '%';
 
   const gradeStyle = g => {
-    const s = EMP_GRADE_COLORS[g] || { bg:'#F1F5F9', color:'#64748B', border:'#CBD5E1' };
+    const s = EMP_GRADE_COLORS[g] || { bg:'#eef3f7', color:'#52707e', border:'#b9d0db' };
     return `background:${s.bg};color:${s.color};border:1px solid ${s.border}`;
   };
   const scoreStyle = sc => {
-    const bg    = sc>=85?'#F0FDF4':sc>=70?'#ECFDF5':sc>=55?'#EFF6FF':sc>=40?'#FFFBEB':'#FEF2F2';
-    const color = sc>=85?'#15803D':sc>=70?'#059669':sc>=55?'#1D4ED8':sc>=40?'#D97706':'#DC2626';
+    const bg    = sc>=85?'#edfaf5':sc>=70?'#edfaf5':sc>=55?'#eaf6fa':sc>=40?'#fdf6ec':'#fdf0f2';
+    const color = sc>=85?'#066a52':sc>=70?'#066a52':sc>=55?'#0d849c':sc>=40?'#c07a14':'#9c2a3a';
     return `background:${bg};color:${color}`;
   };
 
@@ -40789,7 +40808,7 @@ function _empKpiDrawTable() {
       </td>
       <td>${str(r['المنطقة'])}</td>
       <td style="font-weight:700;text-align:center">${assigned}</td>
-      <td style="color:#059669;font-weight:700;text-align:center">${done}</td>
+      <td style="color:#066a52;font-weight:700;text-align:center">${done}</td>
       <td style="text-align:center">${fmt(r['الإنجاز %'])}</td>
       <td style="text-align:center">${fmt(r['توثيق بالصور %'])}</td>
       <td style="text-align:center">${fmt(r['التعليقات %'])}</td>
@@ -40829,7 +40848,7 @@ function _empKpiDrawCharts(rows) {
         type: 'doughnut',
         data: {
           labels: EMP_GRADE_ORDER,
-          datasets: [{ data: counts, backgroundColor: EMP_GRADE_ORDER.map(g=>EMP_GRADE_COLORS[g]?.color||'#94A3B8'), borderWidth: 2, borderColor: '#fff' }]
+          datasets: [{ data: counts, backgroundColor: EMP_GRADE_ORDER.map(g=>EMP_GRADE_COLORS[g]?.color||'#8aa1ad'), borderWidth: 2, borderColor: '#fff' }]
         },
         options: {
           responsive: true, maintainAspectRatio: false, cutout: '62%',
@@ -40867,7 +40886,7 @@ function _empKpiDrawCharts(rows) {
           datasets: [{
             label: 'متوسط الدرجة',
             data: regAvgs,
-            backgroundColor: regAvgs.map(v=>v>=85?'#15803D99':v>=70?'#10B98199':v>=55?'#3B82F699':v>=40?'#F59E0B99':'#EF444499'),
+            backgroundColor: regAvgs.map(v=>v>=85?'#066a5299':v>=70?'#0e948899':v>=55?'#0d849c99':v>=40?'#c07a1499':'#9c2a3a99'),
             borderRadius: 6
           }]
         },
@@ -40908,7 +40927,7 @@ function _empKpiDrawCharts(rows) {
           datasets: [{
             label: 'متوسط %',
             data: metAvgs,
-            backgroundColor: metAvgs.map(v=>v>=85?'#15803D99':v>=70?'#10B98199':v>=55?'#3B82F699':v>=40?'#F59E0B99':'#EF444499'),
+            backgroundColor: metAvgs.map(v=>v>=85?'#066a5299':v>=70?'#0e948899':v>=55?'#0d849c99':v>=40?'#c07a1499':'#9c2a3a99'),
             borderRadius: 6,
             indexAxis: 'y'
           }]
@@ -41076,7 +41095,7 @@ function renderSafetyKpiTab() {
 
   <!-- ══ فلاتر موحدة ══ -->
   <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:14px 16px;
-       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f8fafc);border:1.5px solid var(--bd-light,#e2e8f0)">
+       margin-bottom:14px;border-radius:14px;background:var(--bg-2,#f7fafc);border:1.5px solid var(--bd-light,#dbe7ee)">
     <div class="fg" style="margin:0;min-width:130px">
       <div class="fg-lbl">المنطقة</div>
       <select class="fsel" id="safety-filter-region"
@@ -41139,7 +41158,7 @@ function renderSafetyKpiTab() {
   <div class="g2 mb14">
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#EFF6FF;color:#1D4ED8"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
+        <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
         الزيارات الميدانية: مقرر مقابل منفذ حسب المنطقة
         <span class="sub">إجمالي كل الأسابيع</span>
       </div>
@@ -41147,7 +41166,7 @@ function renderSafetyKpiTab() {
     </div>
     <div class="card">
       <div class="card-title">
-        <span class="card-title-icon" style="background:#FEF2F2;color:#DC2626"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <span class="card-title-icon" style="background:#fdf0f2;color:#9c2a3a"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg></span>
         الحوادث والإصابات حسب الأسبوع
         <span class="sub">اتجاه أسبوعي</span>
       </div>
@@ -41157,7 +41176,7 @@ function renderSafetyKpiTab() {
 
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F0FDF4;color:#059669"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg></span>
+      <span class="card-title-icon" style="background:#edfaf5;color:#066a52"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg></span>
       التدريب الأسبوعي: مقرر مقابل منفذ حسب المنطقة
       <span class="sub">إجمالي كل الأسابيع</span>
     </div>
@@ -41167,7 +41186,7 @@ function renderSafetyKpiTab() {
   <!-- ══ جدول التفاصيل ══ -->
   <div class="card mb14">
     <div class="card-title">
-      <span class="card-title-icon" style="background:#F0F9FF;color:#0369A1"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></span>
+      <span class="card-title-icon" style="background:#eaf6fa;color:#0b6b7e"><svg class="cti-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg></span>
       التفاصيل الأسبوعية حسب المنطقة
       <span class="sub" id="safety-tbl-count"></span>
     </div>
@@ -41180,15 +41199,15 @@ function renderSafetyKpiTab() {
             <th>المنطقة</th>
             <th title="عدد مشرفي السلامة">المشرفون</th>
             <th title="الزيارات الميدانية المقررة">مقرر</th>
-            <th title="الزيارات الميدانية المنفذة" style="color:#059669">منفذ</th>
-            <th title="عدد الحوادث المبلغ عنها" style="color:#DC2626">الحوادث</th>
+            <th title="الزيارات الميدانية المنفذة" style="color:#066a52">منفذ</th>
+            <th title="عدد الحوادث المبلغ عنها" style="color:#9c2a3a">الحوادث</th>
             <th title="عدد التقارير المبدئية">التقرير المبدئي</th>
-            <th title="إصابات شخصية" style="color:#DC2626">الإصابات</th>
+            <th title="إصابات شخصية" style="color:#9c2a3a">الإصابات</th>
             <th title="عدد الحوادث المحقَّقة">تم التحقيق</th>
             <th title="الإجراءات التصحيحية المرسلة للمقاول">إجراءات تصحيحية</th>
             <th title="أوامر العمل المرسلة للمقاول">أوامر عمل</th>
             <th title="التدريب الأسبوعي المقرر">تدريب مقرر</th>
-            <th title="التدريب الأسبوعي المنفذ" style="color:#059669">تدريب منفذ</th>
+            <th title="التدريب الأسبوعي المنفذ" style="color:#066a52">تدريب منفذ</th>
             <th title="تعميمات ودروس مستفادة منشورة">تعميمات/دروس</th>
             <th title="إجمالي موظفي المنطقة">إجمالي الموظفين</th>
           </tr>
@@ -41272,15 +41291,15 @@ function _safetyKpiDrawTable() {
       <td>${str(r['المنطقة'])}</td>
       <td style="text-align:center">${n_(r['عدد المشرفين للسلامة'])}</td>
       <td style="text-align:center">${n_(r['عدد الزيارات الميدانية المقررة'])}</td>
-      <td style="color:#059669;font-weight:700;text-align:center">${n_(r['عدد الزيارات المنفذة'])}</td>
-      <td style="color:${incidents>0?'#DC2626':'var(--tx-muted)'};font-weight:${incidents>0?'700':'400'};text-align:center">${incidents}</td>
+      <td style="color:#066a52;font-weight:700;text-align:center">${n_(r['عدد الزيارات المنفذة'])}</td>
+      <td style="color:${incidents>0?'#9c2a3a':'var(--tx-muted)'};font-weight:${incidents>0?'700':'400'};text-align:center">${incidents}</td>
       <td style="text-align:center">${n_(r['عدد الحوادث التي تم اصدار التقرير المبدئي لها'])}</td>
-      <td style="color:${injuries>0?'#DC2626':'var(--tx-muted)'};font-weight:${injuries>0?'700':'400'};text-align:center">${injuries}</td>
+      <td style="color:${injuries>0?'#9c2a3a':'var(--tx-muted)'};font-weight:${injuries>0?'700':'400'};text-align:center">${injuries}</td>
       <td style="text-align:center">${n_(r['عدد الحوادث التي تم التحقيق فيها'])}</td>
       <td style="text-align:center">${n_(r['عدد الإجراءات التصحيحية المرسلة للمقاول'])}</td>
       <td style="text-align:center">${n_(r['عدد أوامر العمل من الزيارات التي تم ارسالها للمقاول'])}</td>
       <td style="text-align:center">${n_(r['التدريب الأسبوعي - مقرر'])}</td>
-      <td style="color:#059669;font-weight:700;text-align:center">${n_(r['التدريب الأسبوعي - منفذ'])}</td>
+      <td style="color:#066a52;font-weight:700;text-align:center">${n_(r['التدريب الأسبوعي - منفذ'])}</td>
       <td style="text-align:center">${str(r['تعميمات/ دروس منشورة']) || '—'}</td>
       <td style="text-align:center">${n_(r['العدد الكلي لموظفي المنطقة'])}</td>
     </tr>`;
@@ -41323,8 +41342,8 @@ function _safetyKpiDrawCharts(rows) {
         data: {
           labels,
           datasets: [
-            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#93C5FD99', borderRadius: 6 },
-            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#10B98199', borderRadius: 6 },
+            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#cfe6eb99', borderRadius: 6 },
+            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#0e948899', borderRadius: 6 },
           ]
         },
         options: {
@@ -41359,8 +41378,8 @@ function _safetyKpiDrawCharts(rows) {
         data: {
           labels: wLabels,
           datasets: [
-            { label: 'الحوادث المبلغ عنها', data: wLabels.map(w=>weekMap[w].incidents), borderColor:'#DC2626', backgroundColor:'#DC262622', tension:.3, fill:true },
-            { label: 'الإصابات الشخصية',   data: wLabels.map(w=>weekMap[w].injuries),  borderColor:'#D97706', backgroundColor:'#D9770622', tension:.3, fill:true },
+            { label: 'الحوادث المبلغ عنها', data: wLabels.map(w=>weekMap[w].incidents), borderColor:'#9c2a3a', backgroundColor:'#9c2a3a22', tension:.3, fill:true },
+            { label: 'الإصابات الشخصية',   data: wLabels.map(w=>weekMap[w].injuries),  borderColor:'#c07a14', backgroundColor:'#c07a1422', tension:.3, fill:true },
           ]
         },
         options: {
@@ -41395,8 +41414,8 @@ function _safetyKpiDrawCharts(rows) {
         data: {
           labels,
           datasets: [
-            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#FCD34D99', borderRadius: 6 },
-            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#059669AA', borderRadius: 6 },
+            { label: 'مقرر', data: labels.map(r=>regionMap[r].planned), backgroundColor: '#ecd7b899', borderRadius: 6 },
+            { label: 'منفذ', data: labels.map(r=>regionMap[r].done),    backgroundColor: '#066a52AA', borderRadius: 6 },
           ]
         },
         options: {
@@ -44934,7 +44953,7 @@ setTimeout(function tellUserStillTrying() {
         strip.innerHTML =
           '<div class="kpi kc-blue"><div class="kpi-val" id="pqs-schools">—</div><div class="kpi-lbl">عدد المدارس</div></div>' +
           '<div class="kpi kc-teal"><div class="kpi-val" id="pqs-assets">—</div><div class="kpi-lbl">إجمالي الأصول</div></div>' +
-          '<div class="kpi kc-amber"><div class="kpi-val" id="pqs-reports">—</div><div class="kpi-lbl">إجمالي البلاغات</div></div>' +
+          '<div class="kpi kc-amber kc-neutral"><div class="kpi-val" id="pqs-reports">—</div><div class="kpi-lbl">إجمالي البلاغات</div></div>' +
           '<div class="kpi kc-green"><div class="kpi-val" id="pqs-fca">—</div><div class="kpi-lbl">متوسط تقييم FCA</div></div>';
         grid.parentElement.insertBefore(strip, grid);
 

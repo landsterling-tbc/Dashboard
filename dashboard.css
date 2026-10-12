@@ -60,7 +60,10 @@
   /* استخدم هذه دايماً بدل hex مباشرة */
   --c-positive:  #066a52;   /* إيجابي / نجاح / مكتمل        ← --good     */
   --c-danger:    #7d1f2c;   /* خطر / حرج / فوري             ← --red      */
-  --c-warning:   #c07a14;   /* تحذير / يحتاج انتباه          ← --warn     */
+  --c-warning:   #c07a14;
+  --c-warning-text: #92590a;
+  --c-orange: #b3541e;       /* __COLOR_PHASE5_AMBER__ برتقالي أغمق للأولوية «مرتفع» (بين الكهرماني والأحمر) */  /* __COLOR_STEP3_AMBER_TEXT__ برتقالي للنص الصغير فقط (تباين 5.7 على الأبيض) — للأشرطة والخلفيات استخدم --c-warning */   /* تحذير / يحتاج انتباه          ← --warn     */
+  --c-neutral: #8aa1ad;       /* __COLOR_PHASE8_NEUTRALS__ رمادي محايد للأشرطة والنقاط (أولوية منخفضة، غير مصنّف…) */
   --c-info:      #0d849c;   /* معلومة / رئيسي                ← --teal     */
   --c-info-2:    #0b6b7e;   /* ثانوي / تفصيلي               ← --teal-3   */
   --c-special:   #6c2bd9;   /* مميز / خاص / معادة            ← --purple   */
@@ -102,7 +105,7 @@
   /* النصوص */
   --tx-main:    #0c2330;
   --tx-sec:     #2c5468;
-  --tx-muted:   #6d8794;
+  --tx-muted:   #52707e;   /* __COLOR_STEP1_MUTED_CONTRAST__ كان #6d8794 (تباين 3.79) → تباين 5.28 على الأبيض */
 
   /* الحدود */
   --bd-light:   #dbe7ee;
@@ -182,7 +185,7 @@ body, html {
   background:
     radial-gradient(1000px 500px at 95% -8%, rgba(13,132,156,.07), transparent 50%),
     radial-gradient(800px 450px at -5% 105%, rgba(176,138,78,.05), transparent 48%),
-    linear-gradient(180deg, #f8fbfc 0%, var(--bg) 100%);
+    linear-gradient(180deg, #f7fafc 0%, var(--bg) 100%);
 }
 
 body::before {
@@ -378,22 +381,22 @@ b, strong { font-weight: 700; }
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #475569;
+  background: #52707e;
   box-shadow: 0 0 0 3px rgba(255,255,255,.08);
   transition: .25s ease;
 }
 .dot.loading {
-  background: #f59e0b;
+  background: #c07a14;
   animation: pulse-dot 1.2s infinite;
-  box-shadow: 0 0 0 3px rgba(245,158,11,.18);
+  box-shadow: 0 0 0 3px rgba(192,122,20,.18);
 }
 .dot.live {
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16,185,129,.18);
+  background: #0e9488;
+  box-shadow: 0 0 0 3px rgba(14,148,136,.18);
 }
 .dot.error {
-  background: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239,68,68,.18);
+  background: #9c2a3a;
+  box-shadow: 0 0 0 3px rgba(156,42,58,.18);
 }
 
 @keyframes pulse-dot {
@@ -466,9 +469,9 @@ b, strong { font-weight: 700; }
   to   { opacity: 1; transform: none; }
 }
 
-.toast.ok      { background: #f0fdf4; color: #14532d; border: 1px solid #bbf7d0; }
-.toast.err     { background: #fff5f5; color: #7f1d1d; border: 1px solid #fecaca; }
-.toast.loading { background: #fffbeb; color: #78350f; border: 1px solid #fde68a; }
+.toast.ok      { background: #edfaf5; color: #14532d; border: 1px solid #b4d2cb; }
+.toast.err     { background: #fdf0f2; color: #7d1f2c; border: 1px solid #d8bcc0; }
+.toast.loading { background: #fdf6ec; color: #92590a; border: 1px solid #ecd7b8; }
 
 /* ══════════════════════════════════════════════════════════════
    9. FILTERS ROW
@@ -701,7 +704,7 @@ html[dir="ltr"] .fsel {
   color: var(--tx-main);
   padding-bottom: 13px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #e6eff4;
+  border-bottom: 1px solid #dbe7ee;
 }
 
 .card-title-icon {
@@ -720,7 +723,7 @@ html[dir="ltr"] .fsel {
   margin-right: auto;
   padding: 3px 10px;
   border-radius: var(--r-pill);
-  background: #eef5f8;
+  background: #eef3f7;
   color: var(--tx-sec);
   font-size: 10px;
   font-weight: 700;
@@ -752,9 +755,9 @@ html[dir="ltr"] .fsel {
 .chart-box {
   position: relative;
   padding: 10px;
-  background: linear-gradient(180deg, #fdfeff 0%, #f8fbfd 100%);
+  background: linear-gradient(180deg, #f7fafc 0%, #f7fafc 100%);
   border-radius: var(--r-lg);
-  border: 1px solid #eaf1f6;
+  border: 1px solid #dbe7ee;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 1px 4px rgba(8,45,60,.04);
 }
 
@@ -877,7 +880,7 @@ tbody td {
   font-size: 12px;
   padding: 12px 12px;
   text-align: center;
-  border-bottom: 1px solid #edf3f7;
+  border-bottom: 1px solid #dbe7ee;
   color: var(--tx-main);
   transition: background .12s ease;
   vertical-align: middle;
@@ -895,12 +898,12 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── ألوان حالة الأصول الموحدة — تُستخدم في كل التبويبات ── */
 .cond-excellent { color: var(--c-excellent); font-weight: 700; }
 .cond-good      { color: var(--c-good-cond); font-weight: 700; }
-.cond-bad       { color: var(--c-bad-cond);  font-weight: 700; }
+.cond-bad       { color: var(--c-warning-text);  font-weight: 700; }
 .cond-detr      { color: var(--c-detr);      font-weight: 700; }
 
 .badge-excellent { background: var(--bg-positive); color: var(--c-excellent); border: 1px solid var(--bd-positive); border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
 .badge-good      { background: var(--bg-info);     color: var(--c-good-cond); border: 1px solid var(--bd-info);     border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
-.badge-bad       { background: var(--bg-warning);  color: var(--c-bad-cond);  border: 1px solid var(--bd-warning);  border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
+.badge-bad       { background: var(--bg-warning);  color: var(--c-warning-text);  border: 1px solid var(--bd-warning);  border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
 .badge-detr      { background: var(--bg-danger);   color: var(--c-detr);      border: 1px solid var(--bd-danger);   border-radius: var(--r-pill); padding: 2px 10px; font-size: 11px; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1032,7 +1035,7 @@ tbody tr:last-child td { border-bottom: none; }
   align-items: center;
   gap: 9px;
   padding: 9px 0;
-  border-bottom: 1px solid #eff5f9;
+  border-bottom: 1px solid #dbe7ee;
   font-size: 12px;
   border-radius: var(--r-sm);
   transition: background .12s ease, padding-right .12s ease;
@@ -1107,7 +1110,7 @@ tbody tr:last-child td { border-bottom: none; }
   padding: 48px 24px;
   border-radius: var(--r-lg);
   border: 1.5px dashed #d5e0e8;
-  background: #fafcfd;
+  background: #f7fafc;
   color: var(--tx-muted);
 }
 
@@ -1143,7 +1146,7 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .empty-state-sub code {
-  background: #f1f5f9;
+  background: #eef3f7;
   padding: 2px 6px;
   border-radius: 4px;
   margin-top: 6px;
@@ -1162,7 +1165,7 @@ tbody tr:last-child td { border-bottom: none; }
   text-align: center;
   padding: 48px 24px;
   border-radius: var(--r-lg);
-  background-image: linear-gradient(90deg, #f2f6f9 25%, #e9eff4 50%, #f2f6f9 75%);
+  background-image: linear-gradient(90deg, #eef3f7 25%, #eef3f7 50%, #eef3f7 75%);
   background-size: 200% 100%;
   animation: mxShimmer 1.6s linear infinite;
 }
@@ -1195,15 +1198,15 @@ tbody tr:last-child td { border-bottom: none; }
 .export-btn:hover { transform: translateY(-1px); box-shadow: var(--sh-d8); }
 
 .export-btn-csv {
-  border: 1px solid #059669;
-  background: #ecfdf5;
-  color: #059669;
+  border: 1px solid #066a52;
+  background: #edfaf5;
+  color: #066a52;
 }
-.export-btn-csv:hover { background: #059669; color: #fff; }
+.export-btn-csv:hover { background: #066a52; color: #fff; }
 
 .export-btn-excel {
   border: 1px solid var(--teal);
-  background: #ecfeff;
+  background: #eaf6fa;
   color: var(--teal);
 }
 .export-btn-excel:hover { background: var(--teal); color: #fff; }
@@ -1222,7 +1225,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .leaflet-container {
   font-family: "IBM Plex Sans Arabic", Tajawal, sans-serif !important;
-  background: #edf4f8;
+  background: #eef3f7;
 }
 
 .leaflet-popup-content-wrapper {
@@ -1245,7 +1248,7 @@ tbody tr:last-child td { border-bottom: none; }
   justify-content: space-between;
   gap: 10px;
   padding: 4px 0;
-  border-bottom: 1px solid #eef3f6;
+  border-bottom: 1px solid #dbe7ee;
   font-size: 11px;
 }
 
@@ -1430,7 +1433,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .map-search-item:hover,
 .map-search-item.active {
-  background: var(--bg-info, #eef8fb);
+  background: var(--bg-info, #eef3f7);
 }
 
 .map-search-item-name {
@@ -1620,20 +1623,20 @@ tbody tr:last-child td { border-bottom: none; }
   to   { opacity: 1; transform: none; }
 }
 
-.ix-kpi-modal-head { background: linear-gradient(120deg, #16394b, #1d4459); }
+.ix-kpi-modal-head { background: linear-gradient(120deg, #163d52, #163d52); }
 .ix-kpi-modal-close { border-radius: var(--r-pill); transition: background .2s; }
 .ix-kpi-modal-close:hover { background: rgba(255,255,255,.15); }
 
 .ix-school-panel {
   width: min(620px, 96vw);
-  background: #f6f8fa;
+  background: #f7fafc;
   box-shadow: var(--sh-d64);
   transition: transform .32s var(--ease-std);
 }
 
 .ix-panel-head {
   padding: 22px 26px 18px;
-  background: linear-gradient(130deg, #12303f 0%, #1b4356 55%, #235068 100%);
+  background: linear-gradient(130deg, #0d2f40 0%, #163d52 55%, #235068 100%);
   position: relative;
 }
 
@@ -1754,7 +1757,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 .ix-score-card:hover { box-shadow: var(--sh-d16); transform: translateY(-2px); }
 .ix-score-val { font-size: 22px; font-weight: 900; color: var(--ix-sc-color, var(--navy)); letter-spacing: -.4px; }
-.ix-score-bar2 { height: 7px; border-radius: var(--r-pill); background: #edf2f6; }
+.ix-score-bar2 { height: 7px; border-radius: var(--r-pill); background: #eef3f7; }
 .ix-score-fill2 { border-radius: var(--r-pill); background: var(--ix-sc-color, var(--teal)); }
 
 .ix-contract-row {
@@ -1768,10 +1771,10 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .ix-contract-row:hover { box-shadow: var(--sh-d8); }
-.ix-contract-type { font-weight: 800; color: #23485a; }
+.ix-contract-type { font-weight: 800; color: #163d52; }
 .ix-contract-num {
   display: inline-block;
-  background: #eef4f8;
+  background: #eef3f7;
   color: #2f6f84;
   border-radius: 8px;
   padding: 2px 10px;
@@ -2338,7 +2341,7 @@ body.bot-hidden #fcbShowWalkerBtn { display: flex !important; }
 }
 .chart-empty-state   { color: var(--tx-muted); }
 .chart-loading-state { color: var(--tx-muted); }
-.chart-error-state   { color: #DC2626; }
+.chart-error-state   { color: #9c2a3a; }
 
 /* ── 6) Scroll داخلي للجداول الكبيرة فقط — بلا Horizontal Overflow */
 .table-wrap, .table-responsive {
@@ -2386,7 +2389,7 @@ canvas {
 
 /* ── 12) Focus States — Keyboard Navigation مرئية ───────────────── */
 :focus-visible {
-  outline: 2.5px solid var(--teal, #0891B2);
+  outline: 2.5px solid var(--teal, #0d849c);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -2430,7 +2433,7 @@ canvas {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  background: linear-gradient(135deg, #0d2f40 0%, #123b52 100%);
+  background: linear-gradient(135deg, #0d2f40 0%, #163d52 100%);
   border-radius: var(--r-md);
   padding: 12px 20px;
   color: #fff;
@@ -2567,7 +2570,7 @@ canvas {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 11.5px;
   line-height: 1.6;
-  color: #5b7684;
+  color: #52707e;
 }
 
 @media (max-width: 900px) {
@@ -2622,7 +2625,7 @@ canvas {
   align-self: flex-start;
   background: transparent;
   border: none;
-  color: #0d7490;
+  color: #0b6b7e;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 11.5px;
   font-weight: 600;
@@ -2708,7 +2711,7 @@ canvas {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: linear-gradient(160deg, #0a2530 0%, #123b52 100%);
+  background: linear-gradient(160deg, #081e2a 0%, #163d52 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2767,7 +2770,7 @@ canvas {
 .app-loading-progress-fill {
   height: 100%;
   width: 6%;
-  background: linear-gradient(90deg, #0d7490, #16b3c9);
+  background: linear-gradient(90deg, #0b6b7e, #16b3c9);
   border-radius: var(--r-pill);
   transition: width .32s linear;
 }
@@ -2839,14 +2842,14 @@ canvas {
   padding: 3px 9px;
   border-radius: var(--r-pill);
 }
-.portal-card-status.pending { background: rgba(148,163,184,.15); color: #64748b; }
-.portal-card-status.loading { background: rgba(245,158,11,.14); color: #b45309; }
-.portal-card-status.ready   { background: rgba(16,185,129,.14); color: #047857; }
+.portal-card-status.pending { background: rgba(138,161,173,.15); color: #52707e; }
+.portal-card-status.loading { background: rgba(192,122,20,.14); color: #92590a; }
+.portal-card-status.ready   { background: rgba(14,148,136,.14); color: #066a52; }
 
 .portal-card-count {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 10.5px;
-  color: #7c93a1;
+  color: #8aa1ad;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2934,7 +2937,7 @@ canvas {
   margin-right: auto;
   font-size: 10.5px;
   font-weight: 700;
-  color: #7c93a1;
+  color: #8aa1ad;
   background: rgba(13,47,64,.06);
   border-radius: var(--r-pill);
   padding: 3px 9px;
@@ -2945,7 +2948,7 @@ canvas {
   text-align: center;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 12px;
-  color: #7c93a1;
+  color: #8aa1ad;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3071,7 +3074,7 @@ body.portal-active .prog-bar {
   gap: 6px;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 11px;
-  color: #5b7684;
+  color: #52707e;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3082,7 +3085,7 @@ body.portal-active .prog-bar {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #0d7490;
+  background: #0b6b7e;
   opacity: .6;
 }
 
@@ -3231,7 +3234,7 @@ body.portal-active .prog-bar {
 .portal-favorites-cta-btn:hover,
 .portal-favorites-edit-btn:hover,
 .portal-favorites-save-btn:hover {
-  background: #123b52;
+  background: #163d52;
 }
 
 .portal-favorites-head {
@@ -3258,7 +3261,7 @@ body.portal-active .prog-bar {
 .portal-favorites-chip {
   width: 100%;
   text-align: right;
-  background: #f0f6f8;
+  background: #eef3f7;
   border: 1px solid rgba(13,47,64,.1);
   color: #0d2f40;
   border-radius: var(--r-sm);
@@ -3315,7 +3318,7 @@ body.portal-active .prog-bar {
   border: none;
   font-size: 16px;
   cursor: pointer;
-  color: #5b7684;
+  color: #52707e;
 }
 
 .portal-favorites-modal-body {
@@ -3394,7 +3397,7 @@ body.portal-active .prog-bar {
   font-family: Tajawal, sans-serif;
   font-weight: 700;
   font-size: 11.5px;
-  color: #b45309;
+  color: #92590a;
   margin-bottom: 4px;
   padding: 0 2px;
 }
@@ -3895,7 +3898,7 @@ tbody td {
    ──────────────────────────────────────────────────────────────── */
 .finp:hover,
 .fsel:hover {
-  background-color: #fafcfe;  /* جديد — تلميح hover خفيف */
+  background-color: #f7fafc;  /* جديد — تلميح hover خفيف */
   border-color: rgba(13,132,156,.40);
 }
 
@@ -3984,7 +3987,7 @@ tbody td {
 html[dir="ltr"] .msel-btn { direction: ltr; }
 .msel-btn .msel-btn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msel-btn .msel-chev { font-size: 9px; color: #5f7d95; flex-shrink: 0; }
-.msel-btn:hover { background-color: #fafcfe; border-color: rgba(13,132,156,.40); }
+.msel-btn:hover { background-color: #f7fafc; border-color: rgba(13,132,156,.40); }
 .msel-btn.msel-open {
   outline: none;
   background-color: #fff;
@@ -4182,7 +4185,7 @@ html[dir="ltr"] .msel-btn { direction: ltr; }
    يميز البطاقات عن خلفية الصفحة بشكل واضح.
    ──────────────────────────────────────────────────────────────── */
 .card {
-  background: linear-gradient(170deg, #ffffff 0%, #fafcfe 100%);
+  background: linear-gradient(170deg, #ffffff 0%, #f7fafc 100%);
   box-shadow:
     0 1px 3px rgba(8,45,60,.05),
     0 6px 22px rgba(8,45,60,.09),
@@ -4274,7 +4277,7 @@ html[dir="ltr"] .msel-btn { direction: ltr; }
    أكثر وضوحاً وخلفيته أكثر نقاءً لإبراز الـ chart.
    ──────────────────────────────────────────────────────────────── */
 .chart-box {
-  background: linear-gradient(180deg, #fefeff 0%, #f7fafd 100%);
+  background: linear-gradient(180deg, #f7fafc 0%, #f7fafc 100%);
   border: 1px solid rgba(185,208,219,.55); /* ↑ كان: #eaf1f6 — أكثر وضوحاً */
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.9),
@@ -4352,7 +4355,7 @@ html[dir="ltr"] .msel-btn { direction: ltr; }
    الداكنة. نرفع opacity النص ونحسّن الفاصل السفلي.
    ──────────────────────────────────────────────────────────────── */
 thead th {
-  background: linear-gradient(180deg, #0e3347 0%, var(--navy-deep) 100%); /* ↑ كان: navy→navy-deep */
+  background: linear-gradient(180deg, #0d2f40 0%, var(--navy-deep) 100%); /* ↑ كان: navy→navy-deep */
   color: rgba(255,255,255,.96); /* ↑ كان: .87 — وضوح أكبر */
   border-bottom: 2px solid rgba(176,138,78,.55); /* ↑ كان: .35 — فاصل brass واضح */
   letter-spacing: .03em;        /* ↓ كان: .04em (Phase 3 حدّثه لـ .025em، نضبط هنا) */
@@ -4391,7 +4394,7 @@ tbody td:first-child {
    في الجداول الكبيرة.
    ──────────────────────────────────────────────────────────────── */
 tbody tr:nth-child(2n) td {
-  background: #f4f8fb;          /* ↑ كان: var(--bg-neutral) #f7fafc — تمييز أوضح */
+  background: #f7fafc;          /* ↑ كان: var(--bg-neutral) #f7fafc — تمييز أوضح */
 }
 
 /* ── 9-E: Row Hover — تلميح حيوي ────────────────────────────────
@@ -4484,7 +4487,7 @@ tbody tr:last-child td {
   background:
     radial-gradient(ellipse 50% 120% at 5% 50%, rgba(13,132,156,.18), transparent),
     radial-gradient(ellipse 30% 80% at 95% 50%, rgba(176,138,78,.10), transparent),
-    linear-gradient(135deg, #0a2535 0%, #0e3347 45%, #123b52 100%);
+    linear-gradient(135deg, #081e2a 0%, #0d2f40 45%, #163d52 100%);
   padding: 18px 26px;         /* ↑ كان: 12px 20px — أكثر كرماً وأناقة */
   border-radius: var(--r-lg); /* ↑ كان: 14px — متسق مع النظام */
   box-shadow:
@@ -4553,7 +4556,7 @@ tbody tr:last-child td {
    واضحاً وحداً أكثر وضوحاً وتدرجاً خفياً للخلفية.
    ──────────────────────────────────────────────────────────────── */
 .portal-card {
-  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid rgba(185,208,219,.7); /* ↑ كان: rgba(13,47,64,.08) */
   border-radius: var(--r-md);             /* ↑ كان: 14px — متسق */
   padding: 22px 20px;                     /* ↑ كان: 20px 18px */
@@ -4624,7 +4627,7 @@ tbody tr:last-child td {
    باستخدام متغير النظام للاتساق.
    ──────────────────────────────────────────────────────────────── */
 .portal-card-desc {
-  color: var(--tx-muted);     /* ↑ كان: #5b7684 literal — متغير النظام */
+  color: var(--tx-muted);     /* ↑ كان: #52707e literal — متغير النظام */
   line-height: 1.65;          /* ↑ كان: 1.6 — أكثر قابلية للقراءة */
 }
 
@@ -4633,7 +4636,7 @@ tbody tr:last-child td {
    بنفس مستوى الكروت بجانبه. نضيف تدرجاً خفياً.
    ──────────────────────────────────────────────────────────────── */
 .cat-sidebar {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid rgba(185,208,219,.65); /* ↑ كان: rgba(13,47,64,.08) */
   box-shadow:
     0 1px 3px rgba(8,45,60,.04),
@@ -4646,7 +4649,7 @@ tbody tr:last-child td {
    التي أضفناها على .portal-card.
    ──────────────────────────────────────────────────────────────── */
 .portal-favorites-card {
-  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid rgba(185,208,219,.65); /* ↑ كان: rgba(13,47,64,.08) */
   box-shadow:
     0 1px 3px rgba(8,45,60,.05),
@@ -4846,11 +4849,11 @@ tbody tr:last-child td {
 .mx-shimmer {
   background: linear-gradient(
     100deg,
-    #e8f0f5 0%,
-    #e8f0f5 35%,
-    #f4f9fb 50%,    /* ↑ كان: #f0f6f9 — أكثر بريقاً */
-    #e8f0f5 65%,
-    #e8f0f5 100%
+    #eef3f7 0%,
+    #eef3f7 35%,
+    #f7fafc 50%,    /* ↑ كان: #f0f6f9 — أكثر بريقاً */
+    #eef3f7 65%,
+    #eef3f7 100%
   );
   background-size: 800px 100%;
   animation: mxShimmer 1.6s ease-in-out infinite; /* ↓ كان: 1.4s — أبطأ وأهدأ */
@@ -4919,7 +4922,7 @@ body {
     radial-gradient(600px 400px at 50% 110%, rgba(13,132,156,.03), transparent 45%),
     repeating-linear-gradient(0deg,  rgba(13,47,64,.022) 0px, rgba(13,47,64,.022) 1px, transparent 1px, transparent 44px),
     repeating-linear-gradient(90deg, rgba(13,47,64,.022) 0px, rgba(13,47,64,.022) 1px, transparent 1px, transparent 44px),
-    linear-gradient(180deg, #f5f9fb 0%, var(--bg) 60%, #eaf1f6 100%);
+    linear-gradient(180deg, #f7fafc 0%, var(--bg) 60%, #eef3f7 100%);
   background-attachment: fixed;
   /* ↑ زدنا نمط شبكي هندسي خفيف جداً على كامل الداشبورد (كل التبويبات) —
      نفس هوية "Ink & Brass"، ثابت مع الصفحة (fixed) بحيث يبقى متسقاً
@@ -5020,7 +5023,7 @@ body {
    معرّفاً في كل البيئات. نضيفه كـ fallback آمن.
    ──────────────────────────────────────────────────────────────── */
 :root {
-  --muted-ink: #7a96a3;      /* جديد — مستخدم في fg-lbl وعناصر أخرى */
+  --muted-ink: #52707e;      /* __COLOR_STEP1_MUTED_CONTRAST__ كان #7a96a3 (تباين 3.13) — مستخدم في fg-lbl وعناصر أخرى */
   --c-info-2:  #0b6b7e;      /* جديد — مستخدم في card-title .sub */
   --bd-info:   rgba(13,132,156,.20); /* جديد — مستخدم في card-title .sub */
 }
@@ -5111,7 +5114,7 @@ tbody tr:last-child td:last-child {
   flex-direction: column;
   justify-content: center;
   min-height: 128px;
-  background: linear-gradient(170deg, #ffffff 0%, #fafcfe 100%);
+  background: linear-gradient(170deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid var(--bd-light);
   border-top: 1px solid var(--bd-light) !important; /* يمنع أي border-top inline قديم من مضاعفة الشريط اللوني مع ::before */
   border-radius: var(--r-xl);
@@ -5230,9 +5233,9 @@ tbody tr:last-child td:last-child {
 
 .kpi.kc-amber::before, .kpi.kc-amber .kpi-icon { background: var(--warn); }
 .kpi.kc-amber::after                           { background: var(--warn); }
-.kpi.kc-amber .kpi-val                         { color: #92400e; }
+.kpi.kc-amber .kpi-val                         { color: #92590a; }
 
-/* ── PHASE 1 (توحيد الألوان): كان .kc-red بيستخدم أحمر ساطع (#dc2626)
+/* ── PHASE 1 (توحيد الألوان): كان .kc-red بيستخدم أحمر ساطع (#9c2a3a)
    مختلف تماماً عن لون "الخطر" الموحّد في باقي الداشبورد (--red / --c-danger
    #7d1f2c) — حتى ظل الـ hover بتاعه (أسفل) كان بالفعل بيستخدم اللون
    الصح! دلوقتي بقى نفس اللون في كل الحالات (راحة/hover) وفي كل تبويب
@@ -5269,6 +5272,16 @@ tbody tr:last-child td:last-child {
 .kpi.kc-purple:hover {
   box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(108,43,217,.18),
     0 0 0 1px rgba(108,43,217,.12), inset 0 1px 0 #fff;
+}
+
+/* __COLOR_STEP4_NEUTRAL_KPI__ — كروت الأرقام المحايدة (إجمالي/عدد/أقدم…): تيل موحّد مثل .kc-blue بدل التلوين الزخرفي.
+   الصنف kc-neutral يُضاف بجانب الصنف الأصلي (kc-red/kc-green/…) فتبقى أي selectors قديمة تعمل. يجب أن يبقى هذا الجزء بعد قواعد .kc-* أعلاه. */
+.kpi.kc-neutral::before, .kpi.kc-neutral .kpi-icon { background: var(--teal); }
+.kpi.kc-neutral::after                             { background: var(--teal); }
+.kpi.kc-neutral .kpi-val                           { color: var(--teal-3) !important; }
+.kpi.kc-neutral:hover {
+  box-shadow: 0 2px 6px rgba(8,45,60,.08), 0 14px 36px rgba(13,132,156,.18),
+    0 0 0 1px rgba(13,132,156,.12), inset 0 1px 0 #fff;
 }
 
 /* ── جوال — نفس الهوية بمقاسات مناسبة للشاشة الصغيرة ── */
@@ -5340,7 +5353,7 @@ tbody tr:last-child td:last-child {
 
 .kpi.hasr-active {
   border-color: var(--hac, var(--c-info)) !important;
-  background: linear-gradient(170deg, #ffffff 0%, color-mix(in srgb, var(--hac, var(--c-info)) 6%, #fafcfe) 100%);
+  background: linear-gradient(170deg, #ffffff 0%, color-mix(in srgb, var(--hac, var(--c-info)) 6%, #f7fafc) 100%);
   box-shadow:
     0 2px 6px rgba(8, 45, 60, 0.09),
     0 14px 32px color-mix(in srgb, var(--hac, var(--c-info)) 22%, transparent),
@@ -5437,7 +5450,7 @@ tbody tr:last-child td:last-child {
 
 /* ── كارت المفضلة الفارغ — شكل أوضح كـ"دعوة للفعل" بدل نص عادي وسط الكارت ── */
 .portal-favorites-card {
-  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fafc 100%);
   border: 1.5px dashed rgba(13,132,156,.32);
   box-shadow:
     0 1px 3px rgba(8,45,60,.04),
@@ -5488,7 +5501,7 @@ tbody tr:last-child td:last-child {
     radial-gradient(ellipse 55% 140% at 3% 50%, rgba(13,132,156,.22), transparent),
     radial-gradient(ellipse 35% 90% at 97% 20%, rgba(176,138,78,.14), transparent),
     repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, transparent 1px, transparent 34px),
-    linear-gradient(135deg, #0a2535 0%, #0e3347 45%, #123b52 100%);
+    linear-gradient(135deg, #081e2a 0%, #0d2f40 45%, #163d52 100%);
 }
 
 .portal-hero-brand { gap: 16px; }
@@ -5639,7 +5652,7 @@ tbody tr:last-child td:last-child {
 .portal-stat {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(160deg, #ffffff 0%, #f8fbfd 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid rgba(185,208,219,.6);
   border-radius: var(--r-md);
   padding: 18px 12px 16px;
@@ -5765,7 +5778,7 @@ tbody tr:last-child td:last-child {
 
 /* ── 16-A: Hero — عمق أفضل مع تدرج أغنى ─────────────────────────── */
 .portal-hero {
-  background: linear-gradient(135deg, #071C28 0%, #0d3d55 50%, #0A3043 100%);
+  background: linear-gradient(135deg, #071C28 0%, #163d52 50%, #0d2f40 100%);
   padding: 16px 24px;
   border-radius: var(--r-lg);
   border: 1px solid rgba(255,255,255,.06);
@@ -5924,13 +5937,13 @@ tbody tr:last-child td:last-child {
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 17-A: ألوان كارت الأنظمة الرقمية — تيل غامق مميز داخل نفس العائلة ── */
-/* الخلفية والحدّ هنا اتحدّثوا للّون الجديد (نيلي #4f46e5) بدل التيل
+/* الخلفية والحدّ هنا اتحدّثوا للّون الجديد (نيلي #6c2bd9) بدل التيل
    القديم عشان يتماشوا مع --cat-accent الخاص بـ #portal-card-digital
    (اتغيّر في قسم إعادة الترتيب لحل تعارض الألوان التيل/سماوي). خلفية/لون
    أيقونتها بقت معتمدة على النظام الموحّد فقط (زي باقي الكروت) — القاعدة
    القديمة هنا كانت بتكسب بالتحديد على النظام الجديد فبتبيّن لون مختلف. */
-[data-category="digital"] { background: linear-gradient(160deg, #ffffff 0%, rgba(79,70,229,.06) 100%); border-color: rgba(79,70,229,.24); }
-[data-category="digital"]:hover            { border-color: rgba(79,70,229,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(79,70,229,.18), inset 0 1px 0 #fff; }
+[data-category="digital"] { background: linear-gradient(160deg, #ffffff 0%, rgba(108,43,217,.06) 100%); border-color: rgba(108,43,217,.24); }
+[data-category="digital"]:hover            { border-color: rgba(108,43,217,.32); box-shadow: 0 2px 6px rgba(8,45,60,.07), 0 16px 40px rgba(108,43,217,.18), inset 0 1px 0 #fff; }
 
 /* ── 17-B: صفحة تفاصيل الأنظمة الرقمية (overlay) ──────────────────── */
 .digital-systems-overlay {
@@ -5947,7 +5960,7 @@ tbody tr:last-child td:last-child {
 .digital-systems-container {
   width: min(1100px, 94vw);
   max-height: 92vh;
-  background: linear-gradient(170deg, #f7f9fb 0%, #edf2f5 100%);
+  background: linear-gradient(170deg, #f7fafc 0%, #eef3f7 100%);
   border-radius: 22px;
   box-shadow: 0 8px 40px rgba(8,30,43,.25), 0 2px 8px rgba(8,30,43,.12);
   overflow: hidden;
@@ -5960,7 +5973,7 @@ tbody tr:last-child td:last-child {
 .digital-systems-head {
   display: flex; align-items: center; gap: 16px;
   padding: 22px 28px 20px;
-  background: linear-gradient(135deg, #0d2f40 0%, #0d849c 55%, #0d3d55 100%);
+  background: linear-gradient(135deg, #0d2f40 0%, #0d849c 55%, #163d52 100%);
   color: #fff;
 }
 .digital-systems-head-icon {
@@ -6000,7 +6013,7 @@ tbody tr:last-child td:last-child {
 .digital-systems-quicknav {
   display: flex; flex-wrap: wrap; gap: 8px;
   padding: 14px 28px 4px;
-  background: #eef3f5;
+  background: #eef3f7;
   border-bottom: 1px solid rgba(13,47,64,.08);
 }
 .digi-qn-chip {
@@ -6249,7 +6262,7 @@ tbody tr:last-child td:last-child {
 .raci-legend {
   display: flex; flex-wrap: wrap; gap: 8px 12px;
   padding: 14px 18px;
-  background: #fbfcfd;
+  background: #f7fafc;
   border: 1px solid rgba(61,82,102,.12);
   border-radius: 14px;
   margin-bottom: 20px;
@@ -6300,7 +6313,7 @@ tbody tr:last-child td:last-child {
 }
 .raci-table thead th {
   position: sticky; top: 0; z-index: 2;
-  background: linear-gradient(180deg, #eef2f5 0%, #e4eaee 100%);
+  background: linear-gradient(180deg, #eef3f7 0%, #eef3f7 100%);
   border-bottom: 2px solid rgba(176,138,78,.55);
   padding: 11px 8px;
   text-align: center;
@@ -6310,7 +6323,7 @@ tbody tr:last-child td:last-child {
 .raci-th-task {
   position: sticky; right: 0; z-index: 3;
   text-align: right !important;
-  background: linear-gradient(180deg, #eef2f5 0%, #e4eaee 100%);
+  background: linear-gradient(180deg, #eef3f7 0%, #eef3f7 100%);
   min-width: 220px;
   border-left: 1px solid rgba(61,82,102,.16);
   color: #0d2f40;
@@ -6322,7 +6335,7 @@ tbody tr:last-child td:last-child {
 
 .raci-table tbody td {
   padding: 9px 8px;
-  border-bottom: 1px solid var(--bd-light, #eef1f3);
+  border-bottom: 1px solid var(--bd-light, #dbe7ee);
   text-align: center;
   vertical-align: middle;
   transition: background .12s ease;
@@ -6341,7 +6354,7 @@ tbody tr:last-child td:last-child {
    بيخلي نص أبيض على خلفية فاتحة في بعض المجموعات (مش ظاهر) */
 .raci-table tbody tr:nth-child(even):not(.raci-group-row) td,
 .raci-table tbody tr:nth-child(even):not(.raci-group-row) .raci-task-name {
-  background: #f7f9fa;
+  background: #f7fafc;
 }
 .raci-table tbody tr:not(.raci-group-row):hover td,
 .raci-table tbody tr:not(.raci-group-row):hover .raci-task-name {
@@ -6436,13 +6449,13 @@ tbody tr:last-child td:last-child {
 #portal-card-fca              { --cat-accent:#0d849c; --cat-soft:rgba(13,132,156,.13); --cat-bd:rgba(13,132,156,.28); }
 #portal-card-otherAssessments { --cat-accent:#5b6b8c; --cat-soft:rgba(91,107,140,.13);  --cat-bd:rgba(91,107,140,.28); }
 #portal-card-assets     { --cat-accent:#3d5266; --cat-soft:rgba(61,82,102,.12);   --cat-bd:rgba(61,82,102,.28);   }
-#portal-card-equipment  { --cat-accent:#a15c1f; --cat-soft:rgba(161,92,31,.13);   --cat-bd:rgba(161,92,31,.28);   }
+#portal-card-equipment  { --cat-accent:#b3541e; --cat-soft:rgba(179,84,30,.13);   --cat-bd:rgba(179,84,30,.28);   }
 #portal-card-contracts  { --cat-accent:#b08a4e; --cat-soft:rgba(176,138,78,.15);  --cat-bd:rgba(176,138,78,.3);   }
 #portal-card-operations { --cat-accent:#6c2bd9; --cat-soft:rgba(108,43,217,.12);  --cat-bd:rgba(108,43,217,.28);  }
-#portal-card-safety     { --cat-accent:#9f1239; --cat-soft:rgba(159,18,57,.11);   --cat-bd:rgba(159,18,57,.26);   }
+#portal-card-safety     { --cat-accent:#7d1f2c; --cat-soft:rgba(125,31,44,.11);   --cat-bd:rgba(125,31,44,.26);   }
 #portal-card-geo        { --cat-accent:#066a52; --cat-soft:rgba(6,106,82,.13);    --cat-bd:rgba(6,106,82,.28);    }
 #portal-card-explore    { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);    --cat-bd:rgba(22,61,82,.28);    }
-#portal-card-digital    { --cat-accent:#4f46e5; --cat-soft:rgba(79,70,229,.13);   --cat-bd:rgba(79,70,229,.3);    }
+#portal-card-digital    { --cat-accent:#6c2bd9; --cat-soft:rgba(108,43,217,.13);   --cat-bd:rgba(108,43,217,.3);    }
 #portal-card-raci       { --cat-accent:#8a6a37; --cat-soft:rgba(138,106,55,.14);  --cat-bd:rgba(138,106,55,.3);   }
 /* ★ 2026-09-17: أقسام إعادة التوزيع الجديدة — إضافة فقط */
 #portal-card-overview           { --cat-accent:#163d52; --cat-soft:rgba(22,61,82,.12);   --cat-bd:rgba(22,61,82,.28);   }
@@ -6742,7 +6755,7 @@ tbody tr:last-child td:last-child {
   flex:0 0 auto;
   display:flex;align-items:center;gap:10px;
   padding:14px 16px;
-  background:linear-gradient(130deg,#12303f 0%,#1b4356 55%,#235068 100%);
+  background:linear-gradient(130deg,#0d2f40 0%,#163d52 55%,#235068 100%);
   color:#fff;
   border-bottom:1px solid rgba(255,255,255,.12);
 }
@@ -6990,7 +7003,7 @@ button.ix-profile-source:hover{
   position: fixed;
   inset: 0;
   z-index: 999999;
-  background: linear-gradient(160deg, #0a2530 0%, #123b52 100%);
+  background: linear-gradient(160deg, #081e2a 0%, #163d52 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7188,25 +7201,25 @@ button.ix-profile-source:hover{
 .org-view-btn {
   padding: 8px 18px;
   border-radius: 999px;
-  border: 1px solid var(--bd-light, #e2e8f0);
+  border: 1px solid var(--bd-light, #dbe7ee);
   background: #fff;
-  color: var(--tx-muted, #64748b);
+  color: var(--tx-muted, #52707e);
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
   transition: .15s;
   font-family: inherit;
 }
-.org-view-btn:hover { background: #f1f5f9; }
+.org-view-btn:hover { background: #eef3f7; }
 .org-view-btn.active { background: #0b6b7e; border-color: #0b6b7e; color: #fff; }
 .org-view-panel { display: none; }
 .org-view-panel.active { display: block; }
 
 .org-chart-note {
   font-size: 12px;
-  color: #92400e;
-  background: #FFFBEB;
-  border: 1px solid #FDE68A;
+  color: #92590a;
+  background: #fdf6ec;
+  border: 1px solid #ecd7b8;
   border-radius: 8px;
   padding: 9px 14px;
   margin-bottom: 16px;
@@ -7225,7 +7238,7 @@ button.ix-profile-source:hover{
   color: #0b6b7e;
   margin: 22px 2px 10px;
   padding-top: 18px;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid #dbe7ee;
 }
 .org-chart-root-list { list-style: none; margin: 0; padding: 0; }
 .org-chart-root-list > li { margin-bottom: 10px; }
@@ -7256,17 +7269,17 @@ details.org-node-details > summary::marker { content: ''; }
   padding: 9px 14px;
   font-size: 12.5px;
   font-weight: 700;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid #dbe7ee;
   background: #fff;
   box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
-.org-node .org-node-arrow { font-size: 10px; color: #94a3b8; transition: .15s; }
+.org-node .org-node-arrow { font-size: 10px; color: #8aa1ad; transition: .15s; }
 details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .org-node .org-node-sub {
   display: block;
   font-weight: 500;
   font-size: 10.5px;
-  color: var(--tx-muted, #64748b);
+  color: var(--tx-muted, #52707e);
   margin-top: 2px;
 }
 .org-node-count {
@@ -7277,11 +7290,11 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-weight: 700;
   white-space: nowrap;
 }
-.org-node.org-node-team { background: #ECFDF5; border-color: #a7f3d0; color: #065f46; }
-.org-node.org-node-region { background: #EEF2FF; border-color: #c7d2fe; color: #3730a3; }
-.org-node.org-node-title { background: #FFF7ED; border-color: #fed7aa; color: #9a3412; }
-.org-node.org-node-vacant { background: #FEF2F2; border-color: #fecaca; color: #991b1b; }
-.org-node.org-node-person { background: #F8FAFC; border-color: #e2e8f0; color: #334155; font-weight: 600; }
+.org-node.org-node-team { background: #edfaf5; border-color: #b4d2cb; color: #066a52; }
+.org-node.org-node-region { background: #f3eefe; border-color: #d3bff4; color: #6c2bd9; }
+.org-node.org-node-title { background: #fdf6ec; border-color: #ecd7b8; color: #92590a; }
+.org-node.org-node-vacant { background: #fdf0f2; border-color: #d8bcc0; color: #7d1f2c; }
+.org-node.org-node-person { background: #f7fafc; border-color: #dbe7ee; color: #2c5468; font-weight: 600; }
 
 /* ══════════════════════════════════════════════════════════════════════
    21) PORTAL HOME — تحديث المرحلة 1: شريط أدوات الـ Hero (زجاجي موحّد)
@@ -7403,7 +7416,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 
 .portal-card-tab-dot {
-  background: var(--cat-accent, #0d7490);
+  background: var(--cat-accent, #0b6b7e);
   box-shadow: 0 0 0 2px var(--cat-soft, rgba(13,116,144,.15));
   transition: box-shadow .18s ease;
 }
@@ -7499,7 +7512,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-weight: 600;
   color: #0d2f40;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe7ee;
   border-radius: 999px;
   padding: 8px 16px;
   outline: none;
@@ -7512,7 +7525,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   gap: 12px;
   font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: #52707e;
   margin-inline-start: auto;
 }
 .orgc-legend-item { display: inline-flex; align-items: center; gap: 5px; }
@@ -7522,7 +7535,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
    الشاغرة نفسه (راجع .orgc-card.orgc-status-vacant تحت). */
 .orgc-legend-dot-dashed { background: transparent; border: 2px dashed; }
 /* فاصل بصري بسيط بين مجموعة شرح الحالة ومجموعة شرح ألوان المسمى الوظيفي. */
-.orgc-legend-sep { width: 1px; align-self: stretch; background: #e2e8f0; }
+.orgc-legend-sep { width: 1px; align-self: stretch; background: #dbe7ee; }
 
 .orgc-forest {
   /* ★ 2026-09-21: لازم يبقى هو نفسه حاوية الـ scroll (مش .org-chart-wrap
@@ -7533,19 +7546,19 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   direction: ltr;
   overflow-x: auto;
   overflow-y: hidden;
-  background: #fbfcfd;
+  background: #f7fafc;
   /* ★ 2026-09-22: سكرول بار واضح ومصبوغ (بدل الرمادي الافتراضي الخفي)،
      عشان لو الفرع محتاج تمرير فعلًا (بعد "احتواء الكل") يبان ده واضح
      بصريًا، مش مجرد حس غامض إن فيه حاجة ناقصة. */
   scrollbar-width: thin;
-  scrollbar-color: #94c9d3 #eef2f5;
+  scrollbar-color: #94c9d3 #eef3f7;
   /* ★ "أقدر أتحرك بحرّيتي" — سحب بالماوس (drag-to-pan) بدل الاعتماد على
      شريط التمرير بس؛ الشكل بيبقى "يد مفتوحة" وهو واقف، و"يد قابضة" وهو
      بيسحب فعلًا (راجع .orgc-panning تحت). */
   cursor: grab;
 }
 .orgc-forest::-webkit-scrollbar { height: 10px; }
-.orgc-forest::-webkit-scrollbar-track { background: #eef2f5; }
+.orgc-forest::-webkit-scrollbar-track { background: #eef3f7; }
 .orgc-forest::-webkit-scrollbar-thumb { background: #94c9d3; border-radius: 999px; }
 .orgc-forest::-webkit-scrollbar-thumb:hover { background: #6fb3c0; }
 .orgc-forest.orgc-panning {
@@ -7594,7 +7607,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   position: absolute;
   top: 0; left: 50%;
   width: 0; height: 28px;
-  border-left: 2px solid #cbd5e1;
+  border-left: 2px solid #b9d0db;
 }
 .orgc-li {
   position: relative;
@@ -7606,13 +7619,13 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   position: absolute;
   top: 0; right: 50%;
   width: 50%; height: 28px;
-  border-top: 2px solid #cbd5e1;
+  border-top: 2px solid #b9d0db;
 }
-.orgc-li::after { right: auto; left: 50%; border-left: 2px solid #cbd5e1; }
+.orgc-li::after { right: auto; left: 50%; border-left: 2px solid #b9d0db; }
 .orgc-li:only-child { padding-top: 0; }
 .orgc-li:only-child::before, .orgc-li:only-child::after { display: none; }
 .orgc-li:first-child::before, .orgc-li:last-child::after { border-color: transparent; }
-.orgc-li:last-child::before { border-right: 2px solid #cbd5e1; border-radius: 0 6px 0 0; }
+.orgc-li:last-child::before { border-right: 2px solid #b9d0db; border-radius: 0 6px 0 0; }
 .orgc-li:first-child::after { border-radius: 6px 0 0 0; }
 
 .orgc-node { display: inline-block; position: relative; }
@@ -7623,8 +7636,8 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   width: 22px; height: 22px;
   border-radius: 50%;
   background: #fff;
-  border: 2px solid #cbd5e1;
-  color: #475569;
+  border: 2px solid #b9d0db;
+  color: #52707e;
   font-size: 13px;
   font-weight: 800;
   line-height: 1;
@@ -7636,7 +7649,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   padding: 0;
   font-family: inherit;
 }
-.orgc-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
+.orgc-toggle:hover { background: #eef3f7; border-color: #8aa1ad; }
 
 /* — الكارت نفسه (نص عربي، فمتثبّت RTL ووسط بغض النظر عن اتجاه الشجرة) — */
 /* ── كارت الموظف (v2 — ★ 2026-09-21 تحديث بناءً على ملاحظة "الشكل
@@ -7651,22 +7664,22 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   width: 186px;
   background: #fff;
   border-radius: 16px;
-  border: 1px solid #e7ecf1;
+  border: 1px solid #dbe7ee;
   /* ★ v3: خط جانبي ملوّن (border-inline-start) بيوضح حالة التوظيف
      بنظرة واحدة من غير ما يحتاج المستخدم يقرأ النص — فكرة مأخوذة من
      كارت .onode في الكود المرجعي (border-inline-start: 4px solid --oc).
      inline-start بيتبع اتجاه الصفحة تلقائيًا (يمين في RTL) فمحتاجش أي
      تصحيح يدوي. */
-  border-inline-start: 4px solid #cbd5e1;
-  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 18px rgba(15,23,42,.07);
+  border-inline-start: 4px solid #b9d0db;
+  box-shadow: 0 1px 2px rgba(12,35,48,.05), 0 6px 18px rgba(12,35,48,.07);
   padding: 16px 12px 12px;
   font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
   position: relative;
   transition: box-shadow .15s ease, transform .15s ease, opacity .15s ease;
   vertical-align: top;
 }
-.orgc-card:hover { box-shadow: 0 6px 14px rgba(15,23,42,.1), 0 14px 30px rgba(15,23,42,.12); transform: translateY(-3px); }
-.orgc-card.orgc-has-children { box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 18px rgba(15,23,42,.07), 0 0 0 1px rgba(11,107,126,.14); }
+.orgc-card:hover { box-shadow: 0 6px 14px rgba(12,35,48,.1), 0 14px 30px rgba(12,35,48,.12); transform: translateY(-3px); }
+.orgc-card.orgc-has-children { box-shadow: 0 1px 2px rgba(12,35,48,.05), 0 6px 18px rgba(12,35,48,.07), 0 0 0 1px rgba(11,107,126,.14); }
 
 /* ★ v3: دائرة مملوءة باللون (مش حلقة فاضية بس) للموظف الحالي، بنفس
    روح avatar المرجعي — بتدّي إحساس أوضح إن الوظيفة مشغولة فعليًا. */
@@ -7675,7 +7688,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   margin: 0 auto 10px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(160deg, #eaf7f8, #ffffff);
+  background: linear-gradient(160deg, #eef3f7, #ffffff);
   border: 2.5px solid #bfe3e8;
   color: #0b6b7e;
   font-weight: 800;
@@ -7687,13 +7700,13 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   top: 8px; left: 10px;
   width: 20px; height: 20px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #F59E0B, #D97706);
+  background: linear-gradient(135deg, #c07a14, #c07a14);
   color: #fff;
   font-size: 10.5px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 3px rgba(180,83,9,.4);
+  box-shadow: 0 1px 3px rgba(146,89,10,.4);
 }
-.orgc-card-name { font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.4; margin-bottom: 2px; }
+.orgc-card-name { font-size: 13.5px; font-weight: 800; color: #0c2330; line-height: 1.4; margin-bottom: 2px; }
 .orgc-card-title {
   font-weight: 600; font-size: 10.5px; color: #7c8ea0;
   line-height: 1.4; margin-bottom: 10px; min-height: 14px;
@@ -7702,7 +7715,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
   gap: 5px 8px;
   padding-top: 9px;
-  border-top: 1px dashed #eef1f5;
+  border-top: 1px dashed #dbe7ee;
 }
 .orgc-card-status {
   display: inline-flex; align-items: center; gap: 4px;
@@ -7710,14 +7723,14 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 .orgc-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .orgc-card-tag {
-  font-size: 9.5px; font-weight: 700; color: #94a3b8;
-  background: #f4f6f8; border-radius: 999px; padding: 2px 8px;
+  font-size: 9.5px; font-weight: 700; color: #8aa1ad;
+  background: #eef3f7; border-radius: 999px; padding: 2px 8px;
 }
 
-.orgc-card.orgc-status-active { border-inline-start-color: #16a34a; }
-.orgc-card.orgc-status-active .orgc-avatar { border-color: #15803d; color: #fff; background: linear-gradient(155deg, #22a35d, #15803d); }
-.orgc-card.orgc-status-active .orgc-card-status { color: #15803d; }
-.orgc-card.orgc-status-active .orgc-status-dot { background: #16a34a; }
+.orgc-card.orgc-status-active { border-inline-start-color: #066a52; }
+.orgc-card.orgc-status-active .orgc-avatar { border-color: #066a52; color: #fff; background: linear-gradient(155deg, #22a35d, #066a52); }
+.orgc-card.orgc-status-active .orgc-card-status { color: #066a52; }
+.orgc-card.orgc-status-active .orgc-status-dot { background: #066a52; }
 
 /* ★ 2026-09-28: حدّ متقطّع (dashed) لكل الكارت، لا الجانب الملوَّن فقط —
    إشارة بصرية إضافية للوظيفة الشاغرة مطابقة لأسلوب الملف المرجعي (PPTX)،
@@ -7725,23 +7738,23 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
    الحدّ المتقطّع الآخر (outline) الخاص بوضع التعديل (راجع
    #org-view-chart.orgc-edit-mode .orgc-card تحت) — الأول border والثاني
    outline، فلا يتعارضان حتى لو اجتمعا على نفس الكارت. */
-.orgc-card.orgc-status-vacant { background: #fbfcfd; border-inline-start-color: #cbd5e1; border-style: dashed; }
-.orgc-card.orgc-status-vacant .orgc-avatar { border-color: #dbe3ea; color: #94a3b8; background: linear-gradient(160deg,#f4f6f8,#fff); }
-.orgc-card.orgc-status-vacant .orgc-card-name { color: #94a3b8; font-style: italic; }
-.orgc-card.orgc-status-vacant .orgc-card-status { color: #94a3b8; }
-.orgc-card.orgc-status-vacant .orgc-status-dot { background: #94a3b8; }
+.orgc-card.orgc-status-vacant { background: #f7fafc; border-inline-start-color: #b9d0db; border-style: dashed; }
+.orgc-card.orgc-status-vacant .orgc-avatar { border-color: #dbe7ee; color: #8aa1ad; background: linear-gradient(160deg,#eef3f7,#fff); }
+.orgc-card.orgc-status-vacant .orgc-card-name { color: #8aa1ad; font-style: italic; }
+.orgc-card.orgc-status-vacant .orgc-card-status { color: #8aa1ad; }
+.orgc-card.orgc-status-vacant .orgc-status-dot { background: #8aa1ad; }
 
 /* ★ 2026-09-28: تصنيف لوني للمسمى الوظيفي (راجع _orgRoleColorClass في
    dashboard.js) — شريط علوي ملوَّن فوق الكارت، مستقل عن لون الجانب
    (border-inline-start) الخاص بحالة التوظيف، ومستقل أيضًا عن نمط الحدّ
    (solid/dashed) حتى يبقى المتقطّع الخاص بالشاغر ظاهرًا حتى مع وجود لون
    الدور. يُطبَّق فقط على العرض والّلون، لا على النمط. */
-.orgc-card.orgc-role-engineer { border-top-width: 3px; border-top-color: #2563eb; }
-.orgc-card.orgc-role-supervisor { border-top-width: 3px; border-top-color: #d97706; }
-.orgc-card.orgc-role-support { border-top-width: 3px; border-top-color: #db2777; }
-.orgc-card.orgc-role-manager { border-top-width: 3px; border-top-color: #7c3aed; }
+.orgc-card.orgc-role-engineer { border-top-width: 3px; border-top-color: #0d849c; }
+.orgc-card.orgc-role-supervisor { border-top-width: 3px; border-top-color: #c07a14; }
+.orgc-card.orgc-role-support { border-top-width: 3px; border-top-color: #b8425a; }
+.orgc-card.orgc-role-manager { border-top-width: 3px; border-top-color: #6c2bd9; }
 
-.orgc-card.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.orgc-card.orgc-search-match { outline: 3px solid #c07a14; outline-offset: 2px; }
 .orgc-card.orgc-search-dim { opacity: .22; }
 
 /* ── "مدير خارج نطاق هذا الملف" — وسم مضغوط، مختلف عمدًا عن كارت
@@ -7759,9 +7772,9 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   white-space: nowrap;
 }
 .orgc-ext-icon { font-size: 11px; }
-.orgc-ext-name { font-size: 11.5px; font-weight: 800; color: #92400E; }
+.orgc-ext-name { font-size: 11.5px; font-weight: 800; color: #92590a; }
 .orgc-ext-note { font-size: 9px; font-weight: 600; color: #b08a4e; }
-.orgc-ext.orgc-search-match { outline: 3px solid #f59e0b; outline-offset: 2px; }
+.orgc-ext.orgc-search-match { outline: 3px solid #c07a14; outline-offset: 2px; }
 .orgc-ext.orgc-search-dim { opacity: .22; }
 
 /* ── ★ 2026-09-27 (v5): رأس فرع كل منطقة (العقدة في القمة، depth=0) —
@@ -7771,7 +7784,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
    (بدون أي اسم أو بيانات منه إطلاقًا). الهدف: العين توصل على طول لرأس
    كل منطقة وسط الشجرة، بالظبط زي ما بيبان في القالب المرجعي. ──────── */
 .orgc-root-node > .orgc-card {
-  background: linear-gradient(155deg, #0f2a37, #0b6b7e);
+  background: linear-gradient(155deg, #0d2f40, #0b6b7e);
   border-color: #0b6b7e;
   border-inline-start-color: #0ea5b8;
   box-shadow: 0 4px 10px rgba(11,53,66,.22), 0 10px 26px rgba(11,53,66,.18);
@@ -7779,13 +7792,13 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-root-node > .orgc-card .orgc-card-name { color: #fff; }
 .orgc-root-node > .orgc-card .orgc-card-title { color: #bfe9ee; }
 .orgc-root-node > .orgc-card .orgc-card-foot { border-top-color: rgba(255,255,255,.18); }
-.orgc-root-node > .orgc-card .orgc-avatar { background: linear-gradient(160deg,#12414f,#0b6b7e); border-color: #7fd4de; color: #fff; }
+.orgc-root-node > .orgc-card .orgc-avatar { background: linear-gradient(160deg,#163d52,#0b6b7e); border-color: #7fd4de; color: #fff; }
 .orgc-root-node > .orgc-card .orgc-card-tag { background: rgba(255,255,255,.16); color: #eaf9fb; }
 .orgc-root-node > .orgc-card.orgc-status-active .orgc-card-status { color: #8ef0c4; }
 .orgc-root-node > .orgc-card.orgc-status-active .orgc-status-dot { background: #34d399; }
 
 .orgc-root-node > .orgc-ext {
-  background: linear-gradient(155deg, #0f2a37, #0b6b7e);
+  background: linear-gradient(155deg, #0d2f40, #0b6b7e);
   border: 1.5px solid #0ea5b8;
   padding: 9px 16px;
 }
@@ -7877,9 +7890,9 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 .orgc-kpi b { font-size: 14px; font-weight: 800; }
 .orgc-kpi small { font-size: 10px; font-weight: 600; opacity: .82; }
-.orgc-kpi-occ b { color: #86efac; }
+.orgc-kpi-occ b { color: #b4d2cb; }
 .orgc-kpi-vac b { color: #fca5a5; }
-.orgc-kpi-pct b { color: #7dd3fc; }
+.orgc-kpi-pct b { color: #cfe6eb; }
 .orgc-coverage-track {
   height: 6px;
   border-radius: 999px;
@@ -7889,7 +7902,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-coverage-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #16a34a, #4ade80);
+  background: linear-gradient(90deg, #066a52, #4ade80);
 }
 
 /* ── شريط "انتقال سريع" بين بانلات المناطق — مستوحى من org-jump في
@@ -7900,7 +7913,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   gap: 8px;
   margin-bottom: 18px;
   padding: 10px 12px;
-  background: #f8fafc;
+  background: #f7fafc;
   border: 1px solid var(--bd-light, #dbe7ee);
   border-radius: 999px;
   position: sticky;
@@ -7911,15 +7924,15 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-family: inherit;
   font-size: 11.5px;
   font-weight: 700;
-  color: #475569;
+  color: #52707e;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe7ee;
   border-radius: 999px;
   padding: 6px 14px;
   cursor: pointer;
   transition: all .15s ease;
 }
-.orgc-jump-btn:hover { border-color: #94a3b8; }
+.orgc-jump-btn:hover { border-color: #8aa1ad; }
 .orgc-jump-btn.active {
   color: #fff;
   background: linear-gradient(155deg, var(--teal-3, #0b6b7e), var(--teal, #0d849c));
@@ -7937,15 +7950,15 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 20px;
-  background: #f8fafc;
+  background: #f7fafc;
   border-bottom: 1px solid var(--bd-light, #dbe7ee);
 }
 .orgc-zoom-btn {
   width: 26px; height: 26px;
   border-radius: 50%;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe7ee;
   background: #fff;
-  color: #475569;
+  color: #52707e;
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
@@ -7954,9 +7967,9 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-family: inherit;
   padding: 0;
 }
-.orgc-zoom-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+.orgc-zoom-btn:hover { border-color: #8aa1ad; background: #eef3f7; }
 .orgc-zoom-label {
-  font-size: 11px; font-weight: 700; color: #64748b;
+  font-size: 11px; font-weight: 700; color: #52707e;
   min-width: 38px; text-align: center;
 }
 .orgc-zoom-fit-btn {
@@ -7964,13 +7977,13 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-size: 11px;
   font-weight: 700;
   color: var(--teal-3, #0b6b7e);
-  background: #eaf7f8;
+  background: #eef3f7;
   border: 1px solid #bfe3e8;
   border-radius: 999px;
   padding: 5px 12px;
   cursor: pointer;
 }
-.orgc-zoom-fit-btn:hover { background: #d9f0f2; }
+.orgc-zoom-fit-btn:hover { background: #eaf6fa; }
 .orgc-scrollhint {
   font-size: 10.5px;
   font-weight: 700;
@@ -8018,8 +8031,8 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
    "✏️ تعديل" في الشريط العلوي، وزرار ✏️ صغير على كل كارت (يبان بس
    لما وضع التعديل مفعّل)، ومودال عام للباسورد/الفورم. ───────────── */
 #orgc-editmode-btn.active {
-  background: #b45309;
-  border-color: #b45309;
+  background: #92590a;
+  border-color: #92590a;
   color: #fff;
 }
 .orgc-edit-btn {
@@ -8029,17 +8042,17 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   right: 6px;
   width: 22px; height: 22px;
   border-radius: 50%;
-  border: 1px solid #e7ecf1;
+  border: 1px solid #dbe7ee;
   background: #fff;
   font-size: 11px;
   align-items: center; justify-content: center;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(15,23,42,.12);
+  box-shadow: 0 1px 3px rgba(12,35,48,.12);
   padding: 0;
   z-index: 2;
 }
-.orgc-edit-btn:hover { background: #eaf7f8; border-color: #0b6b7e; }
-#org-view-chart.orgc-edit-mode .orgc-card { outline: 1.5px dashed rgba(180,83,9,.35); outline-offset: 2px; }
+.orgc-edit-btn:hover { background: #eef3f7; border-color: #0b6b7e; }
+#org-view-chart.orgc-edit-mode .orgc-card { outline: 1.5px dashed rgba(146,89,10,.35); outline-offset: 2px; }
 #org-view-chart.orgc-edit-mode .orgc-edit-btn { display: flex; }
 
 .orgc-local-edits-row {
@@ -8052,9 +8065,9 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 .orgc-local-edits-badge {
   font-size: 11px;
   font-weight: 700;
-  color: #b45309;
-  background: #FFFBEB;
-  border: 1px solid #FDE68A;
+  color: #92590a;
+  background: #fdf6ec;
+  border: 1px solid #ecd7b8;
   border-radius: 999px;
   padding: 5px 12px;
 }
@@ -8062,21 +8075,21 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   font-family: inherit;
   font-size: 10.5px;
   font-weight: 700;
-  color: #64748b;
+  color: #52707e;
   background: none;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed #b9d0db;
   border-radius: 999px;
   padding: 4px 10px;
   cursor: pointer;
 }
-.orgc-local-edits-clear:hover { color: #b91c1c; border-color: #b91c1c; }
+.orgc-local-edits-clear:hover { color: #9c2a3a; border-color: #9c2a3a; }
 
 /* ── مودالات عامة (باسورد / فورم تعديل صف) — مستقلة عن مودال باسورد
    شعار Land Sterling (خاص بشاشة الدخول)، بنفس روح ألوان الصفحة. ──── */
 .orgc-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15,23,42,.55);
+  background: rgba(12,35,48,.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8095,22 +8108,22 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   box-shadow: 0 20px 50px rgba(0,0,0,.3);
   font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
 }
-.orgc-modal-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-.orgc-modal-sub { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
+.orgc-modal-title { font-size: 16px; font-weight: 800; color: #0c2330; margin-bottom: 4px; }
+.orgc-modal-sub { font-size: 12px; color: #52707e; margin-bottom: 16px; line-height: 1.6; }
 .orgc-modal-input {
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 14px;
   padding: 10px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe7ee;
   border-radius: 10px;
   outline: none;
   margin-bottom: 6px;
 }
 .orgc-modal-input:focus { border-color: #0b6b7e; box-shadow: 0 0 0 3px rgba(11,107,126,.12); }
-.orgc-modal-error { font-size: 11.5px; color: #b91c1c; font-weight: 700; margin-bottom: 8px; }
-.orgc-modal-note { font-size: 11px; color: #94a3b8; margin: 4px 0 12px; line-height: 1.6; }
+.orgc-modal-error { font-size: 11.5px; color: #9c2a3a; font-weight: 700; margin-bottom: 8px; }
+.orgc-modal-note { font-size: 11px; color: #8aa1ad; margin: 4px 0 12px; line-height: 1.6; }
 .orgc-modal-actions { display: flex; gap: 10px; margin-top: 12px; }
 .orgc-modal-btn {
   flex: 1;
@@ -8124,8 +8137,8 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 .orgc-modal-btn-primary { background: #0b6b7e; color: #fff; }
 .orgc-modal-btn-primary:hover { background: #095a6a; }
-.orgc-modal-btn-secondary { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-.orgc-modal-btn-secondary:hover { background: #e2e8f0; }
+.orgc-modal-btn-secondary { background: #eef3f7; color: #52707e; border-color: #dbe7ee; }
+.orgc-modal-btn-secondary:hover { background: #dbe7ee; }
 
 .orgc-edit-form { display: flex; flex-direction: column; gap: 10px; }
 .orgc-edit-form label {
@@ -8134,16 +8147,16 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   gap: 4px;
   font-size: 11.5px;
   font-weight: 700;
-  color: #475569;
+  color: #52707e;
 }
 .orgc-edit-form input[type="text"],
 .orgc-edit-form select {
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
-  color: #0f172a;
+  color: #0c2330;
   padding: 9px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe7ee;
   border-radius: 8px;
   outline: none;
 }
@@ -8158,7 +8171,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   bottom: 24px;
   transform: translate(-50%, 12px);
   max-width: min(90vw, 520px);
-  background: #0f172a;
+  background: #0c2330;
   color: #fff;
   font-family: 'IBM Plex Sans Arabic', Tajawal, sans-serif;
   font-size: 12.5px;
@@ -8175,7 +8188,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
 }
 .orgc-toast.orgc-toast-show { opacity: 1; transform: translate(-50%, 0); }
 .orgc-toast-ok { background: #0b6b7e; }
-.orgc-toast-warn { background: #b45309; }
+.orgc-toast-warn { background: #92590a; }
 
 /* ═══ PORTAL HOME v4 — START ═══
    ★ 2026-09-26 — إعادة تصميم الواجهة الرئيسية (الصفحة اللي فيها كل الكروت) بناءً على
@@ -8226,7 +8239,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   background:
     radial-gradient(760px 300px at 100% -30%, rgba(34, 170, 196, .30), transparent 62%),
     radial-gradient(620px 300px at -5% 130%, rgba(22, 164, 191, .16), transparent 62%),
-    linear-gradient(135deg, #0a2637 0%, #0f3a51 52%, #0b2f44 100%);
+    linear-gradient(135deg, #0d2f40 0%, #163d52 52%, #0d2f40 100%);
   background-size: auto;
   box-shadow: 0 1px 2px rgba(8, 30, 43, .18), 0 22px 44px -18px rgba(8, 30, 43, .55);
   animation: none;
@@ -8582,7 +8595,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   gap: 0;
   padding: 4px 9px;
   border-radius: 7px;
-  background: #f3f6f8;
+  background: #eef3f7;
   border: 1px solid rgba(15, 37, 51, .06);
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 11.5px;
@@ -8664,7 +8677,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   height: 36px;
   padding: 0 18px;
   border-radius: 10px;
-  background: #0f3a51;
+  background: #163d52;
   font-size: 12.5px;
 }
 #portal-home .portal-favorites-cta-btn:hover,
@@ -8760,7 +8773,7 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   border-radius: 8px;
   border: 1px solid var(--ph-line-2);
   border-bottom-width: 2px;
-  background: #f6f8fa;
+  background: #f7fafc;
   color: var(--ph-muted);
   font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
   font-size: 12px;
@@ -8843,8 +8856,8 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   --nv-teal-2: #16a4bf;
   --nv-ink: #0c2330;
   --nv-muted: #5f7784;
-  --nv-line: #dbe5ec;
-  --nv-soft: #f3f7fa;
+  --nv-line: #dbe7ee;
+  --nv-soft: #f7fafc;
   --nv-ease: cubic-bezier(.2, .8, .2, 1);
 }
 
@@ -8870,12 +8883,12 @@ details[open] > summary .org-node .org-node-arrow { transform: rotate(90deg); }
   height: 40px; padding: 0 14px; border-radius: 12px;
   display: inline-flex; align-items: center; gap: 7px;
   border: 1px solid rgba(13, 132, 156, .25);
-  background: linear-gradient(180deg, #f2fafc, #e6f4f8);
+  background: linear-gradient(180deg, #f7fafc, #eef3f7);
   color: var(--nv-teal); font: 700 13px/1 inherit; font-family: inherit; cursor: pointer;
   transition: background .15s, box-shadow .15s, transform .15s;
   z-index: 2;
 }
-#portal-home .portal-search-wrap .portal-dir-btn:hover { background: #dff1f6; box-shadow: 0 4px 12px -4px rgba(13, 132, 156, .45); }
+#portal-home .portal-search-wrap .portal-dir-btn:hover { background: #eaf6fa; box-shadow: 0 4px 12px -4px rgba(13, 132, 156, .45); }
 #portal-home .portal-search-wrap .portal-dir-btn:active { transform: translateY(-50%) scale(.97); }
 #portal-home .portal-search-wrap .portal-dir-btn:focus-visible { outline: 3px solid rgba(22, 164, 191, .45); outline-offset: 2px; }
 #portal-home .portal-search-wrap .portal-dir-btn svg { width: 16px; height: 16px; }
@@ -8905,7 +8918,7 @@ html.navp-lock { overflow: hidden; }
 .navp-head {
   display: flex; align-items: center; gap: 12px;
   padding: 16px 18px; border-bottom: 1px solid var(--nv-line);
-  background: linear-gradient(180deg, #fbfdfe, #fff);
+  background: linear-gradient(180deg, #f7fafc, #fff);
 }
 .navp-search-ico { width: 22px; height: 22px; color: var(--nv-teal); flex-shrink: 0; }
 .navp-search-ico svg { width: 100%; height: 100%; }
@@ -8919,7 +8932,7 @@ html.navp-lock { overflow: hidden; }
   flex-shrink: 0; border: 1px solid var(--nv-line); background: var(--nv-soft); color: var(--nv-muted);
   border-radius: 8px; padding: 5px 9px; font: 700 11px/1 ui-monospace, Consolas, monospace; cursor: pointer;
 }
-.navp-close:hover { background: #e8eef2; color: var(--nv-ink); }
+.navp-close:hover { background: #eef3f7; color: var(--nv-ink); }
 .navp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 16px; scrollbar-width: thin; }
 .navp-foot {
   display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center;
@@ -8947,7 +8960,7 @@ html.navp-lock { overflow: hidden; }
 }
 .navp-chip small { font-weight: 500; color: var(--nv-muted); font-size: 11px; }
 .navp-chip-ico svg, .navp-sec-h svg, .navp-ico svg, .secnav svg.cat-ico-svg, .secnav-menu-item svg, .cat-sidebar-sec-item svg { width: 16px; height: 16px; }
-.navp-chip:hover, .navp-chip.is-active { border-color: rgba(13, 132, 156, .45); background: #f0f9fb; }
+.navp-chip:hover, .navp-chip.is-active { border-color: rgba(13, 132, 156, .45); background: #f7fafc; }
 
 .navp-dir { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .navp-sec { border: 1px solid var(--nv-line); border-radius: 16px; padding: 10px 10px 8px; background: #fff; min-width: 0; }
@@ -8971,7 +8984,7 @@ html.navp-lock { overflow: hidden; }
   display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
   font-size: 11px; color: var(--nv-muted); margin-top: 1px; line-height: 1.5;
 }
-.navp-dir-item:hover, .navp-dir-item.is-active { background: #eef7fa; }
+.navp-dir-item:hover, .navp-dir-item.is-active { background: #eef3f7; }
 .navp-dir-item:hover span, .navp-dir-item.is-active span { color: var(--nv-teal); }
 
 .navp-results { display: flex; flex-direction: column; gap: 3px; }
@@ -8980,11 +8993,11 @@ html.navp-lock { overflow: hidden; }
   border: 1px solid transparent; background: transparent; border-radius: 14px; padding: 10px 12px;
   font-family: inherit; color: var(--nv-ink); cursor: pointer;
 }
-.navp-item.is-active { background: #eef7fa; border-color: rgba(13, 132, 156, .25); }
+.navp-item.is-active { background: #eef3f7; border-color: rgba(13, 132, 156, .25); }
 .navp-ico {
   width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #e8f3f6; color: var(--nv-teal); font-size: 17px;
+  background: #eef3f7; color: var(--nv-teal); font-size: 17px;
 }
 .navp-ico svg { width: 19px; height: 19px; }
 .navp-ico-ai { background: linear-gradient(135deg, #0d2f40, #0d849c); color: #fff; font-size: 16px; }
@@ -9041,7 +9054,7 @@ html.navp-lock { overflow: hidden; }
   border: 0; background: transparent; border-radius: 10px; padding: 8px 10px; cursor: pointer;
   font: 700 13px/1.3 inherit; font-family: inherit; color: var(--nv-ink);
 }
-.secnav-menu-item:hover, .cat-sidebar-sec-item:hover { background: #eef7fa; color: var(--nv-teal); }
+.secnav-menu-item:hover, .cat-sidebar-sec-item:hover { background: #eef3f7; color: var(--nv-teal); }
 .secnav-menu-item.is-current { background: var(--nv-navy); color: #fff; }
 .secnav-find {
   display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
@@ -9138,3 +9151,24 @@ html.navp-lock { overflow: hidden; }
   .navp-backdrop, .navp-box, .secnav-menu.is-open { animation: none !important; }
 }
 /* ═══ NAV v5 — END ═══ */
+
+/* ══════════════════════════════════════════════════════════════════════
+   __COLOR_PHASE1_HOME_QUICKSTATS__ — توحيد كروت الإحصائيات السريعة في الصفحة الرئيسية
+   (قرار: الرقم حبر كحلي هادئ لكل الكروت الأربعة، واللون يظهر في مربع الأيقونة فقط)
+   • كان مربع «إجمالي البلاغات» برتقالي بينما رقمه تيل (تعارض) — صار كحلي من عائلة الهوية.
+   • الثلاثة الأولى (أرقام محايدة): تيل / تيل داكن / كحلي. الرابع (FCA): أخضر لأنه تقييم له حكم.
+   ══════════════════════════════════════════════════════════════════════ */
+#portal-home #portalQuickStats .kpi:nth-child(3) { --st-soft: rgba(22,61,82,.08); --st-bd: rgba(22,61,82,.20); --st-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23163d52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'/%3E%3Cpath d='M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14'/%3E%3Cpath d='M8 6v8'/%3E%3C/svg%3E"); }
+#portal-home #portalQuickStats .kpi .kpi-val { color: var(--navy) !important; }
+/* __COLOR_PHASE2_GREEN__ — #059669/#047857 → #066a52 */
+
+/* __COLOR_PHASE3_FLOAT_CLEARANCE__ — مساحة أسفل الصفحة الرئيسية حتى لا يبقى آخر صف من الكروت تحت دائرة الـAI وزر التنبيه العائمين عند أقصى التمرير */
+#portal-home { padding-bottom: 120px; }
+/* __COLOR_PHASE4_RED__ */
+/* __COLOR_PHASE5_AMBER__ */
+/* __COLOR_PHASE6_PURPLE__ */
+/* __COLOR_PHASE7_BLUE_TEAL__ */
+/* __COLOR_PHASE8_NEUTRALS__ */
+/* __COLOR_PHASE9_TINTS__ */
+/* __COLOR_PHASE10_TAIL__ */
+/* __COLOR_PHASE11_CARDS__ */

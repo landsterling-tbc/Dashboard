@@ -34,6 +34,8 @@
     expand:      '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
     collapse:    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
     comment:     '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    'arrow-up':  '<path d="m18 15-6-6-6 6"/>',
+    'arrow-down':'<path d="m6 9 6 6 6-6"/>',
     trash2:      '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
   };
 
@@ -404,7 +406,7 @@
     footer.innerHTML =
       '<div class="ac-input-shell">' +
         '<textarea class="ac-input" id="ac-input" rows="1" maxlength="' + AC_MAX_CHARS + '" ' +
-          'placeholder="اسأل عن أي بيانات في اللوحة… مثلاً: كم بلاغ مفتوح في جدة؟" aria-label="اكتب سؤالك"></textarea>' +
+          'placeholder="اسأل عن أي بيانات في اللوحة…" aria-label="اكتب سؤالك"></textarea>' +
         '<span class="ac-char-count" id="ac-char-count" aria-hidden="true"></span>' +
         '<button class="ac-send" type="button" id="ac-send-btn" aria-label="إرسال">' + svg('send') + '</button>' +
       '</div>' +
@@ -820,6 +822,7 @@
       startThinking();
       pullLiveData();
       acRestoreHistoryOnce();
+      acRefreshSuggestions();   /* __AICORE_V6_SUGGEST__ */
       /* المستخدم يريد أن تنزل الواجهة عند فتح الشات مباشرة إلى منطقة المحادثة
          (الرسائل/صندوق الكتابة) بدل البقاء فوق عند أقسام الملخص. نمرّر فوراً،
          ثم مرة أخرى بعد تسوية الـlayout (صور/خطوط/رسوم قد تُغيّر الارتفاع). */
@@ -1160,6 +1163,60 @@
       }, { passive: true });
     });
 
+    /* ── __AICORE_V6_SCROLLNAV__ ── زرارا "لأول المحادثة" و"لآخر المحادثة" ──
+       في وضع المحادثة (ac-has-chat) الحاوية اللي بتتحرك فعليًا هي .ac-body
+       (الـthread بيبقى overflow:visible). الزرارين عنصر sticky صفره الارتفاع
+       في آخر الـbody عشان يفضلوا ثابتين على حافة منطقة التمرير. */
+    var acScrollNav = el('div', 'ac-scrollnav');
+    acScrollNav.innerHTML =
+      '<div class="ac-scrollnav-in">' +
+        '<button type="button" class="ac-sn-btn ac-sn-top" aria-label="الانتقال إلى أول المحادثة" title="إلى أول المحادثة">' + svg('arrow-up') + '</button>' +
+        '<button type="button" class="ac-sn-btn ac-sn-bottom" aria-label="الانتقال إلى آخر المحادثة" title="إلى آخر المحادثة">' + svg('arrow-down') + '<i class="ac-sn-dot" aria-hidden="true"></i></button>' +
+      '</div>';
+    body.appendChild(acScrollNav);
+    var acSnTop = acScrollNav.querySelector('.ac-sn-top');
+    var acSnBottom = acScrollNav.querySelector('.ac-sn-bottom');
+    function acReduceMotion() {
+      try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
+    }
+    function acSnUpdate() {
+      if (!acScrollNav) return;
+      var has = panel.classList.contains('ac-has-chat');
+      var overflow = body.scrollHeight - body.clientHeight;
+      var fromTop = body.scrollTop;
+      var fromBottom = body.scrollHeight - body.scrollTop - body.clientHeight;
+      var showTop = has && overflow > 160 && fromTop > 120;
+      var showBottom = has && overflow > 160 && fromBottom > 120;
+      acSnTop.classList.toggle('ac-sn-on', showTop);
+      acSnBottom.classList.toggle('ac-sn-on', showBottom);
+      /* نقطة التنبيه: الرد لسه بيتكتب تحت والمستخدم قاعد بيقرا فوق (التمرير التلقائي
+         أثناء الكتابة ما بيشدّوش — راجع acScrollToBottom(false)) */
+      if (fromBottom <= 120) acScrollNav.classList.remove('ac-sn-new');
+      else if (acGenerating && has) acScrollNav.classList.add('ac-sn-new');
+    }
+    var acSnRaf = 0;
+    function acSnSchedule() {
+      if (acSnRaf) return;
+      acSnRaf = requestAnimationFrame(function() { acSnRaf = 0; acSnUpdate(); });
+    }
+    body.addEventListener('scroll', acSnSchedule, { passive: true });
+    if (typeof ResizeObserver === 'function') {
+      try { var acSnRo = new ResizeObserver(acSnSchedule); acSnRo.observe(body); if (threadEl) acSnRo.observe(threadEl); } catch (_) {}
+    }
+    window.addEventListener('resize', acSnSchedule);
+    acSnTop.addEventListener('click', function() {
+      var first = threadEl && threadEl.firstElementChild;
+      var top = first ? Math.max(0, first.offsetTop - 8) : 0;
+      /* لو الملخص التنفيذي ظاهر فوق المحادثة، "أول المحادثة" = أول رسالة، مش أول البانل */
+      acStickBottom = false;
+      body.scrollTo({ top: top, behavior: acReduceMotion() ? 'auto' : 'smooth' });
+    });
+    acSnBottom.addEventListener('click', function() {
+      acStickBottom = true;
+      acScrollNav.classList.remove('ac-sn-new');
+      body.scrollTo({ top: body.scrollHeight, behavior: acReduceMotion() ? 'auto' : 'smooth' });
+    });
+
     /* ── ★ تعليق المستخدم على رد الشات بوت ──
        المستخدم يقدر يكتب تعليقًا/ملاحظة (مثلاً تصحيح) على أي رد، ويتحفظ
        محليًا (localStorage) ويظهر كملاحظة مثبّتة تحت الرد نفسه، حتى بعد
@@ -1331,6 +1388,240 @@
       });
     }
 
+    /* ── __AICORE_V6_SUGGEST__ ── اقتراحات سريعة تتغير حسب التبويب المفتوح ──
+       الأسئلة العامة الأصلية بتفضل هي الاحتياطي (الصفحة الرئيسية، أو تبويب
+       مالوش اقتراحات). التحديث بيحصل عند فتح النافذة فقط، وفقط طالما
+       الاقتراحات ظاهرة (يعني قبل أول رسالة) — مابنلمسش محادثة جارية. */
+    var AC_TAB_SUGGEST = {
+      "overview": [
+        "لخّص أهم المؤشرات في النظرة العامة",
+        "ما أبرز نقاط الخطر التي تحتاج متابعة؟",
+        "كم عدد المدارس حسب المحافظة؟"
+      ],
+      "stages": [
+        "كم عدد المدارس في كل مرحلة دراسية؟",
+        "ما المرحلة الأعلى في عدد البلاغات؟"
+      ],
+      "students": [
+        "ما متوسط عمر المباني المدرسية؟",
+        "أي المدارس الأعلى كثافة طلابية؟"
+      ],
+      "fca": [
+        "اعرض أسوأ عشر مدارس في FCA",
+        "ما متوسط درجة FCA حسب المحافظة؟",
+        "أي الأنظمة الأعلى تكلفة إصلاح؟"
+      ],
+      "stage-compare": [
+        "قارن درجات FCA بين المراحل الدراسية",
+        "أي مرحلة دراسية حالتها الأضعف؟"
+      ],
+      "fca-ref": [
+        "اشرح مرجع تقييم FCA المعروض",
+        "ما معنى درجات الحالة في FCA؟"
+      ],
+      "sys-main": [
+        "ما أضعف الأنظمة الرئيسية في FCA؟",
+        "كم تبلغ تكلفة إصلاح كل نظام رئيسي؟"
+      ],
+      "sys-detail": [
+        "ما الأنظمة التفصيلية الأسوأ حالة؟",
+        "أي الأنظمة التفصيلية تتكرر فيها الملاحظات؟"
+      ],
+      "asol": [
+        "لخّص نتائج تقييم منصة أصول",
+        "أي المدارس الأقل تقييمًا في أصول؟"
+      ],
+      "ayen": [
+        "لخّص نتائج تقييم عاين",
+        "أي المدارس لديها أكثر ملاحظات في عاين؟"
+      ],
+      "env": [
+        "ما متوسط درجة البيئة المدرسية؟",
+        "أي المدارس الأقل في البيئة المدرسية؟"
+      ],
+      "elevators": [
+        "كم عدد المصاعد المتوقفة أو المعطلة؟",
+        "أي المدارس فيها أكثر مصاعد معطلة؟"
+      ],
+      "khanadeq": [
+        "كم عدد خنادق الصرف المسجلة وما حالتها؟",
+        "أي المدارس تحتاج أعمال خنادق الصرف؟"
+      ],
+      "spare": [
+        "ما قطع الغيار الأكثر طلبًا؟",
+        "ما حالة مخزون قطع الغيار؟"
+      ],
+      "ppm-maximo": [
+        "ما نسبة إنجاز الصيانة الوقائية؟",
+        "كم أمر صيانة وقائية متأخر؟"
+      ],
+      "balagh": [
+        "كم عدد البلاغات المفتوحة والمتأخرة؟",
+        "ما أكثر المدارس بلاغات؟",
+        "ما متوسط زمن إغلاق البلاغ؟"
+      ],
+      "balagh-subcat": [
+        "ما أكثر الفئات الفرعية تكرارًا في البلاغات؟",
+        "أي فئة فرعية ارتفعت مؤخرًا؟"
+      ],
+      "security-safety": [
+        "كم بلاغ أمن وسلامة مفتوح؟",
+        "ما أكثر أنواع بلاغات الأمن والسلامة؟"
+      ],
+      "security-safety-summary": [
+        "لخّص ملخص الأمن والسلامة",
+        "أين تتركز بلاغات الأمن والسلامة؟"
+      ],
+      "new-sla": [
+        "ما نسبة الالتزام باتفاقية مستوى الخدمة SLA؟",
+        "كم بلاغ تجاوز مدة SLA؟"
+      ],
+      "gatekeepers": [
+        "كم عدد البوابين وكيف يتوزعون؟",
+        "أي المدارس بلا بوّاب؟"
+      ],
+      "supervisors": [
+        "كم عدد المشرفين والمهندسين؟",
+        "كيف يتوزع المشرفون على المناطق؟"
+      ],
+      "training": [
+        "ما برامج التدريب المنفذة حتى الآن؟",
+        "كم عدد المتدربين في كل برنامج؟"
+      ],
+      "vehicles": [
+        "كم عدد السيارات وما حالتها؟",
+        "أي السيارات تحتاج صيانة أو تجديدًا؟"
+      ],
+      "fuel": [
+        "ما إجمالي استهلاك الوقود؟",
+        "أي السيارات الأعلى استهلاكًا للوقود؟"
+      ],
+      "correspondence": [
+        "ما آخر المراسلات المسجلة؟",
+        "كم مراسلة لم يُرد عليها بعد؟"
+      ],
+      "org-structure": [
+        "اشرح الهيكل الوظيفي المعروض",
+        "كم عدد الوظائف الشاغرة؟"
+      ],
+      "visits": [
+        "كم زيارة تمت هذا الشهر؟",
+        "أي المدارس لم تُزر بعد؟"
+      ],
+      "tajheez-contracts": [
+        "لخّص عقود التجهيزات",
+        "ما قيمة عقود التجهيزات الحالية؟"
+      ],
+      "tajheez": [
+        "ما الفرق بين المخصص والاحتياج؟",
+        "أي المدارس احتياجها أعلى من المخصص؟"
+      ],
+      "tajheez-supplies": [
+        "ما حالة التوريدات حتى الآن؟",
+        "ما نسبة ما تم توريده؟"
+      ],
+      "nashat-badani": [
+        "لخّص مبادرة النشاط البدني",
+        "كم مدرسة شملتها المبادرة؟"
+      ],
+      "hasr": [
+        "كم عدد الأصول المحصورة؟",
+        "أي المدارس لم يكتمل حصر أصولها؟"
+      ],
+      "cost": [
+        "ما إجمالي التكلفة حتى الآن؟",
+        "ما أعلى بنود التكلفة؟"
+      ],
+      "ls-payments": [
+        "ما إجمالي مدفوعات LS؟",
+        "ما حالة عقود LS؟"
+      ],
+      "contractor-payments": [
+        "ما إجمالي مدفوعات المقاولين؟",
+        "أي المقاولين الأعلى مدفوعات؟"
+      ],
+      "petty-cash": [
+        "ما إجمالي مصروفات العهدة؟",
+        "أين توجد بيانات العهدة والمصروفات؟"
+      ],
+      "map": [
+        "كيف تتوزع المدارس على الخريطة؟",
+        "أي المناطق الأكثر كثافة بالمدارس؟"
+      ],
+      "table": [
+        "ما الأعمدة المتاحة في الجدول التفصيلي؟",
+        "اعرض أول عشر مدارس في الجدول"
+      ],
+      "mag-kpi": [
+        "كيف أداء المقاول حسب المؤشرات؟",
+        "أي المؤشرات دون المستهدف؟"
+      ],
+      "consultant-kpi": [
+        "كيف أداء الاستشاري حسب المؤشرات؟",
+        "أي المؤشرات دون المستهدف؟"
+      ]
+    };
+    var acDefaultSuggest = quickRepliesEl ? Array.prototype.map.call(quickRepliesEl.querySelectorAll('.ac-qr-pill'), function(b) { return b.textContent.trim(); }) : [];
+    var acLastSuggestKey = null;
+    function acTabLabel(name) {
+      try {
+        if (typeof PORTAL_CATEGORIES !== 'undefined') {
+          for (var k in PORTAL_CATEGORIES) {
+            var ts = PORTAL_CATEGORIES[k].tabs || [];
+            for (var i = 0; i < ts.length; i++) if (ts[i].name === name) return ts[i].label;
+          }
+        }
+      } catch (_) {}
+      return window.__ACTIVE_TAB_LABEL__ || name;
+    }
+    function acActiveTabForSuggest() {
+      var home = document.getElementById('portal-home');
+      if (home && home.offsetParent !== null) return null;     /* الصفحة الرئيسية ظاهرة */
+      var n = window.__ACTIVE_TAB__;
+      return (typeof n === 'string' && n) ? n : null;
+    }
+    function acBuildSuggestions(name) {
+      if (!name) return null;
+      var label = acTabLabel(name);
+      var list = (AC_TAB_SUGGEST[name] || []).slice();
+      if (!list.length && !/^sys-/.test(name) && label === name) return null;   /* مفيش اسم مفهوم → الاحتياطي */
+      if (/^sys-/.test(name) && !AC_TAB_SUGGEST[name]) {
+        list.push('اشرح نظام ' + label + ' وما بياناته المتاحة في اللوحة');
+      }
+      if (list.length < 3) list.push('لخّص أهم ما يعرضه تبويب «' + label + '»');
+      list.push('ما أبرز الملاحظات أو المخاطر في «' + label + '»؟');
+      list.push('ما هي البيانات المتاحة في اللوحة كاملةً؟');
+      var seen = {}, out = [];
+      list.forEach(function(t) { if (!seen[t] && out.length < 6) { seen[t] = 1; out.push(t); } });
+      return out;
+    }
+    function acBindPill(btn) {
+      btn.addEventListener('click', function() { sendToAI(btn.textContent.trim()); });
+    }
+    function acRefreshSuggestions() {
+      if (!quickRepliesEl || quickRepliesEl.style.display === 'none') return;
+      var name = acActiveTabForSuggest();
+      var key = name || '';
+      if (key === acLastSuggestKey) return;
+      acLastSuggestKey = key;
+      var items = acBuildSuggestions(name);
+      var ctxLabel = null;
+      if (!items) { items = acDefaultSuggest; }
+      else { ctxLabel = acTabLabel(name); }
+      quickRepliesEl.innerHTML = '';
+      if (ctxLabel) {
+        var cap = el('div', 'ac-qr-ctx');
+        cap.textContent = 'اقتراحات لتبويب «' + ctxLabel + '»';
+        quickRepliesEl.appendChild(cap);
+      }
+      items.forEach(function(t) {
+        var b = el('button', 'ac-qr-pill', t);
+        b.type = 'button';
+        quickRepliesEl.appendChild(b);
+        acBindPill(b);
+      });
+    }
+
     // ★ 2026-09-27: زرارا "حذف المحادثة" و"تكبير/تصغير النافذة" اتشالوا
     // من الشريط العلوي (تبسيط بناءً على طلب صريح)، وبالتالي كودهم
     // اتشال من هنا كمان بدل ما يفضل كود ميت بيدور على عناصر مش موجودة.
@@ -1434,6 +1725,14 @@
       step();
     }
 
+    /* __AICORE_V5_PHASE2_LIVE__ — حالة الاتصال في الهيدر تعكس آخر محاولة فعلية (متصل / غير متصل) */
+    function acSetLive(ok) {
+      var item = hero.querySelector('.ac-status-item.ac-live');
+      if (!item) return;
+      var v = item.querySelector('.ac-si-value');
+      item.classList.toggle('ac-offline', !ok);
+      if (v && v.lastChild && v.lastChild.nodeType === 3) v.lastChild.nodeValue = ok ? 'متصل' : 'غير متصل';
+    }
     function sendToAI(presetText, opts) {
       opts = opts || {};
       var text = (typeof presetText === 'string' ? presetText : (inputEl ? inputEl.value : '')).trim();
@@ -1480,10 +1779,12 @@
 
       window.fcbAskOpenAI(text).then(function(reply) {
         acHideTyping();
+        acSetLive(true);
         if (acStreamAbort) { acSetSendMode('send'); stopThinking('جاهز'); return; }
         acStreamReply(reply);
       }).catch(function(err) {
         acHideTyping();
+        if (!(err && err.name === 'AbortError')) acSetLive(false);
         if (acStreamAbort) { acSetSendMode('send'); stopThinking('جاهز'); return; }
         stopThinking('جاهز');
         acSetSendMode('send');
@@ -1675,8 +1976,9 @@
       function stash(html) { placeholders.push(html); return '\x00P' + (placeholders.length - 1) + '\x00'; }
       esc = esc.replace(cmtRe, function(m) { return stash('<span class="ac-hl-comment">' + m + '</span>'); });
       esc = esc.replace(strRe, function(m) { return stash('<span class="ac-hl-string">' + m + '</span>'); });
-      esc = esc.replace(numRe, function(m) { return '<span class="ac-hl-number">' + m + '</span>'; });
-      esc = esc.replace(AC_HL_KEYWORDS, function(m) { return '<span class="ac-hl-keyword">' + m + '</span>'; });
+      /* __AICORE_V5_PHASE34_JS__ — الأرقام والكلمات المفتاحية تُخزَّن أيضًا كعناصر مؤقتة، حتى لا تُطابَق كلمة class داخل وسم span سبق إنشاؤه فتتسرّب الوسوم للنص */
+      esc = esc.replace(numRe, function(m) { return stash('<span class="ac-hl-number">' + m + '</span>'); });
+      esc = esc.replace(AC_HL_KEYWORDS, function(m) { return stash('<span class="ac-hl-keyword">' + m + '</span>'); });
       esc = esc.replace(/\x00P(\d+)\x00/g, function(_, idx) { return placeholders[idx]; });
       return esc;
     }

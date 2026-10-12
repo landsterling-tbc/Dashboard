@@ -1449,3 +1449,162 @@
 /* ══ نهاية AI CORE — LOOK v4 ══ */
 
 #aicore-root #aicore-panel .ac-input:focus-visible { outline: none; box-shadow: none; }
+
+/* __AICORE_V5_PHASE1_ORB__ */
+/* المرحلة 1 — الأيقونة العائمة (برا): إزاحة آمنة للشاشات ذات الحواف، وتلميح نصي عند التمرير/التركيز، وحلقة تركيز واضحة */
+#aicore-trigger {
+  left: max(22px, env(safe-area-inset-left));
+  bottom: max(22px, env(safe-area-inset-bottom));
+}
+#aicore-trigger::before {
+  content: "اسأل المساعد الذكي";
+  position: absolute; left: calc(100% - 4px); top: 50%;
+  transform: translate(-8px, -50%);
+  padding: 8px 14px; border-radius: 999px; white-space: nowrap;
+  font: 700 12.5px/1 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
+  color: #fff; background: #0d2f40;
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 10px 24px -10px rgba(8, 26, 36, .6);
+  opacity: 0; pointer-events: none; z-index: 5;
+  transition: opacity .2s var(--ac-ease-out), transform .28s var(--ac-ease-out);
+}
+#aicore-trigger:hover::before,
+#aicore-trigger:focus-visible::before { opacity: 1; transform: translate(0, -50%); }
+#aicore-trigger:focus-visible { outline: 3px solid rgba(22, 164, 191, .55); outline-offset: 5px; }
+#aicore-trigger.ac-has-alert::before { content: "لديك تنبيه من المساعد"; background: #9c2a3a; }
+@media (hover: none), (max-width: 520px) {
+  #aicore-trigger::before { display: none; }
+  #aicore-trigger { left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+@media print { #aicore-root { display: none !important; } }
+
+/* __AICORE_V5_PHASE2_HEADER__ */
+/* المرحلة 2 — هيدر البانل: ارتفاع ثابت بلا قفزات، شريط حالة أوضح، وحالة اتصال حقيقية */
+@media (min-width: 521px) {
+  #aicore-root #aicore-panel.ac-expanded {
+    height: min(860px, calc(100dvh - 44px));
+    max-height: none;
+  }
+}
+#aicore-root #aicore-panel .ac-orb { width: 64px; height: 64px; flex-shrink: 0; }
+#aicore-root #aicore-panel .ac-hero-title { min-width: 0; }
+#aicore-root #aicore-panel .ac-hero-title .ac-sub { font-size: 13px; margin-top: 3px; color: rgba(255, 255, 255, .78); }
+#aicore-root #aicore-panel .ac-status-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#aicore-root #aicore-panel .ac-si-label { font-size: 11px; color: rgba(255, 255, 255, .72); letter-spacing: 0; }
+#aicore-root #aicore-panel .ac-si-value { display: flex; align-items: center; gap: 6px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+#aicore-root #aicore-panel .ac-si-value svg { width: 13px; height: 13px; flex: none; }
+#aicore-root #aicore-panel .ac-si-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: 0 0 0 0 rgba(110, 231, 200, .55); animation: acx-live-pulse 2.4s ease-out infinite; }
+#aicore-root #aicore-panel .ac-status-item.ac-live.ac-offline .ac-si-value { color: #f3c677; }
+#aicore-root #aicore-panel .ac-status-item.ac-live.ac-offline .ac-si-dot { background: #f3c677; animation: none; }
+#aicore-root #aicore-panel .ac-presence { font-size: 12.5px; color: rgba(255, 255, 255, .8); }
+#aicore-root #aicore-panel .ac-hero { position: relative; }
+#aicore-root #aicore-panel .ac-hero::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 106, .55), transparent);
+}
+@keyframes acx-live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(110, 231, 200, .5); }
+  70% { box-shadow: 0 0 0 7px rgba(110, 231, 200, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(110, 231, 200, 0); }
+}
+@media (prefers-reduced-motion: reduce) { #aicore-root #aicore-panel .ac-si-dot { animation: none; } }
+@media (max-width: 520px) {
+  #aicore-root #aicore-panel .ac-orb { width: 46px; height: 46px; }
+  #aicore-root #aicore-panel .ac-si-label { font-size: 10px; }
+  #aicore-root #aicore-panel .ac-si-value { font-size: 12px; gap: 4px; }
+  #aicore-root #aicore-panel .ac-si-value svg { display: none; }
+}
+
+/* __AICORE_V5_PHASE3_CHAT__ */
+/* المرحلة 3 — المحادثة: الوقت والأزرار في سطر واحد قريب من الفقاعة، وتباين أفضل للوقت، وحدّ جانبي لرسائل الخطأ */
+#aicore-root #aicore-panel .ac-msg-col { display: grid; align-items: center; row-gap: 3px; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-bot .ac-msg-col { grid-template-columns: 1fr auto auto; column-gap: 8px; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-user .ac-msg-col { grid-template-columns: auto 1fr; column-gap: 8px; }
+#aicore-root #aicore-panel .ac-msg-col > .ac-msg-bubble { grid-column: 1 / -1; grid-row: 1; width: fit-content; max-width: 100%; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-bot .ac-msg-col > .ac-msg-bubble { justify-self: end; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-user .ac-msg-col > .ac-msg-bubble { justify-self: start; }
+#aicore-root #aicore-panel .ac-msg-col > .ac-msg-actions { grid-row: 2; grid-column: 2; margin: 0; }
+#aicore-root #aicore-panel .ac-msg-col > .ac-msg-note-wrap { grid-row: 3; grid-column: 1 / -1; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-bot .ac-msg-col > .ac-msg-time { grid-row: 2; grid-column: 3; }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-user .ac-msg-col > .ac-msg-time { grid-row: 2; grid-column: 1; }
+#aicore-root #aicore-panel .ac-msg-time { font-size: 10.5px; margin: 0; padding: 0 2px; opacity: .85; color: var(--acx-muted, #5f7784); font-variant-numeric: tabular-nums; }
+#aicore-root #aicore-panel .ac-msg-act { width: 26px; height: 26px; }
+#aicore-root #aicore-panel .ac-msg-act svg { width: 13px; height: 13px; }
+#aicore-root #aicore-panel .ac-msg-error .ac-msg-bubble { border-inline-start: 3px solid #9c2a3a; background: #fdf0f2; }
+#aicore-root #aicore-panel .ac-msg-error .ac-msg-bubble::before { background: linear-gradient(90deg, #9c2a3a, #b8425a); }
+#aicore-root #aicore-panel .ac-msg-row.ac-msg-bot .ac-msg-bubble { min-width: min(100%, 440px); }
+#aicore-root #aicore-panel .ac-msg-content pre { max-width: 100%; overflow-x: auto; }
+#aicore-root #aicore-panel .ac-msg-content .ac-table-wrap { max-width: 100%; overflow-x: auto; }
+
+/* __AICORE_V5_PHASE4_FOOTER__ */
+/* المرحلة 4 — الشريط السفلي والاقتراحات: أيقونة SVG بدل الرمز، شكل مدمج، زر إرسال بحسب اتجاه العربية، وحالة الزر الفارغ */
+#aicore-root #aicore-panel .ac-quick-replies { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px; }
+#aicore-root #aicore-panel .ac-qr-pill { padding: 9px 12px; border-radius: 12px; font-size: 13px; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+#aicore-root #aicore-panel .ac-qr-pill:hover { transform: translateY(-1px); }
+#aicore-root #aicore-panel .ac-qr-pill:focus-visible { outline: 3px solid rgba(22, 164, 191, .4); outline-offset: 2px; }
+#aicore-root #aicore-panel .ac-qr-pill::before {
+  content: ""; font-size: 0;
+  background: #e6f4f8 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d849c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z'/%3E%3C/svg%3E") center / 13px no-repeat;
+}
+#aicore-root #aicore-panel .ac-send svg { transform: scaleX(-1); }
+#aicore-root #aicore-panel .ac-input:placeholder-shown ~ .ac-send:not(.ac-send-is-stop) { opacity: .55; box-shadow: none; }
+#aicore-root #aicore-panel .ac-send { cursor: pointer; transition: transform .15s var(--ac-spring), opacity .2s, box-shadow .2s; }
+#aicore-root #aicore-panel .ac-send:hover { transform: translateY(-1px); }
+#aicore-root #aicore-panel .ac-send:focus-visible { outline: 3px solid rgba(22, 164, 191, .5); outline-offset: 2px; }
+#aicore-root #aicore-panel .ac-footer-note { font-size: 11.5px; color: var(--acx-muted, #5f7784); opacity: .9; text-align: center; }
+@media (max-width: 520px) {
+  #aicore-root #aicore-panel .ac-quick-replies { grid-template-columns: 1fr; gap: 6px; }
+  #aicore-root #aicore-panel button.ac-qr-pill:nth-of-type(n+5) { display: none; }
+  #aicore-root #aicore-panel .ac-qr-pill { padding: 9px 11px; font-size: 12.5px; }
+}
+
+
+/* ══ __AICORE_V6_SCROLLNAV__ — أزرار "أول المحادثة / آخر المحادثة" ══ */
+#aicore-root #aicore-panel .ac-scrollnav {
+  position: sticky; bottom: 0; height: 0; margin-top: -16px;   /* يلغي فراغ الـgap بعد آخر عنصر */
+  z-index: 6; pointer-events: none; flex: none;
+}
+#aicore-root #aicore-panel .ac-scrollnav-in {
+  position: absolute; left: 6px; bottom: 12px;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+#aicore-root #aicore-panel .ac-sn-btn {
+  position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.96); color: #0d2f40;
+  border: 1px solid rgba(13,47,64,.14);
+  box-shadow: 0 2px 6px rgba(13,47,64,.14), 0 8px 18px -6px rgba(13,47,64,.28);
+  cursor: pointer; pointer-events: auto;
+  opacity: 0; transform: translateY(6px) scale(.9);
+  transition: opacity .18s ease, transform .18s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+#aicore-root #aicore-panel .ac-sn-btn.ac-sn-on { display: inline-flex; opacity: 1; transform: none; animation: acx-sn-in .2s ease both; }
+@keyframes acx-sn-in { from { opacity: 0; transform: translateY(6px) scale(.9); } to { opacity: 1; transform: none; } }
+#aicore-root #aicore-panel .ac-sn-btn svg { width: 18px; height: 18px; stroke-width: 2.4; }
+#aicore-root #aicore-panel .ac-sn-btn:hover { background: #0d2f40; color: #fff; border-color: #0d2f40; }
+#aicore-root #aicore-panel .ac-sn-btn:active { transform: scale(.94); }
+#aicore-root #aicore-panel .ac-sn-btn:focus-visible { outline: 2px solid #0d849c; outline-offset: 2px; }
+#aicore-root #aicore-panel .ac-sn-dot {
+  display: none; position: absolute; top: -2px; right: -2px; width: 11px; height: 11px;
+  border-radius: 50%; background: #c07a14; border: 2px solid #fff;
+}
+#aicore-root #aicore-panel .ac-scrollnav.ac-sn-new .ac-sn-dot { display: block; }
+@media (max-width: 520px) {
+  #aicore-root #aicore-panel .ac-scrollnav-in { left: 4px; bottom: 10px; }
+  #aicore-root #aicore-panel .ac-sn-btn { width: 38px; height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #aicore-root #aicore-panel .ac-sn-btn, #aicore-root #aicore-panel .ac-sn-btn.ac-sn-on { transition: none; animation: none; }
+}
+@media print { #aicore-root #aicore-panel .ac-scrollnav { display: none; } }
+
+
+/* ══ __AICORE_V6_SUGGEST__ — عنوان الاقتراحات الخاصة بالتبويب ══ */
+#aicore-root #aicore-panel .ac-qr-ctx {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 700; color: #4a6577; line-height: 1.4; padding: 0 2px 2px;
+}
+#aicore-root #aicore-panel .ac-qr-ctx::before {
+  content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: #0d849c;
+}

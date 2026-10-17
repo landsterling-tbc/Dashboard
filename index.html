@@ -41,7 +41,7 @@
 <!-- __EMOJI_ICONS_MODULE__ --><script src="emoji-icons.js?v=20261012"></script>
 <title>لوحة بيانات إدارة المرافق التعليمية | Educational Facilities Management Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="aicore-orb.css">
+<link rel="stylesheet" href="aicore-orb.css?v=20261014">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
@@ -53,7 +53,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
 
-<link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="dashboard.css?v=20261021">
 
 <!-- طبقة التحديث البصري — Executive Theme Layer (v2)
      لا تغيّر أي IDs / منطق JS — تنسيق بصري فقط (ألوان، مسافات، ظلال،
@@ -224,11 +224,8 @@
       screenEl.querySelectorAll(".brand-select-card").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var brand = btn.getAttribute("data-brand");
-          if (brand === "landsterling") {
-            showPasswordStep();
-          } else {
-            enterWithBrand(brand);
-          }
+          // ★ 2026-10-17: أُلغيت كلمة مرور Land Sterling بطلب المستخدم — دخول مباشر.
+          enterWithBrand(brand);
         });
       });
     }
@@ -2479,9 +2476,9 @@
   </div>
 </div>
 
-<script src="dashboard.js" defer></script>
+<script src="dashboard.js?v=20261022" defer></script>
 <script src="balagh-subcat.js" defer></script>
-<script src="report_generator.js?v=20261003" defer></script>
+<script src="report_generator.js?v=20261018a" defer></script>
 
 <!-- ══════════════════════════════════════════════════════════════
      Executive AI Assistant — AI Core Orb (Phase 4)
@@ -2489,5 +2486,5 @@
      API عامة للربط لاحقاً: window.AICore.{open, close, setState,
      setPresenceText, showAlert}
      ══════════════════════════════════════════════════════════════ -->
-<script src="aicore-orb.js" defer></script>
+<script src="aicore-orb.js?v=20261013" defer></script>
 </body></html>
